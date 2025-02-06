@@ -27,16 +27,25 @@
             background-color: #252526;
             border-right: 1px solid #3c3c3c;
         }
+
+        .sidebar.right-sidebar {
+            border-right: none;
+            border-left: 1px solid #3c3c3c;
+            order: 3;
+        }
         
         .panel-container {
             display: flex;
             flex: 1;
             position: relative;
             background-color: #1e1e1e;
+            order: 2;
+            overflow: hidden;
         }
         
         .side-panel {
             width: 250px;
+            height: 100%;
             position: absolute;
             top: 0;
             bottom: 0;
@@ -47,6 +56,18 @@
             background-color: #252526;
             border-right: 1px solid #3c3c3c;
             opacity: 0;
+        }
+
+        .side-panel.right-panel {
+            left: auto;
+            right: 0;
+            transform: translateX(100%);
+            border-right: none;
+            border-left: 1px solid #3c3c3c;
+            position: fixed;
+            top: 0;
+            bottom: 22px; /* Hauteur de la barre de statut */
+            width: 250px;
         }
 
         .side-panel.visible {
@@ -65,6 +86,11 @@
             pointer-events: none;
         }
 
+        .right-panel .resizer {
+            right: auto;
+            left: -5px;
+        }
+
         .side-panel.visible .resizer {
             pointer-events: all;
         }
@@ -77,18 +103,73 @@
         .main-content {
             flex: 1;
             margin-left: 0;
-            transition: margin-left 0.15s ease-out;
+            margin-right: 0;
+            transition: margin-left 0.15s ease-out, margin-right 0.15s ease-out;
             background-color: #1e1e1e;
+            position: relative;
+            z-index: 1;
+            min-width: 0; /* Important pour éviter le débordement */
         }
         
-        .main-content.shifted {
+        .main-content.shifted-left {
             margin-left: 250px;
+        }
+
+        .main-content.shifted-right {
+            margin-right: 250px;
         }
 
         /* Désactiver les transitions pendant le redimensionnement */
         .resizing .side-panel,
         .resizing .main-content {
             transition: none !important;
+        }
+
+        /* Styles pour le chat */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 1rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            background-color: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 0.5rem;
+            color: #fff;
+            resize: none;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #007fd4;
+        }
+
+        .chat-send-button {
+            background-color: #007fd4;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            color: white;
+            cursor: pointer;
+        }
+
+        .chat-send-button:hover {
+            background-color: #1a8ad4;
         }
         
         .status-bar {
@@ -97,40 +178,26 @@
             border-top: 1px solid #3c3c3c;
             color: #cccccc;
         }
-
-        .sidebar-button.active {
-            color: #ffffff;
-            background-color: #37373d;
-        }
-
-        .panel-title {
-            color: #cccccc;
-            text-transform: uppercase;
-            font-size: 11px;
-            font-weight: 600;
-            padding: 0 8px;
-            margin-bottom: 8px;
-        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
     <!-- Main Container -->
     <div class="workspace-container">
-        <!-- Left Sidebar (icons) -->
+        <!-- Left Sidebar -->
         <div class="sidebar bg-gray-800 border-r border-gray-700 flex flex-col">
             <div class="flex-1 flex flex-col items-center py-2 space-y-4">
-                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button active" title="Explorer" data-panel="explorer">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Explorer" data-panel="explorer" data-side="left">
                     <i class="fas fa-folder text-xl"></i>
                 </button>
-                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Search" data-panel="search">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Search" data-panel="search" data-side="left">
                     <i class="fas fa-search text-xl"></i>
                 </button>
-                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Git" data-panel="git">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Git" data-panel="git" data-side="left">
                     <i class="fas fa-code-branch text-xl"></i>
                 </button>
             </div>
             <div class="mt-auto flex flex-col items-center py-2 space-y-4">
-                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings" data-side="left">
                     <i class="fas fa-cog text-xl"></i>
                 </button>
             </div>
@@ -142,25 +209,47 @@
                 <div class="resizer"></div>
                 <div id="explorer-panel" class="h-full p-4">
                     <h2 class="text-sm font-semibold mb-4">EXPLORER</h2>
-                    <!-- Explorer content will go here -->
                 </div>
                 <div id="search-panel" class="h-full p-4 hidden">
                     <h2 class="text-sm font-semibold mb-4">SEARCH</h2>
-                    <!-- Search content will go here -->
                 </div>
                 <div id="git-panel" class="h-full p-4 hidden">
                     <h2 class="text-sm font-semibold mb-4">SOURCE CONTROL</h2>
-                    <!-- Git content will go here -->
                 </div>
                 <div id="settings-panel" class="h-full p-4 hidden">
                     <h2 class="text-sm font-semibold mb-4">SETTINGS</h2>
-                    <!-- Settings content will go here -->
                 </div>
             </div>
 
             <!-- Main Content -->
             <div id="main-content" class="main-content bg-gray-900">
                 <!-- Golden Layout will manage this area -->
+            </div>
+
+            <!-- Right Panel -->
+            <div class="side-panel right-panel bg-gray-800">
+                <div class="resizer"></div>
+                <div id="chat-panel" class="chat-container">
+                    <h2 class="text-sm font-semibold mb-4">CHAT IA</h2>
+                    <div class="chat-messages">
+                        <!-- Les messages du chat apparaîtront ici -->
+                    </div>
+                    <div class="chat-input-container">
+                        <textarea class="chat-input" rows="3" placeholder="Tapez votre message..."></textarea>
+                        <button class="chat-send-button">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar right-sidebar bg-gray-800 flex flex-col">
+            <div class="flex-1 flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Chat IA" data-panel="chat" data-side="right">
+                    <i class="fas fa-comments text-xl"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -180,7 +269,6 @@
     <script src="vendor/golden-layout/goldenlayout.min.js"></script>
     <script>
         function initializeLayout() {
-            // Initialize Golden Layout
             const config = {
                 settings: {
                     showPopoutIcon: false,
@@ -202,7 +290,6 @@
             try {
                 const layout = new GoldenLayout(config, document.getElementById('main-content'));
 
-                // Register welcome component
                 layout.registerComponent('welcome', function(container, state) {
                     const welcomeHtml = `
                         <div class="p-8 max-w-4xl mx-auto">
@@ -249,44 +336,43 @@
                     container.getElement().html(welcomeHtml);
                 });
 
-                // Initialize layout
                 layout.init();
 
-                // Handle window resize
                 window.addEventListener('resize', () => {
                     layout.updateSize();
                 });
 
-                // Store layout in window for later access
                 window.mainLayout = layout;
             } catch (error) {
                 console.error('Golden Layout error:', error);
             }
         }
 
-        // Initialize when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initializeLayout);
         } else {
             initializeLayout();
         }
 
-        // Handle sidebar buttons and resizing
         document.addEventListener('DOMContentLoaded', function() {
-            const sidePanel = document.querySelector('.side-panel');
+            const leftPanel = document.querySelector('.side-panel:not(.right-panel)');
+            const rightPanel = document.querySelector('.side-panel.right-panel');
             const mainContent = document.querySelector('.main-content');
-            const resizer = document.querySelector('.resizer');
-            let activeButton = null;
-            let activePanelId = null;
+            const leftResizer = leftPanel.querySelector('.resizer');
+            const rightResizer = rightPanel.querySelector('.resizer');
+            
+            let activeLeftButton = null;
+            let activeRightButton = null;
+            let activeLeftPanelId = null;
+            let activeRightPanelId = null;
             let isResizing = false;
-            let startX;
-            let startWidth;
+            let activePanel = null;
 
-            function showPanel(panelId) {
-                document.querySelectorAll('.side-panel > div').forEach(panel => {
-                    if (!panel.classList.contains('resizer')) {
-                        panel.classList.add('hidden');
-                    }
+            function showPanel(panelId, isRight) {
+                const targetPanel = isRight ? rightPanel : leftPanel;
+                const panels = targetPanel.querySelectorAll('div[id$="-panel"]');
+                panels.forEach(panel => {
+                    panel.classList.add('hidden');
                 });
                 const panel = document.getElementById(panelId + '-panel');
                 if (panel) {
@@ -294,33 +380,46 @@
                 }
             }
 
-            // Resizer event listeners
-            resizer.addEventListener('mousedown', function(e) {
-                if (!sidePanel.classList.contains('visible')) return; // Ignore si panneau caché
+            function handleResize(e, panel, isRight) {
+                if (!isResizing) return;
                 
-                isResizing = true;
-                startX = e.pageX;
-                startWidth = parseInt(window.getComputedStyle(sidePanel).width, 10);
-                document.body.classList.add('resizing');
-                
-                // Disable transitions during resize
-                sidePanel.style.transition = 'none';
-                mainContent.style.transition = 'none';
-            });
-
-            document.addEventListener('mousemove', function(e) {
-                if (!isResizing || !sidePanel.classList.contains('visible')) return;
-                
-                const width = startWidth + (e.pageX - startX);
-                if (width >= 100 && width <= 800) { // Min et max width
-                    sidePanel.style.width = `${width}px`;
+                if (isRight) {
+                    const maxWidth = Math.min(800, window.innerWidth - 100);
+                    const width = Math.min(maxWidth, Math.max(250, window.innerWidth - e.clientX));
+                    panel.style.width = `${width}px`;
+                    mainContent.style.marginRight = `${width}px`;
+                } else {
+                    const width = Math.min(800, Math.max(250, e.clientX));
+                    panel.style.width = `${width}px`;
                     mainContent.style.marginLeft = `${width}px`;
                 }
                 
-                // Update Golden Layout size
                 if (window.mainLayout) {
                     window.mainLayout.updateSize();
                 }
+            }
+
+            [leftResizer, rightResizer].forEach(resizer => {
+                const isRight = resizer === rightResizer;
+                const panel = isRight ? rightPanel : leftPanel;
+                
+                resizer.addEventListener('mousedown', function(e) {
+                    if (!panel.classList.contains('visible')) return;
+                    
+                    isResizing = true;
+                    activePanel = panel;
+                    document.body.classList.add('resizing');
+                    
+                    panel.style.transition = 'none';
+                    mainContent.style.transition = 'none';
+                    
+                    e.preventDefault();
+                });
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing || !activePanel) return;
+                handleResize(e, activePanel, activePanel === rightPanel);
             });
 
             document.addEventListener('mouseup', function() {
@@ -328,48 +427,71 @@
                     isResizing = false;
                     document.body.classList.remove('resizing');
                     
-                    // Re-enable transitions
-                    sidePanel.style.transition = '';
-                    mainContent.style.transition = '';
+                    if (activePanel) {
+                        activePanel.style.transition = '';
+                        mainContent.style.transition = '';
+                        activePanel = null;
+                    }
                 }
             });
 
-            // Sidebar button event listeners
             document.querySelectorAll('.sidebar-button').forEach(button => {
                 button.addEventListener('click', function() {
                     const panelId = this.dataset.panel;
+                    const isRight = this.dataset.side === 'right';
+                    const panel = isRight ? rightPanel : leftPanel;
+                    const shiftClass = isRight ? 'shifted-right' : 'shifted-left';
                     
-                    if (activeButton === this) {
-                        // Fermeture du panneau
+                    if ((isRight && activeRightButton === this) || (!isRight && activeLeftButton === this)) {
+                        // Fermeture du panneau actif
                         this.classList.remove('active');
-                        sidePanel.classList.remove('visible');
-                        mainContent.classList.remove('shifted');
+                        panel.classList.remove('visible');
+                        mainContent.classList.remove(shiftClass);
                         
-                        // Réinitialisation des styles
-                        sidePanel.style.width = '250px';
-                        mainContent.style.marginLeft = '0';
-                        
-                        activeButton = null;
-                        activePanelId = null;
+                        panel.style.width = '250px';
+                        if (isRight) {
+                            mainContent.style.marginRight = '0';
+                            panel.style.transform = 'translateX(100%)';
+                            activeRightButton = null;
+                            activeRightPanelId = null;
+                        } else {
+                            mainContent.style.marginLeft = '0';
+                            panel.style.transform = 'translateX(-100%)';
+                            activeLeftButton = null;
+                            activeLeftPanelId = null;
+                        }
                     } else {
-                        if (activeButton) {
-                            activeButton.classList.remove('active');
+                        // Fermeture du panneau précédent du même côté s'il existe
+                        if (isRight && activeRightButton) {
+                            activeRightButton.classList.remove('active');
+                            rightPanel.classList.remove('visible');
+                            mainContent.classList.remove('shifted-right');
+                            rightPanel.style.transform = 'translateX(100%)';
+                        } else if (!isRight && activeLeftButton) {
+                            activeLeftButton.classList.remove('active');
+                            leftPanel.classList.remove('visible');
+                            mainContent.classList.remove('shifted-left');
+                            leftPanel.style.transform = 'translateX(-100%)';
                         }
                         
-                        // Ouverture du panneau
+                        // Ouverture du nouveau panneau
                         this.classList.add('active');
-                        sidePanel.classList.add('visible');
-                        mainContent.classList.add('shifted');
+                        panel.classList.add('visible');
+                        mainContent.classList.add(shiftClass);
                         
-                        // Si le panneau a été redimensionné précédemment
-                        const currentWidth = sidePanel.style.width;
-                        if (currentWidth) {
+                        panel.style.transform = 'translateX(0)';
+                        const currentWidth = panel.style.width || '250px';
+                        if (isRight) {
+                            mainContent.style.marginRight = currentWidth;
+                            activeRightButton = this;
+                            activeRightPanelId = panelId;
+                        } else {
                             mainContent.style.marginLeft = currentWidth;
+                            activeLeftButton = this;
+                            activeLeftPanelId = panelId;
                         }
                         
-                        showPanel(panelId);
-                        activeButton = this;
-                        activePanelId = panelId;
+                        showPanel(panelId, isRight);
                     }
 
                     if (window.mainLayout) {
@@ -378,6 +500,35 @@
                         }, 300);
                     }
                 });
+            });
+
+            // Initialisation du chat
+            const chatInput = document.querySelector('.chat-input');
+            const chatSendButton = document.querySelector('.chat-send-button');
+            const chatMessages = document.querySelector('.chat-messages');
+
+            function sendMessage() {
+                const message = chatInput.value.trim();
+                if (message) {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'mb-4';
+                    messageElement.innerHTML = `
+                        <div class="bg-gray-700 rounded p-3 max-w-3/4 ml-auto">
+                            ${message}
+                        </div>
+                    `;
+                    chatMessages.appendChild(messageElement);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    chatInput.value = '';
+                }
+            }
+
+            chatSendButton.addEventListener('click', sendMessage);
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
             });
         });
     </script>
