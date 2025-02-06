@@ -42,20 +42,42 @@
             bottom: 0;
             left: 0;
             transform: translateX(-100%);
-            transition: transform 0.2s ease-in-out;
+            transition: transform 0.15s ease-out;
             z-index: 5;
             background-color: #252526;
             border-right: 1px solid #3c3c3c;
+            opacity: 0;
         }
-        
+
         .side-panel.visible {
             transform: translateX(0);
+            opacity: 1;
+        }
+
+        .resizer {
+            position: absolute;
+            right: -5px;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            cursor: ew-resize;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .side-panel.visible .resizer {
+            pointer-events: all;
+        }
+
+        .resizer:hover, .resizing {
+            background-color: #007fd4;
+            opacity: 0.4;
         }
         
         .main-content {
             flex: 1;
             margin-left: 0;
-            transition: margin-left 0.2s ease-in-out;
+            transition: margin-left 0.15s ease-out;
             background-color: #1e1e1e;
         }
         
@@ -63,6 +85,12 @@
             margin-left: 250px;
         }
 
+        /* Désactiver les transitions pendant le redimensionnement */
+        .resizing .side-panel,
+        .resizing .main-content {
+            transition: none !important;
+        }
+        
         .status-bar {
             height: 22px;
             background-color: #252526;
@@ -111,6 +139,7 @@
         <div class="panel-container">
             <!-- Left Panel -->
             <div class="side-panel bg-gray-800 border-r border-gray-700">
+                <div class="resizer"></div>
                 <div id="explorer-panel" class="h-full p-4">
                     <h2 class="text-sm font-semibold mb-4">EXPLORER</h2>
                     <!-- Explorer content will go here -->
@@ -242,56 +271,111 @@
             initializeLayout();
         }
 
-        // Handle sidebar buttons
+        // Handle sidebar buttons and resizing
         document.addEventListener('DOMContentLoaded', function() {
             const sidePanel = document.querySelector('.side-panel');
             const mainContent = document.querySelector('.main-content');
+            const resizer = document.querySelector('.resizer');
             let activeButton = null;
             let activePanelId = null;
+            let isResizing = false;
+            let startX;
+            let startWidth;
 
             function showPanel(panelId) {
-                // Hide all panels
                 document.querySelectorAll('.side-panel > div').forEach(panel => {
-                    panel.classList.add('hidden');
+                    if (!panel.classList.contains('resizer')) {
+                        panel.classList.add('hidden');
+                    }
                 });
-                // Show selected panel
                 const panel = document.getElementById(panelId + '-panel');
                 if (panel) {
                     panel.classList.remove('hidden');
                 }
             }
 
+            // Resizer event listeners
+            resizer.addEventListener('mousedown', function(e) {
+                if (!sidePanel.classList.contains('visible')) return; // Ignore si panneau caché
+                
+                isResizing = true;
+                startX = e.pageX;
+                startWidth = parseInt(window.getComputedStyle(sidePanel).width, 10);
+                document.body.classList.add('resizing');
+                
+                // Disable transitions during resize
+                sidePanel.style.transition = 'none';
+                mainContent.style.transition = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing || !sidePanel.classList.contains('visible')) return;
+                
+                const width = startWidth + (e.pageX - startX);
+                if (width >= 100 && width <= 800) { // Min et max width
+                    sidePanel.style.width = `${width}px`;
+                    mainContent.style.marginLeft = `${width}px`;
+                }
+                
+                // Update Golden Layout size
+                if (window.mainLayout) {
+                    window.mainLayout.updateSize();
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.classList.remove('resizing');
+                    
+                    // Re-enable transitions
+                    sidePanel.style.transition = '';
+                    mainContent.style.transition = '';
+                }
+            });
+
+            // Sidebar button event listeners
             document.querySelectorAll('.sidebar-button').forEach(button => {
                 button.addEventListener('click', function() {
                     const panelId = this.dataset.panel;
                     
                     if (activeButton === this) {
-                        // Clicking the active button - hide panel
+                        // Fermeture du panneau
                         this.classList.remove('active');
                         sidePanel.classList.remove('visible');
                         mainContent.classList.remove('shifted');
+                        
+                        // Réinitialisation des styles
+                        sidePanel.style.width = '250px';
+                        mainContent.style.marginLeft = '0';
+                        
                         activeButton = null;
                         activePanelId = null;
                     } else {
-                        // Remove active state from previous button
                         if (activeButton) {
                             activeButton.classList.remove('active');
                         }
                         
-                        // Activate this button and show panel
+                        // Ouverture du panneau
                         this.classList.add('active');
                         sidePanel.classList.add('visible');
                         mainContent.classList.add('shifted');
+                        
+                        // Si le panneau a été redimensionné précédemment
+                        const currentWidth = sidePanel.style.width;
+                        if (currentWidth) {
+                            mainContent.style.marginLeft = currentWidth;
+                        }
+                        
                         showPanel(panelId);
                         activeButton = this;
                         activePanelId = panelId;
                     }
 
-                    // Update Golden Layout size after panel toggle
                     if (window.mainLayout) {
                         setTimeout(() => {
                             window.mainLayout.updateSize();
-                        }, 300); // Wait for transition to complete
+                        }, 300);
                     }
                 });
             });
