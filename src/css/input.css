@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.lm_goldenlayout {
+  background: theme('colors.vscode-bg');
+}
+
+.lm_content {
+  background: theme('colors.vscode-bg');
+  border: 1px solid theme('colors.vscode-border');
+}
+
+.lm_tab {
+  background: theme('colors.vscode-tab-inactive');
+  color: theme('colors.gray.300');
+  border: 1px solid theme('colors.vscode-border');
+}
+
+.lm_tab.lm_active {
+  background: theme('colors.vscode-tab-active');
+}
+
+.lm_header {
+  background: theme('colors.vscode-bg');
+}

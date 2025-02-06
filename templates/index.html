@@ -4,9 +4,114 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MysteryAI - Géocaching</title>
+    
+    <!-- Styles -->
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='dist/output.css') }}">
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='node_modules/golden-layout/dist/css/goldenlayout-base.css') }}">
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='node_modules/golden-layout/dist/css/themes/goldenlayout-dark-theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/@fortawesome/fontawesome-free/css/all.min.css') }}">
+    
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='node_modules/golden-layout/dist/bundle/umd/golden-layout.min.js') }}"></script>
 </head>
-<body>
-    <h1>Bienvenue sur MysteryAI</h1>
-    <p>Votre application de géocaching est prête !</p>
+<body class="bg-vscode-bg text-gray-300 h-screen flex flex-col overflow-hidden">
+    <!-- Main Container -->
+    <div class="flex-1 flex">
+        <!-- Left Sidebar -->
+        <div id="left-sidebar" class="w-12 bg-vscode-sidebar border-r border-vscode-border flex flex-col">
+            <div class="flex-1 flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white" title="Explorer">
+                    <i class="fas fa-folder text-xl"></i>
+                </button>
+                <button class="text-gray-400 hover:text-white" title="Search">
+                    <i class="fas fa-search text-xl"></i>
+                </button>
+                <button class="text-gray-400 hover:text-white" title="Git">
+                    <i class="fas fa-code-branch text-xl"></i>
+                </button>
+            </div>
+            <div class="mt-auto flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white" title="Settings">
+                    <i class="fas fa-cog text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Left Panel -->
+        <div id="left-panel" class="w-64 bg-vscode-sidebar border-r border-vscode-border hidden">
+            <!-- Content will be managed by Golden Layout -->
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="flex-1">
+            <!-- Golden Layout will manage this area -->
+        </div>
+
+        <!-- Right Panel -->
+        <div id="right-panel" class="w-64 bg-vscode-sidebar border-l border-vscode-border hidden">
+            <!-- Content will be managed by Golden Layout -->
+        </div>
+    </div>
+
+    <!-- Bottom Panel -->
+    <div id="bottom-panel" class="h-48 bg-vscode-sidebar border-t border-vscode-border hidden">
+        <!-- Content will be managed by Golden Layout -->
+    </div>
+
+    <!-- Status Bar -->
+    <div class="h-6 bg-vscode-sidebar border-t border-vscode-border flex items-center px-2 text-sm">
+        <div class="flex-1">Ready</div>
+        <div class="flex items-center space-x-4">
+            <span>UTF-8</span>
+            <span>JavaScript</span>
+            <span>Ln 1, Col 1</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Golden Layout
+            const config = {
+                settings: {
+                    showPopoutIcon: false,
+                    showMaximiseIcon: true,
+                    showCloseIcon: true,
+                },
+                content: [{
+                    type: 'row',
+                    content: [{
+                        type: 'component',
+                        componentName: 'example',
+                        title: 'Main Editor',
+                        isClosable: false,
+                        componentState: { label: 'A' }
+                    }]
+                }]
+            };
+
+            const layout = new GoldenLayout(config, document.getElementById('main-content'));
+
+            // Register components
+            layout.registerComponent('example', function(container, state) {
+                container.getElement().html('<div class="p-4">Content goes here</div>');
+            });
+
+            // Initialize layout
+            layout.init();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                layout.updateSize();
+            });
+
+            // Toggle panels
+            document.querySelectorAll('#left-sidebar button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const leftPanel = document.getElementById('left-panel');
+                    leftPanel.classList.toggle('hidden');
+                });
+            });
+        });
+    </script>
 </body>
 </html>

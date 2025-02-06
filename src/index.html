@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MysteryAI - Géocaching</title>
+    
+    <!-- Styles -->
+    <link type="text/css" rel="stylesheet" href="css/output.css">
+    <link type="text/css" rel="stylesheet" href="vendor/golden-layout/goldenlayout-base.css">
+    <link type="text/css" rel="stylesheet" href="vendor/golden-layout/goldenlayout-dark-theme.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+    
+    <style>
+        /* Custom styles for VSCode-like layout */
+        .workspace-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            background-color: #1e1e1e;
+        }
+        
+        .sidebar {
+            width: 48px;
+            flex-shrink: 0;
+            z-index: 10;
+            background-color: #252526;
+            border-right: 1px solid #3c3c3c;
+        }
+        
+        .panel-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+            background-color: #1e1e1e;
+        }
+        
+        .side-panel {
+            width: 250px;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease-in-out;
+            z-index: 5;
+            background-color: #252526;
+            border-right: 1px solid #3c3c3c;
+        }
+        
+        .side-panel.visible {
+            transform: translateX(0);
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: 0;
+            transition: margin-left 0.2s ease-in-out;
+            background-color: #1e1e1e;
+        }
+        
+        .main-content.shifted {
+            margin-left: 250px;
+        }
+
+        .status-bar {
+            height: 22px;
+            background-color: #252526;
+            border-top: 1px solid #3c3c3c;
+            color: #cccccc;
+        }
+
+        .sidebar-button.active {
+            color: #ffffff;
+            background-color: #37373d;
+        }
+
+        .panel-title {
+            color: #cccccc;
+            text-transform: uppercase;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 0 8px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
+    <!-- Main Container -->
+    <div class="workspace-container">
+        <!-- Left Sidebar (icons) -->
+        <div class="sidebar bg-gray-800 border-r border-gray-700 flex flex-col">
+            <div class="flex-1 flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button active" title="Explorer" data-panel="explorer">
+                    <i class="fas fa-folder text-xl"></i>
+                </button>
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Search" data-panel="search">
+                    <i class="fas fa-search text-xl"></i>
+                </button>
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Git" data-panel="git">
+                    <i class="fas fa-code-branch text-xl"></i>
+                </button>
+            </div>
+            <div class="mt-auto flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings">
+                    <i class="fas fa-cog text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="panel-container">
+            <!-- Left Panel -->
+            <div class="side-panel bg-gray-800 border-r border-gray-700">
+                <div id="explorer-panel" class="h-full p-4">
+                    <h2 class="text-sm font-semibold mb-4">EXPLORER</h2>
+                    <!-- Explorer content will go here -->
+                </div>
+                <div id="search-panel" class="h-full p-4 hidden">
+                    <h2 class="text-sm font-semibold mb-4">SEARCH</h2>
+                    <!-- Search content will go here -->
+                </div>
+                <div id="git-panel" class="h-full p-4 hidden">
+                    <h2 class="text-sm font-semibold mb-4">SOURCE CONTROL</h2>
+                    <!-- Git content will go here -->
+                </div>
+                <div id="settings-panel" class="h-full p-4 hidden">
+                    <h2 class="text-sm font-semibold mb-4">SETTINGS</h2>
+                    <!-- Settings content will go here -->
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div id="main-content" class="main-content bg-gray-900">
+                <!-- Golden Layout will manage this area -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar flex items-center px-2 text-sm">
+        <div class="flex-1">Ready</div>
+        <div class="flex items-center space-x-4">
+            <span>UTF-8</span>
+            <span>JavaScript</span>
+            <span>Ln 1, Col 1</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="vendor/jquery/jquery.min.js"></script>
+    <script src="vendor/golden-layout/goldenlayout.min.js"></script>
+    <script>
+        function initializeLayout() {
+            // Initialize Golden Layout
+            const config = {
+                settings: {
+                    showPopoutIcon: false,
+                    showMaximiseIcon: true,
+                    showCloseIcon: true,
+                },
+                content: [{
+                    type: 'row',
+                    content: [{
+                        type: 'component',
+                        componentName: 'welcome',
+                        title: 'Welcome',
+                        isClosable: false,
+                        componentState: {}
+                    }]
+                }]
+            };
+
+            try {
+                const layout = new GoldenLayout(config, document.getElementById('main-content'));
+
+                // Register welcome component
+                layout.registerComponent('welcome', function(container, state) {
+                    const welcomeHtml = `
+                        <div class="p-8 max-w-4xl mx-auto">
+                            <div class="text-center mb-8">
+                                <h1 class="text-4xl font-bold text-blue-400 mb-4">Welcome to MysteryAI</h1>
+                                <p class="text-xl text-gray-400">Your Geocaching Adventure Starts Here</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-6 mb-8">
+                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
+                                    <h2 class="text-xl font-semibold text-blue-300 mb-3">
+                                        <i class="fas fa-map-marked-alt mr-2"></i>
+                                        Start New Adventure
+                                    </h2>
+                                    <p class="text-gray-300">Create a new geocaching challenge or explore existing ones in your area.</p>
+                                </div>
+                                
+                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
+                                    <h2 class="text-xl font-semibold text-green-300 mb-3">
+                                        <i class="fas fa-compass mr-2"></i>
+                                        Recent Caches
+                                    </h2>
+                                    <p class="text-gray-300">Continue working on your recent geocaching projects.</p>
+                                </div>
+                                
+                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
+                                    <h2 class="text-xl font-semibold text-purple-300 mb-3">
+                                        <i class="fas fa-tools mr-2"></i>
+                                        Tools & Resources
+                                    </h2>
+                                    <p class="text-gray-300">Access helpful tools and resources for creating engaging geocaches.</p>
+                                </div>
+                                
+                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
+                                    <h2 class="text-xl font-semibold text-yellow-300 mb-3">
+                                        <i class="fas fa-book mr-2"></i>
+                                        Documentation
+                                    </h2>
+                                    <p class="text-gray-300">Learn how to use MysteryAI and discover best practices.</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.getElement().html(welcomeHtml);
+                });
+
+                // Initialize layout
+                layout.init();
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    layout.updateSize();
+                });
+
+                // Store layout in window for later access
+                window.mainLayout = layout;
+            } catch (error) {
+                console.error('Golden Layout error:', error);
+            }
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeLayout);
+        } else {
+            initializeLayout();
+        }
+
+        // Handle sidebar buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidePanel = document.querySelector('.side-panel');
+            const mainContent = document.querySelector('.main-content');
+            let activeButton = null;
+            let activePanelId = null;
+
+            function showPanel(panelId) {
+                // Hide all panels
+                document.querySelectorAll('.side-panel > div').forEach(panel => {
+                    panel.classList.add('hidden');
+                });
+                // Show selected panel
+                const panel = document.getElementById(panelId + '-panel');
+                if (panel) {
+                    panel.classList.remove('hidden');
+                }
+            }
+
+            document.querySelectorAll('.sidebar-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const panelId = this.dataset.panel;
+                    
+                    if (activeButton === this) {
+                        // Clicking the active button - hide panel
+                        this.classList.remove('active');
+                        sidePanel.classList.remove('visible');
+                        mainContent.classList.remove('shifted');
+                        activeButton = null;
+                        activePanelId = null;
+                    } else {
+                        // Remove active state from previous button
+                        if (activeButton) {
+                            activeButton.classList.remove('active');
+                        }
+                        
+                        // Activate this button and show panel
+                        this.classList.add('active');
+                        sidePanel.classList.add('visible');
+                        mainContent.classList.add('shifted');
+                        showPanel(panelId);
+                        activeButton = this;
+                        activePanelId = panelId;
+                    }
+
+                    // Update Golden Layout size after panel toggle
+                    if (window.mainLayout) {
+                        setTimeout(() => {
+                            window.mainLayout.updateSize();
+                        }, 300); // Wait for transition to complete
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
