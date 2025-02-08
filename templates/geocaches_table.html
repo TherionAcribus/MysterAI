@@ -1,42 +1,92 @@
 <!-- Template pour le tableau des géocaches -->
 <div class="w-full h-full bg-gray-900 p-4">
-    <div id="geocaches-table" class="w-full h-full"></div>
+    <div id="geocaches-table-{{ zone_id }}" class="w-full h-full"
+        data-zone-id="{{ zone_id }}"
+        data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}"
+    ></div>
 </div>
 
-<script>
-    // Configuration du tableau Tabulator
-    var table = new Tabulator("#geocaches-table", {
-        ajaxURL: `/api/zones/${zoneId}/geocaches`,
-        layout: "fitDataFill",
-        height: "100%",
-        columns: [
-            {title: "GC Code", field: "gc_code", headerSort: true},
-            {title: "Nom", field: "name", headerSort: true},
-            {title: "Type", field: "cache_type", headerSort: true},
-            {title: "Difficulté", field: "difficulty", headerSort: true},
-            {title: "Terrain", field: "terrain", headerSort: true},
-            {title: "Taille", field: "size", headerSort: true},
-            {title: "Favoris", field: "favorites_count", headerSort: true},
-            {title: "Logs", field: "logs_count", headerSort: true},
-            {title: "Statut", field: "solved", headerSort: true,
-                formatter: function(cell) {
-                    const value = cell.getValue();
-                    switch(value) {
-                        case 'solved':
-                            return '<span class="text-green-500">✓ Résolue</span>';
-                        case 'not_solved':
-                            return '<span class="text-red-500">✗ Non résolue</span>';
-                        case 'ongoing':
-                            return '<span class="text-yellow-500">⟳ En cours</span>';
-                        default:
-                            return '<span class="text-gray-500">-</span>';
+<script type="text/javascript">
+    (function() {
+        const tableId = "geocaches-table-{{ zone_id }}";
+        console.log("Initialisation du tableau", tableId);
+        const tableElement = document.getElementById(tableId);
+        
+        if (tableElement) {
+            try {
+                const config = {
+                    layout: "fitDataFill",
+                    height: "100%",
+                    placeholder: "Aucune géocache trouvée",
+                    ajaxURL: tableElement.getAttribute('data-api-url'),
+                    ajaxLoaderLoading: '<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>',
+                    ajaxRequestHeaders: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    ajaxConfig: {
+                        method: "GET",
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    },
+                    columns: [
+                        {title: "GC Code", field: "gc_code", headerSort: true},
+                        {title: "Nom", field: "name", headerSort: true},
+                        {title: "Type", field: "cache_type", headerSort: true},
+                        {title: "Difficulté", field: "difficulty", headerSort: true},
+                        {title: "Terrain", field: "terrain", headerSort: true},
+                        {title: "Taille", field: "size", headerSort: true},
+                        {title: "Favoris", field: "favorites_count", headerSort: true},
+                        {title: "Logs", field: "logs_count", headerSort: true},
+                        {title: "Statut", field: "solved", headerSort: true,
+                            formatter: function(cell) {
+                                const value = cell.getValue();
+                                switch(value) {
+                                    case 'solved':
+                                        return '<span class="text-green-500">✓ Résolue</span>';
+                                    case 'not_solved':
+                                        return '<span class="text-red-500">✗ Non résolue</span>';
+                                    case 'ongoing':
+                                        return '<span class="text-yellow-500">⟳ En cours</span>';
+                                    default:
+                                        return '<span class="text-gray-500">-</span>';
+                                }
+                            }
+                        },
+                        {title: "Actions", field: "id", headerSort: false,
+                            formatter: function(cell) {
+                                const geocacheId = cell.getValue();
+                                return `<button 
+                                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
+                                    hx-get="${window.location.origin}/geocaches/${geocacheId}/details-panel"
+                                    hx-target="#golden-layout-target"
+                                    hx-trigger="click"
+                                    hx-swap="none"
+                                    _="on click call goldenlayout.addComponent('geocache-details', 'Détails GC-' + ${geocacheId})"
+                                >
+                                    Détails
+                                </button>`;
+                            }
+                        }
+                    ],
+                    rowClick: false,
+                    tableBuilt: function() {
+                        console.log("Tableau construit avec succès");
                     }
-                }
+                };
+                
+                console.log("Création du tableau Tabulator");
+                const table = new Tabulator(`#${tableId}`, config);
+                
+                // Exposer l'instance du tableau pour le redimensionnement
+                window[`tabulator_${tableId}`] = table;
+                
+                console.log("Tabulator initialisé avec succès");
+            } catch (error) {
+                console.error("Erreur lors de l'initialisation de Tabulator:", error);
             }
-        ],
-        rowClick: function(e, row) {
-            // TODO: Ouvrir les détails de la géocache
-            console.log("Clicked row:", row.getData());
+        } else {
+            console.error(`Élément #${tableId} non trouvé`);
         }
-    });
+    })();
 </script>

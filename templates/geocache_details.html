@@ -1,0 +1,123 @@
+<div class="w-full h-full bg-gray-900 p-4 overflow-y-auto"
+     hx-get="/api/geocaches/{{ geocache_id }}/details"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <!-- Loading state -->
+    <div class="flex items-center justify-center h-full">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+</div>
+
+<!-- Template qui sera injecté après le chargement -->
+<template id="geocache-details-template">
+    <div class="space-y-6">
+        <!-- En-tête -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-white" x-text="name"></h2>
+                <p class="text-gray-400">
+                    <span x-text="gc_code"></span> par <span x-text="owner"></span>
+                </p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-yellow-500" x-text="difficulty + '★'"></span>
+                <span class="text-green-500" x-text="terrain + '⛰'"></span>
+                <span class="text-blue-500" x-text="size"></span>
+            </div>
+        </div>
+
+        <!-- Coordonnées -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <h3 class="text-lg font-semibold text-white mb-2">Coordonnées</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-gray-400">Latitude: <span x-text="latitude"></span></p>
+                    <p class="text-gray-400">Longitude: <span x-text="longitude"></span></p>
+                </div>
+                <div>
+                    <p class="text-gray-400">GC Lat: <span x-text="gc_lat"></span></p>
+                    <p class="text-gray-400">GC Lon: <span x-text="gc_lon"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <h3 class="text-lg font-semibold text-white mb-2">Description</h3>
+            <div class="prose prose-invert max-w-none" x-html="description"></div>
+        </div>
+
+        <!-- Indices -->
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <h3 class="text-lg font-semibold text-white mb-2">Indices</h3>
+            <div class="prose prose-invert max-w-none" x-html="hints"></div>
+        </div>
+
+        <!-- Waypoints additionnels -->
+        <div class="bg-gray-800 p-4 rounded-lg" x-show="additional_waypoints && additional_waypoints.length > 0">
+            <h3 class="text-lg font-semibold text-white mb-2">Waypoints additionnels</h3>
+            <div class="grid grid-cols-1 gap-4">
+                <template x-for="wp in additional_waypoints" :key="wp.id">
+                    <div class="border border-gray-700 p-3 rounded">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="font-semibold text-white" x-text="wp.prefix + ': ' + wp.name"></span>
+                                <p class="text-sm text-gray-400" x-text="wp.lookup"></p>
+                            </div>
+                            <div class="text-right text-sm text-gray-400">
+                                <div x-text="wp.gc_lat"></div>
+                                <div x-text="wp.gc_lon"></div>
+                            </div>
+                        </div>
+                        <p class="mt-2 text-gray-300" x-text="wp.note"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Attributs -->
+        <div class="bg-gray-800 p-4 rounded-lg" x-show="attributes && attributes.length > 0">
+            <h3 class="text-lg font-semibold text-white mb-2">Attributs</h3>
+            <div class="flex flex-wrap gap-2">
+                <template x-for="attr in attributes" :key="attr.id">
+                    <div class="flex items-center space-x-2 bg-gray-700 px-3 py-1 rounded">
+                        <img :src="attr.icon_url" :alt="attr.name" class="w-6 h-6">
+                        <span class="text-white" x-text="attr.name"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Checkers -->
+        <div class="bg-gray-800 p-4 rounded-lg" x-show="checkers && checkers.length > 0">
+            <h3 class="text-lg font-semibold text-white mb-2">Checkers</h3>
+            <div class="space-y-2">
+                <template x-for="checker in checkers" :key="checker.id">
+                    <a :href="checker.url" target="_blank" class="block hover:bg-gray-700 p-2 rounded text-blue-400 hover:text-blue-300">
+                        <span x-text="checker.name"></span>
+                        <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                </template>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.target.matches('[hx-get^="/api/geocaches/"][hx-trigger="load"]')) {
+        const data = JSON.parse(evt.detail.xhr.responseText);
+        const template = document.getElementById('geocache-details-template');
+        const clone = template.content.cloneNode(true);
+        evt.detail.target.innerHTML = clone.firstElementChild.outerHTML;
+        
+        // Initialiser Alpine.js sur le contenu
+        Alpine.initTree(evt.detail.target);
+        
+        // Stocker les données pour Alpine.js
+        evt.detail.target.firstElementChild.__x.$data = data;
+    }
+});
+</script>

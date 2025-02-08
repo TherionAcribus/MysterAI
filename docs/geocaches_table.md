@@ -1,101 +1,80 @@
-# Documentation du Tableau des Géocaches
+# Tableau des Géocaches
 
 ## Vue d'ensemble
 
-Le tableau des géocaches est implémenté en utilisant [Tabulator](http://tabulator.info/) v6.3, une bibliothèque JavaScript pour créer des tableaux interactifs. Il est intégré dans l'interface via GoldenLayout pour permettre une gestion flexible des onglets.
+Le tableau des géocaches est un composant interactif qui affiche la liste des géocaches pour une zone donnée. Il est implémenté en utilisant la bibliothèque [Tabulator](http://tabulator.info/) et s'intègre avec GoldenLayout pour la gestion des onglets.
 
 ## Fonctionnalités
 
-- Tri des colonnes
-- Chargement asynchrone des données
-- Redimensionnement automatique
-- Formatage personnalisé des statuts
-- Gestion des clics sur les lignes
+- Affichage des géocaches avec colonnes triables
+- Chargement dynamique des données via AJAX
+- Redimensionnement automatique dans l'onglet
+- Boutons d'action pour voir les détails de chaque géocache
+- Indicateurs visuels pour l'état des géocaches (résolue, non résolue, en cours)
 
-## Structure des données
+## Structure technique
 
-Le tableau affiche les colonnes suivantes :
+### Template (`geocaches_table.html`)
 
-| Colonne | Champ | Description |
-|---------|-------|-------------|
-| GC Code | gc_code | Code unique de la géocache |
-| Nom | name | Nom de la géocache |
-| Type | cache_type | Type de cache (traditionnelle, mystère, etc.) |
-| Difficulté | difficulty | Niveau de difficulté (1-5) |
-| Terrain | terrain | Niveau de terrain (1-5) |
-| Taille | size | Taille de la cache |
-| Favoris | favorites_count | Nombre de favoris |
-| Logs | logs_count | Nombre de logs |
-| Statut | solved | État de résolution |
+Le template contient :
+- Un conteneur pour le tableau avec les attributs data nécessaires
+- Un script d'initialisation qui configure et crée l'instance Tabulator
+- La configuration complète des colonnes et des formateurs
 
-## Implémentation technique
+### Colonnes du tableau
 
-### Initialisation
-
-```javascript
-const table = new Tabulator(`#${tableId}`, {
-    ajaxURL: `/api/zones/${state.zoneId}/geocaches`,
-    layout: "fitDataFill",
-    height: "100%",
-    placeholder: "Aucune géocache trouvée",
-    // ... configuration des colonnes
-});
-```
-
-### Gestion des statuts
-
-Les statuts sont affichés avec des icônes et des couleurs différentes :
-- ✓ Vert : Résolue
-- ✗ Rouge : Non résolue
-- ⟳ Jaune : En cours
-- - Gris : Non défini
+1. GC Code - Code unique de la géocache
+2. Nom - Nom de la géocache
+3. Type - Type de géocache
+4. Difficulté - Niveau de difficulté
+5. Terrain - Niveau de terrain
+6. Taille - Taille du contenant
+7. Favoris - Nombre de favoris
+8. Logs - Nombre de logs
+9. Statut - État de résolution avec indicateurs visuels
+10. Actions - Bouton pour voir les détails
 
 ### Intégration avec GoldenLayout
 
-Le tableau est créé dans un composant GoldenLayout personnalisé nommé `geocachesTable`. L'initialisation est différée via `setTimeout` pour assurer que le DOM est prêt.
+Le tableau est chargé dans un composant GoldenLayout qui :
+1. Charge le template via une requête fetch
+2. Exécute les scripts d'initialisation
+3. Gère le redimensionnement automatique du tableau
 
 ### Gestion du redimensionnement
 
-```javascript
-container.on('resize', function() {
-    if (table) {
-        table.redraw(true);
-    }
-});
-```
+Le tableau s'adapte automatiquement à la taille de son conteneur grâce à :
+- L'option `layout: "fitDataFill"` de Tabulator
+- Un gestionnaire de redimensionnement dans le composant GoldenLayout
+- L'exposition de l'instance Tabulator via une variable globale pour le redimensionnement
 
-## API Backend
+## Endpoints API
 
-Le tableau utilise l'endpoint `/api/zones/{zone_id}/geocaches` qui renvoie un tableau JSON avec les propriétés suivantes :
+Le tableau utilise l'endpoint `/geocaches/<zone_id>` qui retourne les données au format JSON avec les champs suivants :
+- gc_code
+- name
+- cache_type
+- difficulty
+- terrain
+- size
+- favorites_count
+- logs_count
+- solved
+- id
 
-```json
-{
-    "gc_code": "string",
-    "name": "string",
-    "cache_type": "string",
-    "difficulty": "number",
-    "terrain": "number",
-    "size": "string",
-    "favorites_count": "number",
-    "logs_count": "number",
-    "solved": "string"
-}
-```
+## Personnalisation de l'affichage
 
-## Événements
+### États des géocaches
 
-### Clic sur une ligne
+Les états sont affichés avec des couleurs distinctives :
+- ✓ Résolue (vert)
+- ✗ Non résolue (rouge)
+- ⟳ En cours (jaune)
+- - Non défini (gris)
 
-```javascript
-rowClick: function(e, row) {
-    console.log("Clicked row:", row.getData());
-    // TODO: Implémentation de l'ouverture des détails
-}
-```
+### Bouton d'action
 
-## Bonnes pratiques
-
-1. Toujours vérifier l'existence de l'élément DOM avant l'initialisation
-2. Utiliser le placeholder pour informer l'utilisateur quand il n'y a pas de données
-3. Gérer le redimensionnement pour maintenir la mise en page
-4. Sécuriser les appels aux méthodes de la table avec des vérifications d'existence
+Le bouton "Détails" utilise :
+- HTMX pour le chargement du panneau de détails
+- Hyperscript pour l'intégration avec GoldenLayout
+- Classes Tailwind pour le style

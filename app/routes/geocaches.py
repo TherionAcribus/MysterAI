@@ -14,6 +14,7 @@ import requests
 import secrets
 import base64
 import time
+from flask import make_response
 
 logger = setup_logger()
 
@@ -569,3 +570,52 @@ def save_modified_image():
         db.session.rollback()
         logger.error(f"Error saving modified image: {str(e)}")
         return jsonify({'error': 'Failed to save image'}), 500
+
+
+@geocaches_api.route('/geocaches/<int:geocache_id>/details-panel', methods=['GET'])
+def get_geocache_details_panel(geocache_id):
+    """Renvoie le panneau HTML des détails d'une géocache."""
+    return render_template('geocache_details.html', geocache_id=geocache_id)
+
+
+@geocaches_bp.route('/geocaches/table/<int:zone_id>', methods=['GET'])
+def get_geocaches_table(zone_id):
+    """Renvoie le template du tableau des geocaches."""
+    logger.debug(f"Chargement du template du tableau pour la zone {zone_id}")
+    logger.debug(f"Headers de la requête : {dict(request.headers)}")
+    logger.debug(f"URL de la requête : {request.url}")
+    logger.debug(f"Méthode de la requête : {request.method}")
+    
+    try:
+        # Vérifier que la zone existe
+        zone = Zone.query.get(zone_id)
+        if not zone:
+            logger.error(f"Zone {zone_id} non trouvée")
+            return jsonify({
+                "error": "Zone non trouvée",
+                "zone_id": zone_id
+            }), 404
+
+        # Rendre le template
+        logger.debug("Rendu du template geocaches_table.html")
+        html = render_template('geocaches_table.html', zone_id=zone_id)
+        logger.debug("Template rendu avec succès")
+        
+        # Créer la réponse avec les en-têtes appropriés
+        response = make_response(html)
+        response.headers.update({
+            'Content-Type': 'text/html; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With, HX-Request, HX-Current-URL, HX-Target, HX-Trigger',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+        })
+        
+        return response
+        
+    except Exception as e:
+        logger.exception("Erreur lors du rendu du template")
+        return jsonify({
+            "error": str(e),
+            "zone_id": zone_id
+        }), 500

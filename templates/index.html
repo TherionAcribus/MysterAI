@@ -528,62 +528,152 @@
                 });
 
                 layout.registerComponent('geocachesTable', function(container, state) {
+                    console.log("Création du composant geocachesTable pour la zone", state.zoneId);
+                    
                     // Créer le conteneur pour le tableau
                     const element = container.getElement();
-                    const tableId = `geocaches-table-${state.zoneId}`;
-                    element.html(`<div id="${tableId}" class="w-full h-full bg-gray-900"></div>`);
+                    const url = `${window.location.origin}/geocaches/table/${state.zoneId}`;
+                    console.log("URL de la requête:", url);
                     
-                    // Attendre que l'élément soit dans le DOM
-                    setTimeout(() => {
-                        const tableElement = document.getElementById(tableId);
-                        if (tableElement) {
-                            // Initialiser Tabulator
-                            const table = new Tabulator(`#${tableId}`, {
-                                ajaxURL: `/api/zones/${state.zoneId}/geocaches`,
-                                layout: "fitDataFill",
-                                height: "100%",
-                                placeholder: "Aucune géocache trouvée",
-                                columns: [
-                                    {title: "GC Code", field: "gc_code", headerSort: true},
-                                    {title: "Nom", field: "name", headerSort: true},
-                                    {title: "Type", field: "cache_type", headerSort: true},
-                                    {title: "Difficulté", field: "difficulty", headerSort: true},
-                                    {title: "Terrain", field: "terrain", headerSort: true},
-                                    {title: "Taille", field: "size", headerSort: true},
-                                    {title: "Favoris", field: "favorites_count", headerSort: true},
-                                    {title: "Logs", field: "logs_count", headerSort: true},
-                                    {title: "Statut", field: "solved", headerSort: true,
-                                        formatter: function(cell) {
-                                            const value = cell.getValue();
-                                            switch(value) {
-                                                case 'solved':
-                                                    return '<span class="text-green-500">✓ Résolue</span>';
-                                                case 'not_solved':
-                                                    return '<span class="text-red-500">✗ Non résolue</span>';
-                                                case 'ongoing':
-                                                    return '<span class="text-yellow-500">⟳ En cours</span>';
-                                                default:
-                                                    return '<span class="text-gray-500">-</span>';
-                                            }
-                                        }
-                                    }
-                                ],
-                                rowClick: function(e, row) {
-                                    // TODO: Ouvrir les détails de la géocache
-                                    console.log("Clicked row:", row.getData());
-                                }
-                            });
-
-                            // Mettre à jour la taille du tableau lors du redimensionnement
-                            container.on('resize', function() {
-                                if (table) {
-                                    table.redraw(true);
-                                }
-                            });
-                        } else {
-                            console.error(`Element #${tableId} not found in DOM`);
+                    // Créer l'élément div avec un ID unique
+                    const containerId = `geocaches-container-${state.zoneId}`;
+                    const div = document.createElement('div');
+                    div.id = containerId;
+                    div.className = 'w-full h-full';
+                    
+                    // Ajouter l'indicateur de chargement
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.className = 'loading-indicator flex items-center justify-center w-full h-full';
+                    const spinner = document.createElement('div');
+                    spinner.className = 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500';
+                    loadingDiv.appendChild(spinner);
+                    div.appendChild(loadingDiv);
+                    
+                    // Vider le conteneur et ajouter le nouvel élément
+                    element[0].innerHTML = '';
+                    element[0].appendChild(div);
+                    
+                    // Charger le contenu via fetch
+                    console.log("Chargement du contenu via fetch");
+                    fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'text/html',
+                            'X-Requested-With': 'XMLHttpRequest'
                         }
-                    }, 100); // Petit délai pour s'assurer que le DOM est mis à jour
+                    })
+                    .then(response => {
+                        console.log("Réponse reçue:", response);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        console.log("HTML reçu, mise à jour du contenu");
+                        
+                        // Créer un conteneur temporaire pour parser le HTML
+                        const temp = document.createElement('div');
+                        temp.innerHTML = html;
+                        
+                        // Extraire les scripts
+                        const scripts = temp.getElementsByTagName('script');
+                        const scriptsArray = Array.from(scripts);
+                        
+                        // Supprimer les scripts du HTML
+                        scriptsArray.forEach(script => script.remove());
+                        
+                        // Mettre à jour le contenu sans les scripts
+                        div.innerHTML = temp.innerHTML;
+                        
+                        // Fonction pour exécuter les scripts dans l'ordre
+                        const executeScripts = (scripts, index = 0) => {
+                            if (index >= scripts.length) {
+                                console.log("Tous les scripts ont été exécutés");
+                                return;
+                            }
+                            
+                            const script = scripts[index];
+                            const newScript = document.createElement('script');
+                            newScript.textContent = script.textContent;
+                            
+                            // Copier les attributs
+                            Array.from(script.attributes).forEach(attr => {
+                                newScript.setAttribute(attr.name, attr.value);
+                            });
+                            
+                            // Exécuter le script suivant une fois celui-ci chargé
+                            newScript.onload = () => executeScripts(scripts, index + 1);
+                            newScript.onerror = (error) => console.error("Erreur lors du chargement du script:", error);
+                            
+                            console.log("Exécution du script", index + 1);
+                            document.head.appendChild(newScript);
+                        };
+                        
+                        // Commencer l'exécution des scripts
+                        executeScripts(scriptsArray);
+                        
+                        // Configurer le redimensionnement
+                        const tableId = `geocaches-table-${state.zoneId}`;
+                        container.on('resize', function() {
+                            console.log("Redimensionnement du composant geocachesTable");
+                            const table = window[`tabulator_${tableId}`];
+                            if (table) {
+                                console.log("Redimensionnement du tableau Tabulator");
+                                table.redraw(true);
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors du chargement:", error);
+                        div.innerHTML = `<div class="text-red-500">Erreur lors du chargement: ${error.message}</div>`;
+                    });
+                });
+
+                layout.registerComponent('openGeocachesTab', function(container, state) {
+                    console.log("Création du composant openGeocachesTab pour la zone", state.zoneId);
+                    
+                    // Créer le conteneur pour le tableau
+                    const element = container.getElement();
+                    const url = `/geocaches/table/${state.zoneId}`;
+                    console.log("URL de la requête HTMX:", url);
+                    
+                    // Créer l'élément div manuellement
+                    const div = document.createElement('div');
+                    div.className = 'w-full h-full';
+                    div.setAttribute('hx-get', url);
+                    div.setAttribute('hx-trigger', 'load');
+                    div.setAttribute('hx-swap', 'innerHTML');
+                    div.setAttribute('hx-indicator', '.loading-indicator');
+                    
+                    // Ajouter l'indicateur de chargement
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.className = 'loading-indicator flex items-center justify-center w-full h-full';
+                    const spinner = document.createElement('div');
+                    spinner.className = 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500';
+                    loadingDiv.appendChild(spinner);
+                    div.appendChild(loadingDiv);
+                    
+                    // Vider le conteneur et ajouter le nouvel élément
+                    element[0].innerHTML = '';
+                    element[0].appendChild(div);
+                    
+                    // Forcer HTMX à scanner le nouvel élément
+                    console.log("Processing HTMX on element:", div);
+                    htmx.process(div);
+
+                    // Gérer le redimensionnement
+                    container.on('resize', function() {
+                        console.log("Redimensionnement du composant openGeocachesTab");
+                        const tableDiv = element.find(`#geocaches-table-${state.zoneId}`);
+                        if (tableDiv.length > 0) {
+                            const tabulatorInstance = Tabulator.findTable(`#geocaches-table-${state.zoneId}`)[0];
+                            if (tabulatorInstance) {
+                                console.log("Redimensionnement du tableau Tabulator");
+                                tabulatorInstance.redraw(true);
+                            }
+                        }
+                    });
                 });
 
                 layout.init();
@@ -642,6 +732,26 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier que HTMX est chargé
+            if (typeof htmx === 'undefined') {
+                console.error('HTMX n\'est pas chargé !');
+            } else {
+                console.log('HTMX est chargé correctement');
+            }
+
+            // Logger les événements HTMX
+            document.body.addEventListener('htmx:beforeRequest', function(evt) {
+                console.log('HTMX - Avant la requête:', evt.detail);
+            });
+            
+            document.body.addEventListener('htmx:afterRequest', function(evt) {
+                console.log('HTMX - Après la requête:', evt.detail);
+            });
+            
+            document.body.addEventListener('htmx:error', function(evt) {
+                console.error('HTMX - Erreur:', evt.detail);
+            });
+
             const leftPanel = document.querySelector('.side-panel:not(.right-panel)');
             const rightPanel = document.querySelector('.side-panel.right-panel');
             const mainContent = document.querySelector('.main-content');
