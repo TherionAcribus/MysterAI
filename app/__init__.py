@@ -1,11 +1,9 @@
 import logging
 import os
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
 from app.database import db
-#from app.utils.logger import setup_logger
-#from app.plugin_manager import PluginManager
 from app.config import Config
 from app.models.geocache import Zone
 
@@ -17,27 +15,21 @@ def get_plugin_manager():
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, template_folder='../templates', static_folder='../static')
+    app = Flask(__name__, 
+                template_folder='../templates',
+                static_folder='../static',
+                static_url_path='')
     app.config.from_object(Config)
 
-    """
-    # Configuration des dossiers statiques
-    logger.info("Configuring static folders...")
-    static_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
-    upload_folder = os.path.join(static_folder, 'uploads')
-
-    # Créer les dossiers s'ils n'existent pas
-    for folder in [static_folder, upload_folder]:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-
-    app.static_folder = static_folder
-    app.config['UPLOAD_FOLDER'] = upload_folder
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
-    """
-
-    # Initialisation de CORS
-    CORS(app)
+    # Initialisation de CORS avec les options appropriées
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",  # En développement seulement
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "HX-Request", "HX-Current-URL", "HX-Target", "HX-Trigger"],
+            "supports_credentials": True
+        }
+    })
 
     # Initialisation de la base de données
     db.init_app(app)
@@ -66,15 +58,5 @@ def create_app():
             default_zone = Zone(name="default", description="Default zone")
             db.session.add(default_zone)
             db.session.commit()
-
-        # Initialisation de la configuration de l'application
-        #logger.info("Initializing application configuration...")
-
-        # Initialisation du gestionnaire de plugins
-        #logger.info("Initializing PluginManager...")
-        #plugins_dir = os.path.join(app.config['BASEDIR'], 'plugins')
-        #app.plugin_manager = PluginManager(plugins_dir, app)
-        #logger.info("Loading plugins...")
-        #app.plugin_manager.load_plugins()
 
     return app

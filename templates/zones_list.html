@@ -1,0 +1,17 @@
+<!-- Template pour la liste des zones -->
+<div class="p-4">
+    {% if zones %}
+        <ul class="space-y-2">
+            {% for zone in zones %}
+                <li class="bg-gray-700 p-3 rounded-lg hover:bg-gray-600 cursor-pointer">
+                    <h3 class="text-lg font-semibold">{{ zone.name }}</h3>
+                    {% if zone.description %}
+                        <p class="text-sm text-gray-300">{{ zone.description }}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-gray-400">Aucune zone trouvée</p>
+    {% endif %}
+</div>

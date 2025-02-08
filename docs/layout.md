@@ -42,7 +42,7 @@ MysteryAI utilise une interface inspirée de Visual Studio Code, avec une dispos
 #### Barre Latérale Gauche
 - Largeur fixe : 48px
 - Contient les boutons d'action principaux :
-  - Explorer
+  - Geocaches
   - Search
   - Git
   - Settings
@@ -61,7 +61,7 @@ MysteryAI utilise une interface inspirée de Visual Studio Code, avec une dispos
 - Largeur maximale : 800px
 - Redimensionnable via une poignée à droite
 - Contient différentes vues selon le bouton actif :
-  - Explorer : Navigation dans les fichiers
+  - Geocaches : Navigation les "Zones" et les "Geocaches"
   - Search : Recherche globale
   - Git : Contrôle de version
   - Settings : Configuration
