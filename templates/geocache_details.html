@@ -1,16 +1,16 @@
 <div class="w-full h-full bg-gray-900 p-4 overflow-y-auto"
-     hx-get="/api/geocaches/{{ geocache_id }}/details"
-     hx-trigger="load"
-     hx-swap="innerHTML">
+     x-data
+     x-init="fetch('/api/geocaches/{{ geocache_id }}/details')
+            .then(response => response.json())
+            .then(data => { Object.assign($data, data); })"
+>
     <!-- Loading state -->
-    <div class="flex items-center justify-center h-full">
+    <div class="flex items-center justify-center h-full" x-show="!name">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
     </div>
-</div>
 
-<!-- Template qui sera injecté après le chargement -->
-<template id="geocache-details-template">
-    <div class="space-y-6">
+    <!-- Template qui sera affiché après le chargement -->
+    <div class="space-y-6" x-show="name" x-cloak>
         <!-- En-tête -->
         <div class="flex items-center justify-between">
             <div>
@@ -103,21 +103,4 @@
             </div>
         </div>
     </div>
-</template>
-
-<script>
-document.addEventListener('htmx:afterRequest', function(evt) {
-    if (evt.detail.target.matches('[hx-get^="/api/geocaches/"][hx-trigger="load"]')) {
-        const data = JSON.parse(evt.detail.xhr.responseText);
-        const template = document.getElementById('geocache-details-template');
-        const clone = template.content.cloneNode(true);
-        evt.detail.target.innerHTML = clone.firstElementChild.outerHTML;
-        
-        // Initialiser Alpine.js sur le contenu
-        Alpine.initTree(evt.detail.target);
-        
-        // Stocker les données pour Alpine.js
-        evt.detail.target.firstElementChild.__x.$data = data;
-    }
-});
-</script>
+</div>

@@ -676,6 +676,65 @@
                     });
                 });
 
+                layout.registerComponent('geocache-details', function(container, state) {
+                    console.log("Création du composant geocache-details", state);
+                    
+                    // Créer le conteneur pour les détails
+                    const element = container.getElement();
+                    
+                    // Injecter le HTML des détails
+                    element[0].innerHTML = state.html;
+                    
+                    // Initialiser Alpine.js sur le contenu si nécessaire
+                    if (window.Alpine) {
+                        window.Alpine.initTree(element[0]);
+                    }
+                    
+                    // Gérer le redimensionnement si nécessaire
+                    container.on('resize', function() {
+                        console.log("Redimensionnement du composant geocache-details");
+                    });
+                });
+
+                // Exposer l'instance Golden Layout globalement
+                window.goldenlayout = layout;
+
+                // Écouter l'événement openGeocacheDetails depuis les iframes
+                window.addEventListener('message', function(event) {
+                    if (event.data && event.data.type === 'openGeocacheDetails') {
+                        const geocacheId = event.data.geocacheId;
+                        console.log("Réception de l'événement openGeocacheDetails pour la géocache", geocacheId);
+                        
+                        // Charger les détails et ouvrir l'onglet
+                        fetch(`/geocaches/${geocacheId}/details-panel`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.text();
+                            })
+                            .then(html => {
+                                const root = layout.root;
+                                const newItemConfig = {
+                                    type: 'component',
+                                    componentName: 'geocache-details',
+                                    title: `Détails GC-${geocacheId}`,
+                                    componentState: { 
+                                        html: html,
+                                        geocacheId: geocacheId
+                                    }
+                                };
+                                
+                                // Ajouter le composant à la racine du layout
+                                root.contentItems[0].addChild(newItemConfig);
+                            })
+                            .catch(error => {
+                                console.error("Erreur lors du chargement des détails:", error);
+                                alert("Erreur lors du chargement des détails de la géocache");
+                            });
+                    }
+                });
+
                 layout.init();
                 window.mainLayout = layout;
 

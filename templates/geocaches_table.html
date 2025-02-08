@@ -58,11 +58,7 @@
                                 const geocacheId = cell.getValue();
                                 return `<button 
                                     class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
-                                    hx-get="${window.location.origin}/geocaches/${geocacheId}/details-panel"
-                                    hx-target="#golden-layout-target"
-                                    hx-trigger="click"
-                                    hx-swap="none"
-                                    _="on click call goldenlayout.addComponent('geocache-details', 'Détails GC-' + ${geocacheId})"
+                                    onclick="window.parent.postMessage({ type: 'openGeocacheDetails', geocacheId: ${geocacheId} }, '*')"
                                 >
                                     Détails
                                 </button>`;
