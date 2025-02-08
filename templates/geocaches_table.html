@@ -1,0 +1,42 @@
+<!-- Template pour le tableau des géocaches -->
+<div class="w-full h-full bg-gray-900 p-4">
+    <div id="geocaches-table" class="w-full h-full"></div>
+</div>
+
+<script>
+    // Configuration du tableau Tabulator
+    var table = new Tabulator("#geocaches-table", {
+        ajaxURL: `/api/zones/${zoneId}/geocaches`,
+        layout: "fitDataFill",
+        height: "100%",
+        columns: [
+            {title: "GC Code", field: "gc_code", headerSort: true},
+            {title: "Nom", field: "name", headerSort: true},
+            {title: "Type", field: "cache_type", headerSort: true},
+            {title: "Difficulté", field: "difficulty", headerSort: true},
+            {title: "Terrain", field: "terrain", headerSort: true},
+            {title: "Taille", field: "size", headerSort: true},
+            {title: "Favoris", field: "favorites_count", headerSort: true},
+            {title: "Logs", field: "logs_count", headerSort: true},
+            {title: "Statut", field: "solved", headerSort: true,
+                formatter: function(cell) {
+                    const value = cell.getValue();
+                    switch(value) {
+                        case 'solved':
+                            return '<span class="text-green-500">✓ Résolue</span>';
+                        case 'not_solved':
+                            return '<span class="text-red-500">✗ Non résolue</span>';
+                        case 'ongoing':
+                            return '<span class="text-yellow-500">⟳ En cours</span>';
+                        default:
+                            return '<span class="text-gray-500">-</span>';
+                    }
+                }
+            }
+        ],
+        rowClick: function(e, row) {
+            // TODO: Ouvrir les détails de la géocache
+            console.log("Clicked row:", row.getData());
+        }
+    });
+</script>

@@ -10,7 +10,8 @@
     <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-base.css">
     <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-dark-theme.css">
     <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
-
+    <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
+    
     <!-- Scripts -->
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
     
@@ -436,9 +437,9 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
     <script src="/vendor/jquery/jquery.min.js"></script>
     <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
+    <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
     <script>
         function loadZones() {
             const target = document.getElementById('geocaches-panel-content');
@@ -526,17 +527,113 @@
                     container.getElement().html(welcomeHtml);
                 });
 
+                layout.registerComponent('geocachesTable', function(container, state) {
+                    // Créer le conteneur pour le tableau
+                    const element = container.getElement();
+                    const tableId = `geocaches-table-${state.zoneId}`;
+                    element.html(`<div id="${tableId}" class="w-full h-full bg-gray-900"></div>`);
+                    
+                    // Attendre que l'élément soit dans le DOM
+                    setTimeout(() => {
+                        const tableElement = document.getElementById(tableId);
+                        if (tableElement) {
+                            // Initialiser Tabulator
+                            const table = new Tabulator(`#${tableId}`, {
+                                ajaxURL: `/api/zones/${state.zoneId}/geocaches`,
+                                layout: "fitDataFill",
+                                height: "100%",
+                                placeholder: "Aucune géocache trouvée",
+                                columns: [
+                                    {title: "GC Code", field: "gc_code", headerSort: true},
+                                    {title: "Nom", field: "name", headerSort: true},
+                                    {title: "Type", field: "cache_type", headerSort: true},
+                                    {title: "Difficulté", field: "difficulty", headerSort: true},
+                                    {title: "Terrain", field: "terrain", headerSort: true},
+                                    {title: "Taille", field: "size", headerSort: true},
+                                    {title: "Favoris", field: "favorites_count", headerSort: true},
+                                    {title: "Logs", field: "logs_count", headerSort: true},
+                                    {title: "Statut", field: "solved", headerSort: true,
+                                        formatter: function(cell) {
+                                            const value = cell.getValue();
+                                            switch(value) {
+                                                case 'solved':
+                                                    return '<span class="text-green-500">✓ Résolue</span>';
+                                                case 'not_solved':
+                                                    return '<span class="text-red-500">✗ Non résolue</span>';
+                                                case 'ongoing':
+                                                    return '<span class="text-yellow-500">⟳ En cours</span>';
+                                                default:
+                                                    return '<span class="text-gray-500">-</span>';
+                                            }
+                                        }
+                                    }
+                                ],
+                                rowClick: function(e, row) {
+                                    // TODO: Ouvrir les détails de la géocache
+                                    console.log("Clicked row:", row.getData());
+                                }
+                            });
+
+                            // Mettre à jour la taille du tableau lors du redimensionnement
+                            container.on('resize', function() {
+                                if (table) {
+                                    table.redraw(true);
+                                }
+                            });
+                        } else {
+                            console.error(`Element #${tableId} not found in DOM`);
+                        }
+                    }, 100); // Petit délai pour s'assurer que le DOM est mis à jour
+                });
+
                 layout.init();
+                window.mainLayout = layout;
 
                 window.addEventListener('resize', () => {
                     layout.updateSize();
                 });
-
-                window.mainLayout = layout;
             } catch (error) {
                 console.error('Golden Layout error:', error);
             }
         }
+
+        window.openGeocachesTab = function(zoneId, zoneName) {
+            const componentId = `geocaches-${zoneId}`;
+            
+            let existingComponent = null;
+            window.mainLayout.root.contentItems.forEach(item => {
+                item.contentItems.forEach(subItem => {
+                    if (subItem.config.id === componentId) {
+                        existingComponent = subItem;
+                    }
+                });
+            });
+
+            if (existingComponent) {
+                existingComponent.parent.setActiveContentItem(existingComponent);
+                return;
+            }
+
+            const newItemConfig = {
+                type: 'component',
+                componentName: 'geocachesTable',
+                title: `Géocaches - ${zoneName}`,
+                id: componentId,
+                componentState: { 
+                    zoneId: zoneId,
+                    zoneName: zoneName
+                }
+            };
+
+            if (window.mainLayout.root.contentItems[0].type === 'row') {
+                window.mainLayout.root.contentItems[0].addChild(newItemConfig);
+            } else {
+                window.mainLayout.root.contentItems[0].addChild({
+                    type: 'row',
+                    content: [newItemConfig]
+                });
+            }
+        };
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initializeLayout);
@@ -623,17 +720,15 @@
             document.addEventListener('mousemove', function(e) {
                 if (!isResizing || !activePanel) return;
                 if (activePanel === bottomPanel) {
-                    const HEADER_HEIGHT = 35; // Hauteur de la barre d'onglets
+                    const HEADER_HEIGHT = 35; 
                     const maxHeight = Math.min(800, window.innerHeight - 100);
                     const newHeight = Math.min(maxHeight, Math.max(HEADER_HEIGHT, window.innerHeight - e.clientY));
                     
                     bottomPanel.style.height = newHeight + 'px';
                     
-                    // Ajuster la marge du contenu principal en fonction de la hauteur visible
                     const visibleHeight = Math.max(0, newHeight - HEADER_HEIGHT);
                     mainContent.style.marginBottom = visibleHeight + 'px';
                     
-                    // Mettre à jour la classe visible en fonction de la hauteur
                     if (newHeight <= HEADER_HEIGHT) {
                         bottomPanel.classList.remove('visible');
                         mainContent.classList.remove('shifted-bottom');
@@ -659,13 +754,6 @@
                         activePanel.style.transition = '';
                         mainContent.style.transition = '';
                         
-                        // Vérifier la hauteur finale pour mettre à jour l'état
-                        if (activePanel === bottomPanel) {
-                            const currentHeight = parseInt(window.getComputedStyle(bottomPanel).height);
-                            const HEADER_HEIGHT = 35; // Hauteur de la barre d'onglets
-                            isBottomPanelVisible = currentHeight > HEADER_HEIGHT;
-                        }
-                        
                         activePanel = null;
                     }
                 }
@@ -679,7 +767,6 @@
                     const shiftClass = isRight ? 'shifted-right' : 'shifted-left';
                     
                     if ((isRight && activeRightButton === this) || (!isRight && activeLeftButton === this)) {
-                        // Fermeture du panneau actif
                         this.classList.remove('active');
                         panel.classList.remove('visible');
                         mainContent.classList.remove(shiftClass);
@@ -697,7 +784,6 @@
                             activeLeftPanelId = null;
                         }
                     } else {
-                        // Fermeture du panneau précédent du même côté s'il existe
                         if (isRight && activeRightButton) {
                             activeRightButton.classList.remove('active');
                             rightPanel.classList.remove('visible');
@@ -710,7 +796,6 @@
                             leftPanel.style.transform = 'translateX(-100%)';
                         }
                         
-                        // Ouverture du nouveau panneau
                         this.classList.add('active');
                         panel.classList.add('visible');
                         mainContent.classList.add(shiftClass);
@@ -738,7 +823,6 @@
                 });
             });
 
-            // Initialisation du chat
             const chatInput = document.querySelector('.chat-input');
             const chatSendButton = document.querySelector('.chat-send-button');
             const chatMessages = document.querySelector('.chat-messages');
@@ -767,14 +851,12 @@
                 }
             });
 
-            // Initialisation du panneau inférieur
             const bottomPanelTabs = document.querySelectorAll('.bottom-panel-tab');
             const bottomPanelContents = document.querySelectorAll('.bottom-panel');
             let isBottomPanelVisible = false;
 
             bottomPanelTabs.forEach(tab => {
                 tab.addEventListener('click', function() {
-                    // Si le panneau n'est pas visible, on l'affiche d'abord
                     if (!isBottomPanelVisible) {
                         bottomPanel.style.height = '300px';
                         mainContent.style.marginBottom = (300 - 35) + 'px';
@@ -783,11 +865,9 @@
                         isBottomPanelVisible = true;
                     }
 
-                    // Gestion des onglets
                     bottomPanelTabs.forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // Affichage du contenu
                     bottomPanelContents.forEach(panel => {
                         if (panel.id === this.dataset.panel + '-panel') {
                             panel.classList.add('visible');
@@ -804,7 +884,6 @@
                 });
             });
 
-            // Bouton pour afficher/masquer le panneau inférieur
             const bottomPanelToggleButton = document.createElement('button');
             bottomPanelToggleButton.className = 'text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button';
             bottomPanelToggleButton.title = 'Toggle Bottom Panel';
@@ -832,7 +911,6 @@
                 }
             });
 
-            // Ajout du bouton à la barre latérale droite
             const rightSidebar = document.querySelector('.sidebar.right-sidebar .flex-1');
             rightSidebar.appendChild(bottomPanelToggleButton);
         });
