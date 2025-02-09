@@ -441,6 +441,9 @@
     <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
     <script>
+        // Configuration de l'URL de base pour l'API
+        window.API_BASE_URL = 'http://127.0.0.1:3000';
+
         function loadZones() {
             const target = document.getElementById('geocaches-panel-content');
             fetch('/api/zones', {
@@ -531,14 +534,36 @@
                     const containerId = container.parent.config.id;
                     container.getElement().attr('data-container-id', containerId);
                     
-                    fetch(`/geocaches/table/${state.zoneId}`)
-                        .then(response => response.text())
+                    // Utiliser l'URL de base de l'API
+                    const apiUrl = `${window.API_BASE_URL}/geocaches/table/${state.zoneId}`;
+                    console.log("Chargement du tableau depuis:", apiUrl);
+                    
+                    fetch(apiUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.text();
+                        })
                         .then(html => {
                             container.getElement().html(html);
-                            // Stocker l'ID du conteneur dans une variable globale du tableau
+                            // Stocker l'ID du conteneur et l'URL de base dans des variables globales du tableau
                             const tableScript = document.createElement('script');
-                            tableScript.textContent = `window.currentContainerId = "${containerId}";`;
+                            tableScript.textContent = `
+                                window.currentContainerId = "${containerId}";
+                                window.API_BASE_URL = "${window.API_BASE_URL}";
+                            `;
                             container.getElement().append(tableScript);
+                        })
+                        .catch(error => {
+                            console.error("Erreur lors du chargement du tableau:", error);
+                            container.getElement().html(`
+                                <div class="flex items-center justify-center h-full">
+                                    <div class="text-red-500">
+                                        Erreur lors du chargement du tableau: ${error.message}
+                                    </div>
+                                </div>
+                            `);
                         });
                 });
 
@@ -616,11 +641,13 @@
                     if (event.data && event.data.type === 'openGeocacheDetails') {
                         const geocacheId = event.data.geocacheId;
                         const containerId = event.data.containerId;
+                        const detailsUrl = event.data.detailsUrl;
                         console.log("Réception de l'événement openGeocacheDetails pour la géocache", geocacheId);
                         console.log("Container ID:", containerId);
+                        console.log("URL des détails:", detailsUrl);
                         
                         // Charger les détails et ouvrir l'onglet
-                        fetch(`/geocaches/${geocacheId}/details-panel`)
+                        fetch(detailsUrl)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`HTTP error! status: ${response.status}`);
