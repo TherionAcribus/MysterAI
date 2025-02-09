@@ -575,7 +575,9 @@ def save_modified_image():
 @geocaches_bp.route('/geocaches/<int:geocache_id>/details-panel', methods=['GET'])
 def get_geocache_details_panel(geocache_id):
     """Renvoie le panneau HTML des détails d'une géocache."""
-    return render_template('geocache_details.html', geocache_id=geocache_id)
+    print("GCID", geocache_id)
+    geocache = Geocache.query.get_or_404(geocache_id)
+    return render_template('geocache_details.html', geocache=geocache)
 
 
 @geocaches_bp.route('/geocaches/table/<int:zone_id>', methods=['GET'])
