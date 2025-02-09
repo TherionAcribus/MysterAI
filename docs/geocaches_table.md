@@ -75,6 +75,13 @@ Les états sont affichés avec des couleurs distinctives :
 ### Bouton d'action
 
 Le bouton "Détails" utilise :
-- HTMX pour le chargement du panneau de détails
-- Hyperscript pour l'intégration avec GoldenLayout
+- `window.postMessage` pour la communication avec la fenêtre parente
+- Un gestionnaire d'événements dans la fenêtre parente pour ouvrir le panneau de détails dans GoldenLayout
 - Classes Tailwind pour le style
+
+La communication entre le tableau et la fenêtre principale se fait via le système de messagerie `postMessage` :
+1. Le bouton "Détails" envoie un message de type `openGeocacheDetails` avec l'ID de la géocache
+2. La fenêtre principale intercepte ce message et :
+   - Charge le contenu HTML des détails via une requête fetch
+   - Crée un nouvel onglet dans GoldenLayout avec les détails
+   - Affiche le contenu dans le nouvel onglet
