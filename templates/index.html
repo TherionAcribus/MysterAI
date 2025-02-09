@@ -527,107 +527,19 @@
                     container.getElement().html(welcomeHtml);
                 });
 
-                layout.registerComponent('geocachesTable', function(container, state) {
-                    console.log("Création du composant geocachesTable pour la zone", state.zoneId);
+                layout.registerComponent('geocaches-table', function(container, state) {
+                    const containerId = container.parent.config.id;
+                    container.getElement().attr('data-container-id', containerId);
                     
-                    // Créer le conteneur pour le tableau
-                    const element = container.getElement();
-                    const url = `${window.location.origin}/geocaches/table/${state.zoneId}`;
-                    console.log("URL de la requête:", url);
-                    
-                    // Créer l'élément div avec un ID unique
-                    const containerId = `geocaches-container-${state.zoneId}`;
-                    const div = document.createElement('div');
-                    div.id = containerId;
-                    div.className = 'w-full h-full';
-                    
-                    // Ajouter l'indicateur de chargement
-                    const loadingDiv = document.createElement('div');
-                    loadingDiv.className = 'loading-indicator flex items-center justify-center w-full h-full';
-                    const spinner = document.createElement('div');
-                    spinner.className = 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500';
-                    loadingDiv.appendChild(spinner);
-                    div.appendChild(loadingDiv);
-                    
-                    // Vider le conteneur et ajouter le nouvel élément
-                    element[0].innerHTML = '';
-                    element[0].appendChild(div);
-                    
-                    // Charger le contenu via fetch
-                    console.log("Chargement du contenu via fetch");
-                    fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'text/html',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    })
-                    .then(response => {
-                        console.log("Réponse reçue:", response);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.text();
-                    })
-                    .then(html => {
-                        console.log("HTML reçu, mise à jour du contenu");
-                        
-                        // Créer un conteneur temporaire pour parser le HTML
-                        const temp = document.createElement('div');
-                        temp.innerHTML = html;
-                        
-                        // Extraire les scripts
-                        const scripts = temp.getElementsByTagName('script');
-                        const scriptsArray = Array.from(scripts);
-                        
-                        // Supprimer les scripts du HTML
-                        scriptsArray.forEach(script => script.remove());
-                        
-                        // Mettre à jour le contenu sans les scripts
-                        div.innerHTML = temp.innerHTML;
-                        
-                        // Fonction pour exécuter les scripts dans l'ordre
-                        const executeScripts = (scripts, index = 0) => {
-                            if (index >= scripts.length) {
-                                console.log("Tous les scripts ont été exécutés");
-                                return;
-                            }
-                            
-                            const script = scripts[index];
-                            const newScript = document.createElement('script');
-                            newScript.textContent = script.textContent;
-                            
-                            // Copier les attributs
-                            Array.from(script.attributes).forEach(attr => {
-                                newScript.setAttribute(attr.name, attr.value);
-                            });
-                            
-                            // Exécuter le script suivant une fois celui-ci chargé
-                            newScript.onload = () => executeScripts(scripts, index + 1);
-                            newScript.onerror = (error) => console.error("Erreur lors du chargement du script:", error);
-                            
-                            console.log("Exécution du script", index + 1);
-                            document.head.appendChild(newScript);
-                        };
-                        
-                        // Commencer l'exécution des scripts
-                        executeScripts(scriptsArray);
-                        
-                        // Configurer le redimensionnement
-                        const tableId = `geocaches-table-${state.zoneId}`;
-                        container.on('resize', function() {
-                            console.log("Redimensionnement du composant geocachesTable");
-                            const table = window[`tabulator_${tableId}`];
-                            if (table) {
-                                console.log("Redimensionnement du tableau Tabulator");
-                                table.redraw(true);
-                            }
+                    fetch(`/geocaches/table/${state.zoneId}`)
+                        .then(response => response.text())
+                        .then(html => {
+                            container.getElement().html(html);
+                            // Stocker l'ID du conteneur dans une variable globale du tableau
+                            const tableScript = document.createElement('script');
+                            tableScript.textContent = `window.currentContainerId = "${containerId}";`;
+                            container.getElement().append(tableScript);
                         });
-                    })
-                    .catch(error => {
-                        console.error("Erreur lors du chargement:", error);
-                        div.innerHTML = `<div class="text-red-500">Erreur lors du chargement: ${error.message}</div>`;
-                    });
                 });
 
                 layout.registerComponent('openGeocachesTab', function(container, state) {
@@ -703,7 +615,9 @@
                 window.addEventListener('message', function(event) {
                     if (event.data && event.data.type === 'openGeocacheDetails') {
                         const geocacheId = event.data.geocacheId;
+                        const containerId = event.data.containerId;
                         console.log("Réception de l'événement openGeocacheDetails pour la géocache", geocacheId);
+                        console.log("Container ID:", containerId);
                         
                         // Charger les détails et ouvrir l'onglet
                         fetch(`/geocaches/${geocacheId}/details-panel`)
@@ -725,8 +639,15 @@
                                     }
                                 };
                                 
-                                // Ajouter le composant à la racine du layout
-                                root.contentItems[0].addChild(newItemConfig);
+                                // Trouver le conteneur parent par son ID
+                                const container = layout.root.getItemsById(containerId)[0];
+                                if (container && container.parent) {
+                                    // Ajouter le composant au parent du conteneur trouvé
+                                    container.parent.addChild(newItemConfig);
+                                } else {
+                                    // Fallback : ajouter à la racine si le conteneur n'est pas trouvé
+                                    root.contentItems[0].addChild(newItemConfig);
+                                }
                             })
                             .catch(error => {
                                 console.error("Erreur lors du chargement des détails:", error);
@@ -763,11 +684,11 @@
                 return;
             }
 
-            const newItemConfig = {
+            const componentConfig = {
                 type: 'component',
-                componentName: 'geocachesTable',
+                componentName: 'geocaches-table',
                 title: `Géocaches - ${zoneName}`,
-                id: componentId,
+                id: `geocaches-table-${zoneId}`,
                 componentState: { 
                     zoneId: zoneId,
                     zoneName: zoneName
@@ -775,11 +696,11 @@
             };
 
             if (window.mainLayout.root.contentItems[0].type === 'row') {
-                window.mainLayout.root.contentItems[0].addChild(newItemConfig);
+                window.mainLayout.root.contentItems[0].addChild(componentConfig);
             } else {
                 window.mainLayout.root.contentItems[0].addChild({
                     type: 'row',
-                    content: [newItemConfig]
+                    content: [componentConfig]
                 });
             }
         };

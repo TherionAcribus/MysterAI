@@ -58,7 +58,11 @@
                                 const geocacheId = cell.getValue();
                                 return `<button 
                                     class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
-                                    onclick="window.parent.postMessage({ type: 'openGeocacheDetails', geocacheId: ${geocacheId} }, '*')"
+                                    onclick="window.parent.postMessage({ 
+                                        type: 'openGeocacheDetails', 
+                                        geocacheId: ${geocacheId},
+                                        containerId: window.currentContainerId
+                                    }, '*')"
                                 >
                                     Détails
                                 </button>`;
