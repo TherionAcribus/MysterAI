@@ -109,13 +109,13 @@
             flex: 1;
             margin-left: 0;
             margin-right: 0;
-            transition: margin-left 0.15s ease-out, margin-right 0.15s ease-out;
-            background-color: #1e1e1e;
             position: relative;
-            z-index: 1;
-            min-width: 0; /* Important pour éviter le débordement */
+            display: flex;
+            flex-direction: column;
+            transition: margin 0.15s ease-out;
+            overflow: hidden;
         }
-        
+
         .main-content.shifted-left {
             margin-left: 250px;
         }
@@ -124,13 +124,135 @@
             margin-right: 250px;
         }
 
-        .main-content.shifted-bottom {
-            margin-bottom: 300px;
+        .golden-layout-container {
+            flex: 1;
+            min-height: 0;
+            transition: height 0.15s ease-out;
+        }
+
+        .bottom-panel-container {
+            display: flex;
+            flex-direction: column;
+            height: 35px;
+            min-height: 35px;
+            max-height: 800px;
+            background-color: #1e1e1e;
+            transition: height 0.3s ease;
+            overflow: hidden;
+            border-top: 1px solid #3c3c3c;
+        }
+
+        .bottom-panel-container.expanded {
+            height: 300px;
+        }
+
+        .bottom-panel-header {
+            flex-shrink: 0;
+            background-color: #2d2d2d;
+            border-bottom: 1px solid #3c3c3c;
+            padding: 4px 0;
+            user-select: none;
+            z-index: 10;
+        }
+
+        .bottom-panel-tabs {
+            display: flex;
+            gap: 1rem;
+            padding: 0 1rem;
+        }
+
+        .bottom-panel-content {
+            flex: 1;
+            overflow: auto;
+            background-color: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .panel-content {
+            display: none;
+            padding: 1rem;
+            height: 100%;
+            color: #e1e1e1;
+            background-color: #1e1e1e;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .panel-content.active {
+            display: block !important;
+        }
+
+        .bottom-panel-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            transition: color 0.2s;
+            position: relative;
+            outline: none;
+        }
+
+        .bottom-panel-tab:hover {
+            color: #c9d1d9;
+        }
+
+        .bottom-panel-tab.active {
+            color: #58a6ff;
+        }
+
+        .bottom-panel-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: #58a6ff;
+        }
+
+        .bottom-panel-tab i {
+            margin-right: 0.5rem;
+        }
+
+        /* Style pour la poignée de redimensionnement du panneau inférieur */
+        .bottom-panel-resizer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background-color: transparent;
+            cursor: ns-resize;
+            z-index: 10;
+            transition: background-color 0.15s ease-out;
+        }
+
+        .bottom-panel-resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 4px;
+            background-color: #3c3c3c;
+            border-radius: 2px;
+        }
+
+        .bottom-panel-resizer:hover::after,
+        .resizing .bottom-panel-resizer::after {
+            background-color: #007fd4;
         }
 
         /* Désactiver les transitions pendant le redimensionnement */
-        .resizing .side-panel,
-        .resizing .main-content {
+        .resizing .bottom-panel-container,
+        .resizing .golden-layout-container {
             transition: none !important;
         }
 
@@ -191,89 +313,6 @@
         }
 
         /* Styles pour le panneau inférieur */
-        .bottom-panel-container {
-            position: absolute;
-            left: 48px; /* Largeur de la barre latérale */
-            right: 48px;
-            bottom: 22px; /* Hauteur de la barre de statut */
-            background-color: #252526;
-            border-top: 1px solid #3c3c3c;
-            transform: translateY(calc(100% - 35px)); /* 35px est la hauteur de l'en-tête des onglets */
-            transition: transform 0.15s ease-out;
-            z-index: 4; /* En dessous de la barre d'état */
-            display: flex;
-            flex-direction: column;
-            height: 300px;
-        }
-
-        .bottom-panel-container.visible {
-            transform: translateY(0);
-        }
-
-        .bottom-panel-header {
-            display: flex;
-            align-items: center;
-            padding: 0 8px;
-            height: 35px;
-            background-color: #2d2d2d;
-            border-bottom: 1px solid #3c3c3c;
-            user-select: none;
-        }
-
-        .bottom-panel-tabs {
-            display: flex;
-            gap: 1px;
-            height: 100%;
-        }
-
-        .bottom-panel-tab {
-            padding: 0 16px;
-            display: flex;
-            align-items: center;
-            height: 100%;
-            background-color: #2d2d2d;
-            border: none;
-            color: #969696;
-            cursor: pointer;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .bottom-panel-tab:hover {
-            background-color: #303030;
-        }
-
-        .bottom-panel-tab.active {
-            background-color: #252526;
-            color: #ffffff;
-            border-top: 1px solid #007fd4;
-            margin-top: -1px;
-        }
-
-        .bottom-panel-tab i {
-            margin-right: 8px;
-        }
-
-        .bottom-panel-content {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-        }
-
-        .bottom-panel {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            padding: 16px;
-            display: none;
-        }
-
-        .bottom-panel.visible {
-            display: block;
-        }
-
         .bottom-panel-resizer {
             position: absolute;
             left: 0;
@@ -292,6 +331,61 @@
         /* Ajustement du panneau droit quand le panneau inférieur est ouvert */
         .side-panel.right-panel.with-bottom-panel {
             bottom: 322px; /* 300px + 22px */
+        }
+
+        /* Style pour les panneaux de contenu */
+        .side-panel-content {
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-content {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: auto;
+        }
+
+        .panel-content.active {
+            display: block;
+        }
+
+        .panel-header {
+            position: sticky;
+            top: 0;
+            background-color: #252526;
+            z-index: 1;
+        }
+
+        .panel-body {
+            height: calc(100% - 3rem);
+            overflow: auto;
+        }
+
+        .bottom-panel-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .bottom-panel-tab:hover {
+            color: #c9d1d9;
+        }
+
+        .bottom-panel-tab.active {
+            color: #58a6ff;
+            border-bottom: 2px solid #58a6ff;
+        }
+
+        .bottom-panel-tab i {
+            margin-right: 0.5rem;
         }
     </style>
 </head>
@@ -326,28 +420,77 @@
             <!-- Left Panel -->
             <div id="left-panel" class="side-panel bg-gray-800 border-r border-gray-700">
                 <div class="resizer"></div>
-                <div id="geocaches-panel" class="h-full p-4 panel-content">
-                    <div class="panel-header border-b border-gray-700 p-2">
-                        <h2 class="text-lg font-semibold">Géocaches</h2>
+                <div class="side-panel-content">
+                    <div id="geocaches-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Géocaches</h2>
+                        </div>
+                        <div id="geocaches-panel-content" class="panel-body">
+                            <!-- Le contenu sera chargé ici par HTMX -->
+                        </div>
                     </div>
-                    <div id="geocaches-panel-content" class="panel-body">
-                        <!-- Le contenu sera chargé ici par HTMX -->
+                    <div id="search-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Recherche</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau de recherche -->
+                        </div>
                     </div>
-                </div>
-                <div id="search-panel" class="h-full p-4 hidden">
-                    <h2 class="text-sm font-semibold mb-4">SEARCH</h2>
-                </div>
-                <div id="git-panel" class="h-full p-4 hidden">
-                    <h2 class="text-sm font-semibold mb-4">SOURCE CONTROL</h2>
-                </div>
-                <div id="settings-panel" class="h-full p-4 hidden">
-                    <h2 class="text-sm font-semibold mb-4">SETTINGS</h2>
+                    <div id="git-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Source Control</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau git -->
+                        </div>
+                    </div>
+                    <div id="settings-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Paramètres</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau des paramètres -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Main Content -->
             <div id="main-content" class="main-content bg-gray-900">
-                <!-- Golden Layout will manage this area -->
+                <div class="golden-layout-container"></div>
+                
+                <!-- Bottom Panel -->
+                <div class="bottom-panel-container">
+                    <div class="bottom-panel-resizer"></div>
+                    <div class="bottom-panel-header">
+                        <div class="bottom-panel-tabs">
+                            <button class="bottom-panel-tab active" data-panel="map-panel">
+                                <i class="fas fa-map-marked-alt"></i>Map
+                            </button>
+                            <button class="bottom-panel-tab" data-panel="notes-panel">
+                                <i class="fas fa-sticky-note"></i>Notes
+                            </button>
+                            <button class="bottom-panel-tab" data-panel="informations-panel">
+                                <i class="fas fa-info-circle"></i>Informations
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bottom-panel-content">
+                        <div id="map-panel" class="panel-content active">
+                            <h3>Panneau de Carte</h3>
+                            <p>Ici vous pouvez voir la carte interactive des géocaches. Cliquez sur une géocache pour voir ses détails.</p>
+                        </div>
+                        <div id="notes-panel" class="panel-content">
+                            <h3>Panneau de Notes</h3>
+                            <p>Cet espace est dédié à la prise de notes et aux annotations personnelles sur vos géocaches.</p>
+                        </div>
+                        <div id="informations-panel" class="panel-content">
+                            <h3>Panneau d'Informations</h3>
+                            <p>Retrouvez ici toutes les informations importantes sur le système et les mises à jour.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Right Panel -->
@@ -378,54 +521,6 @@
         </div>
     </div>
 
-    <!-- Bottom Panel -->
-    <div class="bottom-panel-container">
-        <div class="bottom-panel-header">
-            <div class="bottom-panel-tabs">
-                <button class="bottom-panel-tab active" data-panel="map">
-                    <i class="fas fa-map"></i>
-                    Map
-                </button>
-                <button class="bottom-panel-tab" data-panel="notes">
-                    <i class="fas fa-sticky-note"></i>
-                    Notes
-                </button>
-                <button class="bottom-panel-tab" data-panel="info">
-                    <i class="fas fa-info-circle"></i>
-                    Informations
-                </button>
-            </div>
-        </div>
-        <div class="bottom-panel-content">
-            <div id="map-panel" class="bottom-panel visible">
-                <div id="map" class="w-full h-full"></div>
-            </div>
-            <div id="notes-panel" class="bottom-panel">
-                <div class="h-full flex flex-col">
-                    <textarea class="flex-1 bg-gray-800 text-gray-300 p-4 border border-gray-700 rounded resize-none focus:outline-none focus:border-blue-500" 
-                              placeholder="Prenez vos notes ici..."></textarea>
-                </div>
-            </div>
-            <div id="info-panel" class="bottom-panel">
-                <div class="space-y-4">
-                    <div class="bg-gray-800 p-4 rounded">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-2">Détails de la cache</h3>
-                        <div class="space-y-2">
-                            <p><span class="text-gray-400">Difficulté:</span> <span class="text-yellow-400">★★★☆☆</span></p>
-                            <p><span class="text-gray-400">Terrain:</span> <span class="text-green-400">★★☆☆☆</span></p>
-                            <p><span class="text-gray-400">Taille:</span> Regular</p>
-                        </div>
-                    </div>
-                    <div class="bg-gray-800 p-4 rounded">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-2">Indices</h3>
-                        <p class="text-gray-300">Aucun indice disponible pour le moment.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="bottom-panel-resizer"></div>
-    </div>
-
     <!-- Status Bar -->
     <div class="status-bar flex items-center px-2 text-sm">
         <div class="flex-1">Ready</div>
@@ -441,11 +536,29 @@
     <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
     <script>
+        // Variables globales
+        let mainContent, leftPanel, rightPanel, bottomPanel, goldenLayoutContainer, bottomPanelResizer;
+        let activeLeftButton = null;
+        let activeRightButton = null;
+        let activeLeftPanelId = null;
+        let activeRightPanelId = null;
+        let isResizing = false;
+        let activePanel = null;
+        let isBottomPanelVisible = false;
+        let startY, startHeight;
+        let mainLayout;
+
         // Configuration de l'URL de base pour l'API
         window.API_BASE_URL = 'http://127.0.0.1:3000';
 
+        // Fonction pour charger les zones
         function loadZones() {
-            const target = document.getElementById('geocaches-panel-content');
+            const target = document.querySelector('.side-panel-content');
+            if (!target) {
+                console.error('Conteneur de panneau non trouvé');
+                return;
+            }
+
             fetch('/api/zones', {
                 method: 'GET',
                 headers: {
@@ -462,29 +575,320 @@
             });
         }
 
+        // Gestion des onglets du panneau inférieur
+        function showPanel(panelId) {
+            // Vérifier que les éléments existent avant de manipuler leurs classes
+            const selectedTab = document.querySelector(`.bottom-panel-tab[data-panel="${panelId}"]`);
+            const selectedPanel = document.getElementById(panelId);
+            const bottomPanelContainer = document.querySelector('.bottom-panel-container');
+
+            if (!selectedTab || !selectedPanel || !bottomPanelContainer) {
+                console.error(`Onglet ou panneau introuvable pour l'ID: ${panelId}`);
+                return;
+            }
+
+            // Si on clique sur l'onglet actif, on bascule la visibilité du panneau
+            if (selectedTab.classList.contains('active')) {
+                bottomPanelContainer.classList.toggle('expanded');
+            } else {
+                // Sinon, on active le nouvel onglet et on s'assure que le panneau est ouvert
+                // Retirer la classe active de tous les onglets et panneaux
+                document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.panel-content').forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                
+                // Activer l'onglet et le panneau sélectionnés
+                selectedTab.classList.add('active');
+                selectedPanel.classList.add('active');
+                bottomPanelContainer.classList.add('expanded');
+            }
+
+            // Debug
+            console.log('Panneau activé:', panelId);
+            console.log('Éléments trouvés:', { 
+                tab: selectedTab, 
+                panel: selectedPanel,
+                container: bottomPanelContainer,
+                isExpanded: bottomPanelContainer.classList.contains('expanded')
+            });
+        }
+
+        // Gestion des panneaux latéraux
+        function showSidePanel(panelId, isRight) {
+            const panel = isRight ? rightPanel : leftPanel;
+            const button = document.querySelector(`.sidebar-button[data-panel="${panelId}"]`);
+            const shiftClass = isRight ? 'shifted-right' : 'shifted-left';
+            
+            if ((isRight && activeRightButton === button) || (!isRight && activeLeftButton === button)) {
+                // Fermeture du panneau actif
+                button.classList.remove('active');
+                panel.classList.remove('visible');
+                mainContent.classList.remove(shiftClass);
+                
+                panel.style.width = '250px';
+                if (isRight) {
+                    mainContent.style.marginRight = '0';
+                    panel.style.transform = 'translateX(100%)';
+                    activeRightButton = null;
+                    activeRightPanelId = null;
+                } else {
+                    mainContent.style.marginLeft = '0';
+                    panel.style.transform = 'translateX(-100%)';
+                    activeLeftButton = null;
+                    activeLeftPanelId = null;
+                }
+            } else {
+                // Fermeture du panneau précédent du même côté s'il existe
+                if (isRight && activeRightButton) {
+                    activeRightButton.classList.remove('active');
+                    rightPanel.classList.remove('visible');
+                    mainContent.classList.remove('shifted-right');
+                    rightPanel.style.transform = 'translateX(100%)';
+                } else if (!isRight && activeLeftButton) {
+                    activeLeftButton.classList.remove('active');
+                    leftPanel.classList.remove('visible');
+                    mainContent.classList.remove('shifted-left');
+                    leftPanel.style.transform = 'translateX(-100%)';
+                }
+                
+                // Ouverture du nouveau panneau
+                button.classList.add('active');
+                panel.classList.add('visible');
+                mainContent.classList.add(shiftClass);
+                
+                panel.style.transform = 'translateX(0)';
+                const currentWidth = panel.style.width || '250px';
+                if (isRight) {
+                    mainContent.style.marginRight = currentWidth;
+                    activeRightButton = button;
+                    activeRightPanelId = panelId;
+                } else {
+                    mainContent.style.marginLeft = currentWidth;
+                    activeLeftButton = button;
+                    activeLeftPanelId = panelId;
+                }
+                
+                // Charger le contenu du panneau si nécessaire
+                loadPanelContent(panelId, isRight);
+            }
+
+            if (window.mainLayout) {
+                setTimeout(() => {
+                    window.mainLayout.updateSize();
+                }, 300);
+            }
+        }
+
+        // Chargement du contenu des panneaux latéraux
+        function loadPanelContent(panelId, isRight) {
+            const panel = isRight ? rightPanel : leftPanel;
+            const panelContent = panel.querySelector('.side-panel-content');
+            
+            if (!panelContent) {
+                console.error('Conteneur de contenu non trouvé dans le panneau');
+                return;
+            }
+
+            // Masquer tous les panneaux de contenu
+            panelContent.querySelectorAll('.panel-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Afficher le panneau sélectionné
+            const selectedPanel = panelContent.querySelector(`#${panelId}-panel`);
+            if (selectedPanel) {
+                selectedPanel.classList.add('active');
+                if (panelId === 'geocaches') {
+                    loadZones();
+                }
+            } else {
+                console.error(`Panneau ${panelId} non trouvé`);
+            }
+        }
+
+        // Fonction de gestion du redimensionnement
+        function handleResize(e, panel, isRight) {
+            if (!isResizing) return;
+
+            if (panel === bottomPanel) {
+                // Gestion du redimensionnement vertical
+                const diff = startY - e.clientY;
+                const newHeight = Math.min(800, Math.max(35, startHeight + diff));
+                
+                // Mettre à jour la hauteur du panneau inférieur
+                panel.style.height = newHeight + 'px';
+                
+                // Mettre à jour la hauteur du conteneur Golden Layout
+                const totalHeight = panel.parentElement.clientHeight;
+                goldenLayoutContainer.style.height = (totalHeight - newHeight) + 'px';
+                
+                // Mettre à jour les classes en fonction de la hauteur
+                if (newHeight <= 35) {
+                    panel.classList.remove('visible');
+                } else {
+                    panel.classList.add('visible');
+                }
+            } else {
+                // Gestion du redimensionnement horizontal (panneaux latéraux)
+                const rect = panel.getBoundingClientRect();
+                const width = isRight 
+                    ? Math.min(800, Math.max(100, rect.right - e.clientX))
+                    : Math.min(800, Math.max(100, e.clientX - rect.left));
+                
+                panel.style.width = width + 'px';
+                if (isRight) {
+                    mainContent.style.marginRight = width + 'px';
+                } else {
+                    mainContent.style.marginLeft = width + 'px';
+                }
+            }
+
+            // Mettre à jour le layout
+            if (window.mainLayout) {
+                window.mainLayout.updateSize();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialisation des références DOM
+            mainContent = document.getElementById('main-content');
+            leftPanel = document.querySelector('.side-panel:not(.right-panel)');
+            rightPanel = document.querySelector('.side-panel.right-panel');
+            bottomPanel = document.querySelector('.bottom-panel-container');
+            goldenLayoutContainer = document.querySelector('.golden-layout-container');
+            bottomPanelResizer = document.querySelector('.bottom-panel-resizer');
+
+            // Gestion des clics sur les onglets du panneau inférieur
+            document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const panelId = this.dataset.panel;
+                    showPanel(panelId);
+                });
+            });
+
+            // Gestion des clics sur les boutons des panneaux latéraux
+            document.querySelectorAll('.sidebar-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const panelId = this.dataset.panel;
+                    const isRight = this.dataset.side === 'right';
+                    showSidePanel(panelId, isRight);
+                });
+            });
+
+            // Gestionnaires d'événements pour le redimensionnement
+            bottomPanelResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                activePanel = bottomPanel;
+                document.body.classList.add('resizing');
+                
+                startY = e.clientY;
+                startHeight = parseInt(window.getComputedStyle(bottomPanel).height);
+                
+                bottomPanel.style.transition = 'none';
+                goldenLayoutContainer.style.transition = 'none';
+                
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing || !activePanel) return;
+                handleResize(e, activePanel, activePanel === rightPanel);
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (!isResizing) return;
+                
+                isResizing = false;
+                document.body.classList.remove('resizing');
+                
+                if (activePanel) {
+                    activePanel.style.transition = '';
+                    if (activePanel === bottomPanel) {
+                        goldenLayoutContainer.style.transition = '';
+                        const currentHeight = parseInt(window.getComputedStyle(bottomPanel).height);
+                        isBottomPanelVisible = currentHeight > 35;
+                    }
+                    activePanel = null;
+                }
+            });
+
+            // Initialisation du layout
+            initializeLayout();
+        });
+
+        // Fonction de gestion du redimensionnement
+        function handleResize(e, panel, isRight) {
+            if (!isResizing) return;
+
+            if (panel === bottomPanel) {
+                // Gestion du redimensionnement vertical
+                const diff = startY - e.clientY;
+                const newHeight = Math.min(800, Math.max(35, startHeight + diff));
+                
+                // Mettre à jour la hauteur du panneau inférieur
+                panel.style.height = newHeight + 'px';
+                
+                // Mettre à jour la hauteur du conteneur Golden Layout
+                const totalHeight = panel.parentElement.clientHeight;
+                goldenLayoutContainer.style.height = (totalHeight - newHeight) + 'px';
+                
+                // Mettre à jour les classes en fonction de la hauteur
+                if (newHeight <= 35) {
+                    panel.classList.remove('visible');
+                } else {
+                    panel.classList.add('visible');
+                }
+            } else {
+                // Gestion du redimensionnement horizontal (panneaux latéraux)
+                const rect = panel.getBoundingClientRect();
+                const width = isRight 
+                    ? Math.min(800, Math.max(100, rect.right - e.clientX))
+                    : Math.min(800, Math.max(100, e.clientX - rect.left));
+                
+                panel.style.width = width + 'px';
+                if (isRight) {
+                    mainContent.style.marginRight = width + 'px';
+                } else {
+                    mainContent.style.marginLeft = width + 'px';
+                }
+            }
+
+            // Mettre à jour le layout
+            if (window.mainLayout) {
+                window.mainLayout.updateSize();
+            }
+        }
+
         function initializeLayout() {
             const config = {
                 settings: {
                     showPopoutIcon: false,
-                    showMaximiseIcon: true,
-                    showCloseIcon: true,
+                    showMaximiseIcon: false,
+                    showCloseIcon: false
                 },
                 content: [{
                     type: 'row',
                     content: [{
                         type: 'component',
                         componentName: 'welcome',
-                        title: 'Welcome',
-                        isClosable: false,
-                        componentState: {}
+                        title: 'Bienvenue'
                     }]
                 }]
             };
 
             try {
-                const layout = new GoldenLayout(config, document.getElementById('main-content'));
+                // S'assurer qu'il n'y a qu'une seule instance
+                if (window.mainLayout) {
+                    window.mainLayout.destroy();
+                }
+                
+                mainLayout = new GoldenLayout(config, document.querySelector('.golden-layout-container'));
+                window.mainLayout = mainLayout;
 
-                layout.registerComponent('welcome', function(container, state) {
+                mainLayout.registerComponent('welcome', function(container, state) {
                     const welcomeHtml = `
                         <div class="p-8 max-w-4xl mx-auto">
                             <div class="text-center mb-8">
@@ -530,7 +934,7 @@
                     container.getElement().html(welcomeHtml);
                 });
 
-                layout.registerComponent('geocaches-table', function(container, state) {
+                mainLayout.registerComponent('geocaches-table', function(container, state) {
                     const containerId = container.parent.config.id;
                     container.getElement().attr('data-container-id', containerId);
                     
@@ -567,53 +971,46 @@
                         });
                 });
 
-                layout.registerComponent('openGeocachesTab', function(container, state) {
-                    console.log("Création du composant openGeocachesTab pour la zone", state.zoneId);
+                mainLayout.registerComponent('openGeocacheDetails', function(container, state) {
+                    console.log("Création du composant openGeocacheDetails pour la zone", state.zoneId);
                     
-                    // Créer le conteneur pour le tableau
-                    const element = container.getElement();
-                    const url = `/geocaches/table/${state.zoneId}`;
-                    console.log("URL de la requête HTMX:", url);
-                    
-                    // Créer l'élément div manuellement
-                    const div = document.createElement('div');
-                    div.className = 'w-full h-full';
-                    div.setAttribute('hx-get', url);
-                    div.setAttribute('hx-trigger', 'load');
-                    div.setAttribute('hx-swap', 'innerHTML');
-                    div.setAttribute('hx-indicator', '.loading-indicator');
-                    
-                    // Ajouter l'indicateur de chargement
-                    const loadingDiv = document.createElement('div');
-                    loadingDiv.className = 'loading-indicator flex items-center justify-center w-full h-full';
-                    const spinner = document.createElement('div');
-                    spinner.className = 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500';
-                    loadingDiv.appendChild(spinner);
-                    div.appendChild(loadingDiv);
-                    
-                    // Vider le conteneur et ajouter le nouvel élément
-                    element[0].innerHTML = '';
-                    element[0].appendChild(div);
-                    
-                    // Forcer HTMX à scanner le nouvel élément
-                    console.log("Processing HTMX on element:", div);
-                    htmx.process(div);
-
-                    // Gérer le redimensionnement
-                    container.on('resize', function() {
-                        console.log("Redimensionnement du composant openGeocachesTab");
-                        const tableDiv = element.find(`#geocaches-table-${state.zoneId}`);
-                        if (tableDiv.length > 0) {
-                            const tabulatorInstance = Tabulator.findTable(`#geocaches-table-${state.zoneId}`)[0];
-                            if (tabulatorInstance) {
-                                console.log("Redimensionnement du tableau Tabulator");
-                                tabulatorInstance.redraw(true);
+                    // Charger les détails et ouvrir l'onglet
+                    fetch(state.detailsUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
                             }
-                        }
-                    });
+                            return response.text();
+                        })
+                        .then(html => {
+                            const root = mainLayout.root;
+                            const newItemConfig = {
+                                type: 'component',
+                                componentName: 'geocache-details',
+                                title: `Détails GC-${state.geocacheId}`,
+                                componentState: { 
+                                    html: html,
+                                    geocacheId: state.geocacheId
+                                }
+                            };
+                            
+                            // Trouver le conteneur parent par son ID
+                            const container = mainLayout.root.getItemsById(state.containerId)[0];
+                            if (container && container.parent) {
+                                // Ajouter le composant au parent du conteneur trouvé
+                                container.parent.addChild(newItemConfig);
+                            } else {
+                                // Fallback : ajouter à la racine si le conteneur n'est pas trouvé
+                                root.contentItems[0].addChild(newItemConfig);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Erreur lors du chargement des détails:", error);
+                            alert("Erreur lors du chargement des détails de la géocache");
+                        });
                 });
 
-                layout.registerComponent('geocache-details', function(container, state) {
+                mainLayout.registerComponent('geocache-details', function(container, state) {
                     console.log("Création du composant geocache-details", state);
                     
                     // Créer le conteneur pour les détails
@@ -634,7 +1031,7 @@
                 });
 
                 // Exposer l'instance Golden Layout globalement
-                window.goldenlayout = layout;
+                window.goldenlayout = mainLayout;
 
                 // Écouter l'événement openGeocacheDetails depuis les iframes
                 window.addEventListener('message', function(event) {
@@ -655,7 +1052,7 @@
                                 return response.text();
                             })
                             .then(html => {
-                                const root = layout.root;
+                                const root = mainLayout.root;
                                 const newItemConfig = {
                                     type: 'component',
                                     componentName: 'geocache-details',
@@ -667,7 +1064,7 @@
                                 };
                                 
                                 // Trouver le conteneur parent par son ID
-                                const container = layout.root.getItemsById(containerId)[0];
+                                const container = mainLayout.root.getItemsById(containerId)[0];
                                 if (container && container.parent) {
                                     // Ajouter le composant au parent du conteneur trouvé
                                     container.parent.addChild(newItemConfig);
@@ -683,11 +1080,11 @@
                     }
                 });
 
-                layout.init();
-                window.mainLayout = layout;
+                mainLayout.init();
+                window.mainLayout = mainLayout;
 
                 window.addEventListener('resize', () => {
-                    layout.updateSize();
+                    mainLayout.updateSize();
                 });
             } catch (error) {
                 console.error('Golden Layout error:', error);
@@ -698,7 +1095,7 @@
             const componentId = `geocaches-${zoneId}`;
             
             let existingComponent = null;
-            window.mainLayout.root.contentItems.forEach(item => {
+            mainLayout.root.contentItems.forEach(item => {
                 item.contentItems.forEach(subItem => {
                     if (subItem.config.id === componentId) {
                         existingComponent = subItem;
@@ -722,10 +1119,10 @@
                 }
             };
 
-            if (window.mainLayout.root.contentItems[0].type === 'row') {
-                window.mainLayout.root.contentItems[0].addChild(componentConfig);
+            if (mainLayout.root.contentItems[0].type === 'row') {
+                mainLayout.root.contentItems[0].addChild(componentConfig);
             } else {
-                window.mainLayout.root.contentItems[0].addChild({
+                mainLayout.root.contentItems[0].addChild({
                     type: 'row',
                     content: [componentConfig]
                 });
@@ -761,7 +1158,7 @@
 
             const leftPanel = document.querySelector('.side-panel:not(.right-panel)');
             const rightPanel = document.querySelector('.side-panel.right-panel');
-            const mainContent = document.querySelector('.main-content');
+            const mainContent = document.getElementById('main-content');
             const leftResizer = leftPanel.querySelector('.resizer');
             const rightResizer = rightPanel.querySelector('.resizer');
             const bottomPanel = document.querySelector('.bottom-panel-container');
@@ -786,20 +1183,44 @@
                 }
             }
 
+            // Fonction générique de redimensionnement
             function handleResize(e, panel, isRight) {
                 if (!isResizing) return;
-                
-                if (isRight) {
-                    const maxWidth = Math.min(800, window.innerWidth - 100);
-                    const width = Math.min(maxWidth, Math.max(250, window.innerWidth - e.clientX));
-                    panel.style.width = `${width}px`;
-                    mainContent.style.marginRight = `${width}px`;
+
+                if (panel === bottomPanel) {
+                    // Gestion du redimensionnement vertical
+                    const diff = startY - e.clientY;
+                    const newHeight = Math.min(800, Math.max(35, startHeight + diff));
+                    
+                    // Mettre à jour la hauteur du panneau inférieur
+                    panel.style.height = newHeight + 'px';
+                    
+                    // Mettre à jour la hauteur du conteneur Golden Layout
+                    const totalHeight = panel.parentElement.clientHeight;
+                    goldenLayoutContainer.style.height = (totalHeight - newHeight) + 'px';
+                    
+                    // Mettre à jour les classes en fonction de la hauteur
+                    if (newHeight <= 35) {
+                        panel.classList.remove('visible');
+                    } else {
+                        panel.classList.add('visible');
+                    }
                 } else {
-                    const width = Math.min(800, Math.max(250, e.clientX));
-                    panel.style.width = `${width}px`;
-                    mainContent.style.marginLeft = `${width}px`;
+                    // Gestion du redimensionnement horizontal (panneaux latéraux)
+                    const rect = panel.getBoundingClientRect();
+                    const width = isRight 
+                        ? Math.min(800, Math.max(100, rect.right - e.clientX))
+                        : Math.min(800, Math.max(100, e.clientX - rect.left));
+                    
+                    panel.style.width = width + 'px';
+                    if (isRight) {
+                        mainContent.style.marginRight = width + 'px';
+                    } else {
+                        mainContent.style.marginLeft = width + 'px';
+                    }
                 }
-                
+
+                // Mettre à jour le layout
                 if (window.mainLayout) {
                     window.mainLayout.updateSize();
                 }
@@ -828,165 +1249,65 @@
                 activePanel = bottomPanel;
                 document.body.classList.add('resizing');
                 
+                startY = e.clientY;
+                startHeight = parseInt(window.getComputedStyle(bottomPanel).height);
+                
                 bottomPanel.style.transition = 'none';
-                mainContent.style.transition = 'none';
+                goldenLayoutContainer.style.transition = 'none';
                 
                 e.preventDefault();
             });
 
             document.addEventListener('mousemove', function(e) {
                 if (!isResizing || !activePanel) return;
-                if (activePanel === bottomPanel) {
-                    const HEADER_HEIGHT = 35; 
-                    const maxHeight = Math.min(800, window.innerHeight - 100);
-                    const newHeight = Math.min(maxHeight, Math.max(HEADER_HEIGHT, window.innerHeight - e.clientY));
-                    
-                    bottomPanel.style.height = newHeight + 'px';
-                    
-                    const visibleHeight = Math.max(0, newHeight - HEADER_HEIGHT);
-                    mainContent.style.marginBottom = visibleHeight + 'px';
-                    
-                    if (newHeight <= HEADER_HEIGHT) {
-                        bottomPanel.classList.remove('visible');
-                        mainContent.classList.remove('shifted-bottom');
-                    } else {
-                        bottomPanel.classList.add('visible');
-                        mainContent.classList.add('shifted-bottom');
-                    }
-                    
-                    if (window.mainLayout) {
-                        window.mainLayout.updateSize();
-                    }
-                } else {
-                    handleResize(e, activePanel, activePanel === rightPanel);
-                }
+                handleResize(e, activePanel, activePanel === rightPanel);
             });
 
             document.addEventListener('mouseup', function() {
-                if (isResizing) {
-                    isResizing = false;
-                    document.body.classList.remove('resizing');
-                    
-                    if (activePanel) {
-                        activePanel.style.transition = '';
-                        mainContent.style.transition = '';
-                        
-                        activePanel = null;
+                if (!isResizing) return;
+                
+                isResizing = false;
+                document.body.classList.remove('resizing');
+                
+                if (activePanel) {
+                    activePanel.style.transition = '';
+                    if (activePanel === bottomPanel) {
+                        goldenLayoutContainer.style.transition = '';
+                        const currentHeight = parseInt(window.getComputedStyle(bottomPanel).height);
+                        isBottomPanelVisible = currentHeight > 35;
                     }
+                    activePanel = null;
                 }
             });
 
-            document.querySelectorAll('.sidebar-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    const panelId = this.dataset.panel;
-                    const isRight = this.dataset.side === 'right';
-                    const panel = isRight ? rightPanel : leftPanel;
-                    const shiftClass = isRight ? 'shifted-right' : 'shifted-left';
-                    
-                    if ((isRight && activeRightButton === this) || (!isRight && activeLeftButton === this)) {
-                        this.classList.remove('active');
-                        panel.classList.remove('visible');
-                        mainContent.classList.remove(shiftClass);
-                        
-                        panel.style.width = '250px';
-                        if (isRight) {
-                            mainContent.style.marginRight = '0';
-                            panel.style.transform = 'translateX(100%)';
-                            activeRightButton = null;
-                            activeRightPanelId = null;
-                        } else {
-                            mainContent.style.marginLeft = '0';
-                            panel.style.transform = 'translateX(-100%)';
-                            activeLeftButton = null;
-                            activeLeftPanelId = null;
-                        }
-                    } else {
-                        if (isRight && activeRightButton) {
-                            activeRightButton.classList.remove('active');
-                            rightPanel.classList.remove('visible');
-                            mainContent.classList.remove('shifted-right');
-                            rightPanel.style.transform = 'translateX(100%)';
-                        } else if (!isRight && activeLeftButton) {
-                            activeLeftButton.classList.remove('active');
-                            leftPanel.classList.remove('visible');
-                            mainContent.classList.remove('shifted-left');
-                            leftPanel.style.transform = 'translateX(-100%)';
-                        }
-                        
-                        this.classList.add('active');
-                        panel.classList.add('visible');
-                        mainContent.classList.add(shiftClass);
-                        
-                        panel.style.transform = 'translateX(0)';
-                        const currentWidth = panel.style.width || '250px';
-                        if (isRight) {
-                            mainContent.style.marginRight = currentWidth;
-                            activeRightButton = this;
-                            activeRightPanelId = panelId;
-                        } else {
-                            mainContent.style.marginLeft = currentWidth;
-                            activeLeftButton = this;
-                            activeLeftPanelId = panelId;
-                        }
-                        
-                        showPanel(panelId, isRight);
-                    }
-
-                    if (window.mainLayout) {
-                        setTimeout(() => {
-                            window.mainLayout.updateSize();
-                        }, 300);
-                    }
-                });
-            });
-
-            const chatInput = document.querySelector('.chat-input');
-            const chatSendButton = document.querySelector('.chat-send-button');
-            const chatMessages = document.querySelector('.chat-messages');
-
-            function sendMessage() {
-                const message = chatInput.value.trim();
-                if (message) {
-                    const messageElement = document.createElement('div');
-                    messageElement.className = 'mb-4';
-                    messageElement.innerHTML = `
-                        <div class="bg-gray-700 rounded p-3 max-w-3/4 ml-auto">
-                            ${message}
-                        </div>
-                    `;
-                    chatMessages.appendChild(messageElement);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    chatInput.value = '';
-                }
-            }
-
-            chatSendButton.addEventListener('click', sendMessage);
-            chatInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-
+            // Gestion des onglets du panneau inférieur
             const bottomPanelTabs = document.querySelectorAll('.bottom-panel-tab');
-            const bottomPanelContents = document.querySelectorAll('.bottom-panel');
-            let isBottomPanelVisible = false;
+            const bottomPanelContents = document.querySelectorAll('.bottom-panel-content');
 
             bottomPanelTabs.forEach(tab => {
                 tab.addEventListener('click', function() {
-                    if (!isBottomPanelVisible) {
-                        bottomPanel.style.height = '300px';
-                        mainContent.style.marginBottom = (300 - 35) + 'px';
+                    const panelId = this.dataset.panel;
+                    
+                    // Si le panneau est réduit, on l'agrandit
+                    const currentHeight = parseInt(window.getComputedStyle(bottomPanel).height);
+                    if (currentHeight <= 35) {
+                        const newHeight = 300;
+                        bottomPanel.style.height = newHeight + 'px';
+                        
+                        // Ajuster la hauteur du conteneur Golden Layout
+                        const totalHeight = bottomPanel.parentElement.clientHeight;
+                        goldenLayoutContainer.style.height = (totalHeight - newHeight) + 'px';
+                        
                         bottomPanel.classList.add('visible');
-                        mainContent.classList.add('shifted-bottom');
-                        isBottomPanelVisible = true;
                     }
 
+                    // Gestion des onglets
                     bottomPanelTabs.forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     
+                    // Affichage du contenu
                     bottomPanelContents.forEach(panel => {
-                        if (panel.id === this.dataset.panel + '-panel') {
+                        if (panel.id === panelId) {
                             panel.classList.add('visible');
                         } else {
                             panel.classList.remove('visible');
@@ -994,42 +1315,10 @@
                     });
 
                     if (window.mainLayout) {
-                        setTimeout(() => {
-                            window.mainLayout.updateSize();
-                        }, 300);
+                        window.mainLayout.updateSize();
                     }
                 });
             });
-
-            const bottomPanelToggleButton = document.createElement('button');
-            bottomPanelToggleButton.className = 'text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button';
-            bottomPanelToggleButton.title = 'Toggle Bottom Panel';
-            bottomPanelToggleButton.innerHTML = '<i class="fas fa-angle-up"></i>';
-            
-            bottomPanelToggleButton.addEventListener('click', function() {
-                if (bottomPanel.classList.contains('visible')) {
-                    bottomPanel.classList.remove('visible');
-                    mainContent.classList.remove('shifted-bottom');
-                    this.innerHTML = '<i class="fas fa-angle-up"></i>';
-                    isBottomPanelVisible = false;
-                } else {
-                    bottomPanel.style.height = '300px';
-                    mainContent.style.marginBottom = (300 - 35) + 'px';
-                    bottomPanel.classList.add('visible');
-                    mainContent.classList.add('shifted-bottom');
-                    this.innerHTML = '<i class="fas fa-angle-down"></i>';
-                    isBottomPanelVisible = true;
-                }
-
-                if (window.mainLayout) {
-                    setTimeout(() => {
-                        window.mainLayout.updateSize();
-                    }, 300);
-                }
-            });
-
-            const rightSidebar = document.querySelector('.sidebar.right-sidebar .flex-1');
-            rightSidebar.appendChild(bottomPanelToggleButton);
         });
     </script>
 </body>

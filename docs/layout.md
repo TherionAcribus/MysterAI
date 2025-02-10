@@ -55,6 +55,24 @@ MysteryAI utilise une interface inspirée de Visual Studio Code, avec une dispos
 
 ### 2. Panneaux Extensibles
 
+#### Structure des Panneaux
+- Chaque panneau suit une structure commune :
+  ```html
+  <div class="side-panel">
+    <div class="resizer"></div>
+    <div class="side-panel-content">
+      <div class="panel-content">
+        <div class="panel-header">
+          <h2>Titre du Panneau</h2>
+        </div>
+        <div class="panel-body">
+          <!-- Contenu spécifique -->
+        </div>
+      </div>
+    </div>
+  </div>
+  ```
+
 #### Panneau Gauche
 - Largeur par défaut : 250px
 - Largeur minimale : 100px
@@ -88,6 +106,10 @@ MysteryAI utilise une interface inspirée de Visual Studio Code, avec une dispos
   - Map : Carte interactive
   - Notes : Éditeur de notes
   - Informations : Détails sur la cache actuelle
+- Comportement :
+  - S'ouvre automatiquement lors du premier clic sur un onglet
+  - Un clic sur l'onglet actif bascule l'ouverture/fermeture
+  - Conserve l'onglet actif lors de la réouverture
 
 ### 5. Barre d'État
 - Hauteur fixe : 22px
@@ -96,36 +118,24 @@ MysteryAI utilise une interface inspirée de Visual Studio Code, avec une dispos
   - Type de fichier
   - Position du curseur
 
-## Comportements
-
-### Redimensionnement
-- Tous les panneaux sont redimensionnables
-- Les transitions sont animées (durée : 150ms)
-- Le contenu principal s'adapte automatiquement
-
-### Panneaux Latéraux
-- Peuvent être ouverts/fermés indépendamment
-- Conservent leur taille lors de la réouverture
-- Poussent le contenu principal lors de l'ouverture
-
-### Panneau Inférieur
-- Peut être réduit à la hauteur des onglets
-- S'ouvre automatiquement lors du clic sur un onglet
-- Conserve l'onglet actif lors de la réouverture
-
 ## Classes CSS Importantes
 
 ### Conteneurs
 - `.workspace-container` : Conteneur principal
 - `.panel-container` : Conteneur des panneaux
+- `.side-panel` : Panneau latéral
+- `.side-panel-content` : Conteneur du contenu d'un panneau
+- `.panel-content` : Section de contenu spécifique
+- `.panel-header` : En-tête de section
+- `.panel-body` : Corps de section
 - `.bottom-panel-container` : Conteneur du panneau inférieur
 
 ### États
-- `.visible` : Panneau visible
-- `.active` : Bouton ou onglet actif
+- `.visible` : Panneau latéral visible
+- `.expanded` : Panneau inférieur ouvert
+- `.active` : Bouton, onglet ou contenu actif
 - `.shifted-left` : Contenu décalé par le panneau gauche
 - `.shifted-right` : Contenu décalé par le panneau droit
-- `.shifted-bottom` : Contenu décalé par le panneau inférieur
 
 ### Éléments Interactifs
 - `.resizer` : Poignées de redimensionnement
@@ -156,35 +166,70 @@ document.addEventListener('mouseup', () => {
 });
 ```
 
-### Basculement des Panneaux
+### Basculement des Panneaux Latéraux
 ```javascript
-button.addEventListener('click', () => {
-    if (isVisible) {
-        // Masquer le panneau
+function showSidePanel(panelId, isRight) {
+    const panel = isRight ? rightPanel : leftPanel;
+    const button = document.querySelector(`.sidebar-button[data-panel="${panelId}"]`);
+    
+    if ((isRight && activeRightButton === button) || (!isRight && activeLeftButton === button)) {
+        // Fermeture du panneau actif
+        button.classList.remove('active');
         panel.classList.remove('visible');
     } else {
-        // Afficher le panneau
+        // Ouverture du nouveau panneau
+        button.classList.add('active');
         panel.classList.add('visible');
+        loadPanelContent(panelId, isRight);
     }
-});
+}
+```
+
+### Basculement du Panneau Inférieur
+```javascript
+function showPanel(panelId) {
+    const selectedTab = document.querySelector(`.bottom-panel-tab[data-panel="${panelId}"]`);
+    const selectedPanel = document.getElementById(panelId);
+    
+    if (selectedTab.classList.contains('active')) {
+        // Basculer l'ouverture/fermeture si on clique sur l'onglet actif
+        bottomPanelContainer.classList.toggle('expanded');
+    } else {
+        // Activer le nouvel onglet et ouvrir le panneau
+        selectedTab.classList.add('active');
+        selectedPanel.classList.add('active');
+        bottomPanelContainer.classList.add('expanded');
+    }
+}
 ```
 
 ## Bonnes Pratiques
 
-1. **Performances**
+1. **Structure HTML**
+   - Utiliser une structure cohérente pour tous les panneaux
+   - Séparer le contenu en sections logiques (header/body)
+   - Maintenir une hiérarchie claire des éléments
+
+2. **Gestion du Contenu**
+   - Charger le contenu dynamiquement via des fonctions dédiées
+   - Utiliser des classes pour gérer la visibilité
+   - Éviter de manipuler directement le HTML quand possible
+
+3. **Performances**
    - Utiliser `transform` pour les animations
    - Éviter les calculs de layout fréquents
    - Regrouper les modifications DOM
 
-2. **Accessibilité**
+4. **Accessibilité**
    - Maintenir un contraste suffisant
    - Fournir des raccourcis clavier
    - Utiliser des attributs ARIA appropriés
 
-3. **Maintenance**
+5. **Maintenance**
    - Garder les dimensions dans des variables CSS
    - Commenter les sections complexes
    - Utiliser des noms de classes explicites
+   - Suivre une structure cohérente pour tous les panneaux
 
 ## Dépendances
 
