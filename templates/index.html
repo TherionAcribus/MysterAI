@@ -140,6 +140,7 @@
             transition: height 0.3s ease;
             overflow: hidden;
             border-top: 1px solid #3c3c3c;
+            position: relative;
         }
 
         .bottom-panel-container.expanded {
@@ -222,32 +223,32 @@
 
         /* Style pour la poignée de redimensionnement du panneau inférieur */
         .bottom-panel-resizer {
+            width: 100%;
+            height: 4px;
+            cursor: ns-resize;
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            height: 4px;
-            background-color: transparent;
-            cursor: ns-resize;
-            z-index: 10;
-            transition: background-color 0.15s ease-out;
+            background: transparent;
+            z-index: 20;
         }
 
-        .bottom-panel-resizer::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 50px;
-            height: 4px;
-            background-color: #3c3c3c;
-            border-radius: 2px;
+        .bottom-panel-resizer:hover,
+        .bottom-panel-resizer.resizing {
+            background: #58a6ff;
         }
 
-        .bottom-panel-resizer:hover::after,
-        .resizing .bottom-panel-resizer::after {
-            background-color: #007fd4;
+        .bottom-panel-container {
+            display: flex;
+            flex-direction: column;
+            height: 35px;
+            min-height: 35px;
+            max-height: 800px;
+            background-color: #1e1e1e;
+            transition: height 0.3s ease;
+            overflow: hidden;
+            border-top: 1px solid #3c3c3c;
+            position: relative;
         }
 
         /* Désactiver les transitions pendant le redimensionnement */
@@ -552,8 +553,8 @@
                 <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="geocaches" data-side="left"
                         hx-get="/api/zones"
                         hx-target="#geocaches-panel-content"
-                        hx-trigger="click"
-                        hx-headers='{"HX-Request": "true"}'>
+                        hx-swap="innerHTML"
+                        hx-trigger="load">
                     <i class="fas fa-map-marker-alt"></i>
                 </button>
                 <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="search" data-side="left">
@@ -758,16 +759,18 @@
                 selectedTab.classList.add('active');
                 selectedPanel.classList.add('active');
                 bottomPanelContainer.classList.add('expanded');
+
+                // Si le panneau est réduit, on l'agrandit
+                const currentHeight = parseInt(window.getComputedStyle(bottomPanelContainer).height);
+                if (currentHeight <= 35) {
+                    bottomPanelContainer.style.height = '300px';
+                }
             }
 
-            // Debug
-            console.log('Panneau activé:', panelId);
-            console.log('Éléments trouvés:', { 
-                tab: selectedTab, 
-                panel: selectedPanel,
-                container: bottomPanelContainer,
-                isExpanded: bottomPanelContainer.classList.contains('expanded')
-            });
+            // Mettre à jour la taille de Golden Layout
+            if (window.mainLayout) {
+                window.mainLayout.updateSize();
+            }
         }
 
         // Gestion des panneaux latéraux
@@ -852,14 +855,28 @@
             });
 
             // Afficher le panneau sélectionné
-            const selectedPanel = panelContent.querySelector(`#${panelId}-panel`);
+            const selectedPanel = document.getElementById(`${panelId}-panel`);
             if (selectedPanel) {
                 selectedPanel.classList.add('active');
                 if (panelId === 'geocaches') {
-                    loadZones();
+                    // Le contenu est déjà chargé par HTMX au chargement initial
+                    console.log('Panneau geocaches activé');
                 }
             } else {
-                console.error(`Panneau ${panelId} non trouvé`);
+                console.warn(`Panneau ${panelId} non trouvé, création d'un panneau par défaut`);
+                // Créer un panneau par défaut s'il n'existe pas
+                const defaultPanel = document.createElement('div');
+                defaultPanel.id = `${panelId}-panel`;
+                defaultPanel.className = 'h-full p-4 panel-content active';
+                defaultPanel.innerHTML = `
+                    <div class="panel-header border-b border-gray-700 p-2">
+                        <h2 class="text-lg font-semibold">${panelId.charAt(0).toUpperCase() + panelId.slice(1)}</h2>
+                    </div>
+                    <div class="panel-body">
+                        <p class="text-gray-400 mt-4">Contenu en cours de développement</p>
+                    </div>
+                `;
+                panelContent.appendChild(defaultPanel);
             }
         }
 
@@ -915,15 +932,58 @@
             goldenLayoutContainer = document.querySelector('.golden-layout-container');
             bottomPanelResizer = document.querySelector('.bottom-panel-resizer');
 
+            // Variables pour le redimensionnement
+            let isResizing = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            // Gestion du redimensionnement du panneau inférieur
+            if (bottomPanelResizer) {
+                bottomPanelResizer.addEventListener('mousedown', function(e) {
+                    isResizing = true;
+                    startY = e.clientY;
+                    startHeight = bottomPanel.offsetHeight;
+                    
+                    bottomPanelResizer.classList.add('resizing');
+                    document.body.style.cursor = 'ns-resize';
+                    
+                    // Désactiver la transition pendant le redimensionnement
+                    bottomPanel.style.transition = 'none';
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isResizing) return;
+                    
+                    const delta = startY - e.clientY;
+                    const newHeight = Math.min(Math.max(startHeight + delta, 35), 800);
+                    bottomPanel.style.height = newHeight + 'px';
+                    
+                    if (window.mainLayout) {
+                        window.mainLayout.updateSize();
+                    }
+                });
+
+                document.addEventListener('mouseup', function() {
+                    if (!isResizing) return;
+                    
+                    isResizing = false;
+                    bottomPanelResizer.classList.remove('resizing');
+                    document.body.style.cursor = '';
+                    
+                    // Réactiver la transition
+                    bottomPanel.style.transition = '';
+                });
+            }
+
             // Gestion des clics sur les onglets du panneau inférieur
             document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
                 tab.addEventListener('click', function() {
-                    const panelId = this.dataset.panel;
+                    const panelId = this.getAttribute('data-panel');
                     showPanel(panelId);
                 });
             });
 
-            // Gestion des clics sur les boutons des panneaux latéraux
+            // Gestion des boutons des panneaux latéraux
             document.querySelectorAll('.sidebar-button').forEach(button => {
                 button.addEventListener('click', function() {
                     const panelId = this.dataset.panel;
@@ -933,18 +993,22 @@
             });
 
             // Gestionnaires d'événements pour le redimensionnement
-            bottomPanelResizer.addEventListener('mousedown', function(e) {
-                isResizing = true;
-                activePanel = bottomPanel;
-                document.body.classList.add('resizing');
+            [leftPanel.querySelector('.resizer'), rightPanel.querySelector('.resizer')].forEach(resizer => {
+                const isRight = resizer === rightPanel.querySelector('.resizer');
+                const panel = isRight ? rightPanel : leftPanel;
                 
-                startY = e.clientY;
-                startHeight = parseInt(window.getComputedStyle(bottomPanel).height);
-                
-                bottomPanel.style.transition = 'none';
-                goldenLayoutContainer.style.transition = 'none';
-                
-                e.preventDefault();
+                resizer.addEventListener('mousedown', function(e) {
+                    if (!panel.classList.contains('visible')) return;
+                    
+                    isResizing = true;
+                    activePanel = panel;
+                    document.body.classList.add('resizing');
+                    
+                    panel.style.transition = 'none';
+                    mainContent.style.transition = 'none';
+                    
+                    e.preventDefault();
+                });
             });
 
             document.addEventListener('mousemove', function(e) {
