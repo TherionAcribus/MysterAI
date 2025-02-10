@@ -1,10 +1,103 @@
 <!-- Template pour le tableau des géocaches -->
 <div class="w-full h-full bg-gray-900 p-4">
+    <!-- Formulaire d'ajout de géocache -->
+    <div class="mb-4">
+        <form id="add-geocache-form" class="flex gap-4 items-end">
+            <input type="hidden" name="zone_id" value="{{ zone_id }}">
+            <div>
+                <label for="gc-code" class="block text-sm font-medium text-gray-300">Code GC</label>
+                <input type="text" 
+                       id="gc-code" 
+                       name="code" 
+                       required 
+                       pattern="GC[A-Z0-9]+"
+                       class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                       placeholder="GC12345">
+            </div>
+            <button type="submit" 
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                <span>Ajouter</span>
+                <div class="loading-indicator hidden ml-2">
+                    <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                </div>
+            </button>
+        </form>
+    </div>
+
     <div id="geocaches-table-{{ zone_id }}" class="w-full h-full"
         data-zone-id="{{ zone_id }}"
         data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}"
     ></div>
 </div>
+
+<script type="text/javascript">
+    // S'assurer que le script s'exécute dans l'iframe
+    (function() {
+        const form = document.getElementById('add-geocache-form');
+        const loadingIndicator = form.querySelector('.loading-indicator');
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            console.log('Soumission du formulaire interceptée');
+            
+            try {
+                // Afficher l'indicateur de chargement
+                loadingIndicator.classList.remove('hidden');
+                
+                // Préparer les données du formulaire
+                const formData = new FormData(form);
+                
+                // Faire la requête
+                const response = await fetch('{{ url_for('geocaches.add_geocache') }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                // Traiter la réponse
+                const data = await response.json();
+                console.log('Réponse reçue:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Une erreur est survenue');
+                }
+                
+                if (data.id) {
+                    // Rafraîchir le tableau
+                    const table = window['tabulator_geocaches-table-{{ zone_id }}'];
+                    if (table) {
+                        console.log('Rafraîchissement du tableau');
+                        table.setData();
+                    } else {
+                        console.error('Table non trouvée');
+                    }
+                    
+                    // Ouvrir le panneau de détails
+                    const detailsUrl = `${window.API_BASE_URL || ''}/geocaches/${data.id}/details-panel`;
+                    console.log('Ouverture du panneau', detailsUrl);
+                    window.parent.postMessage({
+                        type: 'openGeocacheDetails',
+                        geocacheId: data.id,
+                        containerId: window.currentContainerId,
+                        detailsUrl: detailsUrl
+                    }, '*');
+                    
+                    // Réinitialiser le formulaire
+                    form.reset();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert(error.message || 'Une erreur est survenue');
+            } finally {
+                // Cacher l'indicateur de chargement
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+    })();
+</script>
 
 <script type="text/javascript">
     (function() {

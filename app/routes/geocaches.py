@@ -18,8 +18,8 @@ from flask import make_response
 
 logger = setup_logger()
 
+# Un seul blueprint pour toutes les routes
 geocaches_bp = Blueprint('geocaches', __name__)
-geocaches_api = Blueprint('geocaches_api', __name__, url_prefix='/api')
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -68,7 +68,7 @@ def fetch_gc_data():
     return redirect(url_for('geocaches.add_geocache'))
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>', methods=['GET'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>', methods=['GET'])
 def get_geocache(geocache_id):
     """Recupere une geocache via son ID."""
     logger.debug(f"Recherche de la geocache via API {geocache_id}")
@@ -143,7 +143,7 @@ def get_geocache(geocache_id):
     })
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>/text', methods=['GET'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>/text', methods=['GET'])
 def get_geocache_text(geocache_id):
     """Recupere le texte brut d'une geocache."""
     logger.debug(f"Recherche du texte de la geocache {geocache_id}")
@@ -154,7 +154,7 @@ def get_geocache_text(geocache_id):
     })
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>/coordinates', methods=['GET'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates', methods=['GET'])
 def get_geocache_coordinates(geocache_id):
     """Recupere toutes les coordonnees associees a une geocache (point d'origine, point corrige, waypoints)"""
     logger.debug(f"Recuperation des coordonnees pour la geocache {geocache_id}")
@@ -200,7 +200,7 @@ def get_geocache_coordinates(geocache_id):
     return jsonify(coordinates)
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>/details', methods=['GET'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>/details', methods=['GET'])
 def get_geocache_details(geocache_id):
     """Recupere les details d'une geocache."""
     logger.debug(f"Recherche de la geocache {geocache_id}")
@@ -266,7 +266,7 @@ def get_geocache_details(geocache_id):
         return jsonify({'error': str(e)}), 500
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>', methods=['DELETE'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>', methods=['DELETE'])
 def delete_geocache(geocache_id):
     """Supprime une geocache."""
     try:
@@ -280,23 +280,42 @@ def delete_geocache(geocache_id):
         return jsonify({'error': 'Failed to delete geocache'}), 500
 
 
-@geocaches_api.route('/geocaches/add', methods=['POST'])
+@geocaches_bp.route('/geocaches/add', methods=['POST'])
 def add_geocache():
     """Ajoute une nouvelle geocache."""
     try:
-        data = request.get_json()
+        # Log des headers de la requête
+        logger.debug(f"Headers de la requête : {dict(request.headers)}")
+        logger.debug(f"Content-Type : {request.content_type}")
+        logger.debug(f"Données reçues : {request.get_json() if request.is_json else request.form}")
+
+        # Accepter à la fois JSON et form-data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()  # Convertir en dict pour uniformiser le traitement
+
         code = data.get('code')
         zone_id = data.get('zone_id')
+
+        logger.debug(f"Tentative d'ajout de la géocache {code} pour la zone {zone_id}")
 
         if not code or not zone_id:
             return jsonify({'error': 'Missing required fields'}), 400
 
         # Verifier si la geocache existe deja
-        existing = Geocache.query.filter_by(gc_code=code).first()
+        existing = db.session.query(Geocache).filter_by(gc_code=code).first()
         if existing:
-            return jsonify({'error': 'Geocache already exists'}), 409
+            logger.debug(f"La géocache {code} existe déjà avec l'ID {existing.id}")
+            return jsonify({
+                'error': 'Geocache already exists',
+                'id': existing.id,
+                'gc_code': existing.gc_code,
+                'name': existing.name
+            }), 409
 
         # Recuperer les informations via le scraper
+        logger.debug(f"Récupération des données pour la géocache {code}")
         geocache_data = scrape_geocache(code)
         
         if not geocache_data:
@@ -388,102 +407,44 @@ def add_geocache():
                             waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
                     geocache.additional_waypoints.append(waypoint)
 
-        # Ajouter les checkers
-        if geocache_data.get('checkers'):
-            for checker_data in geocache_data['checkers']:
-                if isinstance(checker_data, dict):
-                    checker = Checker(
-                        name=checker_data.get('name', ''),
-                        url=checker_data.get('url', '')
-                    )
-                    geocache.checkers.append(checker)
-
-        # Ajouter les images
-        if geocache_data.get('images'):
-            for img_data in geocache_data['images']:
-                if isinstance(img_data, dict):
-                    # Si l'image a une URL, on la télécharge
-                    img_url = img_data.get('url')
-                    if img_url:
-                        try:
-                            response = requests.get(img_url)
-                            if response.status_code == 200:
-                                # Créer le dossier de la geocache si nécessaire
-                                geocache_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], code)
-                                os.makedirs(geocache_folder, exist_ok=True)
-                                
-                                # Générer un nom de fichier unique
-                                ext = img_url.split('.')[-1].lower()
-                                if ext not in current_app.config['ALLOWED_EXTENSIONS']:
-                                    ext = 'jpg'  # Extension par défaut
-                                filename = f"{secrets.token_hex(8)}.{ext}"
-                                
-                                # Sauvegarder l'image dans le dossier de la geocache
-                                img_path = os.path.join(geocache_folder, filename)
-                                with open(img_path, 'wb') as f:
-                                    f.write(response.content)
-                                
-                                # Créer l'entrée dans la base de données
-                                image = GeocacheImage(
-                                    filename=filename,
-                                    original_url=img_url
-                                )
-                                geocache.images.append(image)
-                        except Exception as e:
-                            logger.error(f"Erreur lors du téléchargement de l'image {img_url}: {str(e)}")
-
-        db.session.add(geocache)
-        db.session.commit()
-
-        return jsonify({
-            'id': geocache.id,
-            'gc_code': geocache.gc_code,
-            'name': geocache.name,
-            'owner': geocache.owner,
-            'cache_type': geocache.cache_type,
-            'latitude': geocache.latitude,
-            'longitude': geocache.longitude,
-            'gc_lat': geocache.gc_lat,
-            'gc_lon': geocache.gc_lon,
-            'description': geocache.description,
-            'difficulty': geocache.difficulty,
-            'terrain': geocache.terrain,
-            'size': geocache.size,
-            'hints': geocache.hints,
-            'favorites_count': geocache.favorites_count,
-            'logs_count': geocache.logs_count,
-            'hidden_date': geocache.hidden_date.isoformat() if geocache.hidden_date else None,
-            'created_at': geocache.created_at.isoformat() if geocache.created_at else None,
-            'solved': geocache.solved,
-            'additional_waypoints': [{
-                'id': wp.id,
-                'name': wp.name,
-                'prefix': wp.prefix,
-                'lookup': wp.lookup,
-                'latitude': wp.latitude,
-                'longitude': wp.longitude,
-                'gc_lat': wp.gc_lat,
-                'gc_lon': wp.gc_lon,
-                'note': wp.note
-            } for wp in geocache.additional_waypoints],
-            'checkers': [{
-                'id': checker.id,
-                'name': checker.name,
-                'url': checker.url
-            } for checker in geocache.checkers],
-            'images': [{
-                'id': image.id,
-                'url': image.url
-            } for image in geocache.images]
-        }), 201
-
+        logger.debug(f"Ajout de la géocache {code} à la base de données")
+        
+        # S'assurer qu'aucune transaction n'est active
+        if db.session.is_active:
+            db.session.rollback()
+            
+        # Utiliser une transaction atomique pour l'insertion
+        try:
+            # Vérifier une dernière fois que la géocache n'existe pas
+            existing = db.session.query(Geocache).filter_by(gc_code=code).with_for_update().first()
+            if existing:
+                return jsonify({
+                    'error': 'Geocache already exists',
+                    'id': existing.id,
+                    'gc_code': existing.gc_code,
+                    'name': existing.name
+                }), 409
+                
+            db.session.add(geocache)
+            db.session.commit()
+            
+            logger.debug(f"Géocache {code} ajoutée avec succès, ID: {geocache.id}")
+            return jsonify({
+                'message': 'Geocache added successfully',
+                'id': geocache.id,
+                'gc_code': geocache.gc_code,
+                'name': geocache.name
+            }), 201
+        except Exception as e:
+            db.session.rollback()
+            raise e
+            
     except Exception as e:
         logger.error(f"Error adding geocache: {str(e)}")
-        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
-@geocaches_api.route('/geocaches/<int:geocache_id>/solved-status', methods=['PUT'])
+@geocaches_bp.route('/geocaches/<int:geocache_id>/solved-status', methods=['PUT'])
 def update_solved_status(geocache_id):
     """Met à jour le statut de résolution d'une geocache."""
     try:
@@ -514,7 +475,7 @@ def update_solved_status(geocache_id):
         return jsonify({'error': str(e)}), 500
 
 
-@geocaches_api.route('/geocaches/images/save', methods=['POST'])
+@geocaches_bp.route('/geocaches/images/save', methods=['POST'])
 def save_modified_image():
     """Sauvegarde une image modifiée."""
     try:
