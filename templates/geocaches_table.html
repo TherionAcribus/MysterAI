@@ -1,7 +1,7 @@
 <!-- Template pour le tableau des géocaches -->
-<div class="w-full h-full bg-gray-900 p-4">
+<div class="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
     <!-- Formulaire d'ajout de géocache -->
-    <div class="flex gap-4 items-end mb-4">
+    <div class="flex-shrink-0 gap-4 items-end p-4">
         <form id="addGeocacheForm" class="flex gap-4 items-end">
             <div>
                 <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
@@ -23,10 +23,12 @@
     </div>
 
     <!-- Conteneur du tableau -->
-    <div id="geocaches-table-{{ zone_id }}" class="w-full h-full"
-         data-zone-id="{{ zone_id }}"
-         data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}">
-        {% include 'geocaches_table_content.html' %}
+    <div class="flex-1 min-h-0 overflow-hidden">
+        <div id="geocaches-table-{{ zone_id }}" class="w-full h-full overflow-auto"
+             data-zone-id="{{ zone_id }}"
+             data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}">
+            {% include 'geocaches_table_content.html' %}
+        </div>
     </div>
 </div>
 
@@ -47,8 +49,113 @@
         100% { transform: rotate(360deg); }
     }
 
+    /* Styles pour Tabulator */
+    .tabulator {
+        background-color: transparent !important;
+        border: none !important;
+        color: #e1e1e1 !important;
+        font-size: 14px !important;
+    }
+
+    .tabulator-header {
+        background-color: #1a1a1a !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+        font-weight: 600 !important;
+    }
+
+    .tabulator-header .tabulator-col {
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #2d2d2d !important;
+        padding: 8px !important;
+    }
+
+    .tabulator-header .tabulator-col-content {
+        padding: 8px !important;
+    }
+
+    .tabulator-col-title {
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row {
+        background-color: #1e1e1e !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row.tabulator-row-even {
+        background-color: #252525 !important;
+    }
+
+    .tabulator-row.tabulator-selectable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-row .tabulator-cell {
+        padding: 8px !important;
+        border-right: 1px solid #2d2d2d !important;
+    }
+
+    .tabulator-tableholder {
+        background-color: transparent !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+    }
+
+    /* Style pour les barres de défilement de Tabulator */
+    .tabulator-tableholder::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-track {
+        background: #1e1e1e;
+        border-radius: 5px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb {
+        background: #3c3c3c;
+        border-radius: 5px;
+        border: 2px solid #1e1e1e;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+        background: #4c4c4c;
+    }
+
+    /* Support Firefox */
+    .tabulator-tableholder {
+        scrollbar-width: thin;
+        scrollbar-color: #3c3c3c #1e1e1e;
+    }
+
+    /* Style pour les en-têtes de colonnes triables */
+    .tabulator-col.tabulator-sortable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="none"] .tabulator-col-content:after {
+        border-top: 4px solid #666 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="asc"] .tabulator-col-content:after {
+        border-bottom: 4px solid #e1e1e1 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="desc"] .tabulator-col-content:after {
+        border-top: 4px solid #e1e1e1 !important;
+    }
+
+    /* Style pour les cellules spécifiques */
+    .tabulator-row .tabulator-cell[tabulator-field="solved"] {
+        font-weight: 600 !important;
+    }
+
+    /* Style pour les boutons d'action */
     .action-button {
         @apply font-bold py-1 px-2 rounded mr-2;
+        transition: all 0.2s ease-in-out;
     }
 
     .details-button {
