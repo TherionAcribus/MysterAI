@@ -22,10 +22,12 @@
         <div id="message" class="mt-2"></div>
     </div>
 
+    <!-- Conteneur du tableau -->
     <div id="geocaches-table-{{ zone_id }}" class="w-full h-full"
          data-zone-id="{{ zone_id }}"
-         data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}"
-    ></div>
+         data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}">
+        {% include 'geocaches_table_content.html' %}
+    </div>
 </div>
 
 <style>
@@ -44,6 +46,18 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
+
+    .action-button {
+        @apply font-bold py-1 px-2 rounded mr-2;
+    }
+
+    .details-button {
+        @apply bg-blue-500 hover:bg-blue-700 text-white action-button;
+    }
+
+    .delete-button {
+        @apply bg-red-500 hover:bg-red-700 text-white action-button;
+    }
 </style>
 
 <script type="text/javascript">
@@ -55,10 +69,122 @@
         const messageDiv = document.getElementById('message');
         const submitButton = form.querySelector('button[type="submit"]');
 
+        // Fonction pour initialiser Tabulator
+        function initializeTabulator() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const tableElement = document.getElementById(tableId);
+            if (!tableElement) return;
+
+            const apiUrl = tableElement.dataset.apiUrl;
+            
+            // Détruire l'instance existante si elle existe
+            if (window[`tabulator_${tableId}`]) {
+                window[`tabulator_${tableId}`].destroy();
+            }
+
+            // Créer une nouvelle instance de Tabulator
+            window[`tabulator_${tableId}`] = new Tabulator(`#${tableId}`, {
+                ajaxURL: apiUrl,
+                layout: "fitDataFill",
+                height: "100%",
+                placeholder: "Aucune géocache trouvée",
+                columns: [
+                    { title: "GC Code", field: "gc_code", headerSort: true },
+                    { title: "Nom", field: "name", headerSort: true },
+                    { title: "Type", field: "cache_type", headerSort: true },
+                    { title: "Difficulté", field: "difficulty", headerSort: true },
+                    { title: "Terrain", field: "terrain", headerSort: true },
+                    { title: "Taille", field: "size", headerSort: true },
+                    { title: "Favoris", field: "favorites_count", headerSort: true },
+                    { title: "Logs", field: "logs_count", headerSort: true },
+                    { title: "Statut", field: "solved", headerSort: true,
+                        formatter: function(cell) {
+                            const value = cell.getValue();
+                            switch(value) {
+                                case 'solved':
+                                    return '<span class="text-green-500">✓ Résolue</span>';
+                                case 'not_solved':
+                                    return '<span class="text-red-500">✗ Non résolue</span>';
+                                case 'ongoing':
+                                    return '<span class="text-yellow-500">⟳ En cours</span>';
+                                default:
+                                    return '<span class="text-gray-500">-</span>';
+                            }
+                        }
+                    },
+                    { title: "Actions", field: "id", headerSort: false,
+                        formatter: function(cell) {
+                            const geocacheId = cell.getValue();
+                            const gcCode = cell.getRow().getData().gc_code;
+                            const apiUrl = window.API_BASE_URL || '';
+                            const detailsUrl = `${apiUrl}/geocaches/${geocacheId}/details-panel`;
+                            return `<button 
+                                class="details-button"
+                                onclick="window.parent.postMessage({ 
+                                    type: 'openGeocacheDetails', 
+                                    geocacheId: ${geocacheId},
+                                    containerId: window.currentContainerId,
+                                    detailsUrl: '${detailsUrl}'
+                                }, '*')"
+                            >
+                                Détails
+                            </button>
+                            <button 
+                                class="delete-button"
+                                onclick="window.deleteGeocache(${geocacheId}, '${gcCode}')"
+                            >
+                                Supprimer
+                            </button>`;
+                        }
+                    }
+                ]
+            });
+        }
+
+        // Fonction pour recharger le tableau
+        async function reloadTable() {
+            // Recharger les données via Tabulator
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (table) {
+                await table.setData();
+            }
+        }
+
+        // Initialiser Tabulator au chargement
+        initializeTabulator();
+
+        // Gestionnaire d'événements pour la suppression
+        window.deleteGeocache = async function(geocacheId, gcCode) {
+            if (!confirm(`Êtes-vous sûr de vouloir supprimer la géocache ${gcCode} ?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/geocaches/${geocacheId}`, {
+                    method: 'DELETE',
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.textContent = data.message;
+                    messageDiv.className = 'mt-2 text-green-600';
+                    // Recharger le tableau
+                    await reloadTable();
+                } else {
+                    messageDiv.textContent = data.error || 'Une erreur est survenue lors de la suppression';
+                    messageDiv.className = 'mt-2 text-red-600';
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                messageDiv.textContent = 'Une erreur est survenue lors de la communication avec le serveur';
+                messageDiv.className = 'mt-2 text-red-600';
+            }
+        };
+
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
-            console.log('Soumission du formulaire interceptée');
-            
+
             try {
                 // Afficher l'indicateur de chargement
                 loadingIndicator.classList.remove('hidden');
@@ -70,48 +196,38 @@
                 // Préparer les données du formulaire
                 const formData = new FormData(form);
                 
-                // Faire la requête
-                const response = await fetch('{{ url_for('geocaches.add_geocache') }}', {
+                // Envoyer la requête
+                const response = await fetch('/geocaches/add', {
                     method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    }
+                    body: formData
                 });
                 
-                // Traiter la réponse
                 const data = await response.json();
-                console.log('Réponse reçue:', data);
                 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Une erreur est survenue');
-                }
-                
-                if (data.id) {
-                    // Rafraîchir le tableau
-                    const table = window['tabulator_geocaches-table-{{ zone_id }}'];
-                    if (table) {
-                        console.log('Rafraîchissement du tableau');
-                        table.setData();
-                    } else {
-                        console.error('Table non trouvée');
-                    }
+                if (response.ok) {
+                    // Afficher le message de succès
+                    messageDiv.textContent = 'Géocache ajoutée avec succès !';
+                    messageDiv.className = 'mt-2 text-green-600';
                     
-                    // Ouvrir le panneau de détails
-                    const detailsUrl = `${window.API_BASE_URL || ''}/geocaches/${data.id}/details-panel`;
-                    console.log('Ouverture du panneau', detailsUrl);
+                    // Réinitialiser le formulaire
+                    form.reset();
+
+                    // Recharger le tableau
+                    await reloadTable();
+
+                    // Ouvrir la page de détails de la nouvelle géocache
+                    const apiUrl = window.API_BASE_URL || '';
+                    const detailsUrl = `${apiUrl}/geocaches/${data.id}/details-panel`;
                     window.parent.postMessage({
                         type: 'openGeocacheDetails',
                         geocacheId: data.id,
                         containerId: window.currentContainerId,
                         detailsUrl: detailsUrl
                     }, '*');
-                    
-                    // Réinitialiser le formulaire
-                    form.reset();
-                    messageDiv.textContent = 'Géocache ajoutée avec succès !';
-                    messageDiv.className = 'mt-2 text-green-600';
+                } else {
+                    // Afficher le message d'erreur
+                    messageDiv.textContent = data.error || 'Une erreur est survenue';
+                    messageDiv.className = 'mt-2 text-red-600';
                 }
             } catch (error) {
                 console.error('Erreur:', error);
@@ -124,93 +240,5 @@
                 submitButton.disabled = false;
             }
         });
-    })();
-</script>
-
-<script type="text/javascript">
-    (function() {
-        const tableId = "geocaches-table-{{ zone_id }}";
-        console.log("Initialisation du tableau", tableId);
-        const tableElement = document.getElementById(tableId);
-        
-        if (tableElement) {
-            try {
-                const config = {
-                    layout: "fitDataFill",
-                    height: "100%",
-                    placeholder: "Aucune géocache trouvée",
-                    ajaxURL: tableElement.getAttribute('data-api-url'),
-                    ajaxLoaderLoading: '<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>',
-                    ajaxRequestHeaders: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    ajaxConfig: {
-                        method: "GET",
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    },
-                    columns: [
-                        {title: "GC Code", field: "gc_code", headerSort: true},
-                        {title: "Nom", field: "name", headerSort: true},
-                        {title: "Type", field: "cache_type", headerSort: true},
-                        {title: "Difficulté", field: "difficulty", headerSort: true},
-                        {title: "Terrain", field: "terrain", headerSort: true},
-                        {title: "Taille", field: "size", headerSort: true},
-                        {title: "Favoris", field: "favorites_count", headerSort: true},
-                        {title: "Logs", field: "logs_count", headerSort: true},
-                        {title: "Statut", field: "solved", headerSort: true,
-                            formatter: function(cell) {
-                                const value = cell.getValue();
-                                switch(value) {
-                                    case 'solved':
-                                        return '<span class="text-green-500">✓ Résolue</span>';
-                                    case 'not_solved':
-                                        return '<span class="text-red-500">✗ Non résolue</span>';
-                                    case 'ongoing':
-                                        return '<span class="text-yellow-500">⟳ En cours</span>';
-                                    default:
-                                        return '<span class="text-gray-500">-</span>';
-                                }
-                            }
-                        },
-                        {title: "Actions", field: "id", headerSort: false,
-                            formatter: function(cell) {
-                                const geocacheId = cell.getValue();
-                                const apiUrl = window.API_BASE_URL || '';
-                                const detailsUrl = `${apiUrl}/geocaches/${geocacheId}/details-panel`;
-                                return `<button 
-                                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
-                                    onclick="window.parent.postMessage({ 
-                                        type: 'openGeocacheDetails', 
-                                        geocacheId: ${geocacheId},
-                                        containerId: window.currentContainerId,
-                                        detailsUrl: '${detailsUrl}'
-                                    }, '*')"
-                                >
-                                    Détails
-                                </button>`;
-                            }
-                        }
-                    ],
-                    rowClick: false,
-                    tableBuilt: function() {
-                        console.log("Tableau construit avec succès");
-                    }
-                };
-                
-                console.log("Création du tableau Tabulator");
-                const table = new Tabulator(`#${tableId}`, config);
-                
-                // Exposer l'instance du tableau pour le redimensionnement
-                window[`tabulator_${tableId}`] = table;
-                
-                console.log("Tabulator initialisé avec succès");
-            } catch (error) {
-                console.error("Erreur lors de l'initialisation de Tabulator:", error);
-            }
-        } else {
-            console.error(`Élément #${tableId} non trouvé`);
-        }
     })();
 </script>

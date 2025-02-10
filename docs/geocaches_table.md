@@ -9,17 +9,24 @@ Le tableau des géocaches est un composant interactif qui affiche la liste des g
 - Affichage des géocaches avec colonnes triables
 - Chargement dynamique des données via AJAX
 - Redimensionnement automatique dans l'onglet
-- Boutons d'action pour voir les détails de chaque géocache
+- Boutons d'action pour voir les détails ou supprimer une géocache
 - Indicateurs visuels pour l'état des géocaches (résolue, non résolue, en cours)
+- Formulaire d'ajout de géocache intégré
+- Rechargement automatique du tableau après ajout ou suppression
 
 ## Structure technique
 
-### Template (`geocaches_table.html`)
+### Templates
 
-Le template contient :
-- Un conteneur pour le tableau avec les attributs data nécessaires
-- Un script d'initialisation qui configure et crée l'instance Tabulator
-- La configuration complète des colonnes et des formateurs
+#### Template principal (`geocaches_table.html`)
+- Formulaire d'ajout de géocache avec validation
+- Conteneur pour le tableau avec les attributs data nécessaires
+- Script d'initialisation qui configure et crée l'instance Tabulator
+- Gestionnaires d'événements pour l'ajout et la suppression
+
+#### Template du contenu (`geocaches_table_content.html`)
+- Conteneur pour l'instance Tabulator
+- Séparé du formulaire pour permettre le rechargement partiel
 
 ### Colonnes du tableau
 
@@ -32,7 +39,7 @@ Le template contient :
 7. Favoris - Nombre de favoris
 8. Logs - Nombre de logs
 9. Statut - État de résolution avec indicateurs visuels
-10. Actions - Bouton pour voir les détails
+10. Actions - Boutons pour voir les détails et supprimer
 
 ### Intégration avec GoldenLayout
 
@@ -50,17 +57,16 @@ Le tableau s'adapte automatiquement à la taille de son conteneur grâce à :
 
 ## Endpoints API
 
-Le tableau utilise l'endpoint `/geocaches/<zone_id>` qui retourne les données au format JSON avec les champs suivants :
-- gc_code
-- name
-- cache_type
-- difficulty
-- terrain
-- size
-- favorites_count
-- logs_count
-- solved
-- id
+### Données du tableau
+- GET `/geocaches/<zone_id>` : Données des géocaches au format JSON
+
+### Gestion des géocaches
+- POST `/geocaches/add` : Ajoute une nouvelle géocache
+  - Paramètres : `code` (GC code), `zone_id`
+  - Retourne : `{ id, gc_code, name, message }`
+- DELETE `/geocaches/<id>` : Supprime une géocache
+  - Retourne : `{ message }`
+- GET `/geocaches/table/<zone_id>/content` : Contenu HTML du tableau pour le rechargement
 
 ## Personnalisation de l'affichage
 
@@ -72,16 +78,36 @@ Les états sont affichés avec des couleurs distinctives :
 - ⟳ En cours (jaune)
 - - Non défini (gris)
 
-### Bouton d'action
+### Boutons d'action
 
-Le bouton "Détails" utilise :
-- `window.postMessage` pour la communication avec la fenêtre parente
-- Un gestionnaire d'événements dans la fenêtre parente pour ouvrir le panneau de détails dans GoldenLayout
+#### Bouton "Détails"
+- Utilise `window.postMessage` pour la communication
+- Ouvre le panneau de détails dans un nouvel onglet
 - Classes Tailwind pour le style
 
+#### Bouton "Supprimer"
+- Affiche une confirmation avant suppression
+- Supprime la géocache via une requête DELETE
+- Recharge automatiquement le tableau après suppression
+
+## Gestion des événements
+
+### Ajout de géocache
+1. Soumission du formulaire
+2. Envoi des données via fetch
+3. Affichage du message de succès/erreur
+4. Rechargement du tableau via Tabulator
+5. Ouverture automatique du panneau de détails
+
+### Suppression de géocache
+1. Confirmation de l'utilisateur
+2. Envoi de la requête DELETE
+3. Affichage du message de succès/erreur
+4. Rechargement du tableau via Tabulator
+
 La communication entre le tableau et la fenêtre principale se fait via le système de messagerie `postMessage` :
-1. Le bouton "Détails" envoie un message de type `openGeocacheDetails` avec l'ID de la géocache
-2. La fenêtre principale intercepte ce message et :
-   - Charge le contenu HTML des détails via une requête fetch
-   - Crée un nouvel onglet dans GoldenLayout avec les détails
-   - Affiche le contenu dans le nouvel onglet
+1. Les boutons d'action envoient des messages avec les informations nécessaires
+2. La fenêtre principale intercepte ces messages et :
+   - Charge le contenu HTML approprié
+   - Crée un nouvel onglet si nécessaire
+   - Affiche le contenu dans l'onglet

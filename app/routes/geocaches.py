@@ -582,3 +582,10 @@ def get_geocaches_table(zone_id):
             "error": str(e),
             "zone_id": zone_id
         }), 500
+
+
+@geocaches_bp.route('/geocaches/table/<int:zone_id>/content', methods=['GET'])
+def get_geocaches_table_content(zone_id):
+    """Renvoie uniquement le contenu du tableau des geocaches."""
+    geocaches = Geocache.query.filter_by(zone_id=zone_id).all()
+    return render_template('geocaches_table_content.html', geocaches=geocaches, zone_id=zone_id)
