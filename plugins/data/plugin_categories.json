@@ -1,0 +1,29 @@
+{
+    "categories": {
+      "Decoding": {
+        "Alphabets": [],
+        "Decryption": {
+          "NumbersDecryption": [],
+          "SymbolsDecryption": [],
+          "AlphabetsDecryption": []
+        }
+      },
+      "Coordinates": {
+        "ConversionCoordinates": [],
+        "CalculationsCoordinates": []
+      },
+      "Conversion": [],
+      "Analysis": {
+        "Pages": [],
+        "Images": []
+      },
+      "Search": {
+        "SearchEngines": [],
+        "Databases": []
+      },
+      "Validation": {
+        "Validators": [],
+        "Keyword": []
+      }
+    }
+  }

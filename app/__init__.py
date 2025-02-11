@@ -6,12 +6,15 @@ from flask_migrate import Migrate
 from app.database import db
 from app.config import Config
 from app.models.geocache import Zone
+from app.plugin_manager import PluginManager
+from app.utils.logger import setup_logger
 
-"""
+logger = setup_logger()
+
 def get_plugin_manager():
     from flask import current_app
     return current_app.plugin_manager
-"""
+
 
 def create_app():
     """Create and configure the Flask application."""
@@ -58,5 +61,13 @@ def create_app():
             default_zone = Zone(name="default", description="Default zone")
             db.session.add(default_zone)
             db.session.commit()
+
+        # Initialisation du gestionnaire de plugins
+        logger.info("Initializing PluginManager...")
+        plugins_dir = os.path.join(app.config['BASEDIR'], 'plugins')
+        app.plugin_manager = PluginManager(plugins_dir, app)
+        logger.info("Loading plugins...")
+        app.plugin_manager.load_plugins()
+        logger.info("PluginManager initialized.")
 
     return app

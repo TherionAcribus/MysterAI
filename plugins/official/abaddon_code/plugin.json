@@ -1,0 +1,39 @@
+{
+  "name": "abaddon_code",
+  "version": "1.7.0",
+  "description": "Plugin de chiffrement et déchiffrement utilisant le code Abaddon (3 symboles: þ, µ, ¥).",
+  "author": "MysterAI",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "categories": ["SymbolsDecryption"],
+  "dependencies": [],
+  "input_types": {
+      "text": {
+          "type": "string",
+          "label": "Texte à traiter",
+          "placeholder": "Entrez le texte ici..."
+      },
+      "mode": {
+          "type": "select",
+          "label": "Mode",
+          "options": ["decode", "encode"],
+          "default": "decode"
+      },
+      "strict": {
+          "type": "select",
+          "label": "Mode strict",
+          "options": ["strict", "smooth"],
+          "default": "smooth"
+      }
+  },
+  "output_types": {
+      "encoded_text": {
+          "type": "string",
+          "label": "Texte chiffré"
+      },
+      "decoded_text": {
+          "type": "string",
+          "label": "Texte déchiffré"
+      }
+  }
+}

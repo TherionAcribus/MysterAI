@@ -563,6 +563,12 @@
                 <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="git" data-side="left">
                     <i class="fas fa-code-branch text-xl"></i>
                 </button>
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="decrypt" data-side="left"
+                        hx-get="/api/plugins_list"
+                        hx-target="#decrypt-panel .panel-body"
+                        hx-trigger="load">
+                    <i class="fas fa-key text-xl"></i>
+                </button>
             </div>
             <div class="mt-auto flex flex-col items-center py-2 space-y-4">
                 <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings" data-side="left">
@@ -598,6 +604,14 @@
                         </div>
                         <div class="panel-body">
                             <!-- Contenu du panneau git -->
+                        </div>
+                    </div>
+                    <div id="decrypt-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Décryptage</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau de décryptage -->
                         </div>
                     </div>
                     <div id="settings-panel" class="h-full p-4 panel-content">

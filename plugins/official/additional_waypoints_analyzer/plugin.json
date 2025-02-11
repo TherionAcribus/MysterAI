@@ -1,0 +1,24 @@
+{
+    "name": "additional_waypoints_analyzer",
+    "version": "1.0.0",
+    "description": "Plugin pour analyser les points de passage additionnels d'une cache",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": [],
+    "categories": ["Analyze"],
+    "brute_force": false,
+  
+    "input_types": {
+      "html": {
+        "type": "string",
+        "label": "Contenu HTML à analyser"
+      }
+    },
+    "output_types": {
+      "comments": {
+        "type": "array",
+        "label": "Liste de WPs trouvés"
+      }
+    }
+  }
