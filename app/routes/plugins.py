@@ -38,8 +38,9 @@ def get_plugins():
     
     return jsonify(plugins_list)
 
-@plugins_bp.route('/api/plugins/<plugin_name>/execute', methods=['POST'])
-def execute_plugin(plugin_name):
+
+@plugins_bp.route('/api/plugins/<plugin_name>/execute_old', methods=['POST'])
+def execute_plugin_old(plugin_name):
     """Exécute un plugin avec les paramètres fournis."""
     plugin = Plugin.query.filter_by(name=plugin_name).first_or_404()
     if not plugin.enabled:
@@ -141,3 +142,69 @@ def get_plugin_details(plugin_id):
     except Exception as e:
         print(f"Error loading plugin details: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/api/plugins/<plugin_name>/interface')
+def get_plugin_interface(plugin_name):
+    """Renvoie l'interface HTML du plugin avec ses métadonnées."""
+    try:
+        plugin = Plugin.query.filter_by(name=plugin_name).first()
+        if not plugin:
+            return jsonify({'error': 'Plugin non trouvé'}), 404
+            
+        # Utiliser le chemin stocké dans la base de données
+        plugin_json_path = os.path.join(plugin.path, 'plugin.json')
+        
+        print(f"Searching for plugin.json at: {plugin_json_path}")
+        
+        # Vérifier que le fichier existe
+        if not os.path.isfile(plugin_json_path):
+            return jsonify({'error': f'plugin.json non trouvé dans {plugin.path}'}), 404
+            
+        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+            plugin_data = json.load(f)
+            
+        # Fusionner les données de la base avec celles du plugin.json
+        plugin_data.update({
+            'id': plugin.id,
+            'name': plugin.name,
+            'version': plugin.version,
+            'description': plugin.description,
+            'author': plugin.author,
+            'categories': json.loads(plugin.categories)
+        })
+        
+        return render_template('plugin_interface.html', plugin=plugin_data)
+    except Exception as e:
+        print(f"Error loading plugin interface: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/api/plugins/<plugin_name>/execute', methods=['POST'])
+def execute_plugin(plugin_name):
+    """Exécute le plugin avec les paramètres fournis."""
+    try:
+        plugin = Plugin.query.filter_by(name=plugin_name).first()
+        if not plugin:
+            return jsonify({'error': 'Plugin non trouvé'}), 404
+
+        # Récupérer les paramètres du formulaire
+        inputs = {}
+        for key, value in request.form.items():
+            if key != 'mode':  # Exclure le mode (encode/decode/bruteforce)
+                inputs[key] = value
+
+        # Récupérer le mode d'exécution
+        mode = request.form.get('mode', 'decode')
+        inputs['mode'] = mode
+
+        # Exécuter le plugin via le plugin manager
+        from app import get_plugin_manager
+        plugin_manager = get_plugin_manager()
+        result = plugin_manager.execute_plugin(plugin.name, inputs)
+
+        # Renvoyer les résultats sous forme de HTML
+        return render_template('plugin_output.html', 
+                            result=result,
+                            output_types=json.loads(plugin.metadata_json)['output_types'])
+    except Exception as e:
+        print(f"Error executing plugin: {str(e)}")
+        return f'<div class="text-red-500">Erreur lors de l\'exécution du plugin: {str(e)}</div>', 500

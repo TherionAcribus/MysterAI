@@ -1,0 +1,27 @@
+<!-- Template pour l'affichage des résultats du plugin -->
+<div class="space-y-4">
+    {% for output_name, output_data in result.items() %}
+        {% set output_config = output_types.get(output_name, {}) %}
+        <div class="bg-gray-700 rounded-lg p-4">
+            <h3 class="text-lg font-medium text-gray-300 mb-2">{{ output_config.get('label', output_name) }}</h3>
+            
+            {% if output_config.type == "string" %}
+                <div class="bg-gray-800 p-4 rounded">
+                    <pre class="text-gray-300 whitespace-pre-wrap">{{ output_data }}</pre>
+                </div>
+            {% elif output_config.type == "array" %}
+                <div class="space-y-2">
+                    {% for item in output_data %}
+                        <div class="bg-gray-800 p-4 rounded">
+                            <pre class="text-gray-300 whitespace-pre-wrap">{{ item }}</pre>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bg-gray-800 p-4 rounded">
+                    <pre class="text-gray-300 whitespace-pre-wrap">{{ output_data }}</pre>
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>

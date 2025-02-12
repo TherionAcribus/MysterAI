@@ -1262,8 +1262,8 @@
                     });
                 });
 
-                window.openPluginTab = function(pluginId, pluginName) {
-                    const componentId = `plugin-${pluginId}`;
+                window.openPluginTab = function(pluginName, displayName) {
+                    const componentId = `plugin-${pluginName}`;
                     
                     let existingComponent = null;
                     mainLayout.root.contentItems.forEach(item => {
@@ -1282,11 +1282,11 @@
                     const componentConfig = {
                         type: 'component',
                         componentName: 'plugin-details',
-                        title: `Plugin - ${pluginName}`,
+                        title: `Plugin - ${displayName}`,
                         id: componentId,
                         componentState: { 
-                            pluginId: pluginId,
-                            pluginName: pluginName
+                            pluginName: pluginName,
+                            displayName: displayName
                         }
                     };
 
@@ -1298,7 +1298,7 @@
                 };
 
                 mainLayout.registerComponent('plugin-details', function(container, state) {
-                    const url = `/api/plugin/${state.pluginId}`;
+                    const url = `/api/plugins/${state.pluginName}/interface`;
                     
                     container.getElement().html('<div class="p-4">Chargement...</div>');
                     
