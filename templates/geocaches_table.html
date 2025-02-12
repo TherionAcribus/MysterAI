@@ -268,7 +268,7 @@
             }
 
             try {
-                const response = await fetch(`/geocaches/${geocacheId}`, {
+                const response = await fetch(`/api/geocaches/${geocacheId}`, {
                     method: 'DELETE',
                 });
                 const data = await response.json();
@@ -304,7 +304,7 @@
                 const formData = new FormData(form);
                 
                 // Envoyer la requête
-                const response = await fetch('/geocaches/add', {
+                const response = await fetch('/api/geocaches/add', {
                     method: 'POST',
                     body: formData
                 });

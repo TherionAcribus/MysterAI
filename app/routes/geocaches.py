@@ -266,7 +266,7 @@ def get_geocache_details(geocache_id):
         return jsonify({'error': str(e)}), 500
 
 
-@geocaches_bp.route('/geocaches/<int:geocache_id>', methods=['DELETE'])
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>', methods=['DELETE'])
 def delete_geocache(geocache_id):
     """Supprime une geocache."""
     try:
@@ -280,7 +280,7 @@ def delete_geocache(geocache_id):
         return jsonify({'error': 'Failed to delete geocache'}), 500
 
 
-@geocaches_bp.route('/geocaches/add', methods=['POST'])
+@geocaches_bp.route('/api/geocaches/add', methods=['POST'])
 def add_geocache():
     """Ajoute une nouvelle geocache."""
     try:
