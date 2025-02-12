@@ -1,3 +1,6 @@
+# Dossier images GC
+geocaches_images/
+
 # Python
 __pycache__/
 *.py[cod]

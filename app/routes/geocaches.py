@@ -407,6 +407,50 @@ def add_geocache():
                             waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
                     geocache.additional_waypoints.append(waypoint)
 
+        # Ajouter les checkers
+        if geocache_data.get('checkers'):
+            for checker_data in geocache_data['checkers']:
+                if isinstance(checker_data, dict):
+                    checker = Checker(
+                        name=checker_data.get('name', ''),
+                        url=checker_data.get('url', '')
+                    )
+                    geocache.checkers.append(checker)
+
+        # Ajouter les images
+        if geocache_data.get('images'):
+            for img_data in geocache_data['images']:
+                if isinstance(img_data, dict):
+                    # Si l'image a une URL, on la télécharge
+                    img_url = img_data.get('url')
+                    if img_url:
+                        try:
+                            response = requests.get(img_url)
+                            if response.status_code == 200:
+                                # Créer le dossier de la geocache si nécessaire
+                                geocache_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], code)
+                                os.makedirs(geocache_folder, exist_ok=True)
+                                
+                                # Générer un nom de fichier unique
+                                ext = img_url.split('.')[-1].lower()
+                                if ext not in current_app.config['ALLOWED_EXTENSIONS']:
+                                    ext = 'jpg'  # Extension par défaut
+                                filename = f"{secrets.token_hex(8)}.{ext}"
+                                
+                                # Sauvegarder l'image dans le dossier de la geocache
+                                img_path = os.path.join(geocache_folder, filename)
+                                with open(img_path, 'wb') as f:
+                                    f.write(response.content)
+                                
+                                # Créer l'entrée dans la base de données
+                                image = GeocacheImage(
+                                    filename=filename,
+                                    original_url=img_url
+                                )
+                                geocache.images.append(image)
+                        except Exception as e:
+                            logger.error(f"Erreur lors du téléchargement de l'image {img_url}: {str(e)}")
+
         logger.debug(f"Ajout de la géocache {code} à la base de données")
         
         # S'assurer qu'aucune transaction n'est active
@@ -475,7 +519,7 @@ def update_solved_status(geocache_id):
         return jsonify({'error': str(e)}), 500
 
 
-@geocaches_bp.route('/geocaches/images/save', methods=['POST'])
+@geocaches_bp.route('/api/geocaches/images/save', methods=['POST'])
 def save_modified_image():
     """Sauvegarde une image modifiée."""
     try:

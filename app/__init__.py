@@ -24,6 +24,18 @@ def create_app():
                 static_url_path='')
     app.config.from_object(Config)
 
+    # Configuration du dossier des images GC
+    logger.info("Configuring static folders...")
+    images_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'geocaches_images')
+    app.images_folder = images_folder
+    app.config['UPLOAD_FOLDER'] = images_folder
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+
+    # Créer les dossiers s'ils n'existent pas
+    for folder in [images_folder]:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
     # Initialisation de CORS avec les options appropriées
     CORS(app, resources={
         r"/*": {
