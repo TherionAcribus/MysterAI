@@ -1,0 +1,30 @@
+<!-- Template pour les détails d'un plugin -->
+<div class="w-full h-full bg-gray-900 p-6">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-blue-400">{{ plugin.name }}</h1>
+                    <p class="text-gray-400">Version {{ plugin.version }}</p>
+                </div>
+                <div class="text-gray-400">
+                    <p>Auteur: {{ plugin.author }}</p>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-300 mb-2">Description</h2>
+                <p class="text-gray-400">{{ plugin.description }}</p>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-300 mb-2">Catégories</h2>
+                <div class="flex flex-wrap gap-2">
+                    {% for category in plugin.categories %}
+                        <span class="px-3 py-1 bg-gray-700 rounded-full text-sm text-gray-300">{{ category }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

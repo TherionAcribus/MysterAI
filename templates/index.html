@@ -1262,6 +1262,57 @@
                     });
                 });
 
+                window.openPluginTab = function(pluginId, pluginName) {
+                    const componentId = `plugin-${pluginId}`;
+                    
+                    let existingComponent = null;
+                    mainLayout.root.contentItems.forEach(item => {
+                        item.contentItems.forEach(subItem => {
+                            if (subItem.config.id === componentId) {
+                                existingComponent = subItem;
+                            }
+                        });
+                    });
+
+                    if (existingComponent) {
+                        existingComponent.parent.setActiveContentItem(existingComponent);
+                        return;
+                    }
+
+                    const componentConfig = {
+                        type: 'component',
+                        componentName: 'plugin-details',
+                        title: `Plugin - ${pluginName}`,
+                        id: componentId,
+                        componentState: { 
+                            pluginId: pluginId,
+                            pluginName: pluginName
+                        }
+                    };
+
+                    // Trouver le conteneur principal
+                    let container = mainLayout.root.contentItems[0];
+                    if (container) {
+                        container.addChild(componentConfig);
+                    }
+                };
+
+                mainLayout.registerComponent('plugin-details', function(container, state) {
+                    const url = `/api/plugin/${state.pluginId}`;
+                    
+                    container.getElement().html('<div class="p-4">Chargement...</div>');
+                    
+                    fetch(url)
+                        .then(response => response.text())
+                        .then(html => {
+                            container.getElement().html(html);
+                        })
+                        .catch(error => {
+                            console.error("Erreur lors du chargement des détails du plugin:", error);
+                            container.getElement().html('<div class="p-4 text-red-500">Erreur lors du chargement des détails du plugin</div>');
+                        });
+                });
+
                 // Exposer l'instance Golden Layout globalement
                 window.goldenlayout = mainLayout;
 

@@ -107,6 +107,7 @@ def get_plugins_list():
         plugins_list = []
         for plugin in plugins:
             plugins_list.append({
+                'id': plugin.id,
                 'name': plugin.name,
                 'version': plugin.version,
                 'description': plugin.description,
@@ -118,4 +119,25 @@ def get_plugins_list():
         return render_template('plugins_list.html', categories=categories_list, plugins=plugins_list)
     except Exception as e:
         print(f"Error loading plugins list: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/api/plugin/<plugin_id>')
+def get_plugin_details(plugin_id):
+    """Renvoie les détails d'un plugin spécifique."""
+    try:
+        plugin = Plugin.query.get(plugin_id)
+        if not plugin:
+            return jsonify({'error': 'Plugin non trouvé'}), 404
+            
+        plugin_data = {
+            'name': plugin.name,
+            'version': plugin.version,
+            'description': plugin.description,
+            'author': plugin.author,
+            'categories': json.loads(plugin.categories)
+        }
+        
+        return render_template('plugin_details.html', plugin=plugin_data)
+    except Exception as e:
+        print(f"Error loading plugin details: {str(e)}")
         return jsonify({'error': str(e)}), 500
