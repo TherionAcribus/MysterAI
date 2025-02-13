@@ -123,28 +123,31 @@
         </div>
         {% endif %}
 
+        <!-- Galerie d'images -->
+        {% if geocache.images %}
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="text-lg font-semibold text-gray-100 mb-4">Images</h2>
+            <div class="flex flex-wrap gap-4 !w-full">
+                {% for image in geocache.images %}
+                <div class="!w-[150px] !h-[150px] !flex-none relative group overflow-hidden bg-gray-700 rounded-lg p-1">
+                    <div class="!w-full !h-full relative overflow-hidden rounded-lg border-2 border-gray-600 transition-all duration-300 ease-in-out hover:border-blue-500">
+                        <img src="{{ image.url }}" 
+                             alt="Image de la géocache" 
+                             class="!w-full !h-full !object-cover !max-w-full !max-h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+                             style="width: 150px !important; height: 150px !important; object-fit: cover !important;"
+                             loading="lazy">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Logs -->
         {% if geocache.logs_count %}
         <div class="bg-gray-800 rounded-lg p-4">
             <h2 class="text-lg font-semibold text-gray-100 mb-4">Logs</h2>
             <div class="text-gray-300">{{ geocache.logs_count }} logs enregistrés</div>
-        </div>
-        {% endif %}
-
-        <!-- Galerie d'images -->
-        {% if geocache.images %}
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h2 class="text-lg font-semibold text-gray-100 mb-4">Images</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {% for image in geocache.images %}
-                <div class="aspect-square relative group">
-                    <img src="{{ image.url }}" 
-                        alt="Image de la géocache" 
-                        class="w-full h-full object-cover rounded-lg"
-                        loading="lazy">
-                </div>
-                {% endfor %}
-            </div>
         </div>
         {% endif %}
 
