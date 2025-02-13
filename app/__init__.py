@@ -26,7 +26,8 @@ def create_app():
 
     # Configuration du dossier des images GC
     logger.info("Configuring static folders...")
-    images_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'geocaches_images')
+    images_folder = os.path.abspath(os.path.join(app.config['BASEDIR'], 'geocaches_images'))
+    logger.info(f"Images folder path: {images_folder}")
     app.images_folder = images_folder
     app.config['UPLOAD_FOLDER'] = images_folder
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
@@ -35,6 +36,7 @@ def create_app():
     for folder in [images_folder]:
         if not os.path.exists(folder):
             os.makedirs(folder)
+            logger.info(f"Created folder: {folder}")
 
     # Initialisation de CORS avec les options appropriées
     CORS(app, resources={
@@ -51,6 +53,23 @@ def create_app():
 
     # Initialisation de Flask-Migrate
     migrate = Migrate(app, db)
+
+    # Route pour servir les images des géocaches
+    @app.route('/geocaches_images/<gc_code>/<filename>')
+    def serve_geocache_image(gc_code, filename):
+        logger.debug(f"Tentative d'accès à l'image: {gc_code}/{filename}")
+        try:
+            # Construire le chemin complet
+            full_path = os.path.join(app.images_folder, gc_code, filename)
+            logger.debug(f"Chemin complet: {full_path}")
+            logger.debug(f"Le fichier existe: {os.path.exists(full_path)}")
+            
+            # Obtenir le répertoire contenant l'image et le nom du fichier
+            directory = os.path.dirname(full_path)
+            return send_from_directory(directory=directory, path=filename)
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi de l'image: {str(e)}")
+            return f"Erreur: {str(e)}", 404
 
     # Enregistrer tous les blueprints
     try:

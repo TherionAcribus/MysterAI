@@ -67,7 +67,7 @@ def fetch_gc_data():
 
     return redirect(url_for('geocaches.add_geocache'))
 
-
+# Plus utilisé !!!!
 @geocaches_bp.route('/geocaches/<int:geocache_id>', methods=['GET'])
 def get_geocache(geocache_id):
     """Recupere une geocache via son ID."""
@@ -209,7 +209,8 @@ def get_geocache_details(geocache_id):
             db.joinedload(Geocache.additional_waypoints),
             db.joinedload(Geocache.attributes),
             db.joinedload(Geocache.checkers),
-            db.joinedload(Geocache.zone)
+            db.joinedload(Geocache.zone),
+            db.joinedload(Geocache.images)
         ).get_or_404(geocache_id)
         
         return jsonify({
@@ -259,7 +260,13 @@ def get_geocache_details(geocache_id):
                 'id': checker.id,
                 'name': checker.name,
                 'url': checker.url
-            } for checker in (geocache.checkers or [])]
+            } for checker in (geocache.checkers or [])],
+            'images': [{
+                'id': image.id,
+                'url': image.url,
+                'filename': image.filename,
+                'is_original': image.is_original
+            } for image in geocache.images if image.is_original]
         })
     except Exception as e:
         logger.error(f"Error getting geocache {geocache_id}: {str(e)}")

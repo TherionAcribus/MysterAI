@@ -130,7 +130,7 @@ class GeocacheImage(db.Model):
     @property
     def url(self):
         # Construire le chemin avec le code de la géocache
-        return url_for('static', filename=f'uploads/{self.geocache.gc_code}/{self.filename}')
+        return f'http://127.0.0.1:3000/geocaches_images/{self.geocache.gc_code}/{self.filename}'
 
 class Geocache(db.Model):
     __table_args__ = {'extend_existing': True}
