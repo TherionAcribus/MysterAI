@@ -1,13 +1,14 @@
 import logging
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify, request, render_template, url_for
 from flask_cors import CORS
 from flask_migrate import Migrate
 from app.database import db
 from app.config import Config
-from app.models.geocache import Zone
+from app.models.geocache import Zone, Geocache
 from app.plugin_manager import PluginManager
 from app.utils.logger import setup_logger
+import base64
 
 logger = setup_logger()
 
@@ -70,6 +71,56 @@ def create_app():
         except Exception as e:
             logger.error(f"Erreur lors de l'envoi de l'image: {str(e)}")
             return f"Erreur: {str(e)}", 404
+
+    # Route pour l'éditeur d'image
+    @app.route('/geocaches/image-editor/<image_id>')
+    def image_editor(image_id):
+        try:
+            # Récupérer les informations de l'image
+            image = Geocache.get_image_by_id(image_id)
+            if not image:
+                return jsonify({'error': 'Image non trouvée'}), 404
+
+            # Construire les URLs
+            image_url = url_for('serve_geocache_image', filename=image['filename'])
+            save_url = url_for('save_edited_image', image_id=image_id)
+
+            return render_template('image_editor.html', 
+                                 image_name=image['filename'],
+                                 image_url=image_url,
+                                 save_url=save_url)
+
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de l'éditeur d'image: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+    # Route pour sauvegarder l'image éditée
+    @app.route('/geocaches/save-image/<image_id>', methods=['POST'])
+    def save_edited_image(image_id):
+        try:
+            data = request.get_json()
+            if not data or 'image_data' not in data:
+                return jsonify({'error': 'Données d\'image manquantes'}), 400
+
+            # Récupérer les informations de l'image
+            image = Geocache.get_image_by_id(image_id)
+            if not image:
+                return jsonify({'error': 'Image non trouvée'}), 404
+
+            # Décoder l'image base64 et la sauvegarder
+            image_data = data['image_data'].split(',')[1]  # Enlever le préfixe "data:image/png;base64,"
+            image_bytes = base64.b64decode(image_data)
+
+            # Sauvegarder l'image
+            image_path = os.path.join(app.config['GEOCACHES_IMAGES_FOLDER'], image['filename'])
+            with open(image_path, 'wb') as f:
+                f.write(image_bytes)
+
+            return jsonify({'success': True})
+
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la sauvegarde de l'image: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
     # Enregistrer tous les blueprints
     try:

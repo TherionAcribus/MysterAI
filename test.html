@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test IPC</title>
+</head>
+<body>
+    <h1>Test IPC Electron</h1>
+    <button onclick="window.electronTest.sendTestMessage()">Envoyer message de test</button>
+    <div id="result"></div>
+    <script>
+        console.log('=== DEBUG: Page de test chargée ===');
+        console.log('=== DEBUG: window.electronTest existe:', !!window.electronTest);
+    </script>
+</body>
+</html>

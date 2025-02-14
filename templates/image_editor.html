@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="h-full flex flex-col bg-gray-900 text-gray-300">
+    <div class="flex-1 flex">
+        <!-- Zone de l'image -->
+        <div class="flex-1 p-4">
+            <div class="w-full h-full relative">
+                <canvas id="canvas" class="w-full h-full"></canvas>
+            </div>
+        </div>
+
+        <!-- Barre d'outils -->
+        <div class="w-64 bg-gray-800 p-4 border-l border-gray-700">
+            <h3 class="text-lg font-semibold mb-4">Outils</h3>
+            
+            <!-- Outils de base -->
+            <div class="space-y-4">
+                <div class="tool-group">
+                    <h4 class="text-sm font-medium mb-2">Basique</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="tool-btn" data-tool="select">
+                            <i class="fas fa-mouse-pointer"></i>
+                            <span>Sélection</span>
+                        </button>
+                        <button class="tool-btn" data-tool="move">
+                            <i class="fas fa-arrows-alt"></i>
+                            <span>Déplacer</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tool-group">
+                    <h4 class="text-sm font-medium mb-2">Dessin</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="tool-btn" data-tool="brush">
+                            <i class="fas fa-paint-brush"></i>
+                            <span>Pinceau</span>
+                        </button>
+                        <button class="tool-btn" data-tool="eraser">
+                            <i class="fas fa-eraser"></i>
+                            <span>Gomme</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tool-group">
+                    <h4 class="text-sm font-medium mb-2">Formes</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="tool-btn" data-tool="rect">
+                            <i class="far fa-square"></i>
+                            <span>Rectangle</span>
+                        </button>
+                        <button class="tool-btn" data-tool="circle">
+                            <i class="far fa-circle"></i>
+                            <span>Cercle</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tool-group">
+                    <h4 class="text-sm font-medium mb-2">Texte</h4>
+                    <button class="tool-btn w-full" data-tool="text">
+                        <i class="fas fa-font"></i>
+                        <span>Ajouter du texte</span>
+                    </button>
+                </div>
+
+                <div class="tool-group">
+                    <h4 class="text-sm font-medium mb-2">Actions</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="tool-btn" data-action="undo">
+                            <i class="fas fa-undo"></i>
+                            <span>Annuler</span>
+                        </button>
+                        <button class="tool-btn" data-action="redo">
+                            <i class="fas fa-redo"></i>
+                            <span>Refaire</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Propriétés de l'outil -->
+            <div class="mt-6">
+                <h4 class="text-sm font-medium mb-2">Propriétés</h4>
+                <div class="space-y-3">
+                    <!-- Couleur -->
+                    <div>
+                        <label class="text-xs">Couleur</label>
+                        <input type="color" class="w-full h-8 bg-transparent" value="#ffffff">
+                    </div>
+                    
+                    <!-- Taille -->
+                    <div>
+                        <label class="text-xs">Taille</label>
+                        <input type="range" class="w-full" min="1" max="100" value="10">
+                    </div>
+
+                    <!-- Opacité -->
+                    <div>
+                        <label class="text-xs">Opacité</label>
+                        <input type="range" class="w-full" min="0" max="100" value="100">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barre d'état -->
+    <div class="h-8 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-sm">
+        <div class="flex-1">
+            <span id="image-info">Image: {{ image_name }}</span>
+        </div>
+        <div>
+            <button class="px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white" id="save-btn">
+                Enregistrer
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.tool-btn {
+    @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded text-sm;
+}
+
+.tool-btn i {
+    @apply mb-1;
+}
+
+.tool-btn.active {
+    @apply bg-blue-600;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = new fabric.Canvas('canvas', {
+        isDrawingMode: false
+    });
+
+    // Charger l'image
+    fabric.Image.fromURL('{{ image_url }}', function(img) {
+        canvas.setWidth(img.width);
+        canvas.setHeight(img.height);
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+    });
+
+    // Gestion des outils
+    const tools = document.querySelectorAll('[data-tool]');
+    tools.forEach(tool => {
+        tool.addEventListener('click', function() {
+            const toolName = this.dataset.tool;
+            tools.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+
+            switch(toolName) {
+                case 'select':
+                    canvas.isDrawingMode = false;
+                    break;
+                case 'brush':
+                    canvas.isDrawingMode = true;
+                    canvas.freeDrawingBrush.width = 5;
+                    break;
+                case 'text':
+                    const text = new fabric.IText('Double-cliquez pour éditer', {
+                        left: 100,
+                        top: 100,
+                        fontFamily: 'Arial',
+                        fill: '#ffffff'
+                    });
+                    canvas.add(text);
+                    break;
+                // Ajouter d'autres outils ici
+            }
+        });
+    });
+
+    // Gestion des actions
+    const actions = document.querySelectorAll('[data-action]');
+    actions.forEach(action => {
+        action.addEventListener('click', function() {
+            const actionName = this.dataset.action;
+            switch(actionName) {
+                case 'undo':
+                    if (canvas._objects.length > 0) {
+                        canvas.remove(canvas._objects[canvas._objects.length - 1]);
+                    }
+                    break;
+                case 'redo':
+                    // À implémenter
+                    break;
+            }
+        });
+    });
+
+    // Gestion des propriétés
+    const colorPicker = document.querySelector('input[type="color"]');
+    colorPicker.addEventListener('change', function() {
+        if (canvas.isDrawingMode) {
+            canvas.freeDrawingBrush.color = this.value;
+        } else if (canvas.getActiveObject()) {
+            canvas.getActiveObject().set('fill', this.value);
+            canvas.renderAll();
+        }
+    });
+
+    const sizeSlider = document.querySelector('input[type="range"]');
+    sizeSlider.addEventListener('input', function() {
+        if (canvas.isDrawingMode) {
+            canvas.freeDrawingBrush.width = parseInt(this.value);
+        }
+    });
+
+    // Gestion de la sauvegarde
+    document.getElementById('save-btn').addEventListener('click', function() {
+        const dataUrl = canvas.toDataURL({
+            format: 'png',
+            quality: 1
+        });
+
+        fetch('{{ save_url }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image_data: dataUrl
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Image sauvegardée avec succès!');
+            } else {
+                alert('Erreur lors de la sauvegarde: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erreur lors de la sauvegarde');
+        });
+    });
+});
+</script>
+{% endblock %}

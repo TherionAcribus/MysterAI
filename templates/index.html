@@ -3,7 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MysteryAI - Géocaching</title>
+    <title>MysteryAI - Geocaching</title>
+    <script>
+        // Définir openImageEditor globalement avant tout
+        window.openImageEditor = function(imageId, imageName) {
+            console.log('=== DEBUG: Tentative d\'ouverture de l\'éditeur d\'image ===');
+            console.log('Params:', { imageId, imageName });
+            console.log('Layout actuel:', mainLayout);
+            console.log('Root items:', mainLayout.root.contentItems);
+            
+            // Vérifier si GoldenLayout est initialisé
+            if (!window.goldenlayout) {
+                console.error('=== DEBUG: GoldenLayout n\'est pas encore initialisé ===');
+                return;
+            }
+
+            try {
+                // Trouver le conteneur principal (row)
+                const rootContentItem = mainLayout.root.contentItems[0];
+                
+                // Configuration du composant
+                const componentConfig = {
+                    type: 'component',
+                    componentName: 'image-editor',
+                    componentState: { 
+                        imageId: imageId,
+                        imageName: imageName
+                    },
+                    title: `Éditeur - ${imageName || `Image ${imageId}`}`,
+                    id: `image-editor-${imageId}`
+                };
+
+                // Si c'est un stack, ajouter directement
+                if (rootContentItem.isStack) {
+                    rootContentItem.addChild(componentConfig);
+                } else {
+                    // Sinon, trouver ou créer un stack
+                    let stack = rootContentItem.contentItems.find(item => item.isStack);
+                    if (!stack) {
+                        stack = mainLayout.createContentItem({
+                            type: 'stack',
+                            content: []
+                        });
+                        rootContentItem.addChild(stack);
+                    }
+                    stack.addChild(componentConfig);
+                }
+
+                console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
+            } catch (error) {
+                console.error('=== DEBUG: Erreur lors de l\'ajout de l\'éditeur ===', error);
+            }
+        };
+
+        console.log('=== DEBUG: Index.html commence à charger ===');
+        
+        // Fonction pour initialiser le menu contextuel
+        function initContextMenu() {
+            console.log('=== DEBUG: Initialisation du menu contextuel ===');
+            
+            // Utiliser la délégation d'événements pour gérer le clic droit sur les images
+            document.body.addEventListener('contextmenu', function(e) {
+                console.log('=== DEBUG: Événement contextmenu détecté ===');
+                console.log('Target:', e.target);
+                console.log('Target classList:', e.target.classList);
+                
+                // Vérifier si l'élément cliqué ou un de ses parents est une image de géocache
+                const targetImage = e.target.closest('.geocache-image');
+                console.log('Image trouvée:', !!targetImage);
+                
+                if (targetImage) {
+                    console.log('=== DEBUG: Clic droit sur une image de géocache ===');
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Retirer la sélection de toutes les images
+                    document.querySelectorAll('.geocache-image').forEach(img => {
+                        img.classList.remove('selected');
+                    });
+
+                    // Sélectionner l'image actuelle
+                    targetImage.classList.add('selected');
+
+                    // Vérifier si window.electron existe
+                    console.log('=== DEBUG: window.electron existe:', !!window.electron);
+                    console.log('=== DEBUG: window.electron:', window.electron);
+
+                    // Si nous sommes dans Electron, utiliser le menu contextuel natif
+                    if (window.electron) {
+                        console.log('=== DEBUG: Utilisation du menu Electron ===');
+                        const imageData = {
+                            imageId: targetImage.dataset.imageId,
+                            imageName: targetImage.dataset.imageName
+                        };
+                        const position = {
+                            x: e.clientX,
+                            y: e.clientY
+                        };
+                        console.log('=== DEBUG: Image data:', imageData);
+                        console.log('=== DEBUG: Position:', position);
+                        window.electron.showImageContextMenu(imageData, position);
+                    } else {
+                        console.log('=== DEBUG: Utilisation du menu web ===');
+                        // Fallback pour le navigateur web
+                        const rect = targetImage.getBoundingClientRect();
+                        showWebContextMenu(rect.left, rect.top, targetImage.dataset.imageId, targetImage.dataset.imageName);
+                    }
+                }
+            });
+        }
+
+        // Fonction pour afficher le menu contextuel web
+        function showWebContextMenu(x, y, imageId, imageName) {
+            // Supprimer tout menu contextuel existant
+            const existingMenu = document.querySelector('.context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+
+            const contextMenu = document.createElement('div');
+            contextMenu.className = 'context-menu';
+            contextMenu.innerHTML = `
+                <div class="context-menu-item edit-image">
+                    <i class="fas fa-edit"></i>
+                    Éditer l'image
+                </div>
+            `;
+
+            // Positionner le menu
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            document.body.appendChild(contextMenu);
+
+            // Gérer le clic sur l'option d'édition
+            contextMenu.querySelector('.edit-image').addEventListener('click', function() {
+                window.openImageEditor(imageId, imageName);
+                contextMenu.remove();
+            });
+
+            // Fermer le menu au clic en dehors
+            function handleClickOutside(e) {
+                if (!contextMenu.contains(e.target)) {
+                    contextMenu.remove();
+                    document.removeEventListener('click', handleClickOutside);
+                }
+            }
+
+            // Attendre un peu avant d'ajouter le gestionnaire de clic
+            setTimeout(() => {
+                document.addEventListener('click', handleClickOutside);
+            }, 0);
+        }
+
+        // Initialiser le menu contextuel au chargement du DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initContextMenu);
+        } else {
+            initContextMenu();
+        }
+    </script>
     
     <!-- Styles -->
     <link type="text/css" rel="stylesheet" href="/css/output.css">
@@ -542,6 +700,47 @@
             overflow-y: auto !important;
             overflow-x: auto !important;
         }
+
+        /* Ajout de styles pour le menu contextuel */
+        .geocache-image {
+            cursor: pointer;
+        }
+
+        .geocache-image.selected {
+            outline: 2px solid #3b82f6;
+            outline-offset: -2px;
+        }
+
+        .context-menu {
+            position: fixed;
+            z-index: 10000;
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0;
+            min-width: 160px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .context-menu-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: #e5e7eb;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        .context-menu-item:hover {
+            background-color: #374151;
+        }
+
+        .context-menu-item i {
+            margin-right: 0.5rem;
+            width: 1rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
@@ -627,7 +826,7 @@
 
             <!-- Main Content -->
             <div id="main-content" class="main-content bg-gray-900">
-                <div class="golden-layout-container"></div>
+                <div id="layoutContainer" class="golden-layout-container"></div>
                 
                 <!-- Bottom Panel -->
                 <div class="bottom-panel-container">
@@ -1117,54 +1316,32 @@
                     window.mainLayout.destroy();
                 }
                 
-                mainLayout = new GoldenLayout(config, document.querySelector('.golden-layout-container'));
+                mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
                 window.mainLayout = mainLayout;
 
+                // Enregistrer les composants avant l'initialisation
                 mainLayout.registerComponent('welcome', function(container, state) {
                     const welcomeHtml = `
                         <div class="p-8 max-w-4xl mx-auto">
-                            <div class="text-center mb-8">
-                                <h1 class="text-4xl font-bold text-blue-400 mb-4">Welcome to MysteryAI</h1>
-                                <p class="text-xl text-gray-400">Your Geocaching Adventure Starts Here</p>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-6 mb-8">
-                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
-                                    <h2 class="text-xl font-semibold text-blue-300 mb-3">
-                                        <i class="fas fa-map-marked-alt mr-2"></i>
-                                        Start New Adventure
-                                    </h2>
-                                    <p class="text-gray-300">Create a new geocaching challenge or explore existing ones in your area.</p>
-                                </div>
-                                
-                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
-                                    <h2 class="text-xl font-semibold text-green-300 mb-3">
-                                        <i class="fas fa-compass mr-2"></i>
-                                        Recent Caches
-                                    </h2>
-                                    <p class="text-gray-300">Continue working on your recent geocaching projects.</p>
-                                </div>
-                                
-                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
-                                    <h2 class="text-xl font-semibold text-purple-300 mb-3">
-                                        <i class="fas fa-tools mr-2"></i>
-                                        Tools & Resources
-                                    </h2>
-                                    <p class="text-gray-300">Access helpful tools and resources for creating engaging geocaches.</p>
-                                </div>
-                                
-                                <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer">
-                                    <h2 class="text-xl font-semibold text-yellow-300 mb-3">
-                                        <i class="fas fa-book mr-2"></i>
-                                        Documentation
-                                    </h2>
-                                    <p class="text-gray-300">Learn how to use MysteryAI and discover best practices.</p>
-                                </div>
-                            </div>
+                            <h1 class="text-3xl font-bold mb-6">Bienvenue dans MysteryAI</h1>
+                            <!-- ... reste du HTML ... -->
                         </div>
                     `;
                     container.getElement().html(welcomeHtml);
                 });
+
+                // Initialiser le layout
+                mainLayout.init();
+
+                // Maintenant on peut logger l'état après initialisation
+                console.log('=== DEBUG: État du layout après initialisation ===');
+                console.log('mainLayout:', mainLayout);
+                console.log('Root:', mainLayout.root);
+                if (mainLayout.root) {
+                    console.log('ContentItems:', mainLayout.root.contentItems);
+                } else {
+                    console.error('=== DEBUG: Root est null après initialisation ===');
+                }
 
                 mainLayout.registerComponent('geocaches-table', function(container, state) {
                     const containerId = container.parent.config.id;
@@ -1245,73 +1422,110 @@
                 mainLayout.registerComponent('geocache-details', function(container, state) {
                     console.log("Création du composant geocache-details", state);
                     
-                    // Créer le conteneur pour les détails
-                    const element = container.getElement();
+                    const html = `
+                        <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                            <div class="flex flex-col h-full">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl text-white">Détails de la Géocache</h2>
+                                    <div class="flex space-x-2">
+                                        <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">
+                                            <i class="fas fa-save mr-2"></i>Sauvegarder
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-grow relative">
+                                    ${state.html}
+                                </div>
+                            </div>
+                        </div>
+                    `;
                     
-                    // Injecter le HTML des détails
-                    element[0].innerHTML = state.html;
+                    container.getElement().html(html);
                     
-                    // Initialiser Alpine.js sur le contenu si nécessaire
-                    if (window.Alpine) {
-                        window.Alpine.initTree(element[0]);
-                    }
+                    // Initialiser les handlers
+                    container.getElement().find('.save-button').on('click', function() {
+                        console.log('=== DEBUG: Sauvegarde des détails ===', state);
+                        // TODO: Implémenter la sauvegarde
+                    });
+                });
+
+                mainLayout.registerComponent('image-editor', function(container, state) {
+                    console.log('=== DEBUG: Création du composant image-editor ===', state);
                     
+                    // Récupérer l'image source originale
+                    const originalImage = document.querySelector(`img[data-image-id="${state.imageId}"]`);
+                    const imageUrl = originalImage ? originalImage.src : '';
+                    
+                    console.log('=== DEBUG: URL de l\'image source ===', imageUrl);
+                    
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                            <div class="flex flex-col h-full">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl text-white">Éditeur d'Image</h2>
+                                    <div class="flex space-x-2">
+                                        <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">
+                                            <i class="fas fa-save mr-2"></i>Sauvegarder
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-grow relative">
+                                    <img src="${imageUrl}"
+                                         class="max-w-full h-auto"
+                                         alt="Image à éditer"
+                                         data-image-id="${state.imageId}">
+                                </div>
+                            </div>
+                        </div>
+                    `);
+
                     // Gérer le redimensionnement si nécessaire
                     container.on('resize', function() {
-                        console.log("Redimensionnement du composant geocache-details");
+                        console.log('=== DEBUG: Redimensionnement de l\'éditeur d\'image ===');
                     });
                 });
 
-                window.openPluginTab = function(pluginName, displayName) {
-                    const componentId = `plugin-${pluginName}`;
+                // Fonction pour ouvrir l'éditeur d'image
+                window.exposeOpenImageEditor = function(imageId, imageName) {
+                    console.log('=== DEBUG: Exposition de openImageEditor appelée ===', { imageId, imageName });
                     
-                    let existingComponent = null;
-                    mainLayout.root.contentItems.forEach(item => {
-                        item.contentItems.forEach(subItem => {
-                            if (subItem.config.id === componentId) {
-                                existingComponent = subItem;
+                    try {
+                        // Trouver le conteneur principal (row)
+                        const rootContentItem = mainLayout.root.contentItems[0];
+                        
+                        // Configuration du composant
+                        const componentConfig = {
+                            type: 'component',
+                            componentName: 'image-editor',
+                            componentState: { 
+                                imageId: imageId,
+                                imageName: imageName
+                            },
+                            title: `Éditeur - ${imageName || `Image ${imageId}`}`,
+                            id: `image-editor-${imageId}`
+                        };
+
+                        // Si c'est un stack, ajouter directement
+                        if (rootContentItem.isStack) {
+                            rootContentItem.addChild(componentConfig);
+                        } else {
+                            // Sinon, trouver ou créer un stack
+                            let stack = rootContentItem.contentItems.find(item => item.isStack);
+                            if (!stack) {
+                                stack = mainLayout.createContentItem({
+                                    type: 'stack',
+                                    content: []
+                                });
+                                rootContentItem.addChild(stack);
                             }
-                        });
-                    });
-
-                    if (existingComponent) {
-                        existingComponent.parent.setActiveContentItem(existingComponent);
-                        return;
-                    }
-
-                    const componentConfig = {
-                        type: 'component',
-                        componentName: 'plugin-details',
-                        title: `Plugin - ${displayName}`,
-                        id: componentId,
-                        componentState: { 
-                            pluginName: pluginName,
-                            displayName: displayName
+                            stack.addChild(componentConfig);
                         }
-                    };
 
-                    // Trouver le conteneur principal
-                    let container = mainLayout.root.contentItems[0];
-                    if (container) {
-                        container.addChild(componentConfig);
+                        console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
+                    } catch (error) {
+                        console.error('=== DEBUG: Erreur lors de l\'ajout du composant ===', error);
                     }
                 };
-
-                mainLayout.registerComponent('plugin-details', function(container, state) {
-                    const url = `/api/plugins/${state.pluginName}/interface`;
-                    
-                    container.getElement().html('<div class="p-4">Chargement...</div>');
-                    
-                    fetch(url)
-                        .then(response => response.text())
-                        .then(html => {
-                            container.getElement().html(html);
-                        })
-                        .catch(error => {
-                            console.error("Erreur lors du chargement des détails du plugin:", error);
-                            container.getElement().html('<div class="p-4 text-red-500">Erreur lors du chargement des détails du plugin</div>');
-                        });
-                });
 
                 // Exposer l'instance Golden Layout globalement
                 window.goldenlayout = mainLayout;
@@ -1602,6 +1816,156 @@
                     }
                 });
             });
+        });
+
+        // Gestionnaire de menu contextuel pour les images
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Script de menu contextuel chargé');
+
+            // Utiliser la délégation d'événements pour gérer le clic droit sur les images
+            document.body.addEventListener('contextmenu', function(e) {
+                console.log('=== DEBUG: Événement contextmenu détecté ===');
+                console.log('Target:', e.target);
+                console.log('Target classList:', e.target.classList);
+                
+                // Vérifier si l'élément cliqué ou un de ses parents est une image de géocache
+                const targetImage = e.target.closest('.geocache-image');
+                console.log('Image trouvée:', !!targetImage);
+                
+                if (targetImage) {
+                    console.log('=== DEBUG: Clic droit sur une image de géocache ===');
+                    // Empêcher le menu contextuel par défaut
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // Retirer la sélection de toutes les images
+                    document.querySelectorAll('.geocache-image').forEach(img => {
+                        img.classList.remove('selected');
+                    });
+
+                    // Sélectionner l'image actuelle
+                    targetImage.classList.add('selected');
+
+                    // Vérifier si window.electron existe
+                    console.log('=== DEBUG: window.electron existe:', !!window.electron);
+                    console.log('=== DEBUG: window.electron:', window.electron);
+
+                    // Si nous sommes dans Electron, utiliser le menu contextuel natif
+                    if (window.electron) {
+                        console.log('=== DEBUG: Utilisation du menu Electron ===');
+                        const imageData = {
+                            imageId: targetImage.dataset.imageId,
+                            imageName: targetImage.dataset.imageName
+                        };
+                        const position = {
+                            x: e.clientX,
+                            y: e.clientY
+                        };
+                        console.log('=== DEBUG: Image data:', imageData);
+                        console.log('=== DEBUG: Position:', position);
+                        window.electron.showImageContextMenu(imageData, position);
+                        return false;
+                    } else {
+                        console.log('=== DEBUG: Utilisation du menu web ===');
+                        // Fallback pour le navigateur web
+                        const rect = targetImage.getBoundingClientRect();
+                        showWebContextMenu(rect.left, rect.top, targetImage.dataset.imageId, targetImage.dataset.imageName);
+                    }
+                }
+            }, true);  // Capture phase
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Écouter l'événement d'ouverture de l'éditeur
+            window.electron.on('execute-open-editor', ({ imageId, imageName }) => {
+                console.log('=== DEBUG: Réception de la demande d\'ouverture de l\'éditeur ===', { imageId, imageName });
+                
+                // Vérifier si GoldenLayout est initialisé
+                if (!window.goldenlayout) {
+                    console.error('=== DEBUG: GoldenLayout n\'est pas encore initialisé ===');
+                    return;
+                }
+
+                // Créer un nouveau composant pour l'éditeur d'image
+                const componentConfig = {
+                    type: 'component',
+                    componentName: 'image-editor',
+                    id: `image-editor-${imageId}`,
+                    title: `Éditeur - ${imageName || `Image ${imageId}`}`,
+                    componentState: { 
+                        imageId: imageId,
+                        imageName: imageName
+                    }
+                };
+
+                try {
+                    // Ajouter le composant à la mise en page
+                    window.goldenlayout.root.contentItems[0].addChild(componentConfig);
+                    console.log('=== DEBUG: Composant éditeur ajouté ===');
+                } catch (error) {
+                    console.error('=== DEBUG: Erreur lors de l\'ajout du composant ===', error);
+                }
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Écouter les événements d'édition d'image
+            window.electron.on('request-open-image-editor', (data) => {
+                console.log('=== DEBUG: Événement IPC request-open-image-editor reçu ===', data);
+                handleImageEditorRequest(data);
+            });
+
+            // Écouter aussi les messages window pour le cas local
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'request-open-image-editor') {
+                    console.log('=== DEBUG: Message local request-open-image-editor reçu ===', event.data);
+                    handleImageEditorRequest(event.data.data);
+                }
+            });
+
+            // Fonction pour gérer la demande d'édition d'image
+            function handleImageEditorRequest(data) {
+                console.log('=== DEBUG: Traitement de la demande d\'édition ===', data);
+                try {
+                    // Trouver le conteneur principal (row)
+                    const rootContentItem = mainLayout.root.contentItems[0];
+                    console.log('=== DEBUG: Root content items ===', rootContentItem);
+                    
+                    // Configuration du composant
+                    const componentConfig = {
+                        type: 'component',
+                        componentName: 'image-editor',
+                        componentState: { 
+                            imageId: data.imageId,
+                            imageName: data.imageName
+                        },
+                        title: `Éditeur - ${data.imageName || `Image ${data.imageId}`}`,
+                        id: `image-editor-${data.imageId}`
+                    };
+
+                    console.log('=== DEBUG: Configuration du composant ===', componentConfig);
+
+                    // Si c'est un stack, ajouter directement
+                    if (rootContentItem.isStack) {
+                        rootContentItem.addChild(componentConfig);
+                    } else {
+                        // Sinon, trouver ou créer un stack
+                        let stack = rootContentItem.contentItems.find(item => item.isStack);
+                        if (!stack) {
+                            stack = mainLayout.createContentItem({
+                                type: 'stack',
+                                content: []
+                            });
+                            rootContentItem.addChild(stack);
+                        }
+                        stack.addChild(componentConfig);
+                    }
+
+                    console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
+                } catch (error) {
+                    console.error('=== DEBUG: Erreur lors de l\'ajout de l\'éditeur ===', error);
+                }
+            }
         });
     </script>
 </body>

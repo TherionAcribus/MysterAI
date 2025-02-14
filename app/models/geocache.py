@@ -274,3 +274,42 @@ class Geocache(db.Model):
         text = '\n'.join(line.strip() for line in text.splitlines() if line.strip())
         
         return text
+
+    @staticmethod
+    def get_image_by_id(image_id):
+        """Récupère une image par son ID."""
+        try:
+            # Récupérer la géocache qui contient cette image
+            geocache = Geocache.get_by_image_id(image_id)
+            if not geocache:
+                return None
+            
+            # Trouver l'image dans la liste des images
+            for image in geocache.images:
+                if image.id == image_id:
+                    return image
+            
+            return None
+            
+        except Exception as e:
+            current_app.logger.error(f"Erreur lors de la récupération de l'image {image_id}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_by_image_id(image_id):
+        """Récupère une géocache par l'ID d'une de ses images."""
+        try:
+            # Charger toutes les géocaches
+            geocaches = Geocache.load_all()
+            
+            # Chercher la géocache qui contient l'image
+            for geocache in geocaches:
+                for image in geocache.images:
+                    if image.id == image_id:
+                        return geocache
+            
+            return None
+            
+        except Exception as e:
+            current_app.logger.error(f"Erreur lors de la récupération de la géocache par image {image_id}: {str(e)}")
+            return None
