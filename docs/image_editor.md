@@ -99,12 +99,40 @@ L'éditeur d'images est un composant intégré à l'application MysteryAI qui pe
 2. **UX**
    - Interface intuitive
    - Feedback visuel des actions
-   - Raccourcis clavier (à venir)
+   - Styles cohérents avec l'application
+   - Transitions fluides entre les états des outils
 
-3. **Maintenance**
-   - Code modulaire
-   - Logs détaillés
-   - Gestion des doublons d'éditeurs
+## Style et Apparence
+
+1. **Thème**
+   - Palette de couleurs sombre (dark theme)
+   - Boutons avec états hover et actif
+   - Transitions douces pour une meilleure expérience
+
+2. **Outils**
+   - Boutons organisés verticalement
+   - Icônes Font Awesome avec labels
+   - État actif en bleu (#3B82F6)
+   - État hover en gris clair
+
+3. **Contrôles**
+   - Valeurs par défaut :
+     * Couleur : Noir (#000000)
+     * Taille du pinceau : 5px
+     * Épaisseur de bordure : 2px
+   - Sélecteurs de couleur personnalisés
+   - Sliders stylisés pour les tailles
+
+4. **Responsive**
+   - Adaptation à la taille de la fenêtre
+   - Canvas redimensionnable
+   - Interface flexible
+
+## Styles CSS
+- Utilisation de Tailwind CSS
+- Classes personnalisées dans input.css
+- Styles compilés dans output.css
+- Composants réutilisables (@layer components)
 
 ## Évolutions Futures
 

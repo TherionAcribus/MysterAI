@@ -339,99 +339,238 @@ function initializeLayout() {
         });
 
         function initializeTools(canvas) {
+            // État des outils
+            let currentTool = null;
+            let isDrawing = false;
+            let startX = 0;
+            let startY = 0;
+            let activeShape = null;
+
+            const toolState = {
+                brush: {
+                    color: '#000000',
+                    size: 5
+                },
+                shape: {
+                    color: '#000000',
+                    border: 2,
+                    fill: false,
+                    fillColor: '#000000'
+                }
+            };
+
             // Gestion des outils
             const tools = document.querySelectorAll('[data-tool]');
-            tools.forEach(tool => {
-                tool.addEventListener('click', function() {
-                    const toolName = this.dataset.tool;
-                    tools.forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
+            const brushControls = document.querySelector('.brush-controls');
+            const shapeControls = document.querySelector('.shape-controls');
+            
+            // Contrôles du pinceau
+            const brushColor = document.querySelector('#brush-color');
+            const brushSize = document.querySelector('#brush-size');
+            const brushSizeValue = document.querySelector('#brush-size-value');
 
-                    switch(toolName) {
-                        case 'select':
-                            canvas.isDrawingMode = false;
-                            break;
-                        case 'brush':
-                            canvas.isDrawingMode = true;
-                            canvas.freeDrawingBrush.width = 5;
-                            break;
-                        case 'text':
-                            const text = new fabric.IText('Double-cliquez pour éditer', {
-                                left: 100,
-                                top: 100,
-                                fontFamily: 'Arial',
-                                fill: '#ffffff'
-                            });
-                            canvas.add(text);
-                            break;
-                    }
-                });
-            });
+            // Contrôles des formes
+            const shapeColor = document.querySelector('#shape-color');
+            const shapeBorder = document.querySelector('#shape-border');
+            const shapeBorderValue = document.querySelector('#shape-border-value');
+            const shapeFill = document.querySelector('#shape-fill');
+            const shapeFillColor = document.querySelector('#shape-fill-color');
+            const shapeFillColorContainer = document.querySelector('.shape-fill-color');
 
-            // Gestion des actions
-            const actions = document.querySelectorAll('[data-action]');
-            actions.forEach(action => {
-                action.addEventListener('click', function() {
-                    const actionName = this.dataset.action;
-                    switch(actionName) {
-                        case 'undo':
-                            if (canvas._objects.length > 0) {
-                                canvas.remove(canvas._objects[canvas._objects.length - 1]);
-                            }
-                            break;
-                        case 'redo':
-                            // À implémenter
-                            break;
-                    }
-                });
-            });
+            // Initialiser les contrôles
+            if (brushColor) brushColor.value = toolState.brush.color;
+            if (brushSize) brushSize.value = toolState.brush.size;
+            if (brushSizeValue) brushSizeValue.textContent = `${toolState.brush.size}px`;
+            if (shapeColor) shapeColor.value = toolState.shape.color;
+            if (shapeBorder) shapeBorder.value = toolState.shape.border;
+            if (shapeBorderValue) shapeBorderValue.textContent = `${toolState.shape.border}px`;
+            if (shapeFillColor) shapeFillColor.value = toolState.shape.fillColor;
 
-            // Gestion des propriétés
-            const colorPicker = document.querySelector('input[type="color"]');
-            colorPicker.addEventListener('change', function() {
-                if (canvas.isDrawingMode) {
-                    canvas.freeDrawingBrush.color = this.value;
-                } else if (canvas.getActiveObject()) {
-                    canvas.getActiveObject().set('fill', this.value);
+            // Gérer les contrôles des formes
+            shapeColor?.addEventListener('change', (e) => {
+                toolState.shape.color = e.target.value;
+                if (activeShape) {
+                    activeShape.set('stroke', e.target.value);
                     canvas.renderAll();
                 }
             });
 
-            const sizeSlider = document.querySelector('input[type="range"]');
-            sizeSlider.addEventListener('input', function() {
-                if (canvas.isDrawingMode) {
-                    canvas.freeDrawingBrush.width = parseInt(this.value);
+            shapeBorder?.addEventListener('input', (e) => {
+                const size = parseInt(e.target.value);
+                toolState.shape.border = size;
+                shapeBorderValue.textContent = `${size}px`;
+                if (activeShape) {
+                    activeShape.set('strokeWidth', size);
+                    canvas.renderAll();
                 }
             });
 
-            // Gestion de la sauvegarde
-            document.getElementById('save-btn').addEventListener('click', function() {
-                const dataUrl = canvas.toDataURL({
-                    format: 'png',
-                    quality: 1
-                });
+            shapeFill?.addEventListener('change', (e) => {
+                toolState.shape.fill = e.target.checked;
+                shapeFillColorContainer?.classList.toggle('hidden', !e.target.checked);
+                if (activeShape) {
+                    activeShape.set('fill', e.target.checked ? toolState.shape.fillColor : 'transparent');
+                    canvas.renderAll();
+                }
+            });
 
-                const saveUrl = document.getElementById('save-btn').dataset.saveUrl;
-                fetch(saveUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        image_data: dataUrl
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Image sauvegardée avec succès!');
-                    } else {
-                        alert('Erreur lors de la sauvegarde: ' + data.error);
+            shapeFillColor?.addEventListener('change', (e) => {
+                toolState.shape.fillColor = e.target.value;
+                if (activeShape && toolState.shape.fill) {
+                    activeShape.set('fill', e.target.value);
+                    canvas.renderAll();
+                }
+            });
+
+            // Gérer les changements de couleur du pinceau
+            brushColor?.addEventListener('change', (e) => {
+                toolState.brush.color = e.target.value;
+                if (currentTool === 'brush') {
+                    canvas.freeDrawingBrush.color = e.target.value;
+                }
+            });
+
+            // Gérer les changements de taille du pinceau
+            brushSize?.addEventListener('input', (e) => {
+                const size = parseInt(e.target.value);
+                toolState.brush.size = size;
+                brushSizeValue.textContent = `${size}px`;
+                if (currentTool === 'brush') {
+                    canvas.freeDrawingBrush.width = size;
+                }
+            });
+
+            // Désactiver la sélection par défaut
+            canvas.selection = false;
+
+            // Gérer le dessin des formes
+            canvas.on('mouse:down', (o) => {
+                if (currentTool === 'rect' || currentTool === 'circle') {
+                    isDrawing = true;
+                    const pointer = canvas.getPointer(o.e);
+                    startX = pointer.x;
+                    startY = pointer.y;
+
+                    // Désactiver la sélection pendant le dessin
+                    canvas.selection = false;
+                    canvas.discardActiveObject();
+                    canvas.renderAll();
+
+                    const shapeOptions = {
+                        left: startX,
+                        top: startY,
+                        stroke: toolState.shape.color,
+                        strokeWidth: toolState.shape.border,
+                        fill: toolState.shape.fill ? toolState.shape.fillColor : 'transparent',
+                        width: 0,
+                        height: 0,
+                        selectable: true,
+                        evented: true
+                    };
+
+                    if (currentTool === 'rect') {
+                        activeShape = new fabric.Rect(shapeOptions);
+                    } else if (currentTool === 'circle') {
+                        activeShape = new fabric.Circle({
+                            ...shapeOptions,
+                            radius: 0
+                        });
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Erreur lors de la sauvegarde');
+
+                    if (activeShape) {
+                        canvas.add(activeShape);
+                        canvas.setActiveObject(activeShape);
+                    }
+                }
+            });
+
+            canvas.on('mouse:move', (o) => {
+                if (!isDrawing) return;
+
+                const pointer = canvas.getPointer(o.e);
+                if (currentTool === 'rect' && activeShape) {
+                    const width = Math.abs(pointer.x - startX);
+                    const height = Math.abs(pointer.y - startY);
+                    activeShape.set({
+                        width: width,
+                        height: height,
+                        left: Math.min(startX, pointer.x),
+                        top: Math.min(startY, pointer.y)
+                    });
+                } else if (currentTool === 'circle' && activeShape) {
+                    const radius = Math.sqrt(
+                        Math.pow(pointer.x - startX, 2) +
+                        Math.pow(pointer.y - startY, 2)
+                    ) / 2;
+                    const center = {
+                        x: (startX + pointer.x) / 2,
+                        y: (startY + pointer.y) / 2
+                    };
+                    activeShape.set({
+                        radius: radius,
+                        left: center.x - radius,
+                        top: center.y - radius
+                    });
+                }
+                canvas.renderAll();
+            });
+
+            canvas.on('mouse:up', () => {
+                isDrawing = false;
+                if (activeShape) {
+                    activeShape.setCoords();
+                    canvas.setActiveObject(activeShape);
+                }
+                activeShape = null;
+                // Réactiver la sélection après le dessin
+                canvas.selection = true;
+                canvas.renderAll();
+            });
+
+            // Gérer la sélection des outils
+            tools.forEach(tool => {
+                tool.addEventListener('click', () => {
+                    const toolName = tool.dataset.tool;
+                    
+                    // Désactiver l'outil précédent
+                    if (currentTool) {
+                        tools.forEach(t => t.classList.remove('active'));
+                        canvas.isDrawingMode = false;
+                        brushControls?.classList.add('hidden');
+                        shapeControls?.classList.add('hidden');
+                    }
+
+                    // Activer le nouvel outil
+                    if (toolName === currentTool) {
+                        currentTool = null;
+                    } else {
+                        currentTool = toolName;
+                        tool.classList.add('active');
+
+                        switch (toolName) {
+                            case 'select':
+                                canvas.isDrawingMode = false;
+                                canvas.selection = true;
+                                break;
+                            case 'brush':
+                                canvas.isDrawingMode = true;
+                                canvas.freeDrawingBrush.color = toolState.brush.color;
+                                canvas.freeDrawingBrush.width = toolState.brush.size;
+                                brushControls?.classList.remove('hidden');
+                                break;
+                            case 'eraser':
+                                canvas.isDrawingMode = true;
+                                canvas.freeDrawingBrush.color = '#2D3748'; // bg-gray-700
+                                canvas.freeDrawingBrush.width = 20;
+                                break;
+                            case 'rect':
+                            case 'circle':
+                                canvas.isDrawingMode = false;
+                                canvas.selection = false;
+                                shapeControls?.classList.remove('hidden');
+                                break;
+                        }
+                    }
                 });
             });
         }
