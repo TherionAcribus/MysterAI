@@ -1,18 +1,28 @@
-const { Menu, MenuItem } = require('electron');
+const { Menu } = require('electron');
 
 function createImageContextMenu(mainWindow) {
-    const menu = new Menu();
-    
-    menu.append(new MenuItem({
-        label: 'Éditer l\'image',
-        click: () => {
-            mainWindow.webContents.send('edit-image-requested');
+    return Menu.buildFromTemplate([
+        {
+            label: 'Éditer l\'image',
+            click: () => {
+                mainWindow.webContents.send('edit-image-requested');
+            }
         }
-    }));
+    ]);
+}
 
-    return menu;
+function createSymbolContextMenu(mainWindow, data) {
+    return Menu.buildFromTemplate([
+        {
+            label: 'Supprimer le symbole',
+            click: () => {
+                mainWindow.webContents.send('context-menu-command', 'remove-symbol', data);
+            }
+        }
+    ]);
 }
 
 module.exports = {
-    createImageContextMenu
+    createImageContextMenu,
+    createSymbolContextMenu
 };

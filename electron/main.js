@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, contextBridge } = require('electron');
 const path = require('path');
-const { createImageContextMenu } = require('./contextMenu');
+const { createImageContextMenu, createSymbolContextMenu } = require('./contextMenu');
 
 let mainWindow;
 let currentImageData = null;
@@ -18,11 +18,19 @@ function createWindow() {
 
     mainWindow.loadURL('http://localhost:5000');
 
-    // Gérer le clic droit sur les images
+    // Handle right-click on images
     ipcMain.on('show-image-context-menu', (event, imageData) => {
         currentImageData = imageData;
         const menu = createImageContextMenu(mainWindow);
         menu.popup(BrowserWindow.fromWebContents(event.sender));
+    });
+
+    // Handle right-click on symbols
+    ipcMain.on('show-context-menu', (event, { type, data }) => {
+        if (type === 'symbol') {
+            const menu = createSymbolContextMenu(mainWindow, data);
+            menu.popup(BrowserWindow.fromWebContents(event.sender));
+        }
     });
 }
 

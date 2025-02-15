@@ -29,81 +29,75 @@ function initContextMenu() {
             console.log('=== DEBUG: window.electron existe:', !!window.electron);
             console.log('=== DEBUG: window.electron:', window.electron);
 
-            // Si nous sommes dans Electron, utiliser le menu contextuel natif
             if (window.electron) {
-                console.log('=== DEBUG: Utilisation du menu Electron ===');
+                // Utiliser le menu contextuel natif d'Electron
                 const imageData = {
                     imageId: targetImage.dataset.imageId,
                     imageName: targetImage.dataset.imageName
                 };
-                const position = {
-                    x: e.clientX,
-                    y: e.clientY
-                };
-                console.log('=== DEBUG: Image data:', imageData);
-                console.log('=== DEBUG: Position:', position);
-                window.electron.showImageContextMenu(imageData, position);
-                
-                // Éviter les doublons d'événements
-                window.electron.removeAllListeners('edit-image');
-
-                window.electron.on('edit-image', (event) => {
-                    console.log('=== DEBUG: Événement edit-image reçu ===', event);
-                    
-                    if (event.action === 'edit') {
-                        const imageData = event.imageData || {};
-                        console.log('=== DEBUG: Envoi de l\'événement au renderer ===', imageData);
-                        window.postMessage({ type: 'request-open-image-editor', data: imageData }, '*');
-                    }
-                });
+                window.electron.showImageContextMenu(imageData);
             } else {
-                console.log('=== DEBUG: Utilisation du menu web ===');
-                // Fallback pour le navigateur web
-                const rect = targetImage.getBoundingClientRect();
-                showWebContextMenu(rect.left, rect.top, targetImage.dataset.imageId, targetImage.dataset.imageName);
+                // Utiliser le menu contextuel web
+                showWebContextMenu(
+                    e.clientX,
+                    e.clientY,
+                    targetImage.dataset.imageId,
+                    targetImage.dataset.imageName
+                );
             }
         }
     });
 }
 
 // Fonction pour afficher le menu contextuel web
-function showWebContextMenu(x, y, imageId, imageName) {
-    // Supprimer tout menu contextuel existant
-    const existingMenu = document.querySelector('.context-menu');
-    if (existingMenu) {
-        existingMenu.remove();
+function showWebContextMenu(x, y, id, name, customItems = []) {
+    // Créer le menu
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    // Ajouter les éléments personnalisés s'ils existent
+    if (customItems.length > 0) {
+        customItems.forEach(item => {
+            const menuItem = document.createElement('div');
+            menuItem.className = 'context-menu-item';
+            menuItem.textContent = item.label;
+            menuItem.addEventListener('click', () => {
+                item.click();
+                menu.remove();
+            });
+            menu.appendChild(menuItem);
+        });
+    } else {
+        // Menu par défaut pour les images
+        const editItem = document.createElement('div');
+        editItem.className = 'context-menu-item';
+        editItem.textContent = 'Éditer l\'image';
+        editItem.addEventListener('click', () => {
+            window.openImageEditor(id, name);
+            menu.remove();
+        });
+        menu.appendChild(editItem);
     }
 
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'context-menu';
-    contextMenu.innerHTML = `
-        <div class="context-menu-item edit-image">
-            <i class="fas fa-edit"></i>
-            Éditer l'image
-        </div>
-    `;
-
-    // Positionner le menu
-    contextMenu.style.left = x + 'px';
-    contextMenu.style.top = y + 'px';
-    document.body.appendChild(contextMenu);
-
-    // Gérer le clic sur l'option d'édition
-    contextMenu.querySelector('.edit-image').addEventListener('click', function() {
-        window.openImageEditor(imageId, imageName);
-        contextMenu.remove();
-    });
+    // Ajouter le menu au document
+    document.body.appendChild(menu);
 
     // Fermer le menu au clic en dehors
     function handleClickOutside(e) {
-        if (!contextMenu.contains(e.target)) {
-            contextMenu.remove();
+        if (!menu.contains(e.target)) {
+            menu.remove();
             document.removeEventListener('click', handleClickOutside);
         }
     }
-
-    // Attendre un peu avant d'ajouter le gestionnaire de clic
+    
+    // Utiliser setTimeout pour éviter que le menu ne se ferme immédiatement
     setTimeout(() => {
         document.addEventListener('click', handleClickOutside);
     }, 0);
 }
+
+// Exporter les fonctions
+window.initContextMenu = initContextMenu;
+window.showWebContextMenu = showWebContextMenu;

@@ -4,6 +4,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron', {
     showImageContextMenu: (imageData) => {
         ipcRenderer.send('show-image-context-menu', imageData);
+    },
+    showContextMenu: (type, data) => {
+        ipcRenderer.send('show-context-menu', { type, data });
+    },
+    on: (channel, callback) => {
+        ipcRenderer.on(channel, (event, ...args) => callback(...args));
     }
 });
 

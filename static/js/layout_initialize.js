@@ -74,6 +74,28 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant Alphabet Viewer
+        mainLayout.registerComponent('alphabet-viewer', function(container, state) {
+            container.getElement().load(`/api/alphabets/${state.alphabetId}/view`, function() {
+                // Attendre que le DOM soit chargé
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initializeAlphabetViewer);
+                } else {
+                    initializeAlphabetViewer();
+                }
+
+                function initializeAlphabetViewer() {
+                    // S'assurer que Stimulus est initialisé
+                    const application = window.Stimulus;
+                    if (application) {
+                        const element = container.getElement()[0];
+                        // Forcer Stimulus à scanner et initialiser les contrôleurs
+                        application.load();
+                    }
+                }
+            });
+        });
+
         // Initialiser le layout
         mainLayout.init();
 

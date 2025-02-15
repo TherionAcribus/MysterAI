@@ -4,8 +4,9 @@
 <div class="panel-body mt-4 space-y-4">
     {% if alphabets %}
         {% for alphabet in alphabets %}
-            <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 cursor-pointer transition-colors duration-200"
-                 data-alphabet-id="{{ alphabet.id }}">
+            <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 cursor-pointer transition-colors"
+                 data-alphabet-id="{{ alphabet.id }}"
+                 onclick="openAlphabetTab('{{ alphabet.id }}', '{{ alphabet.name }}')">
                 <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
                 <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
                 <div class="flex items-center mt-2 text-xs text-gray-400">
@@ -24,3 +25,38 @@
         </div>
     {% endif %}
 </div>
+
+<script>
+function openAlphabetTab(alphabetId, alphabetName) {
+    // Trouver le conteneur principal (row)
+    const rootContentItem = window.mainLayout.root.contentItems[0];
+    
+    // Configuration du composant
+    const componentConfig = {
+        type: 'component',
+        componentName: 'alphabet-viewer',
+        componentState: { 
+            alphabetId: alphabetId,
+            alphabetName: alphabetName
+        },
+        title: `Alphabet - ${alphabetName}`,
+        id: `alphabet-${alphabetId}`
+    };
+
+    // Si c'est un stack, ajouter directement
+    if (rootContentItem.isStack) {
+        rootContentItem.addChild(componentConfig);
+    } else {
+        // Sinon, trouver ou créer un stack
+        let stack = rootContentItem.contentItems.find(item => item.isStack);
+        if (!stack) {
+            stack = window.mainLayout.createContentItem({
+                type: 'stack',
+                content: []
+            });
+            rootContentItem.addChild(stack);
+        }
+        stack.addChild(componentConfig);
+    }
+}
+</script>
