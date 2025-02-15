@@ -85,12 +85,10 @@ function initializeLayout() {
                 }
 
                 function initializeAlphabetViewer() {
-                    // S'assurer que Stimulus est initialisé
-                    const application = window.Stimulus;
-                    if (application) {
-                        const element = container.getElement()[0];
-                        // Forcer Stimulus à scanner et initialiser les contrôleurs
-                        application.load();
+                    // Forcer Stimulus à scanner et initialiser les contrôleurs
+                    const element = container.getElement()[0];
+                    if (window.Stimulus) {
+                        window.Stimulus.Application.start();
                     }
                 }
             });

@@ -5,7 +5,8 @@
     application.register("alphabet-viewer", class extends Stimulus.Controller {
         static targets = ["enteredSymbols", "decodedText", "availableSymbol"]
         static values = {
-            alphabetId: String
+            alphabetId: String,
+            type: String
         }
 
         connect() {
@@ -13,6 +14,52 @@
             this.enteredChars = []
             this.updateDisplay()
             this.setupContextMenu()
+            this.setupDragAndDrop()
+        }
+
+        setupDragAndDrop() {
+            this.enteredSymbolsTarget.addEventListener('dragstart', this.handleDragStart.bind(this))
+            this.enteredSymbolsTarget.addEventListener('dragover', this.handleDragOver.bind(this))
+            this.enteredSymbolsTarget.addEventListener('drop', this.handleDrop.bind(this))
+        }
+
+        handleDragStart(event) {
+            const symbolElement = event.target.closest('[data-index]')
+            if (symbolElement) {
+                event.dataTransfer.setData('text/plain', symbolElement.dataset.index)
+                event.dataTransfer.effectAllowed = 'move'
+                symbolElement.classList.add('opacity-50')
+            }
+        }
+
+        handleDragOver(event) {
+            event.preventDefault()
+            const symbolElement = event.target.closest('[data-index]')
+            if (symbolElement) {
+                event.dataTransfer.dropEffect = 'move'
+            }
+        }
+
+        handleDrop(event) {
+            event.preventDefault()
+            const sourceIndex = parseInt(event.dataTransfer.getData('text/plain'))
+            const targetElement = event.target.closest('[data-index]')
+            
+            if (targetElement) {
+                const targetIndex = parseInt(targetElement.dataset.index)
+                if (sourceIndex !== targetIndex) {
+                    // Réorganiser les caractères
+                    const char = this.enteredChars[sourceIndex]
+                    this.enteredChars.splice(sourceIndex, 1)
+                    this.enteredChars.splice(targetIndex, 0, char)
+                    this.updateDisplay()
+                }
+            }
+
+            // Retirer l'effet d'opacité de tous les symboles
+            this.enteredSymbolsTarget.querySelectorAll('[data-index]').forEach(el => {
+                el.classList.remove('opacity-50')
+            })
         }
 
         setupContextMenu() {
@@ -49,50 +96,55 @@
             const char = symbol.dataset.char
             console.log('Adding symbol:', char)
             
-            // Add character to our list
             this.enteredChars.push(char)
-            
-            // Update display
             this.updateDisplay()
         }
 
         updateDisplay() {
-            console.log('Updating display with chars:', this.enteredChars)
-            
-            // Update entered symbols area
-            const symbolsHtml = this.enteredChars.map((char, index) => {
-                const symbol = this.availableSymbolTargets.find(s => s.dataset.char === char)
-                if (!symbol) return ''
-                
-                // Create a clone of the symbol content
-                const symbolContent = symbol.querySelector('span').cloneNode(true)
-                symbolContent.classList.remove('group-hover:text-gray-200')
-                
-                return `<div class="inline-flex items-center justify-center bg-gray-700 rounded p-2 relative group" data-index="${index}">
-                    ${symbolContent.outerHTML}
-                </div>`
-            }).join('')
-            
-            this.enteredSymbolsTarget.innerHTML = symbolsHtml
-            
-            // Update decoded text
+            // Mettre à jour les symboles entrés
+            this.enteredSymbolsTarget.innerHTML = this.enteredChars
+                .map((char, index) => {
+                    const symbol = this.availableSymbolTargets.find(s => s.dataset.char === char)
+                    if (!symbol) return ''
+
+                    // Gérer différemment selon le type de symbole (font ou image)
+                    let symbolContent
+                    if (symbol.querySelector('span')) {
+                        // Cas d'une police personnalisée
+                        symbolContent = symbol.querySelector('span').cloneNode(true)
+                        symbolContent.classList.remove('group-hover:text-gray-200')
+                    } else if (symbol.querySelector('img')) {
+                        // Cas d'une image
+                        symbolContent = symbol.querySelector('img').cloneNode(true)
+                    } else {
+                        return ''
+                    }
+
+                    return `
+                        <div class="w-24 h-24 flex items-center justify-center bg-gray-800 rounded-lg cursor-move group"
+                             draggable="true"
+                             data-index="${index}"
+                             data-char="${char}">
+                            ${symbolContent.outerHTML}
+                        </div>
+                    `
+                }).join('')
+
+            // Mettre à jour le texte décodé
             this.decodedTextTarget.value = this.enteredChars.join('')
         }
 
         removeSymbol(index) {
-            if (typeof index === 'number' && index >= 0 && index < this.enteredChars.length) {
-                console.log('Removing symbol at index:', index)
+            if (index >= 0 && index < this.enteredChars.length) {
                 this.enteredChars.splice(index, 1)
                 this.updateDisplay()
             }
         }
 
         keydown(event) {
-            // Keyboard shortcut to remove last character
             if (event.key === 'Backspace' && this.enteredChars.length > 0) {
                 event.preventDefault()
-                this.enteredChars.pop()
-                this.updateDisplay()
+                this.removeSymbol(this.enteredChars.length - 1)
             }
         }
     })
