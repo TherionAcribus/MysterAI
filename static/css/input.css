@@ -51,3 +51,18 @@
   background: theme('colors.gray.700');
   color: theme('colors.white');
 }
+
+.context-menu-item.text-gray-500 {
+  cursor: default;
+}
+
+.context-menu-item.text-gray-500:hover {
+  background: transparent;
+  color: theme('colors.gray.500');
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: theme('colors.gray.700');
+  margin: theme('spacing.1') 0;
+}

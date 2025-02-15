@@ -81,6 +81,18 @@
                         `Symbole ${char}`,
                         [
                             {
+                                label: `Valeur : "${char}"`,
+                                disabled: true,
+                                className: 'text-gray-500'
+                            },
+                            {
+                                type: 'separator'
+                            },
+                            {
+                                label: 'Dupliquer le symbole',
+                                click: () => this.duplicateSymbol(index)
+                            },
+                            {
                                 label: 'Supprimer le symbole',
                                 click: () => this.removeSymbol(index)
                             }
@@ -137,6 +149,15 @@
         removeSymbol(index) {
             if (index >= 0 && index < this.enteredChars.length) {
                 this.enteredChars.splice(index, 1)
+                this.updateDisplay()
+            }
+        }
+
+        duplicateSymbol(index) {
+            if (index >= 0 && index < this.enteredChars.length) {
+                const char = this.enteredChars[index]
+                // Insérer le symbole dupliqué juste après l'original
+                this.enteredChars.splice(index + 1, 0, char)
                 this.updateDisplay()
             }
         }
