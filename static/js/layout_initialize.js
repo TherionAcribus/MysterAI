@@ -94,19 +94,142 @@ function initializeLayout() {
             });
         });
 
-        // Initialiser le layout
-        mainLayout.init();
+        // Enregistrer le composant image-editor
+        mainLayout.registerComponent('image-editor', function(container, state) {
+            console.log('=== DEBUG: Initialisation du composant image-editor ===', state);
+            
+            // Charger le template de l'éditeur d'image
+            fetch(`http://127.0.0.1:3000/geocaches/image-editor/${state.imageId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Injecter le HTML dans le conteneur
+                    container.getElement().html(html);
+                    console.log('=== DEBUG: HTML injecté dans le conteneur ===');
+                    
+                    // Attendre que le DOM et Fabric.js soient chargés
+                    const waitForFabric = () => {
+                        if (typeof fabric === 'undefined') {
+                            console.log('=== DEBUG: Fabric.js pas encore chargé, réessai dans 100ms ===');
+                            setTimeout(waitForFabric, 100);
+                            return;
+                        }
+                        
+                        console.log('=== DEBUG: Fabric.js chargé, initialisation de l\'éditeur ===');
+                        initializeEditor();
+                    };
 
-        // Maintenant on peut logger l'état après initialisation
-        console.log('=== DEBUG: État du layout après initialisation ===');
-        console.log('mainLayout:', mainLayout);
-        console.log('Root:', mainLayout.root);
-        if (mainLayout.root) {
-            console.log('ContentItems:', mainLayout.root.contentItems);
-        } else {
-            console.error('=== DEBUG: Root est null après initialisation ===');
-        }
+                    const initializeEditor = () => {
+                        const canvas = container.getElement().find('#canvas')[0];
+                        if (!canvas) {
+                            console.error('=== DEBUG: Canvas non trouvé, réessai dans 100ms ===');
+                            setTimeout(initializeEditor, 100);
+                            return;
+                        }
 
+                        const imageUrl = canvas.dataset.imageUrl;
+                        if (!imageUrl) {
+                            console.error('=== DEBUG: URL de l\'image non trouvée ===');
+                            return;
+                        }
+
+                        console.log('=== DEBUG: Canvas trouvé ===', canvas);
+                        console.log('=== DEBUG: URL de l\'image ===', imageUrl);
+
+                        // Vérifier que l'URL est accessible
+                        fetch(imageUrl)
+                            .then(response => {
+                                console.log('=== DEBUG: Réponse de l\'image ===', response.status, response.statusText);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.blob();
+                            })
+                            .then(() => {
+                                // L'image est accessible, on peut l'utiliser avec Fabric
+                                const containerWidth = container.width;
+                                const containerHeight = container.height;
+                                console.log('=== DEBUG: Dimensions du conteneur ===', containerWidth, containerHeight);
+
+                                // Créer le canvas avec les dimensions du conteneur
+                                const fabricCanvas = new fabric.Canvas('canvas', {
+                                    width: containerWidth,
+                                    height: containerHeight,
+                                    backgroundColor: '#2D3748' // bg-gray-700
+                                });
+
+                                // Charger l'image
+                                fabric.Image.fromURL(imageUrl, function(img) {
+                                    if (!img) {
+                                        console.error('Erreur lors du chargement de l\'image');
+                                        return;
+                                    }
+                                    console.log('=== DEBUG: Image Fabric.js créée ===', img.width, img.height);
+                                    
+                                    // Calculer le ratio pour ajuster l'image au canvas
+                                    const scaleX = containerWidth / img.width;
+                                    const scaleY = containerHeight / img.height;
+                                    const scale = Math.min(scaleX, scaleY);
+                                    
+                                    // Appliquer l'échelle et centrer l'image
+                                    img.set({
+                                        scaleX: scale,
+                                        scaleY: scale,
+                                        left: (containerWidth - img.width * scale) / 2,
+                                        top: (containerHeight - img.height * scale) / 2,
+                                        selectable: false,
+                                        evented: false
+                                    });
+
+                                    // Ajouter l'image au canvas
+                                    fabricCanvas.add(img);
+                                    fabricCanvas.renderAll();
+                                    
+                                    console.log('=== DEBUG: Image chargée avec succès ===');
+                                    console.log('=== DEBUG: Dimensions finales ===', {
+                                        canvas: { width: containerWidth, height: containerHeight },
+                                        image: { 
+                                            width: img.width * scale, 
+                                            height: img.height * scale,
+                                            scale: scale,
+                                            position: { left: img.left, top: img.top }
+                                        }
+                                    });
+
+                                    // Initialiser les outils
+                                    initializeTools(fabricCanvas);
+                                }, {
+                                    crossOrigin: 'anonymous'
+                                });
+                            })
+                            .catch(error => {
+                                console.error('=== DEBUG: Erreur lors de la vérification de l\'image ===', error);
+                                container.getElement().html(`
+                                    <div class="p-4 text-red-500">
+                                        Erreur lors du chargement de l'image: ${error.message}
+                                    </div>
+                                `);
+                            });
+                    };
+
+                    // Démarrer l'initialisation
+                    waitForFabric();
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement du template:', error);
+                    container.getElement().html(`
+                        <div class="p-4 text-red-500">
+                            Erreur lors du chargement de l'éditeur: ${error.message}
+                        </div>
+                    `);
+                });
+        });
+
+        // Enregistrer le composant geocaches-table
         mainLayout.registerComponent('geocaches-table', function(container, state) {
             const containerId = container.parent.config.id;
             container.getElement().attr('data-container-id', containerId);
@@ -144,6 +267,7 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant openGeocacheDetails
         mainLayout.registerComponent('openGeocacheDetails', function(container, state) {
             console.log("Création du composant openGeocacheDetails pour la zone", state.zoneId);
             
@@ -183,6 +307,7 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant geocache-details
         mainLayout.registerComponent('geocache-details', function(container, state) {
             console.log("Création du composant geocache-details", state);
             
@@ -211,112 +336,6 @@ function initializeLayout() {
                 console.log('=== DEBUG: Sauvegarde des détails ===', state);
                 // TODO: Implémenter la sauvegarde
             });
-        });
-
-        mainLayout.registerComponent('image-editor', function(container, state) {
-            console.log('=== DEBUG: Création du composant image-editor ===', state);
-            
-            // Charger le template image_editor.html via une requête AJAX
-            fetch(`http://localhost:3000/geocaches/image-editor/${state.imageId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(html => {
-                    // Injecter le HTML dans le container
-                    container.getElement().html(html);
-
-                    // Attendre que Fabric.js soit chargé
-                    const checkFabric = setInterval(() => {
-                        if (window.fabric) {
-                            clearInterval(checkFabric);
-                            
-                            // Récupérer l'URL de l'image du template
-                            const canvas = container.getElement().find('#canvas')[0];
-                            const imageUrl = canvas.dataset.imageUrl;
-                            console.log('=== DEBUG: Canvas trouvé ===', canvas);
-                            console.log('=== DEBUG: URL de l\'image ===', imageUrl);
-
-                            // Vérifier que l'URL est accessible
-                            fetch(imageUrl)
-                                .then(response => {
-                                    console.log('=== DEBUG: Réponse de l\'image ===', response.status, response.statusText);
-                                    if (!response.ok) {
-                                        throw new Error(`HTTP error! status: ${response.status}`);
-                                    }
-                                    return response.blob();
-                                })
-                                .then(() => {
-                                    // L'image est accessible, on peut l'utiliser avec Fabric
-                                    const containerWidth = container.width;
-                                    const containerHeight = container.height;
-                                    console.log('=== DEBUG: Dimensions du conteneur ===', containerWidth, containerHeight);
-
-                                    // Créer le canvas avec les dimensions du conteneur
-                                    const fabricCanvas = new fabric.Canvas('canvas', {
-                                        width: containerWidth,
-                                        height: containerHeight,
-                                        backgroundColor: '#2D3748' // bg-gray-700
-                                    });
-
-                                    // Charger l'image
-                                    fabric.Image.fromURL(imageUrl, function(img) {
-                                        if (!img) {
-                                            console.error('Erreur lors du chargement de l\'image');
-                                            return;
-                                        }
-                                        console.log('=== DEBUG: Image Fabric.js créée ===', img.width, img.height);
-                                        
-                                        // Calculer le ratio pour ajuster l'image au canvas
-                                        const scaleX = containerWidth / img.width;
-                                        const scaleY = containerHeight / img.height;
-                                        const scale = Math.min(scaleX, scaleY);
-                                        
-                                        // Appliquer l'échelle et centrer l'image
-                                        img.set({
-                                            scaleX: scale,
-                                            scaleY: scale,
-                                            left: (containerWidth - img.width * scale) / 2,
-                                            top: (containerHeight - img.height * scale) / 2,
-                                            selectable: false,
-                                            evented: false
-                                        });
-
-                                        // Ajouter l'image au canvas
-                                        fabricCanvas.add(img);
-                                        fabricCanvas.renderAll();
-                                        
-                                        console.log('=== DEBUG: Image chargée avec succès ===');
-                                        console.log('=== DEBUG: Dimensions finales ===', {
-                                            canvas: { width: containerWidth, height: containerHeight },
-                                            image: { 
-                                                width: img.width * scale, 
-                                                height: img.height * scale,
-                                                scale: scale,
-                                                position: { left: img.left, top: img.top }
-                                            }
-                                        });
-
-                                        // Initialiser les outils
-                                        initializeTools(fabricCanvas);
-                                    }, {
-                                        crossOrigin: 'anonymous'
-                                    });
-                                })
-                                .catch(error => {
-                                    console.error('=== DEBUG: Erreur lors de la vérification de l\'image ===', error);
-                                });
-                        }
-                    }, 100);
-                })
-                .catch(error => {
-                    console.error('Erreur lors du chargement du template:', error);
-                    container.getElement().html(`<div class="p-4 text-red-500">
-                        Erreur lors du chargement de l'éditeur d'image: ${error.message}
-                    </div>`);
-                });
         });
 
         function initializeTools(canvas) {
