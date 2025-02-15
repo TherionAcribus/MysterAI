@@ -35,6 +35,45 @@ function initializeLayout() {
             container.getElement().html(welcomeHtml);
         });
 
+        // Enregistrer le composant Alphabets
+        mainLayout.registerComponent('alphabets', function(container, state) {
+            container.getElement().html(`
+                <div class="p-4">
+                    <h2 class="text-xl font-bold mb-4">Alphabets</h2>
+                    <div id="alphabets-list" class="space-y-4">
+                        <div class="animate-pulse">Chargement des alphabets...</div>
+                    </div>
+                </div>
+            `);
+            
+            // Charger la liste des alphabets
+            fetch('/api/alphabets')
+                .then(response => response.json())
+                .then(alphabets => {
+                    const alphabetsList = container.getElement().find('#alphabets-list');
+                    alphabetsList.empty();
+                    
+                    alphabets.forEach(alphabet => {
+                        const alphabetCard = $(`
+                            <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 cursor-pointer">
+                                <h3 class="font-semibold">${alphabet.name}</h3>
+                                <p class="text-sm text-gray-300">${alphabet.description}</p>
+                                <div class="text-xs text-gray-400 mt-2">Type: ${alphabet.alphabetConfig.type}</div>
+                            </div>
+                        `);
+                        
+                        alphabetsList.append(alphabetCard);
+                    });
+                })
+                .catch(error => {
+                    container.getElement().find('#alphabets-list').html(`
+                        <div class="text-red-500">
+                            Erreur lors du chargement des alphabets: ${error.message}
+                        </div>
+                    `);
+                });
+        });
+
         // Initialiser le layout
         mainLayout.init();
 

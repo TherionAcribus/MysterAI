@@ -1,0 +1,26 @@
+<div class="panel-header border-b border-gray-700 p-2">
+    <h2 class="text-lg font-semibold">Alphabets</h2>
+</div>
+<div class="panel-body mt-4 space-y-4">
+    {% if alphabets %}
+        {% for alphabet in alphabets %}
+            <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 cursor-pointer transition-colors duration-200"
+                 data-alphabet-id="{{ alphabet.id }}">
+                <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
+                <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
+                <div class="flex items-center mt-2 text-xs text-gray-400">
+                    <span class="mr-2">Type: {{ alphabet.alphabetConfig.type }}</span>
+                    {% if alphabet.alphabetConfig.type == 'images' %}
+                        <i class="fas fa-images"></i>
+                    {% elif alphabet.alphabetConfig.type == 'font' %}
+                        <i class="fas fa-font"></i>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-gray-400 text-center py-4">
+            Aucun alphabet disponible
+        </div>
+    {% endif %}
+</div>

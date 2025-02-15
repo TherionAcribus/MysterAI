@@ -108,6 +108,9 @@
                         hx-trigger="load">
                     <i class="fas fa-key text-xl"></i>
                 </button>
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="alphabets" data-side="left">
+                    <i class="fas fa-font"></i>
+                </button>
             </div>
             <div class="mt-auto flex flex-col items-center py-2 space-y-4">
                 <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings" data-side="left">
@@ -151,6 +154,17 @@
                         </div>
                         <div class="panel-body">
                             <!-- Contenu du panneau de décryptage -->
+                        </div>
+                    </div>
+                    <div id="alphabets-panel" class="h-full p-4 panel-content"
+                         hx-get="/api/alphabets"
+                         hx-trigger="load"
+                         hx-swap="innerHTML">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Alphabets</h2>
+                        </div>
+                        <div class="panel-body mt-4 space-y-4">
+                            <div class="animate-pulse">Chargement des alphabets...</div>
                         </div>
                     </div>
                     <div id="settings-panel" class="h-full p-4 panel-content">
@@ -573,7 +587,7 @@
                     window.goldenlayout.root.contentItems[0].addChild(componentConfig);
                     console.log('=== DEBUG: Composant éditeur ajouté ===');
                 } catch (error) {
-                    console.error('=== DEBUG: Erreur lors de l\'ajout du composant ===', error);
+                    console.error('Erreur lors de l\'ajout du composant:', error);
                 }
             });
         });
