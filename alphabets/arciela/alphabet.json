@@ -11,7 +11,7 @@
     "upperCaseOnly": false,
     "characters": {
       "letters": "all",
-      "numbers": "all",
+      "numbers": "",
       "special": {
         ".": "point",
         ",": "virgule",

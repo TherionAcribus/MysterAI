@@ -13,10 +13,7 @@
       "letters": "all",
       "numbers": "all",
       "special": {
-        ".": "point",
-        ",": "virgule",
-        "!": "exclamation",
-        "?": "question"
+        ".": "point"
       }
     }
   }
