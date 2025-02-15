@@ -580,15 +580,33 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             // Écouter les événements d'édition d'image
-            window.electron.on('request-open-image-editor', (data) => {
-                console.log('=== DEBUG: Événement IPC request-open-image-editor reçu ===', data);
-                handleImageEditorRequest(data);
+            window.electron.on('request-open-image-editor', (event) => {
+                console.log('=== DEBUG: Événement IPC request-open-image-editor reçu ===', event);
+                
+                // Éviter les doublons
+                const existingEditor = mainLayout.root.getItemsById('image-editor-' + event.imageId)[0];
+                if (existingEditor) {
+                    console.log('=== DEBUG: Éditeur déjà ouvert, focus sur celui-ci ===');
+                    existingEditor.parent.setActiveContentItem(existingEditor);
+                    return;
+                }
+
+                handleImageEditorRequest(event);
             });
 
             // Écouter aussi les messages window pour le cas local
-            window.addEventListener('message', (event) => {
-                if (event.data.type === 'request-open-image-editor') {
-                    console.log('=== DEBUG: Message local request-open-image-editor reçu ===', event.data);
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'request-open-image-editor') {
+                    console.log('=== DEBUG: Message local request-open-image-editor reçu ===', event);
+                    
+                    // Éviter les doublons
+                    const existingEditor = mainLayout.root.getItemsById('image-editor-' + event.data.data.imageId)[0];
+                    if (existingEditor) {
+                        console.log('=== DEBUG: Éditeur déjà ouvert, focus sur celui-ci ===');
+                        existingEditor.parent.setActiveContentItem(existingEditor);
+                        return;
+                    }
+
                     handleImageEditorRequest(event.data.data);
                 }
             });
@@ -596,44 +614,38 @@
             // Fonction pour gérer la demande d'édition d'image
             function handleImageEditorRequest(data) {
                 console.log('=== DEBUG: Traitement de la demande d\'édition ===', data);
+                
+                // Récupérer la racine du layout
+                const rootContentItems = mainLayout.root.contentItems[0];
+                console.log('=== DEBUG: Root content items ===', rootContentItems);
+                
+                // Éviter les doublons
+                const existingEditor = mainLayout.root.getItemsById('image-editor-' + data.imageId)[0];
+                if (existingEditor) {
+                    console.log('=== DEBUG: Éditeur déjà ouvert, focus sur celui-ci ===');
+                    existingEditor.parent.setActiveContentItem(existingEditor);
+                    return;
+                }
+
+                // Configuration du composant
+                const config = {
+                    type: 'component',
+                    componentName: 'image-editor',
+                    componentState: {
+                        imageId: data.imageId,
+                        imageName: data.imageName
+                    },
+                    title: 'Éditeur - Image ' + data.imageId,
+                    id: 'image-editor-' + data.imageId
+                };
+                console.log('=== DEBUG: Configuration du composant ===', config);
+
+                // Ajouter le composant au layout
                 try {
-                    // Trouver le conteneur principal (row)
-                    const rootContentItem = mainLayout.root.contentItems[0];
-                    console.log('=== DEBUG: Root content items ===', rootContentItem);
-                    
-                    // Configuration du composant
-                    const componentConfig = {
-                        type: 'component',
-                        componentName: 'image-editor',
-                        componentState: { 
-                            imageId: data.imageId,
-                            imageName: data.imageName
-                        },
-                        title: `Éditeur - ${data.imageName || `Image ${data.imageId}`}`,
-                        id: `image-editor-${data.imageId}`
-                    };
-
-                    console.log('=== DEBUG: Configuration du composant ===', componentConfig);
-
-                    // Si c'est un stack, ajouter directement
-                    if (rootContentItem.isStack) {
-                        rootContentItem.addChild(componentConfig);
-                    } else {
-                        // Sinon, trouver ou créer un stack
-                        let stack = rootContentItem.contentItems.find(item => item.isStack);
-                        if (!stack) {
-                            stack = mainLayout.createContentItem({
-                                type: 'stack',
-                                content: []
-                            });
-                            rootContentItem.addChild(stack);
-                        }
-                        stack.addChild(componentConfig);
-                    }
-
+                    rootContentItems.addChild(config);
                     console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
                 } catch (error) {
-                    console.error('=== DEBUG: Erreur lors de l\'ajout de l\'éditeur ===', error);
+                    console.error('Erreur lors de l\'ajout du composant:', error);
                 }
             }
         });

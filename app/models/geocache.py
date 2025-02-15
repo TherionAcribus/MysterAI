@@ -4,7 +4,7 @@ from geoalchemy2 import Geometry
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
 from bs4 import BeautifulSoup
-from flask import url_for
+from flask import url_for, current_app
 
 def decimal_to_dm(decimal_degrees):
     """Convertit des degrés décimaux en degrés et minutes décimales"""
@@ -279,16 +279,17 @@ class Geocache(db.Model):
     def get_image_by_id(image_id):
         """Récupère une image par son ID."""
         try:
-            # Récupérer la géocache qui contient cette image
-            geocache = Geocache.get_by_image_id(image_id)
-            if not geocache:
-                return None
+            # Convertir l'ID en entier
+            image_id = int(image_id)
             
-            # Trouver l'image dans la liste des images
-            for image in geocache.images:
-                if image.id == image_id:
-                    return image
-            
+            # Chercher l'image directement dans la base de données
+            image = GeocacheImage.query.get(image_id)
+            if image:
+                return {
+                    'id': image.id,
+                    'filename': image.filename,
+                    'gc_code': image.geocache.gc_code
+                }
             return None
             
         except Exception as e:
@@ -299,15 +300,13 @@ class Geocache(db.Model):
     def get_by_image_id(image_id):
         """Récupère une géocache par l'ID d'une de ses images."""
         try:
-            # Charger toutes les géocaches
-            geocaches = Geocache.load_all()
+            # Convertir l'ID en entier
+            image_id = int(image_id)
             
-            # Chercher la géocache qui contient l'image
-            for geocache in geocaches:
-                for image in geocache.images:
-                    if image.id == image_id:
-                        return geocache
-            
+            # Chercher l'image directement
+            image = GeocacheImage.query.get(image_id)
+            if image:
+                return image.geocache
             return None
             
         except Exception as e:

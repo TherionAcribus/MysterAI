@@ -43,6 +43,19 @@ function initContextMenu() {
                 console.log('=== DEBUG: Image data:', imageData);
                 console.log('=== DEBUG: Position:', position);
                 window.electron.showImageContextMenu(imageData, position);
+                
+                // Éviter les doublons d'événements
+                window.electron.removeAllListeners('edit-image');
+
+                window.electron.on('edit-image', (event) => {
+                    console.log('=== DEBUG: Événement edit-image reçu ===', event);
+                    
+                    if (event.action === 'edit') {
+                        const imageData = event.imageData || {};
+                        console.log('=== DEBUG: Envoi de l\'événement au renderer ===', imageData);
+                        window.postMessage({ type: 'request-open-image-editor', data: imageData }, '*');
+                    }
+                });
             } else {
                 console.log('=== DEBUG: Utilisation du menu web ===');
                 // Fallback pour le navigateur web
@@ -94,4 +107,3 @@ function showWebContextMenu(x, y, imageId, imageName) {
         document.addEventListener('click', handleClickOutside);
     }, 0);
 }
-

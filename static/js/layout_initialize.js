@@ -157,38 +157,206 @@ function initializeLayout() {
         mainLayout.registerComponent('image-editor', function(container, state) {
             console.log('=== DEBUG: Création du composant image-editor ===', state);
             
-            // Récupérer l'image source originale
-            const originalImage = document.querySelector(`img[data-image-id="${state.imageId}"]`);
-            const imageUrl = originalImage ? originalImage.src : '';
-            
-            console.log('=== DEBUG: URL de l\'image source ===', imageUrl);
-            
-            container.getElement().html(`
-                <div class="w-full h-full bg-gray-900 overflow-auto p-4">
-                    <div class="flex flex-col h-full">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl text-white">Éditeur d'Image</h2>
-                            <div class="flex space-x-2">
-                                <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">
-                                    <i class="fas fa-save mr-2"></i>Sauvegarder
-                                </button>
-                            </div>
-                        </div>
-                        <div class="flex-grow relative">
-                            <img src="${imageUrl}"
-                                 class="max-w-full h-auto"
-                                 alt="Image à éditer"
-                                 data-image-id="${state.imageId}">
-                        </div>
-                    </div>
-                </div>
-            `);
+            // Charger le template image_editor.html via une requête AJAX
+            fetch(`http://localhost:3000/geocaches/image-editor/${state.imageId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Injecter le HTML dans le container
+                    container.getElement().html(html);
 
-            // Gérer le redimensionnement si nécessaire
-            container.on('resize', function() {
-                console.log('=== DEBUG: Redimensionnement de l\'éditeur d\'image ===');
-            });
+                    // Attendre que Fabric.js soit chargé
+                    const checkFabric = setInterval(() => {
+                        if (window.fabric) {
+                            clearInterval(checkFabric);
+                            
+                            // Récupérer l'URL de l'image du template
+                            const canvas = container.getElement().find('#canvas')[0];
+                            const imageUrl = canvas.dataset.imageUrl;
+                            console.log('=== DEBUG: Canvas trouvé ===', canvas);
+                            console.log('=== DEBUG: URL de l\'image ===', imageUrl);
+
+                            // Vérifier que l'URL est accessible
+                            fetch(imageUrl)
+                                .then(response => {
+                                    console.log('=== DEBUG: Réponse de l\'image ===', response.status, response.statusText);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    return response.blob();
+                                })
+                                .then(() => {
+                                    // L'image est accessible, on peut l'utiliser avec Fabric
+                                    const containerWidth = container.width;
+                                    const containerHeight = container.height;
+                                    console.log('=== DEBUG: Dimensions du conteneur ===', containerWidth, containerHeight);
+
+                                    // Créer le canvas avec les dimensions du conteneur
+                                    const fabricCanvas = new fabric.Canvas('canvas', {
+                                        width: containerWidth,
+                                        height: containerHeight,
+                                        backgroundColor: '#2D3748' // bg-gray-700
+                                    });
+
+                                    // Charger l'image
+                                    fabric.Image.fromURL(imageUrl, function(img) {
+                                        if (!img) {
+                                            console.error('Erreur lors du chargement de l\'image');
+                                            return;
+                                        }
+                                        console.log('=== DEBUG: Image Fabric.js créée ===', img.width, img.height);
+                                        
+                                        // Calculer le ratio pour ajuster l'image au canvas
+                                        const scaleX = containerWidth / img.width;
+                                        const scaleY = containerHeight / img.height;
+                                        const scale = Math.min(scaleX, scaleY);
+                                        
+                                        // Appliquer l'échelle et centrer l'image
+                                        img.set({
+                                            scaleX: scale,
+                                            scaleY: scale,
+                                            left: (containerWidth - img.width * scale) / 2,
+                                            top: (containerHeight - img.height * scale) / 2,
+                                            selectable: false,
+                                            evented: false
+                                        });
+
+                                        // Ajouter l'image au canvas
+                                        fabricCanvas.add(img);
+                                        fabricCanvas.renderAll();
+                                        
+                                        console.log('=== DEBUG: Image chargée avec succès ===');
+                                        console.log('=== DEBUG: Dimensions finales ===', {
+                                            canvas: { width: containerWidth, height: containerHeight },
+                                            image: { 
+                                                width: img.width * scale, 
+                                                height: img.height * scale,
+                                                scale: scale,
+                                                position: { left: img.left, top: img.top }
+                                            }
+                                        });
+
+                                        // Initialiser les outils
+                                        initializeTools(fabricCanvas);
+                                    }, {
+                                        crossOrigin: 'anonymous'
+                                    });
+                                })
+                                .catch(error => {
+                                    console.error('=== DEBUG: Erreur lors de la vérification de l\'image ===', error);
+                                });
+                        }
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement du template:', error);
+                    container.getElement().html(`<div class="p-4 text-red-500">
+                        Erreur lors du chargement de l'éditeur d'image: ${error.message}
+                    </div>`);
+                });
         });
+
+        function initializeTools(canvas) {
+            // Gestion des outils
+            const tools = document.querySelectorAll('[data-tool]');
+            tools.forEach(tool => {
+                tool.addEventListener('click', function() {
+                    const toolName = this.dataset.tool;
+                    tools.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+
+                    switch(toolName) {
+                        case 'select':
+                            canvas.isDrawingMode = false;
+                            break;
+                        case 'brush':
+                            canvas.isDrawingMode = true;
+                            canvas.freeDrawingBrush.width = 5;
+                            break;
+                        case 'text':
+                            const text = new fabric.IText('Double-cliquez pour éditer', {
+                                left: 100,
+                                top: 100,
+                                fontFamily: 'Arial',
+                                fill: '#ffffff'
+                            });
+                            canvas.add(text);
+                            break;
+                    }
+                });
+            });
+
+            // Gestion des actions
+            const actions = document.querySelectorAll('[data-action]');
+            actions.forEach(action => {
+                action.addEventListener('click', function() {
+                    const actionName = this.dataset.action;
+                    switch(actionName) {
+                        case 'undo':
+                            if (canvas._objects.length > 0) {
+                                canvas.remove(canvas._objects[canvas._objects.length - 1]);
+                            }
+                            break;
+                        case 'redo':
+                            // À implémenter
+                            break;
+                    }
+                });
+            });
+
+            // Gestion des propriétés
+            const colorPicker = document.querySelector('input[type="color"]');
+            colorPicker.addEventListener('change', function() {
+                if (canvas.isDrawingMode) {
+                    canvas.freeDrawingBrush.color = this.value;
+                } else if (canvas.getActiveObject()) {
+                    canvas.getActiveObject().set('fill', this.value);
+                    canvas.renderAll();
+                }
+            });
+
+            const sizeSlider = document.querySelector('input[type="range"]');
+            sizeSlider.addEventListener('input', function() {
+                if (canvas.isDrawingMode) {
+                    canvas.freeDrawingBrush.width = parseInt(this.value);
+                }
+            });
+
+            // Gestion de la sauvegarde
+            document.getElementById('save-btn').addEventListener('click', function() {
+                const dataUrl = canvas.toDataURL({
+                    format: 'png',
+                    quality: 1
+                });
+
+                const saveUrl = document.getElementById('save-btn').dataset.saveUrl;
+                fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image_data: dataUrl
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Image sauvegardée avec succès!');
+                    } else {
+                        alert('Erreur lors de la sauvegarde: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Erreur lors de la sauvegarde');
+                });
+            });
+        }
 
         // Fonction pour ouvrir l'éditeur d'image
         window.exposeOpenImageEditor = function(imageId, imageName) {
