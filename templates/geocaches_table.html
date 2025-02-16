@@ -221,17 +221,19 @@
                     },
                     { title: "Actions", field: "id", headerSort: false,
                         formatter: function(cell) {
-                            const geocacheId = cell.getValue();
-                            const gcCode = cell.getRow().getData().gc_code;
-                            const apiUrl = window.API_BASE_URL || '';
-                            const detailsUrl = `${apiUrl}/geocaches/${geocacheId}/details-panel`;
+                            const row = cell.getRow();
+                            const data = row.getData();
+                            const geocacheId = data.id;
+                            const gcCode = data.gc_code;
+                            const name = data.name;
+                            
                             return `<button 
                                 class="details-button"
                                 onclick="window.parent.postMessage({ 
                                     type: 'openGeocacheDetails', 
                                     geocacheId: ${geocacheId},
-                                    containerId: window.currentContainerId,
-                                    detailsUrl: '${detailsUrl}'
+                                    gcCode: '${gcCode}',
+                                    name: '${name}'
                                 }, '*')"
                             >
                                 Détails

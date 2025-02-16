@@ -24,6 +24,46 @@ function initializeLayout() {
         mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
         window.mainLayout = mainLayout;
 
+        // Écouteurs d'événements pour le gestionnaire d'état
+        mainLayout.on('itemCreated', function(item) {
+            console.log('=== Layout: Item créé ===', {
+                id: item.id,
+                type: item.type,
+                isComponent: item.isComponent,
+                isStack: item.isStack
+            });
+
+            if (item.isStack) {
+                window.layoutStateManager.registerStack(item);
+            }
+        });
+
+        mainLayout.on('stackCreated', function(stack) {
+            console.log('=== Layout: Stack créé ===', {
+                id: stack.id,
+                components: stack.contentItems.map(item => item.id)
+            });
+            window.layoutStateManager.registerStack(stack);
+        });
+
+        mainLayout.on('activeContentItemChanged', function(component) {
+            if (!component || !component.isComponent) return;
+            
+            const componentInfo = {
+                id: component.id,
+                type: component.componentName,
+                state: component.config.componentState || {},
+                metadata: {
+                    gcCode: component.config.componentState?.gcCode,
+                    name: component.config.componentState?.name,
+                    geocacheId: component.config.componentState?.geocacheId
+                }
+            };
+            
+            console.log('=== Layout: Component actif changé ===', componentInfo);
+            window.layoutStateManager.setActiveComponent(componentInfo);
+        });
+
         // Enregistrer les composants avant l'initialisation
         mainLayout.registerComponent('welcome', function(container, state) {
             const welcomeHtml = `
@@ -287,7 +327,9 @@ function initializeLayout() {
                         title: `Détails GC-${state.geocacheId}`,
                         componentState: { 
                             html: html,
-                            geocacheId: state.geocacheId
+                            geocacheId: state.geocacheId,
+                            gcCode: state.gcCode,
+                            name: state.name
                         }
                     };
                     
@@ -309,33 +351,80 @@ function initializeLayout() {
 
         // Enregistrer le composant geocache-details
         mainLayout.registerComponent('geocache-details', function(container, state) {
-            console.log("Création du composant geocache-details", state);
+            const geocacheId = state.geocacheId;
+            const gcCode = state.gcCode;
+            const name = state.name;
             
-            const html = `
+            // Mettre à jour immédiatement l'état du composant
+            container.setState({
+                geocacheId: geocacheId,
+                gcCode: gcCode,
+                name: name
+            });
+            
+            // Mettre à jour le titre
+            container.setTitle(`${gcCode} - ${name}`);
+            
+            // Afficher un état de chargement
+            container.getElement().html(`
                 <div class="w-full h-full bg-gray-900 overflow-auto p-4">
-                    <div class="flex flex-col h-full">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl text-white">Détails de la Géocache</h2>
-                            <div class="flex space-x-2">
-                                <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">
-                                    <i class="fas fa-save mr-2"></i>Sauvegarder
-                                </button>
-                            </div>
-                        </div>
-                        <div class="flex-grow relative">
-                            ${state.html}
-                        </div>
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement...</span>
                     </div>
                 </div>
-            `;
+            `);
             
-            container.getElement().html(html);
-            
-            // Initialiser les handlers
-            container.getElement().find('.save-button').on('click', function() {
-                console.log('=== DEBUG: Sauvegarde des détails ===', state);
-                // TODO: Implémenter la sauvegarde
-            });
+            // Charger les détails de la géocache
+            fetch(`http://127.0.0.1:3000/geocaches/${geocacheId}/details-panel`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Afficher le HTML avec les métadonnées
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                            <div class="flex flex-col h-full">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl text-white">
+                                        ${gcCode} - ${name}
+                                    </h2>
+                                    <div class="flex space-x-2">
+                                        <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">
+                                            <i class="fas fa-save mr-2"></i>Sauvegarder
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-grow relative">
+                                    ${html}
+                                </div>
+                            </div>
+                        </div>
+                    `);
+
+                    // Initialiser les handlers
+                    container.getElement().find('.save-button').on('click', function() {
+                        const currentState = container.getState();
+                        console.log('=== DEBUG: Sauvegarde des détails ===', currentState);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement de la géocache:', error);
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 p-4">
+                            <div class="text-red-500 mb-4">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                Erreur lors du chargement de la géocache
+                            </div>
+                            <div class="text-gray-400 text-sm">
+                                ${error.message}
+                            </div>
+                        </div>
+                    `);
+                });
         });
 
         function initializeTools(canvas) {
@@ -343,7 +432,7 @@ function initializeLayout() {
             let currentTool = null;
             let isDrawing = false;
             let startX = 0;
-            let startY = 0;
+            startY = 0;
             let activeShape = null;
 
             const toolState = {
@@ -617,6 +706,47 @@ function initializeLayout() {
             }
         };
 
+        // Fonction pour ouvrir les détails d'une géocache
+        window.openGeocacheDetails = function(geocacheId, gcCode, name) {
+            const componentId = `geocache-details-${geocacheId}`;
+            
+            // Vérifier si le composant existe déjà
+            let existingComponent = null;
+            mainLayout.root.contentItems.forEach(item => {
+                item.contentItems.forEach(subItem => {
+                    if (subItem.config.id === componentId) {
+                        existingComponent = subItem;
+                    }
+                });
+            });
+
+            if (existingComponent) {
+                existingComponent.parent.setActiveContentItem(existingComponent);
+                return;
+            }
+
+            const componentConfig = {
+                type: 'component',
+                componentName: 'geocache-details',
+                title: `${gcCode} - ${name}`,
+                id: componentId,
+                componentState: {
+                    geocacheId: geocacheId,
+                    gcCode: gcCode,
+                    name: name
+                }
+            };
+
+            if (mainLayout.root.contentItems[0].type === 'row') {
+                mainLayout.root.contentItems[0].addChild(componentConfig);
+            } else {
+                mainLayout.root.contentItems[0].addChild({
+                    type: 'row',
+                    content: [componentConfig]
+                });
+            }
+        };
+
         // Exposer l'instance Golden Layout globalement
         window.goldenlayout = mainLayout;
 
@@ -624,57 +754,27 @@ function initializeLayout() {
         window.addEventListener('message', function(event) {
             if (event.data && event.data.type === 'openGeocacheDetails') {
                 const geocacheId = event.data.geocacheId;
-                const containerId = event.data.containerId;
-                const detailsUrl = event.data.detailsUrl;
-                console.log("Réception de l'événement openGeocacheDetails pour la géocache", geocacheId);
-                console.log("Container ID:", containerId);
-                console.log("URL des détails:", detailsUrl);
+                const gcCode = event.data.gcCode;
+                const name = event.data.name;
+                console.log("Réception de l'événement openGeocacheDetails", { geocacheId, gcCode, name });
                 
-                // Charger les détails et ouvrir l'onglet
-                fetch(detailsUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.text();
-                    })
-                    .then(html => {
-                        const root = mainLayout.root;
-                        const newItemConfig = {
-                            type: 'component',
-                            componentName: 'geocache-details',
-                            title: `Détails GC-${geocacheId}`,
-                            componentState: { 
-                                html: html,
-                                geocacheId: geocacheId
-                            }
-                        };
-                        
-                        // Trouver le conteneur parent par son ID
-                        const container = mainLayout.root.getItemsById(containerId)[0];
-                        if (container && container.parent) {
-                            // Ajouter le composant au parent du conteneur trouvé
-                            container.parent.addChild(newItemConfig);
-                        } else {
-                            // Fallback : ajouter à la racine si le conteneur n'est pas trouvé
-                            root.contentItems[0].addChild(newItemConfig);
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erreur lors du chargement des détails:", error);
-                        alert("Erreur lors du chargement des détails de la géocache");
-                    });
+                // Utiliser la fonction openGeocacheDetails
+                window.openGeocacheDetails(geocacheId, gcCode, name);
             }
         });
 
+        // Initialiser le layout
         mainLayout.init();
-        window.mainLayout = mainLayout;
 
+        // Ajuster la taille lors du redimensionnement de la fenêtre
         window.addEventListener('resize', () => {
             mainLayout.updateSize();
         });
+
+        console.log('=== Layout: Initialisation terminée ===');
+
     } catch (error) {
-        console.error('Golden Layout error:', error);
+        console.error('Erreur lors de l\'initialisation du layout:', error);
     }
 }
 
