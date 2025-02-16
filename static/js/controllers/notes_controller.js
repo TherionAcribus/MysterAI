@@ -5,36 +5,28 @@ export default class extends Controller {
 
     connect() {
         console.log('Notes controller connected');
-        // Récupérer l'ID de la géocache depuis le composant GoldenLayout
-        const component = this.element.closest('.lm_item');
-        if (component) {
-            const geocacheId = component.getAttribute('data-geocache-id');
+        
+        // Écouter l'événement geocacheSelected
+        window.addEventListener('geocacheSelected', (event) => {
+            const geocacheId = event.detail;
             if (geocacheId) {
-                this.loadNotes(geocacheId);
+                this.loadNotesPanel(geocacheId);
             }
-        }
+        });
     }
 
-    loadNotes(geocacheId) {
-        // Charger les notes pour la géocache
-        fetch(`/api/logs/geocache/${geocacheId}/notes`)
-            .then(response => response.text())
-            .then(html => {
-                this.element.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Erreur lors du chargement des notes:', error);
-            });
+    loadNotesPanel(geocacheId) {
+        htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+            target: this.element,
+            swap: 'innerHTML'
+        });
     }
 
     onActivated(event) {
         // Récupérer l'état du composant actif
         const activeComponent = window.layoutStateManager.getActiveComponentInfo();
         if (activeComponent && activeComponent.state && activeComponent.state.geocacheId) {
-            htmx.ajax('GET', `/api/logs/geocache/${activeComponent.state.geocacheId}`, {
-                target: this.element,
-                swap: 'innerHTML'
-            });
+            this.loadNotesPanel(activeComponent.state.geocacheId);
         }
     }
 
@@ -54,19 +46,21 @@ export default class extends Controller {
         });
 
         // Fermer le formulaire après l'ajout
-        document.getElementById('note-form-container').innerHTML = '';
+        this.closeNoteForm();
     }
 
-    // Gestionnaire pour l'édition d'une note
     editNote(noteId) {
-        htmx.ajax('GET', `/templates/note_form.html?note_id=${noteId}`, {
+        const geocacheId = this.element.getAttribute('data-geocache-id');
+        htmx.ajax('GET', `/api/logs/note/${noteId}/edit?geocacheId=${geocacheId}`, {
             target: '#note-form-container',
             swap: 'innerHTML'
         });
     }
 
-    // Gestionnaire pour la fermeture du formulaire
     closeNoteForm() {
-        document.getElementById('note-form-container').innerHTML = '';
+        const formContainer = document.getElementById('note-form-container');
+        if (formContainer) {
+            formContainer.innerHTML = '';
+        }
     }
 }

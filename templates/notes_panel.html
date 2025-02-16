@@ -1,3 +1,4 @@
+{% if geocache_id %}
 <!-- Template pour l'affichage des notes d'une géocache -->
 <div class="p-4 space-y-4">
     <!-- En-tête avec bouton d'ajout -->
@@ -61,3 +62,8 @@
         {% endif %}
     </div>
 </div>
+{% else %}
+<div class="flex items-center justify-center h-full text-gray-500">
+    <p>Sélectionnez une géocache pour voir ses notes</p>
+</div>
+{% endif %}
