@@ -21,6 +21,17 @@
             }
         }
 
+        onActivated(event) {
+            // Récupérer l'état du composant actif
+            const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+            if (activeComponent && activeComponent.state && activeComponent.state.geocacheId) {
+                htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${activeComponent.state.geocacheId}`, {
+                    target: this.element,
+                    swap: 'innerHTML'
+                });
+            }
+        }
+
         async initMap() {
             // Initialize map
             this.map = L.map(this.containerTarget).setView([46.227638, 2.213749], 5)

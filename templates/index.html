@@ -263,13 +263,17 @@
                         <div class="bottom-panel-tabs">
                             <button class="bottom-panel-tab active" 
                                     data-panel="map-panel"
-                                    onclick="htmx.ajax('GET', '/api/logs/map_panel', {target: '#map-panel', swap: 'innerHTML'})">
+                                    onclick="switchTab(this, 'map-panel')">
                                 <i class="fas fa-map-marked-alt"></i>Map
                             </button>
-                            <button class="bottom-panel-tab" data-panel="notes-panel">
+                            <button class="bottom-panel-tab" 
+                                    data-panel="notes-panel"
+                                    onclick="switchTab(this, 'notes-panel')">
                                 <i class="fas fa-sticky-note"></i>Notes
                             </button>
-                            <button class="bottom-panel-tab" data-panel="informations-panel">
+                            <button class="bottom-panel-tab" 
+                                    data-panel="informations-panel"
+                                    onclick="switchTab(this, 'informations-panel')">
                                 <i class="fas fa-info-circle"></i>Informations
                             </button>
                         </div>
@@ -278,18 +282,19 @@
                     <div class="bottom-panel-content">
                         <div id="map-panel" 
                              class="panel-content active"
+                             data-controller="map"
+                             data-action="tab-activated@window->map#onActivated"
                              hx-get="/api/logs/map_panel"
                              hx-trigger="load"
                              hx-swap="innerHTML">
                         </div>
-                        <div id="notes-panel" class="panel-content"
+                        <div id="notes-panel" 
+                             class="panel-content"
                              data-controller="notes"
-                             data-action="tab-activated@window->notes#onActivated">
-                            <div id="notes-content">
-                                <div class="flex items-center justify-center h-full text-gray-500">
-                                    <p>Sélectionnez une géocache pour voir ses notes</p>
-                                </div>
-                            </div>
+                             data-action="tab-activated@window->notes#onActivated"
+                             hx-get="/api/logs/notes_panel"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
                         </div>
                         <div id="informations-panel" class="panel-content">
                             <h3>Panneau d'Informations</h3>
@@ -400,14 +405,16 @@
                     geocacheCodeElement.textContent = event.detail.gcCode;
                 }
                 
-                // Update map panel
-                const mapPanel = document.getElementById('map-panel');
-                if (mapPanel) {
-                    htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
-                        target: '#map-panel',
-                        swap: 'innerHTML'
-                    });
-                }
+                // Update both map and notes panels
+                htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                    target: '#map-panel',
+                    swap: 'innerHTML'
+                });
+                
+                htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+                    target: '#notes-panel',
+                    swap: 'innerHTML'
+                });
             });
         });
     </script>
@@ -419,6 +426,28 @@
             <!-- Le contenu sera chargé dynamiquement -->
         </div>
     </template>
+    <script>
+        // Fonction pour gérer le changement d'onglet
+        function switchTab(button, panelId) {
+            // Mettre à jour les classes des onglets
+            document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            button.classList.add('active');
+
+            // Mettre à jour les classes des panneaux
+            document.querySelectorAll('.panel-content').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            const targetPanel = document.getElementById(panelId);
+            targetPanel.classList.add('active');
+
+            // Déclencher l'événement tab-activated
+            window.dispatchEvent(new CustomEvent('tab-activated', {
+                detail: { panelId: panelId }
+            }));
+        }
+    </script>
     <script>
         // Register components with GoldenLayout
         window.registerComponents = function(layout) {
