@@ -64,6 +64,82 @@ function initializeLayout() {
             window.layoutStateManager.setActiveComponent(componentInfo);
         });
 
+        // Fonction pour mettre à jour le code GC et les notes
+        function updateGeocacheCode(contentItem) {
+            if (contentItem && contentItem.config && contentItem.config.componentState) {
+                const state = contentItem.config.componentState;
+                if (state.gcCode) {
+                    // Mettre à jour le code GC
+                    const geocacheCodeElement = document.querySelector('.geocache-code');
+                    if (geocacheCodeElement) {
+                        geocacheCodeElement.textContent = state.gcCode;
+                    }
+                    
+                    // Mettre à jour les notes si le panneau est actif
+                    const notesPanel = document.getElementById('notes-panel');
+                    if (notesPanel && notesPanel.classList.contains('active') && state.geocacheId) {
+                        const notesContent = document.getElementById('notes-content');
+                        if (notesContent) {
+                            // Charger le template notes_panel.html d'abord
+                            htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${state.geocacheId}`, {
+                                target: '#notes-content',
+                                swap: 'innerHTML'
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Gestionnaire pour le changement de composant actif dans une stack
+        mainLayout.on('activeContentItemChanged', function(contentItem) {
+            updateGeocacheCode(contentItem);
+        });
+
+        // Gestionnaire pour le focus d'une stack
+        mainLayout.on('stackCreated', function(stack) {
+            stack.on('activeContentItemChanged', function(contentItem) {
+                updateGeocacheCode(contentItem);
+            });
+
+            // Gérer le clic sur les onglets de la stack
+            stack.header.tabs.forEach(tab => {
+                tab.element.addEventListener('click', () => {
+                    updateGeocacheCode(tab.contentItem);
+                });
+            });
+        });
+
+        // Gestionnaire pour les nouveaux items créés
+        mainLayout.on('itemCreated', function(item) {
+            if (item.type === 'stack') {
+                item.on('activeContentItemChanged', function(contentItem) {
+                    updateGeocacheCode(contentItem);
+                });
+            }
+        });
+
+        // Gestionnaire pour le focus global
+        mainLayout.on('focus', function() {
+            const activeContentItem = mainLayout.selectedItem;
+            if (activeContentItem) {
+                updateGeocacheCode(activeContentItem);
+            }
+        });
+
+        mainLayout.on('activeContentItemChanged', function(contentItem) {
+            if (contentItem && contentItem.config && contentItem.config.componentState) {
+                const state = contentItem.config.componentState;
+                if (state.gcCode) {
+                    // Mettre à jour le code GC dans le panneau inférieur
+                    const geocacheCodeElement = document.querySelector('.geocache-code');
+                    if (geocacheCodeElement) {
+                        geocacheCodeElement.textContent = state.gcCode;
+                    }
+                }
+            }
+        });
+
         // Enregistrer les composants avant l'initialisation
         mainLayout.registerComponent('welcome', function(container, state) {
             const welcomeHtml = `
@@ -815,3 +891,15 @@ window.openGeocachesTab = function(zoneId, zoneName) {
         });
     }
 };
+
+function updateGeocacheCode(geocacheId) {
+    // Mettre à jour le panneau de notes
+    const notesPanel = document.querySelector('.notes-panel');
+    if (notesPanel) {
+        notesPanel.setAttribute('data-geocache-id', geocacheId);
+        const notesController = application.getControllerForElementAndIdentifier(notesPanel, 'notes');
+        if (notesController) {
+            notesController.loadNotes(geocacheId);
+        }
+    }
+}

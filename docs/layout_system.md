@@ -41,19 +41,58 @@ Le gestionnaire d'état est responsable du suivi de l'état global du layout.
 - Enregistrement des métadonnées des components
 - Gestion des relations entre stacks et components
 
-**API**:
-```javascript
-// Obtenir les infos sur le component actif
-const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+### 2. Composant Géocache Details
 
-// Obtenir tous les components d'un type
-const geocaches = window.layoutStateManager.getComponentsByType('geocache');
+**Fichier**: `static/js/layout_initialize.js`
 
-// Obtenir les infos sur le stack actif
-const activeStack = window.layoutStateManager.getActiveStackInfo();
+**Fonctionnalités**:
+- Affichage des détails d'une géocache dans un nouvel onglet
+- Gestion des métadonnées (GC code, nom, ID)
+- Chargement asynchrone du contenu
+- Réutilisation des onglets existants
+
+**Flux de données**:
+```mermaid
+sequenceDiagram
+    participant Table as Tableau Géocaches
+    participant Parent as Window Parent
+    participant Layout as GoldenLayout
+    participant State as StateManager
+    
+    Table->>Parent: postMessage(type: openGeocacheDetails)
+    Note over Table,Parent: Inclut: geocacheId, gcCode, name
+    Parent->>Layout: openGeocacheDetails()
+    Layout->>Layout: Vérifie onglet existant
+    Layout->>State: Enregistre état component
+    Layout->>Layout: Charge contenu détails
 ```
 
-### 2. Système de Panneaux (Panels)
+**Communication**:
+1. Le tableau des géocaches envoie un message avec :
+   ```javascript
+   {
+       type: 'openGeocacheDetails',
+       geocacheId: id,
+       gcCode: 'GC12345',
+       name: 'Nom Cache'
+   }
+   ```
+
+2. La fonction `openGeocacheDetails` :
+   ```javascript
+   window.openGeocacheDetails(geocacheId, gcCode, name)
+   ```
+   - Crée un ID unique : `geocache-details-${geocacheId}`
+   - Vérifie si l'onglet existe déjà
+   - Configure le component avec les métadonnées
+
+3. Le composant géocache-details :
+   - Initialise l'état avec les métadonnées
+   - Met à jour le titre de l'onglet
+   - Charge le contenu HTML
+   - Gère les erreurs de chargement
+
+### 3. Système de Panneaux (Panels)
 
 **Fichier**: `static/js/panels.js`
 
@@ -63,13 +102,7 @@ const activeStack = window.layoutStateManager.getActiveStackInfo();
 - Redimensionnement dynamique
 - Chargement de contenu asynchrone
 
-**États des panneaux**:
-- Visible/Caché
-- Taille (largeur/hauteur)
-- Contenu actif
-- Position
-
-### 3. Initialisation du Layout
+### 4. Initialisation du Layout
 
 **Fichier**: `static/js/layout_initialize.js`
 
@@ -85,13 +118,17 @@ const activeStack = window.layoutStateManager.getActiveStackInfo();
 - Page d'accueil par défaut
 - Affiche les informations de bienvenue
 
-### 2. Composant Alphabets
-- Affiche la liste des alphabets disponibles
-- Chargement asynchrone depuis l'API
+### 2. Composant Géocaches Table
+- Affiche la liste des géocaches
+- Intégration avec Tabulator
+- Actions : Détails, Suppression
+- Communication avec le parent via postMessage
 
-### 3. Composant Alphabet Viewer
-- Affiche un alphabet spécifique
-- Intégration avec Stimulus.js
+### 3. Composant Géocache Details
+- Affiche les détails d'une géocache spécifique
+- Gestion des métadonnées
+- Interface de modification
+- Sauvegarde des changements
 
 ### 4. Composant Image Editor
 - Éditeur d'images intégré
@@ -100,32 +137,20 @@ const activeStack = window.layoutStateManager.getActiveStackInfo();
 
 ## Flux de Communication
 
-### 1. Création d'un Nouveau Component
+### 1. Ouverture des Détails d'une Géocache
 ```mermaid
 sequenceDiagram
     participant User
+    participant Table
     participant Layout
-    participant StateManager
     participant API
 
-    User->>Layout: Demande création
-    Layout->>StateManager: Enregistre component
-    Layout->>API: Charge données
-    API-->>Layout: Retourne données
-    Layout->>User: Affiche component
-```
-
-### 2. Changement de Component Actif
-```mermaid
-sequenceDiagram
-    participant User
-    participant Layout
-    participant StateManager
-    participant Panels
-
-    User->>Layout: Sélectionne component
-    Layout->>StateManager: Met à jour état
-    StateManager->>Panels: Met à jour UI
+    User->>Table: Clic "Détails"
+    Table->>Layout: postMessage(openGeocacheDetails)
+    Layout->>Layout: Vérifie onglet existant
+    Layout->>API: Charge détails
+    API-->>Layout: Retourne HTML
+    Layout->>User: Affiche onglet
 ```
 
 ## Gestion des Événements
@@ -134,11 +159,92 @@ sequenceDiagram
 - `itemCreated`: Création d'un nouvel élément
 - `stackCreated`: Création d'un nouveau stack
 - `activeContentItemChanged`: Changement de component actif
+- `focus`: Changement de focus global
 
-### 2. Événements Panels
-- Redimensionnement
-- Ouverture/Fermeture
-- Changement d'onglet
+### 2. Événements Composants
+- Ouverture des détails de géocache
+- Sauvegarde des modifications
+- Gestion des erreurs
+- Mise à jour du code GC dans le panneau inférieur
+
+### 3. Flux d'Événements pour le Code GC
+```mermaid
+sequenceDiagram
+    participant User
+    participant Stack
+    participant Layout
+    participant BottomPanel
+
+    Note over User,BottomPanel: Plusieurs scénarios de déclenchement
+    
+    alt Changement dans la même Stack
+        User->>Stack: Clic sur onglet
+        Stack->>Layout: activeContentItemChanged
+        Layout->>BottomPanel: updateGeocacheCode()
+    else Nouvelle Stack créée
+        Layout->>Stack: stackCreated
+        Stack->>Stack: Attache événements
+        User->>Stack: Interaction
+        Stack->>BottomPanel: updateGeocacheCode()
+    else Changement entre Stacks
+        User->>Layout: focus
+        Layout->>Layout: selectedItem
+        Layout->>BottomPanel: updateGeocacheCode()
+    end
+```
+
+### 4. Gestion des Métadonnées
+```javascript
+// Exemple de mise à jour du code GC
+function updateGeocacheCode(contentItem) {
+    if (contentItem?.config?.componentState?.gcCode) {
+        document.querySelector('.geocache-code').textContent = 
+            contentItem.config.componentState.gcCode;
+    }
+}
+```
+
+### 5. Points de Déclenchement
+- Création d'une nouvelle stack
+- Changement d'onglet dans une stack
+- Focus sur une stack différente
+- Clic direct sur un onglet
+- Création d'un nouveau composant
+
+## Interface Utilisateur
+
+### 1. Panneau Inférieur
+- Barre d'onglets avec Map, Notes, Informations
+- Affichage du code GC à droite
+- Style monospace pour le code GC
+- Fond sombre et coins arrondis
+
+### 2. Styles CSS
+```css
+.bottom-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.geocache-code {
+    font-family: monospace;
+    background-color: rgb(17, 24, 39);
+    border-radius: 0.25rem;
+}
+```
+
+### 3. Structure HTML
+```html
+<div class="bottom-panel-header">
+    <div class="bottom-panel-tabs">
+        <!-- Onglets: Map, Notes, Informations -->
+    </div>
+    <div class="geocache-code">
+        <!-- Code GC dynamique -->
+    </div>
+</div>
+```
 
 ## Bonnes Pratiques
 
@@ -147,112 +253,47 @@ sequenceDiagram
 - Éviter les modifications directes de l'état
 - Logger les changements importants
 
-### 2. Performance
-- Utiliser la délégation d'événements
-- Limiter les requêtes API
-- Optimiser les redimensionnements
+### 2. Communication
+- Utiliser postMessage pour la communication iframe/parent
+- Passer toutes les métadonnées nécessaires
+- Gérer les erreurs de communication
 
-### 3. Maintenance
-- Suivre les conventions de nommage
-- Documenter les changements majeurs
-- Utiliser les outils de debugging
+### 3. Performance
+- Réutiliser les onglets existants
+- Charger le contenu de manière asynchrone
+- Optimiser les mises à jour d'état
 
 ## Debugging
 
 ### 1. Logs Console
 ```javascript
-// Logs de création de component
-=== Layout: Component créé === {id: "comp1", type: "geocache"}
-
-// Logs de changement d'état
-=== LayoutStateManager: Mise à jour component actif === {id: "comp1"}
-
-// Logs d'erreur
-=== Panels: Erreur - Éléments DOM manquants ===
+// Ouverture des détails
+=== Layout: Component actif changé === {
+    id: "geocache-details-123",
+    type: "geocache-details",
+    state: {
+        geocacheId: 123,
+        gcCode: "GC12345",
+        name: "Nom Cache"
+    }
+}
 ```
 
-### 2. Outils de Développement
-- Console Chrome pour les logs
-- Devtools Electron
-- React Developer Tools (si applicable)
-
-## Configuration
-
-### 1. GoldenLayout
+### 2. Gestion des Erreurs
 ```javascript
-const config = {
-    settings: {
-        showPopoutIcon: false,
-        showMaximiseIcon: false,
-        showCloseIcon: false
-    },
-    content: [{
-        type: 'row',
-        content: [{
-            type: 'component',
-            componentName: 'welcome',
-            title: 'Bienvenue'
-        }]
-    }]
-};
+// Erreur de chargement
+=== DEBUG: Erreur lors du chargement des détails ===
+Error: HTTP error! status: 404
 ```
-
-### 2. Panels
-```javascript
-// Configuration par défaut des panels
-const defaultPanelConfig = {
-    minWidth: 100,
-    maxWidth: 800,
-    defaultWidth: 250
-};
-```
-
-## Extensibilité
-
-### 1. Ajout d'un Nouveau Component
-1. Enregistrer le component dans layout_initialize.js
-2. Créer les gestionnaires d'état nécessaires
-3. Implémenter le rendu et la logique
-4. Documenter le nouveau component
-
-### 2. Modification des Panels
-1. Mettre à jour la configuration des panels
-2. Adapter les gestionnaires d'événements
-3. Mettre à jour la documentation
-
-## Dépendances
-
-### 1. Externes
-- GoldenLayout
-- jQuery
-- Fabric.js
-- HTMX
-
-### 2. Internes
-- layout_state_manager.js
-- panels.js
-- layout_initialize.js
-
-## Sécurité
-
-### 1. IPC
-- Utilisation du context bridge
-- Validation des données
-- Gestion des erreurs
-
-### 2. API
-- Validation des entrées
-- Gestion des sessions
-- Protection CSRF
 
 ## Prochaines Étapes
 
 ### 1. Améliorations
-- [ ] Optimisation des performances
+- [ ] Optimisation des performances de chargement
 - [ ] Amélioration de la gestion des erreurs
-- [ ] Tests unitaires
+- [ ] Persistance de l'état des onglets
 
 ### 2. Nouvelles Fonctionnalités
-- [ ] Système de persistance
-- [ ] Drag and drop entre components
-- [ ] Thèmes personnalisés
+- [ ] Prévisualisation des détails
+- [ ] Historique des modifications
+- [ ] Synchronisation en temps réel

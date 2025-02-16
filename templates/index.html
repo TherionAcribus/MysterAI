@@ -120,6 +120,30 @@
             color: white;
             background: #444;
         }
+        
+        .bottom-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgb(31, 41, 55);
+            border-bottom: 1px solid rgb(55, 65, 81);
+            padding: 0.5rem;
+        }
+        
+        .bottom-panel-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .geocache-code {
+            color: rgb(156, 163, 175);
+            font-family: monospace;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            background-color: rgb(17, 24, 39);
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+        }
     </style>
     
     <!-- Scripts -->
@@ -246,15 +270,19 @@
                                 <i class="fas fa-info-circle"></i>Informations
                             </button>
                         </div>
+                        <div class="geocache-code"></div>
                     </div>
                     <div class="bottom-panel-content">
                         <div id="map-panel" class="panel-content active">
                             <h3>Panneau de Carte</h3>
                             <p>Ici vous pouvez voir la carte interactive des géocaches. Cliquez sur une géocache pour voir ses détails.</p>
                         </div>
-                        <div id="notes-panel" class="panel-content">
-                            <h3>Panneau de Notes</h3>
-                            <p>Cet espace est dédié à la prise de notes et aux annotations personnelles sur vos géocaches.</p>
+                        <div id="notes-panel" class="panel-content"
+                             data-controller="notes"
+                             data-action="tab-activated@window->notes#onActivated">
+                            <div id="notes-content">
+                                <!-- Le contenu sera chargé dynamiquement -->
+                            </div>
                         </div>
                         <div id="informations-panel" class="panel-content">
                             <h3>Panneau d'Informations</h3>
@@ -347,5 +375,13 @@
             });
         });
     </script>
+    <template id="notes-panel-template">
+        <div class="notes-panel h-full"
+             data-controller="notes"
+             data-geocache-id=""
+             data-notes-target="content">
+            <!-- Le contenu sera chargé dynamiquement -->
+        </div>
+    </template>
 </body>
 </html>
