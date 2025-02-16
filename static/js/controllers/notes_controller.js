@@ -10,15 +10,8 @@ export default class extends Controller {
         window.addEventListener('geocacheSelected', (event) => {
             const geocacheId = event.detail;
             if (geocacheId) {
-                this.loadNotesPanel(geocacheId);
+                this.loadNotes(geocacheId);
             }
-        });
-    }
-
-    loadNotesPanel(geocacheId) {
-        htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
-            target: this.element,
-            swap: 'innerHTML'
         });
     }
 
@@ -26,8 +19,15 @@ export default class extends Controller {
         // Récupérer l'état du composant actif
         const activeComponent = window.layoutStateManager.getActiveComponentInfo();
         if (activeComponent && activeComponent.state && activeComponent.state.geocacheId) {
-            this.loadNotesPanel(activeComponent.state.geocacheId);
+            this.loadNotes(activeComponent.state.geocacheId);
         }
+    }
+
+    loadNotes(geocacheId) {
+        htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+            target: '#notes-panel',
+            swap: 'innerHTML'
+        });
     }
 
     // Gestionnaire pour l'ajout d'une note

@@ -12,16 +12,16 @@
         </div>
         <div class="flex space-x-2">
             <button class="text-gray-400 hover:text-blue-400"
-                    hx-get="/api/logs/note_form?note_id={{ note.id }}"
-                    hx-target="#note-form-container"
+                    hx-get="/api/logs/note_form?note_id={{ note.id }}&geocacheId={{ geocache_id }}"
+                    hx-target="#notes-content"
                     hx-swap="innerHTML">
                 <i class="fas fa-edit"></i>
             </button>
             <button class="text-gray-400 hover:text-red-400"
                     hx-delete="/api/logs/note/{{ note.id }}"
                     hx-confirm="Êtes-vous sûr de vouloir supprimer cette note ?"
-                    hx-target="closest .note-item"
-                    hx-swap="outerHTML">
+                    hx-target="#notes-content"
+                    hx-swap="innerHTML">
                 <i class="fas fa-trash"></i>
             </button>
         </div>

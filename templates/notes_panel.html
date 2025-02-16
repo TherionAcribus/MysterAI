@@ -1,69 +1,23 @@
-{% if geocache_id %}
-<!-- Template pour l'affichage des notes d'une géocache -->
-<div class="p-4 space-y-4">
-    <!-- En-tête avec bouton d'ajout -->
-    <div class="flex justify-between items-center">
-        <h3 class="text-lg font-semibold text-gray-200">
-            Notes pour <span class="text-blue-400">{{ geocache_name if geocache_name else "..." }}</span>
-            <span class="text-sm text-gray-400 ml-2">({{ geocache_id if geocache_id else "..." }})</span>
-        </h3>
-        <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm"
-                hx-get="/api/logs/note_form?geocacheId={{ geocache_id }}"
-                hx-target="#note-form-container"
-                hx-swap="innerHTML">
-            <i class="fas fa-plus mr-1"></i>Ajouter une note
-        </button>
-    </div>
-
-    <!-- Conteneur pour le formulaire d'ajout/édition -->
-    <div id="note-form-container"></div>
-
-    <!-- Liste des notes -->
-    <div id="notes-list" class="space-y-3">
+<div id="notes-content" class="space-y-4 p-4">
+    {% if geocache_id %}
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-200">Notes pour {{ geocache_name }}</h3>
+            <button class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                    hx-get="/api/logs/note_form?geocacheId={{ geocache_id }}"
+                    hx-target="#notes-content"
+                    hx-swap="innerHTML">
+                Nouvelle note
+            </button>
+        </div>
+        
         {% if notes %}
             {% for note in notes %}
-            <div class="note-item bg-gray-800 rounded-lg p-3 space-y-2" data-note-id="{{ note.id }}">
-                <div class="flex justify-between items-start">
-                    <div class="flex items-center space-x-2">
-                        <span class="px-2 py-1 text-xs rounded-full 
-                            {% if note.note_type == 'user' %}bg-blue-600
-                            {% elif note.note_type == 'system' %}bg-gray-600
-                            {% elif note.note_type == 'hint' %}bg-green-600
-                            {% else %}bg-yellow-600{% endif %}">
-                            {{ note.note_type }}
-                        </span>
-                        <span class="text-gray-400 text-xs">{{ note.created_at }}</span>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button class="text-gray-400 hover:text-blue-400"
-                                hx-get="/api/logs/note_form?note_id={{ note.id }}&geocacheId={{ geocache_id }}"
-                                hx-target="#note-form-container"
-                                hx-swap="innerHTML">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="text-gray-400 hover:text-red-400"
-                                hx-delete="/api/logs/note/{{ note.id }}"
-                                hx-confirm="Êtes-vous sûr de vouloir supprimer cette note ?"
-                                hx-target="closest .note-item"
-                                hx-swap="outerHTML">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="note-content text-gray-300 whitespace-pre-wrap">{{ note.content }}</div>
-            </div>
+                {% include 'note_item.html' %}
             {% endfor %}
         {% else %}
-            <div class="text-center text-gray-400 py-8">
-                <i class="fas fa-sticky-note text-4xl mb-2"></i>
-                <p>Aucune note pour cette géocache.</p>
-                <p class="text-sm">Cliquez sur "Ajouter une note" pour commencer.</p>
-            </div>
+            <p class="text-gray-400">Aucune note pour cette géocache.</p>
         {% endif %}
-    </div>
+    {% else %}
+        <p class="text-gray-400">Sélectionnez une géocache pour voir ses notes.</p>
+    {% endif %}
 </div>
-{% else %}
-<div class="flex items-center justify-center h-full text-gray-500">
-    <p>Sélectionnez une géocache pour voir ses notes</p>
-</div>
-{% endif %}

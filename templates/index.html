@@ -288,13 +288,15 @@
                              hx-trigger="load"
                              hx-swap="innerHTML">
                         </div>
-                        <div id="notes-panel" 
-                             class="panel-content"
-                             data-controller="notes"
-                             data-action="tab-activated@window->notes#onActivated"
-                             hx-get="/api/logs/notes_panel"
-                             hx-trigger="load"
-                             hx-swap="innerHTML">
+                        <div id="notes-panel" class="panel-content" data-controller="notes" data-action="tab-activated@window->notes#onActivated">
+                            <template id="notes-panel-template">
+                                <div class="notes-panel h-full"
+                                     data-controller="notes"
+                                     data-geocache-id=""
+                                     data-notes-target="content">
+                                    <!-- Le contenu sera chargé dynamiquement -->
+                                </div>
+                            </template>
                         </div>
                         <div id="informations-panel" class="panel-content">
                             <h3>Panneau d'Informations</h3>
@@ -418,14 +420,6 @@
             });
         });
     </script>
-    <template id="notes-panel-template">
-        <div class="notes-panel h-full"
-             data-controller="notes"
-             data-geocache-id=""
-             data-notes-target="content">
-            <!-- Le contenu sera chargé dynamiquement -->
-        </div>
-    </template>
     <script>
         // Fonction pour gérer le changement d'onglet
         function switchTab(button, panelId) {

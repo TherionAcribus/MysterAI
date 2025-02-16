@@ -74,7 +74,10 @@ def get_note_form_template():
     note = None
     if note_id:
         note = Note.query.get_or_404(note_id)
-        geocache_id = next((gn.geocache_id for gn in note.geocaches), None)
+        # Récupérer l'ID de la géocache via la table d'association
+        geocache_note = GeocacheNote.query.filter_by(note_id=note_id).first()
+        if geocache_note:
+            geocache_id = geocache_note.geocache_id
     
     return render_template('note_form.html', 
                          note=note,
@@ -84,10 +87,21 @@ def get_note_form_template():
 def manage_note(note_id):
     """Gère la modification et la suppression d'une note."""
     note = Note.query.get_or_404(note_id)
+    geocache_note = GeocacheNote.query.filter_by(note_id=note_id).first()
+    geocache_id = geocache_note.geocache_id if geocache_note else None
     
     if request.method == 'DELETE':
         db.session.delete(note)
         db.session.commit()
+        
+        # Après la suppression, renvoyer le panneau de notes mis à jour
+        if geocache_id:
+            geocache = Geocache.query.get_or_404(geocache_id)
+            notes = Note.query.join(GeocacheNote).filter(GeocacheNote.geocache_id == geocache_id).order_by(Note.created_at.desc()).all()
+            return render_template('notes_panel.html',
+                                notes=notes,
+                                geocache_id=geocache_id,
+                                geocache_name=geocache.name)
         return '', 204
         
     # PUT: modification de la note
@@ -97,4 +111,10 @@ def manage_note(note_id):
     note.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     
-    return render_template('note_item.html', note=note)
+    # Renvoie tout le panneau de notes mis à jour
+    geocache = Geocache.query.get_or_404(geocache_id)
+    notes = Note.query.join(GeocacheNote).filter(GeocacheNote.geocache_id == geocache_id).order_by(Note.created_at.desc()).all()
+    return render_template('notes_panel.html',
+                        notes=notes,
+                        geocache_id=geocache_id,
+                        geocache_name=geocache.name)
