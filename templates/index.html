@@ -436,7 +436,7 @@
             button.classList.add('active');
 
             // Mettre à jour les classes des panneaux
-            document.querySelectorAll('.panel-content').forEach(panel => {
+            document.querySelectorAll('.bottom-panel-container .panel-content').forEach(panel => {
                 panel.classList.remove('active');
             });
             const targetPanel = document.getElementById(panelId);
