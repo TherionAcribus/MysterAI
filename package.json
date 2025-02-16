@@ -15,7 +15,8 @@
     "fs-extra": "^11.2.0",
     "golden-layout": "1.5.9",
     "http-proxy-middleware": "^3.0.3",
-    "jquery": "^3.7.1"
+    "jquery": "^3.7.1",
+    "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.17",
