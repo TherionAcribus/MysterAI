@@ -18,6 +18,22 @@ def get_notes_panel():
                             geocache_name=geocache.name)
     return render_template('notes_panel.html', notes=[], geocache_id=None)
 
+@logs_bp.route('/map_panel')
+def get_map_panel():
+    """Render the map panel template"""
+    geocache_id = request.args.get('geocacheId')
+    
+    if geocache_id:
+        geocache = Geocache.query.get(geocache_id)
+        if geocache:
+            return render_template('map_panel.html', 
+                                geocache=geocache,
+                                geocache_id=geocache_id)
+    
+    return render_template('map_panel.html', 
+                         geocache=None,
+                         geocache_id=None)
+
 @logs_bp.route('/geocache/<geocache_id>/notes', methods=['GET', 'POST'])
 def geocache_notes(geocache_id):
     """Gère les notes d'une géocache."""

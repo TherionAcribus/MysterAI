@@ -9,7 +9,7 @@ coordinates_bp = Blueprint('coordinates', __name__)
 
 # ...
 
-@coordinates_bp.route('/api/geocaches/<int:geocache_id>/coordinates', methods=['POST'])
+@coordinates_bp.route('/api/geocaches/save/<int:geocache_id>/coordinates', methods=['POST'])
 def save_geocache_coordinates(geocache_id):
     """
     Sauvegarde les coordonnées corrigées d'une géocache.

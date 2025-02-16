@@ -92,6 +92,16 @@ class LayoutStateManager {
         if (componentInfo.parent && componentInfo.parent.isStack) {
             this.activeStack = componentInfo.parent.id;
         }
+
+        // Dispatch event for geocache selection
+        if (componentInfo.type === 'geocache-details' && componentInfo.metadata.geocacheId) {
+            document.dispatchEvent(new CustomEvent('geocacheSelected', {
+                detail: {
+                    geocacheId: componentInfo.metadata.geocacheId,
+                    gcCode: componentInfo.metadata.gcCode
+                }
+            }));
+        }
     }
 
     /**

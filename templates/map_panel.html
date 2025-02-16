@@ -1,0 +1,13 @@
+{% if geocache %}
+<div id="map-panel" 
+     data-controller="map"
+     data-map-geocache-id-value="{{ geocache_id }}"
+     data-map-geocache-code-value="{{ geocache.gc_code }}"
+     class="h-full">
+    <div class="map-container h-full" data-map-target="container"></div>
+</div>
+{% else %}
+<div class="flex items-center justify-center h-full text-gray-500">
+    <p>Sélectionnez une géocache pour voir sa carte</p>
+</div>
+{% endif %}

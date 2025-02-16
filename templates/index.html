@@ -73,6 +73,7 @@
     <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-dark-theme.css">
     <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
     <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="/vendor/leaflet/leaflet.css">
     <link type="text/css" rel="stylesheet" href="/css/index.css">
     
     <style>
@@ -256,11 +257,13 @@
                 <div id="layoutContainer" class="golden-layout-container"></div>
                 
                 <!-- Bottom Panel -->
-                <div class="bottom-panel-container">
+                <div class="bottom-panel-container expanded" style="height: 300px;">
                     <div class="bottom-panel-resizer"></div>
                     <div class="bottom-panel-header">
                         <div class="bottom-panel-tabs">
-                            <button class="bottom-panel-tab active" data-panel="map-panel">
+                            <button class="bottom-panel-tab active" 
+                                    data-panel="map-panel"
+                                    onclick="htmx.ajax('GET', '/api/logs/map_panel', {target: '#map-panel', swap: 'innerHTML'})">
                                 <i class="fas fa-map-marked-alt"></i>Map
                             </button>
                             <button class="bottom-panel-tab" data-panel="notes-panel">
@@ -273,9 +276,11 @@
                         <div class="geocache-code"></div>
                     </div>
                     <div class="bottom-panel-content">
-                        <div id="map-panel" class="panel-content active">
-                            <h3>Panneau de Carte</h3>
-                            <p>Ici vous pouvez voir la carte interactive des géocaches. Cliquez sur une géocache pour voir ses détails.</p>
+                        <div id="map-panel" 
+                             class="panel-content active"
+                             hx-get="/api/logs/map_panel"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
                         </div>
                         <div id="notes-panel" class="panel-content"
                              data-controller="notes"
@@ -334,6 +339,9 @@
     <script src="/vendor/jquery/jquery.min.js"></script>
     <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
+    <script src="/vendor/leaflet/leaflet.js"></script>
+    <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
+    <script src="/js/controllers/map_controller.js"></script>
     
     <!-- Layout State Manager -->
     <script src="/js/layout_state_manager.js"></script>
@@ -373,6 +381,32 @@
             document.body.addEventListener('htmx:error', function(evt) {
                 console.error('HTMX - Erreur:', evt.detail);
             });
+            
+            // Initialize Stimulus application
+            const application = Stimulus.Application.start()
+            
+            // Initialize layout state manager
+            const layoutStateManager = new LayoutStateManager();
+            
+            // Listen for geocache selection changes
+            document.addEventListener('geocacheSelected', function(event) {
+                const geocacheId = event.detail.geocacheId;
+                
+                // Update geocache code display
+                const geocacheCodeElement = document.querySelector('.geocache-code');
+                if (geocacheCodeElement) {
+                    geocacheCodeElement.textContent = event.detail.gcCode;
+                }
+                
+                // Update map panel
+                const mapPanel = document.getElementById('map-panel');
+                if (mapPanel) {
+                    htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                        target: '#map-panel',
+                        swap: 'innerHTML'
+                    });
+                }
+            });
         });
     </script>
     <template id="notes-panel-template">
@@ -383,5 +417,13 @@
             <!-- Le contenu sera chargé dynamiquement -->
         </div>
     </template>
+    <script>
+        // Register components with GoldenLayout
+        window.registerComponents = function(layout) {
+            layout.registerComponent('map-panel', function(container, state) {
+                return new MapComponent(container, state);
+            });
+        };
+    </script>
 </body>
 </html>
