@@ -119,7 +119,7 @@ def get_geocache(geocache_id):
             'gc_lat': wp.gc_lat,
             'gc_lon': wp.gc_lon,
             'note': wp.note
-        } for wp in (geocache.additional_waypoints or [])],
+        } for wp in geocache.additional_waypoints if wp.latitude is not None and wp.longitude is not None],
         'attributes': [{
             'id': attr.id,
             'name': attr.name,
@@ -640,3 +640,48 @@ def get_geocaches_table_content(zone_id):
     """Renvoie uniquement le contenu du tableau des geocaches."""
     geocaches = Geocache.query.filter_by(zone_id=zone_id).all()
     return render_template('geocaches_table_content.html', geocaches=geocaches, zone_id=zone_id)
+
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates/edit', methods=['GET'])
+def edit_coordinates_form(geocache_id):
+    """Renvoie le formulaire d'édition des coordonnées."""
+    logger.debug(f"Edit coordinates form requested for geocache {geocache_id}")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    
+    geocache = Geocache.query.get_or_404(geocache_id)
+    response = make_response(render_template('partials/coordinate_edit_form.html', geocache=geocache))
+    response.headers['HX-Trigger'] = 'coordinatesFormLoaded'
+    
+    logger.debug(f"Sending response with headers: {dict(response.headers)}")
+    return response
+
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates', methods=['PUT'])
+def update_coordinates(geocache_id):
+    """Met à jour les coordonnées corrigées d'une géocache."""
+    logger.debug(f"Update coordinates requested for geocache {geocache_id}")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    logger.debug(f"Form data: {dict(request.form)}")
+    
+    geocache = Geocache.query.get_or_404(geocache_id)
+    
+    gc_lat = request.form.get('gc_lat')
+    gc_lon = request.form.get('gc_lon')
+    
+    logger.debug(f"Updating coordinates to: {gc_lat}, {gc_lon}")
+    
+    # Mise à jour des coordonnées
+    geocache.gc_lat_corrected = gc_lat
+    geocache.gc_lon_corrected = gc_lon
+    
+    # TODO: Implémenter la conversion des coordonnées GC en décimales
+    # Pour l'instant, on ne met à jour que le format GC
+    
+    db.session.commit()
+    logger.debug("Database updated successfully")
+    
+    response = make_response(render_template('partials/coordinates_display.html', geocache=geocache))
+    response.headers['HX-Trigger'] = 'coordinatesUpdated'
+    
+    logger.debug(f"Sending response with headers: {dict(response.headers)}")
+    return response

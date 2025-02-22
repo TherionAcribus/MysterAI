@@ -431,16 +431,6 @@ function initializeLayout() {
             const gcCode = state.gcCode;
             const name = state.name;
             
-            // Fonction pour échapper les caractères spéciaux
-            function escapeHtml(text) {
-                return text
-                    .replace(/&/g, "&amp;")
-                    .replace(/'/g, "&#39;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
-            }
-            
             // Mettre à jour immédiatement l'état du composant
             container.setState({
                 geocacheId: geocacheId,
@@ -449,7 +439,7 @@ function initializeLayout() {
             });
             
             // Mettre à jour le titre
-            container.setTitle(`${escapeHtml(gcCode)} - ${escapeHtml(name)}`);
+            container.setTitle(`${gcCode} - ${name}`);
             
             // Afficher un état de chargement
             container.getElement().html(`
@@ -476,7 +466,7 @@ function initializeLayout() {
                             <div class="flex flex-col h-full">
                                 <div class="flex justify-between items-center mb-4">
                                     <h2 class="text-xl text-white">
-                                        ${escapeHtml(gcCode)} - ${escapeHtml(name)}
+                                        ${gcCode} - ${name}
                                     </h2>
                                     <div class="flex space-x-2">
                                         <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 save-button">

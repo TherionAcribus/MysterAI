@@ -1,0 +1,30 @@
+<div class="space-y-2">
+    <!-- Coordonnées d'origine -->
+    <div class="text-sm text-gray-400 mb-1">Coordonnées d'origine:</div>
+    <div>
+        <span class="text-gray-400">{{ geocache.gc_coords }}</span>
+    </div>
+
+    <!-- Coordonnées corrigées ou bouton d'édition -->
+    {% if geocache.gc_coords_corrected %}
+        <div class="mt-4 pt-2 border-t border-gray-700">
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="text-sm text-gray-400 mb-1">Coordonnées corrigées:</div>
+                    <div class="text-green-400">{{ geocache.gc_coords_corrected }}</div>
+                </div>
+                <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                        data-action="click->geocache-coordinates#edit">
+                    Modifier
+                </button>
+            </div>
+        </div>
+    {% else %}
+        <div class="mt-4">
+            <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                    data-action="click->geocache-coordinates#edit">
+                Corriger les coordonnées
+            </button>
+        </div>
+    {% endif %}
+</div>

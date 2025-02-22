@@ -1,4 +1,10 @@
-<div class="w-full h-full bg-gray-900 overflow-auto p-4">
+<div class="w-full h-full bg-gray-900 overflow-auto p-4" 
+     hx-ext="include-vals" 
+     hx-headers='{"X-Layout-Component": "true"}'
+     data-controller="geocache-coordinates"
+     data-geocache-id="{{ geocache.id }}"
+     x-init="console.log('Component initialized with geocache ID:', '{{ geocache.id }}')"
+     data-action="coordinatesFormLoaded@window->geocache-coordinates#formLoaded coordinatesUpdated@window->geocache-coordinates#coordinatesUpdated">
     <div class="max-w-4xl mx-auto">
         <!-- En-tête -->
         <div class="mb-6">
@@ -44,30 +50,12 @@
             </div>
 
             <!-- Coordonnées -->
-            <div class="bg-gray-800 rounded-lg p-4">
+            <div class="bg-gray-800 rounded-lg p-4"
+                 data-controller="geocache-coordinates"
+                 data-geocache-id="{{ geocache.id }}">
                 <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
-                <div class="space-y-2">
-                    <div>
-                        <span class="text-gray-400">Latitude:</span>
-                        <span class="text-gray-100">{{ geocache.latitude }}</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-400">Longitude:</span>
-                        <span class="text-gray-100">{{ geocache.longitude }}</span>
-                    </div>
-                    {% if geocache.gc_lat and geocache.gc_lon %}
-                    <div class="mt-2 pt-2 border-t border-gray-700">
-                        <div class="text-sm text-gray-400 mb-1">Coordonnées d'origine:</div>
-                        <div>
-                            <span class="text-gray-400">Lat:</span>
-                            <span class="text-gray-100">{{ geocache.gc_lat }}</span>
-                        </div>
-                        <div>
-                            <span class="text-gray-400">Lon:</span>
-                            <span class="text-gray-100">{{ geocache.gc_lon }}</span>
-                        </div>
-                    </div>
-                    {% endif %}
+                <div id="coordinates-container" data-geocache-coordinates-target="container">
+                    {% include 'partials/coordinates_display.html' %}
                 </div>
             </div>
         </div>
