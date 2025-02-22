@@ -24,80 +24,64 @@ function initContextMenu() {
 
             // Sélectionner l'image actuelle
             targetImage.classList.add('selected');
-
-            // Vérifier si window.electron existe
-            console.log('=== DEBUG: window.electron existe:', !!window.electron);
-            console.log('=== DEBUG: window.electron:', window.electron);
-
-            if (window.electron) {
-                // Utiliser le menu contextuel natif d'Electron
-                const imageData = {
-                    imageId: targetImage.dataset.imageId,
-                    imageName: targetImage.dataset.imageName
-                };
-                window.electron.showImageContextMenu(imageData);
-            } else {
-                // Utiliser le menu contextuel web
-                showWebContextMenu(
-                    e.clientX,
-                    e.clientY,
-                    targetImage.dataset.imageId,
-                    targetImage.dataset.imageName
-                );
-            }
+            
+            const imageId = targetImage.dataset.imageId;
+            const imageName = targetImage.dataset.imageName || 'Sans nom';
+            
+            // Créer le menu contextuel avec le style Tailwind
+            const menu = document.createElement('div');
+            menu.className = 'fixed z-50 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 min-w-[200px]';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+            
+            // En-tête avec le nom de l'image
+            const header = document.createElement('div');
+            header.className = 'px-4 py-2 text-gray-400 text-sm border-b border-gray-700';
+            header.textContent = `Image : "${imageName}"`;
+            menu.appendChild(header);
+            
+            // Option d'édition
+            const editOption = document.createElement('div');
+            editOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            editOption.innerHTML = '<i class="fas fa-edit mr-2"></i>Éditer l\'image';
+            editOption.onclick = () => {
+                if (window.electron) {
+                    window.electron.openImageEditor(imageId, imageName);
+                } else {
+                    window.openImageEditor(imageId, imageName);
+                }
+                menu.remove();
+            };
+            menu.appendChild(editOption);
+            
+            // Option de copie
+            const copyOption = document.createElement('div');
+            copyOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            copyOption.innerHTML = '<i class="fas fa-copy mr-2"></i>Copier';
+            copyOption.onclick = () => {
+                // TODO: Implémenter la copie
+                menu.remove();
+            };
+            menu.appendChild(copyOption);
+            
+            // Ajouter le menu au document
+            document.body.appendChild(menu);
+            
+            // Fermer le menu au clic en dehors
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            
+            // Petit délai pour éviter la fermeture immédiate
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu);
+            }, 0);
         }
     });
 }
 
-// Fonction pour afficher le menu contextuel web
-function showWebContextMenu(x, y, id, name, customItems = []) {
-    // Créer le menu
-    const menu = document.createElement('div');
-    menu.className = 'context-menu';
-    menu.style.left = `${x}px`;
-    menu.style.top = `${y}px`;
-
-    // Ajouter les éléments personnalisés s'ils existent
-    if (customItems.length > 0) {
-        customItems.forEach(item => {
-            const menuItem = document.createElement('div');
-            menuItem.className = 'context-menu-item';
-            menuItem.textContent = item.label;
-            menuItem.addEventListener('click', () => {
-                item.click();
-                menu.remove();
-            });
-            menu.appendChild(menuItem);
-        });
-    } else {
-        // Menu par défaut pour les images
-        const editItem = document.createElement('div');
-        editItem.className = 'context-menu-item';
-        editItem.textContent = 'Éditer l\'image';
-        editItem.addEventListener('click', () => {
-            window.openImageEditor(id, name);
-            menu.remove();
-        });
-        menu.appendChild(editItem);
-    }
-
-    // Ajouter le menu au document
-    document.body.appendChild(menu);
-
-    // Fermer le menu au clic en dehors
-    function handleClickOutside(e) {
-        if (!menu.contains(e.target)) {
-            menu.remove();
-            document.removeEventListener('click', handleClickOutside);
-        }
-    }
-    
-    // Utiliser setTimeout pour éviter que le menu ne se ferme immédiatement
-    setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-    }, 0);
-}
-
 // Exporter les fonctions
 window.initContextMenu = initContextMenu;
-window.showWebContextMenu = showWebContextMenu;

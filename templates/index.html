@@ -57,6 +57,14 @@
             }
         };
 
+        // Écouter l'événement open-image-editor depuis le main process
+        if (window.electron) {
+            window.electron.on('open-image-editor', (data) => {
+                console.log('=== DEBUG: Événement open-image-editor reçu ===', data);
+                window.openImageEditor(data.imageId, data.imageName);
+            });
+        }
+
         console.log('=== DEBUG: Index.html commence à charger ===');  
 
         // Initialiser le menu contextuel au chargement du DOM
@@ -149,6 +157,8 @@
     
     <!-- Scripts -->
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="/js/context_menu.js"></script>
     
     <!-- Ancien zone avec le CSS -->
     <style>

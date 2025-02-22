@@ -1,11 +1,3 @@
-{% extends "base.html" %}
-
-{% block head %}
-<!-- Fabric.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-{% endblock %}
-
-{% block content %}
 <div class="h-full flex flex-col bg-gray-900 text-gray-300">
     <div class="flex-1 flex">
         <!-- Zone de l'image -->
@@ -49,11 +41,11 @@
                             <h4 class="text-sm font-medium mb-2">Formes</h4>
                             <div class="grid grid-cols-2 gap-2">
                                 <button class="tool-btn" data-tool="rect">
-                                    <i class="far fa-square"></i>
+                                    <i class="fas fa-square"></i>
                                     <span>Rectangle</span>
                                 </button>
                                 <button class="tool-btn" data-tool="circle">
-                                    <i class="far fa-circle"></i>
+                                    <i class="fas fa-circle"></i>
                                     <span>Cercle</span>
                                 </button>
                             </div>
@@ -61,55 +53,33 @@
 
                         <div class="tool-group">
                             <h4 class="text-sm font-medium mb-2">Texte</h4>
-                            <button class="tool-btn w-full" data-tool="text">
-                                <i class="fas fa-font"></i>
-                                <span>Ajouter du texte</span>
-                            </button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button class="tool-btn" data-tool="text">
+                                    <i class="fas fa-font"></i>
+                                    <span>Texte</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Actions</h4>
+                            <h4 class="text-sm font-medium mb-2">Couleur et taille</h4>
                             <div class="grid grid-cols-2 gap-2">
-                                <button class="tool-btn" data-action="undo">
-                                    <i class="fas fa-undo"></i>
-                                    <span>Annuler</span>
-                                </button>
-                                <button class="tool-btn" data-action="redo">
-                                    <i class="fas fa-redo"></i>
-                                    <span>Refaire</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Propriétés de l'outil -->
-                    <div class="mt-6">
-                        <h4 class="text-sm font-medium mb-2">Propriétés</h4>
-                        <div class="space-y-3">
-                            <!-- Couleur -->
-                            <div>
-                                <label class="text-xs">Couleur</label>
-                                <input type="color" class="w-full h-8 bg-transparent" value="#000000">
-                            </div>
-                            
-                            <!-- Taille -->
-                            <div>
-                                <label class="text-xs">Taille</label>
-                                <input type="range" class="w-full" min="1" max="100" value="10">
-                            </div>
-
-                            <!-- Opacité -->
-                            <div>
-                                <label class="text-xs">Opacité</label>
-                                <input type="range" class="w-full" min="0" max="100" value="100">
+                                <div class="flex flex-col">
+                                    <label class="text-xs mb-1">Couleur</label>
+                                    <input type="color" id="color-picker" class="w-full h-8">
+                                </div>
+                                <div class="flex flex-col">
+                                    <label class="text-xs mb-1">Taille</label>
+                                    <input type="range" id="size-picker" min="1" max="50" value="5" class="w-full">
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Conteneur du canvas -->
                 <div class="flex-grow relative bg-gray-700">
-                    <canvas id="canvas" class="absolute inset-0 w-full h-full" data-image-url="{{ image_url }}"></canvas>
+                    <canvas id="canvas" class="absolute inset-0 w-full h-full" data-image-url="{{ image_url }}" data-save-url="{{ save_url }}"></canvas>
                 </div>
             </div>
         </div>
@@ -117,61 +87,66 @@
         <!-- Barre d'état -->
         <div class="h-8 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-sm">
             <div class="flex-1">
-                <span id="image-info">Image: {{ image_name }}</span>
-            </div>
-            <div>
-                <button class="px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white" id="save-btn" data-save-url="{{ save_url }}">
-                    Enregistrer
-                </button>
+                <span id="status">Prêt</span>
             </div>
         </div>
     </div>
 
     <style>
-    /* Styles pour les contrôles de couleur et de taille */
-    input[type="color"] {
-        -webkit-appearance: none;
-        padding: 0;
-        border: none;
-        border-radius: 4px;
-        width: 32px;
-        height: 32px;
-        cursor: pointer;
-    }
-
-    input[type="color"]::-webkit-color-swatch-wrapper {
-        padding: 0;
-        border-radius: 4px;
-    }
-
-    input[type="color"]::-webkit-color-swatch {
-        border: none;
-        border-radius: 4px;
-    }
-
-    input[type="range"] {
-        -webkit-appearance: none;
-        width: 100%;
-        height: 4px;
-        border-radius: 2px;
-        background: #4B5563;
-        outline: none;
-        cursor: pointer;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #3B82F6;
-        cursor: pointer;
-    }
+        /* Styles pour les boutons d'outils */
+        .tool-btn {
+            @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300;
+        }
+        
+        .tool-btn i {
+            @apply text-lg mb-1;
+        }
+        
+        .tool-btn span {
+            @apply text-xs;
+        }
+        
+        .tool-btn.active {
+            @apply bg-blue-600;
+        }
+        
+        /* Styles pour les contrôles de couleur et de taille */
+        input[type="color"] {
+            @apply rounded border border-gray-600 bg-gray-700;
+            -webkit-appearance: none;
+        }
+        
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+        }
+        
+        input[type="range"] {
+            @apply rounded-lg overflow-hidden appearance-none bg-gray-700;
+            height: 32px;
+        }
+        
+        input[type="range"]::-webkit-slider-runnable-track {
+            @apply bg-gray-700;
+            height: 32px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            @apply appearance-none w-4 h-8 bg-blue-500;
+            border-radius: 3px;
+        }
+        
+        input[type="range"]::-moz-range-track {
+            @apply bg-gray-700;
+            height: 32px;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            @apply w-4 h-8 bg-blue-500 border-0;
+            border-radius: 3px;
+        }
     </style>
-
-    <!-- Ajout d'un indicateur d'outil actif -->
-    <div class="fixed bottom-4 left-4 px-4 py-2 bg-gray-800 rounded-lg shadow-lg text-sm text-gray-300 z-50 hidden" id="active-tool-indicator">
-        <i class="fas fa-info-circle mr-2"></i>
-        <span>Outil actif: <span id="active-tool-name">Aucun</span></span>
-    </div>
-{% endblock %}
+</div>

@@ -124,26 +124,23 @@
         {% endif %}
 
         <!-- Galerie d'images -->
-        {% if geocache.images %}
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+        <div class="bg-gray-800 rounded-lg p-4 mb-6"
+             data-controller="geocache-gallery"
+             data-action="contextmenu->geocache-gallery#handleContextMenu">
             <h2 class="text-lg font-semibold text-gray-100 mb-4">Images</h2>
-            <div class="flex flex-wrap gap-4 !w-full">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {% for image in geocache.images %}
-                <div class="!w-[150px] !h-[150px] !flex-none relative group overflow-hidden bg-gray-700 rounded-lg p-1">
-                    <div class="!w-full !h-full relative overflow-hidden rounded-lg border-2 border-gray-600 transition-all duration-300 ease-in-out hover:border-blue-500">
-                        <img src="{{ image.url }}" 
-                             alt="Image de la géocache" 
-                             class="geocache-image !w-full !h-full !object-cover !max-w-full !max-h-full transition-transform duration-300 ease-in-out group-hover:scale-110"
-                             style="width: 150px !important; height: 150px !important; object-fit: cover !important;"
-                             loading="lazy"
-                             data-image-id="{{ image.id }}"
-                             data-image-name="{{ image.name }}">
-                    </div>
+                <div class="relative aspect-square">
+                    <img src="{{ image.url }}"
+                         alt="{{ image.name or 'Image de la géocache' }}"
+                         class="geocache-image w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90"
+                         data-geocache-gallery-target="image"
+                         data-image-id="{{ image.id }}"
+                         data-image-name="{{ image.name or '' }}">
                 </div>
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
 
         <!-- Logs -->
         {% if geocache.logs_count %}
@@ -228,107 +225,3 @@
         text-align: center;
     }
 </style>
-
-<script>
-// Fonction pour initialiser les gestionnaires d'événements des images
-function initializeImageHandlers() {
-    console.log('Initialisation des gestionnaires d\'images');
-    
-    // Gestionnaire de clic droit sur les images
-    const images = document.querySelectorAll('.geocache-image');
-    console.log('Images trouvées:', images.length);
-    
-    images.forEach(img => {
-        // Retirer la classe selected de toutes les images
-        img.addEventListener('click', function() {
-            console.log('Click sur image');
-            images.forEach(i => i.classList.remove('selected'));
-            this.classList.add('selected');
-        });
-
-        // Gérer le clic droit
-        img.addEventListener('contextmenu', function(e) {
-            console.log('Clic droit sur image');
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Sélectionner l'image
-            images.forEach(i => i.classList.remove('selected'));
-            this.classList.add('selected');
-
-            // Vérifier si window.electron existe
-            console.log('window.electron existe:', !!window.electron);
-
-            // Si nous sommes dans Electron, utiliser le menu contextuel natif
-            if (window.electron) {
-                console.log('Utilisation du menu Electron');
-                const imageData = {
-                    imageId: this.dataset.imageId,
-                    imageName: this.dataset.imageName
-                };
-                console.log('Image data:', imageData);
-                window.electron.showImageContextMenu(imageData);
-            } else {
-                console.log('Utilisation du menu web');
-                // Fallback pour le navigateur web
-                const rect = this.getBoundingClientRect();
-                showWebContextMenu(rect.left, rect.top, this.dataset.imageId, this.dataset.imageName);
-            }
-        });
-    });
-}
-
-// Fonction pour afficher le menu contextuel web (pour les navigateurs)
-function showWebContextMenu(x, y, imageId, imageName) {
-    const contextMenu = document.createElement('div');
-    contextMenu.className = 'context-menu';
-    contextMenu.innerHTML = `
-        <div class="context-menu-item edit-image">
-            <i class="fas fa-edit"></i>
-            Éditer l'image
-        </div>
-    `;
-
-    // Positionner le menu
-    contextMenu.style.left = x + 'px';
-    contextMenu.style.top = y + 'px';
-    document.body.appendChild(contextMenu);
-
-    // Gérer le clic sur l'option d'édition
-    contextMenu.querySelector('.edit-image').addEventListener('click', function() {
-        window.openImageEditor(imageId, imageName);
-        contextMenu.remove();
-    });
-
-    // Fermer le menu au clic en dehors
-    function handleClickOutside(e) {
-        if (!contextMenu.contains(e.target)) {
-            contextMenu.remove();
-            document.removeEventListener('click', handleClickOutside);
-        }
-    }
-
-    // Attendre un peu avant d'ajouter le gestionnaire de clic pour éviter la fermeture immédiate
-    setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-    }, 0);
-}
-
-// Initialiser les gestionnaires au chargement initial
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script chargé - DOMContentLoaded');
-    initializeImageHandlers();
-});
-
-// Initialiser les gestionnaires après un chargement HTMX
-document.body.addEventListener('htmx:afterSwap', function() {
-    console.log('Contenu HTMX chargé - afterSwap');
-    initializeImageHandlers();
-});
-
-// Initialiser les gestionnaires après une mise à jour HTMX
-document.body.addEventListener('htmx:afterSettle', function() {
-    console.log('Contenu HTMX stabilisé - afterSettle');
-    initializeImageHandlers();
-});
-</script>
