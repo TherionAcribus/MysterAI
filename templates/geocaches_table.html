@@ -227,20 +227,24 @@
                             const gcCode = data.gc_code;
                             const name = data.name;
                             
+                            // Échapper les caractères spéciaux pour JavaScript
+                            const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
+                            const escapedName = name.replace(/['\\]/g, '\\$&');
+                            
                             return `<button 
                                 class="details-button"
                                 onclick="window.parent.postMessage({ 
                                     type: 'openGeocacheDetails', 
                                     geocacheId: ${geocacheId},
-                                    gcCode: '${gcCode}',
-                                    name: '${name}'
+                                    gcCode: '${escapedGcCode}',
+                                    name: '${escapedName}'
                                 }, '*')"
                             >
                                 Détails
                             </button>
                             <button 
                                 class="delete-button"
-                                onclick="window.deleteGeocache(${geocacheId}, '${gcCode}')"
+                                onclick="window.deleteGeocache(${geocacheId}, '${escapedGcCode}')"
                             >
                                 Supprimer
                             </button>`;
