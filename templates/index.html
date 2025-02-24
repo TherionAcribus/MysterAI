@@ -3,7 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Styles -->
+    <link type="text/css" rel="stylesheet" href="/css/output.css">
+    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-base.css">
+    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-dark-theme.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link type="text/css" rel="stylesheet" href="/css/index.css">
+    
+    <!-- Third-party Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
+    
+    <!-- Initialize Stimulus -->
+    <script>
+        (function() {
+            window.Stimulus = window.Stimulus || {};
+            window.Stimulus.Controller = window.Stimulus.Controller || {};
+            
+            const application = window.Stimulus.Application.start();
+            window.Stimulus.register = function(name, controller) {
+                console.log(`=== DEBUG: Registering controller: ${name} ===`);
+                return application.register(name, controller);
+            };
+            
+            console.log('=== DEBUG: Stimulus initialized ===');
+        })();
+    </script>
+    
+    <!-- Application Scripts -->
     <script src="/js/contextual_menu.js"></script>
+    <script src="/js/controllers/map_controller.js"></script>
+    <script src="/js/controllers/zone_map_controller.js"></script>
+    
     <title>MysteryAI - Geocaching</title>
     <script>
         // Définir openImageEditor globalement avant tout
@@ -74,15 +109,6 @@
             initContextMenu();
         }
     </script>
-    
-    <!-- Styles -->
-    <link type="text/css" rel="stylesheet" href="/css/output.css">
-    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-base.css">
-    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-dark-theme.css">
-    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
-    <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
-    <link type="text/css" rel="stylesheet" href="/css/index.css">
     
     <style>
         /* Styles pour les polices d'alphabet */
@@ -165,7 +191,6 @@
     <style>
     </style>
     
-    <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
     <script src="/js/controllers/alphabet_viewer_controller.js" defer></script>
 </head>
 <body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
@@ -359,8 +384,6 @@
     <script src="/vendor/jquery/jquery.min.js"></script>
     <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
     <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
-    <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
-    <script src="/js/controllers/map_controller.js"></script>
     
     <!-- Layout State Manager -->
     <script src="/js/layout_state_manager.js"></script>

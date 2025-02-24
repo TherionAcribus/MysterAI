@@ -1,0 +1,18 @@
+<!-- Zone Map Component -->
+<div id="zone-map" 
+     data-controller="zone-map"
+     data-zone-map-zone-id-value="{{ zone.id }}"
+     class="h-full bg-gray-900">
+    <!-- Debug info -->
+    <div class="absolute top-0 left-0 z-50 bg-black bg-opacity-50 text-white p-2 text-xs">
+        Controller: zone-map<br>
+        Zone ID: {{ zone.id }}
+    </div>
+    <!-- Map container -->
+    <div id="map" class="w-full h-full" data-zone-map-target="container"></div>
+</div>
+
+<script>
+    console.log('=== DEBUG: Zone Map HTML chargé ===');
+    console.log('Zone ID:', {{ zone.id }});
+</script>

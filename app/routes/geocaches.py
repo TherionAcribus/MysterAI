@@ -685,3 +685,19 @@ def update_coordinates(geocache_id):
     
     logger.debug(f"Sending response with headers: {dict(response.headers)}")
     return response
+
+
+@geocaches_bp.route('/map_panel/<int:zone_id>')
+def get_map_panel(zone_id):
+    """Renvoie le template du panneau de carte pour une zone."""
+    zone = Zone.query.get_or_404(zone_id)
+    return render_template('map_panel.html', zone=zone)
+
+
+@geocaches_bp.route('/zone_map/<int:zone_id>')
+def get_zone_map(zone_id):
+    """Renvoie le template de la carte d'une zone."""
+    logger.debug(f"=== DEBUG: Chargement de la carte pour la zone {zone_id} ===")
+    zone = Zone.query.get_or_404(zone_id)
+    logger.debug(f"=== DEBUG: Zone trouvée: {zone.id} - {zone.name} ===")
+    return render_template('zone_map.html', zone=zone)

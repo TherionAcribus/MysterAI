@@ -1,11 +1,14 @@
+// Map Controller
 (() => {
-    const application = Stimulus.Application.start()
-
-    application.register("map", class extends Stimulus.Controller {
+    class MapController extends window.Stimulus.Controller {
         static targets = ["container", "popup", "popupContent"]
         static values = {
             geocacheId: String,
-            geocacheCode: String
+            geocacheCode: String,
+            isGoldenLayout: Boolean,
+            zoneId: String,
+            showAllPoints: Boolean,
+            showNames: Boolean
         }
 
         connect() {
@@ -151,6 +154,11 @@
 
             // Load geocache coordinates
             this.loadGeocacheCoordinates();
+
+            // Si on est dans GoldenLayout et qu'on a un zoneId, charger tous les points
+            if (this.isGoldenLayoutValue && this.zoneIdValue) {
+                this.loadZoneGeocaches();
+            }
         }
 
         showPointContextMenu(event, feature) {
@@ -407,6 +415,24 @@
             }
         }
 
+        async loadZoneGeocaches() {
+            try {
+                const response = await fetch(`/api/zones/${this.zoneIdValue}/geocaches`);
+                const geocaches = await response.json();
+
+                geocaches.forEach(geocache => {
+                    if (geocache.latitude && geocache.longitude) {
+                        this.addMarker(geocache.id, geocache, geocache.name, 'black');
+                    }
+                });
+
+                // Fit view to show all markers
+                this.fitMapToMarkers();
+            } catch (error) {
+                console.error('Error loading zone geocaches:', error);
+            }
+        }
+
         addMarker(id, coords, title, color) {
             console.log("Adding marker:", { id, coords, title, color });
             const feature = new ol.Feature({
@@ -435,5 +461,12 @@
                 })
             });
         }
-    })
-})()
+    }
+
+    // Register the controller
+    try {
+        window.Stimulus.register('map', MapController);
+    } catch (error) {
+        console.error('Error registering map controller:', error);
+    }
+})();

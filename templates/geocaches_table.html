@@ -2,22 +2,30 @@
 <div class="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
     <!-- Formulaire d'ajout de géocache -->
     <div class="flex-shrink-0 gap-4 items-end p-4">
-        <form id="addGeocacheForm" class="flex gap-4 items-end">
-            <div>
-                <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
-                <input type="text" id="geocacheCode" name="code" required
-                       class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                       placeholder="GC12345">
-                <input type="hidden" name="zone_id" value="{{ zone_id }}">
-            </div>
-            <button type="submit" 
-                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
-                <span>Ajouter</span>
-                <div class="loading-indicator hidden ml-2">
-                    <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+        <div class="flex justify-between w-full">
+            <form id="addGeocacheForm" class="flex gap-4 items-end">
+                <div>
+                    <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
+                    <input type="text" id="geocacheCode" name="code" required
+                           class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                           placeholder="GC12345">
+                    <input type="hidden" name="zone_id" value="{{ zone_id }}">
                 </div>
+                <button type="submit" 
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Ajouter</span>
+                    <div class="loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </form>
+            <button id="openMapButton" 
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2"
+                    data-zone-id="{{ zone_id }}">
+                <i class="fas fa-map-marked-alt"></i>
+                <span>Map</span>
             </button>
-        </form>
+        </div>
         <div id="spinner" class="spinner"></div>
         <div id="message" class="mt-2"></div>
     </div>
@@ -175,6 +183,7 @@
         const spinner = document.getElementById('spinner');
         const messageDiv = document.getElementById('message');
         const submitButton = form.querySelector('button[type="submit"]');
+        const openMapButton = document.getElementById('openMapButton');
 
         // Fonction pour initialiser Tabulator
         function initializeTabulator() {

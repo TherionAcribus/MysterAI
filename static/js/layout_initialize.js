@@ -503,6 +503,32 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant geocachesMap
+        mainLayout.registerComponent('geocachesMap', function(container, componentState) {
+            const { zoneId, title } = componentState;
+            
+            // Charger le contenu de la carte
+            fetch(`/zone_map/${zoneId}`)
+                .then(response => response.text())
+                .then(html => {
+                    container.getElement().html(html);
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement de la carte:', error);
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 p-4">
+                            <div class="text-red-500 mb-4">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                Erreur lors du chargement de la carte
+                            </div>
+                            <div class="text-gray-400 text-sm">
+                                ${error.message}
+                            </div>
+                        </div>
+                    `);
+                });
+        });
+
         function initializeTools(canvas) {
             // État des outils
             let currentTool = null;
@@ -848,6 +874,26 @@ function initializeLayout() {
         });
 
         console.log('=== Layout: Initialisation terminée ===');
+
+        // Ajouter le gestionnaire d'événements pour le bouton Map dans geocaches_table.html
+        document.addEventListener('click', function(event) {
+            const mapButton = event.target.closest('#openMapButton');
+            if (!mapButton) return;
+
+            const zoneId = mapButton.dataset.zoneId;
+            const title = `Map - Zone ${zoneId}`;
+
+            // Créer un nouvel onglet avec la carte
+            mainLayout.root.contentItems[0].addChild({
+                type: 'component',
+                componentName: 'geocachesMap',
+                title: title,
+                componentState: {
+                    zoneId: zoneId,
+                    title: title
+                }
+            });
+        });
 
     } catch (error) {
         console.error('Erreur lors de l\'initialisation du layout:', error);
