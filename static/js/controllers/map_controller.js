@@ -28,6 +28,17 @@
             }
         }
 
+        onActivated(event) {
+            console.log("Map panel activated", event);
+            const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+            if (activeComponent && activeComponent.state && activeComponent.state.geocacheId) {
+                htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${activeComponent.state.geocacheId}`, {
+                    target: this.element,
+                    swap: 'innerHTML'
+                });
+            }
+        }
+
         async initMap() {
             console.log("Initializing map...");
             
