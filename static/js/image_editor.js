@@ -135,8 +135,15 @@ function initializeEditor() {
     const saveBtn = document.getElementById('save-image');
     if (saveBtn) {
         saveBtn.addEventListener('click', function() {
-            // Récupérer l'ID de l'image parent depuis l'URL
-            const imageId = window.location.pathname.split('/').pop();
+            // Récupérer l'ID de l'image depuis le dataset du canvas
+            const canvasElement = document.getElementById('editor-canvas');
+            const imageId = canvasElement.dataset.imageId;
+            
+            if (!imageId) {
+                console.error('ID de l\'image non trouvé');
+                alert('Erreur : ID de l\'image non trouvé');
+                return;
+            }
 
             // Convertir le canvas en base64
             const imageData = canvas.toDataURL({

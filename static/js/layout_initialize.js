@@ -290,6 +290,12 @@ function initializeLayout() {
                     // Injecter le HTML dans le conteneur
                     container.getElement().html(html);
                     console.log('=== DEBUG: HTML injecté dans le conteneur ===');
+                    
+                    // Passer l'ID de l'image au template
+                    const canvas = container.getElement().find('#editor-canvas')[0];
+                    if (canvas) {
+                        canvas.dataset.imageId = state.imageId;
+                    }
                 })
                 .catch(error => {
                     console.error('Erreur lors du chargement du template:', error);
