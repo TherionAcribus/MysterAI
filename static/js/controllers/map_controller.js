@@ -120,6 +120,7 @@
 
             // Add context menu handler
             this.map.getViewport().addEventListener('contextmenu', (evt) => {
+                evt.preventDefault();
                 const pixel = this.map.getEventPixel(evt);
                 const feature = this.map.forEachFeatureAtPixel(pixel, 
                     (feature) => feature,
@@ -130,8 +131,11 @@
                 );
 
                 if (feature) {
-                    evt.preventDefault();
-                    this.showContextMenu(evt, feature);
+                    this.showPointContextMenu(evt, feature);
+                } else {
+                    // Obtenir les coordonnées du clic
+                    const coordinates = this.map.getCoordinateFromPixel(pixel);
+                    this.showMapContextMenu(evt, coordinates);
                 }
             });
 
@@ -149,7 +153,7 @@
             this.loadGeocacheCoordinates();
         }
 
-        showContextMenu(event, feature) {
+        showPointContextMenu(event, feature) {
             // Récupérer les coordonnées transformées
             const coordinates = feature.getGeometry().getCoordinates();
             const [longitude, latitude] = ol.proj.transform(coordinates, 'EPSG:3857', 'EPSG:4326');
@@ -240,6 +244,66 @@
 
             menuItem.addEventListener('click', copyHandler);
             menuItem.addEventListener('click', circleHandler);
+
+            this.contextMenu.innerHTML = '';
+            this.contextMenu.appendChild(menuItem);
+
+            // Positionner le menu
+            this.contextMenu.style.left = (event.clientX) + 'px';
+            this.contextMenu.style.top = (event.clientY) + 'px';
+            this.contextMenu.style.display = 'block';
+        }
+
+        showMapContextMenu(event, coordinates) {
+            // Convertir les coordonnées de la projection de la carte (EPSG:3857) vers lat/lon (EPSG:4326)
+            const [longitude, latitude] = ol.proj.transform(coordinates, 'EPSG:3857', 'EPSG:4326');
+            const coords = this.formatCoordinates(latitude, longitude);
+
+            const menuItem = document.createElement('div');
+            menuItem.className = 'px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer';
+            menuItem.style.cssText = 'color: black; background-color: white;';
+            menuItem.setAttribute('data-coords', coords);
+
+            menuItem.innerHTML = `
+                <div class="font-bold text-black copy-text" style="color: black;">
+                    Copier les coordonnées
+                </div>
+                <div class="font-mono text-sm text-black" style="color: black;">
+                    ${coords}
+                </div>
+            `;
+
+            const copyHandler = (event) => {
+                const element = event.currentTarget;
+                const coords = element.getAttribute('data-coords');
+                const copyText = element.querySelector('.copy-text');
+                
+                if (!copyText) return;
+                
+                navigator.clipboard.writeText(coords).then(() => {
+                    const originalBgColor = element.style.backgroundColor;
+                    const originalColor = element.style.color;
+                    const originalText = copyText.textContent;
+                    
+                    element.style.backgroundColor = '#4CAF50';
+                    element.style.color = 'white';
+                    copyText.textContent = 'Copié !';
+                    
+                    setTimeout(() => {
+                        element.style.backgroundColor = originalBgColor;
+                        element.style.color = originalColor;
+                        copyText.textContent = originalText;
+                        
+                        if (this.contextMenu && this.contextMenu.style) {
+                            this.contextMenu.style.display = 'none';
+                        }
+                    }, 500);
+                }).catch(error => {
+                    console.error('Erreur lors de la copie:', error);
+                });
+            };
+
+            menuItem.addEventListener('click', copyHandler);
 
             this.contextMenu.innerHTML = '';
             this.contextMenu.appendChild(menuItem);
