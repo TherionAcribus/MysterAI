@@ -19,12 +19,62 @@
             if (this.hasContainerTarget && this.geocacheIdValue) {
                 this.initMap()
             }
+
+            // Créer le menu contextuel
+            this.contextMenu = document.createElement('div');
+            this.contextMenu.className = 'absolute bg-white shadow-lg rounded-lg z-[1001] py-1';
+            this.contextMenu.style.cssText = 'display: none; background-color: white; color: black;';
+            document.body.appendChild(this.contextMenu);
+
+            // Masquer le menu contextuel lors d'un clic ailleurs
+            document.addEventListener('click', () => {
+                this.contextMenu.style.display = 'none';
+            });
+
+            // Ajouter la fonction de copie au window pour pouvoir l'appeler depuis le menu
+            window.handleCoordinatesCopy = (event) => {
+                const coords = event.currentTarget.getAttribute('data-coords');
+                navigator.clipboard.writeText(coords).then(() => {
+                    const element = event.currentTarget;
+                    const copyText = element.querySelector('.copy-text');
+                    
+                    if (!copyText) return;
+                    
+                    // Stocker les styles originaux
+                    const originalBgColor = element.style.backgroundColor;
+                    const originalColor = element.style.color;
+                    const originalText = copyText.textContent;
+                    
+                    // Appliquer le feedback visuel
+                    element.style.backgroundColor = '#4CAF50';
+                    element.style.color = 'white';
+                    copyText.textContent = 'Copié !';
+                    
+                    // Attendre avant de cacher le menu
+                    setTimeout(() => {
+                        // Restaurer les styles originaux au cas où le menu est encore visible
+                        element.style.backgroundColor = originalBgColor;
+                        element.style.color = originalColor;
+                        copyText.textContent = originalText;
+                        
+                        // Cacher le menu s'il existe encore
+                        if (this.contextMenu && this.contextMenu.style) {
+                            this.contextMenu.style.display = 'none';
+                        }
+                    }, 500);
+                }).catch(error => {
+                    console.error('Erreur lors de la copie:', error);
+                });
+            };
         }
 
         disconnect() {
             if (this.map) {
                 this.map.setTarget(null)
                 this.map = null
+            }
+            if (this.contextMenu) {
+                this.contextMenu.remove();
             }
         }
 
@@ -90,6 +140,23 @@
                 }
             });
 
+            // Add context menu handler
+            this.map.getViewport().addEventListener('contextmenu', (evt) => {
+                const pixel = this.map.getEventPixel(evt);
+                const feature = this.map.forEachFeatureAtPixel(pixel, 
+                    (feature) => feature,
+                    {
+                        hitTolerance: 5
+                    }
+                );
+
+                if (feature) {
+                    evt.preventDefault();
+                    const properties = feature.getProperties();
+                    this.showContextMenu(evt, properties);
+                }
+            });
+
             // Add pointer cursor when hovering features
             this.map.on('pointermove', (evt) => {
                 const pixel = this.map.getEventPixel(evt.originalEvent);
@@ -101,6 +168,135 @@
 
             // Load geocache coordinates
             await this.loadGeocacheCoordinates();
+        }
+
+        showContextMenu(event, properties) {
+            // Récupérer les coordonnées transformées comme dans showPopup
+            const coordinates = ol.proj.transform(properties.geometry.getCoordinates(), 'EPSG:3857', 'EPSG:4326');
+            const [longitude, latitude] = coordinates;
+            
+            // Formater les coordonnées
+            const coords = this.formatCoordinates(latitude, longitude);
+
+            const menuItem = document.createElement('div');
+            menuItem.className = 'px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer';
+            menuItem.style.cssText = 'color: black; background-color: white;';
+            menuItem.setAttribute('data-coords', coords);
+            menuItem.innerHTML = `
+                <div class="font-bold text-black copy-text" style="color: black;">
+                    Copier les coordonnées
+                </div>
+                <div class="font-mono text-sm text-black" style="color: black;">
+                    ${coords}
+                </div>
+            `;
+
+            const copyHandler = (event) => {
+                const element = event.currentTarget;
+                const coords = element.getAttribute('data-coords');
+                const copyText = element.querySelector('.copy-text');
+                
+                if (!copyText) return;
+                
+                navigator.clipboard.writeText(coords).then(() => {
+                    // Stocker les styles originaux
+                    const originalBgColor = element.style.backgroundColor;
+                    const originalColor = element.style.color;
+                    const originalText = copyText.textContent;
+                    
+                    // Appliquer le feedback visuel
+                    element.style.backgroundColor = '#4CAF50';
+                    element.style.color = 'white';
+                    copyText.textContent = 'Copié !';
+                    
+                    // Attendre avant de cacher le menu
+                    setTimeout(() => {
+                        // Restaurer les styles originaux au cas où le menu est encore visible
+                        element.style.backgroundColor = originalBgColor;
+                        element.style.color = originalColor;
+                        copyText.textContent = originalText;
+                        
+                        // Cacher le menu s'il existe encore
+                        if (this.contextMenu && this.contextMenu.style) {
+                            this.contextMenu.style.display = 'none';
+                        }
+                    }, 500);
+                }).catch(error => {
+                    console.error('Erreur lors de la copie:', error);
+                });
+            };
+
+            menuItem.addEventListener('click', copyHandler);
+
+            this.contextMenu.innerHTML = '';
+            this.contextMenu.appendChild(menuItem);
+
+            // Positionner le menu
+            this.contextMenu.style.left = (event.clientX) + 'px';
+            this.contextMenu.style.top = (event.clientY) + 'px';
+            this.contextMenu.style.display = 'block';
+        }
+
+        formatCoordinates(latitude, longitude) {
+            // Format N DD° MM.MMM E DD° MM.MMM
+            const latDeg = Math.abs(Math.floor(latitude));
+            const latMin = Math.abs((latitude - latDeg) * 60).toFixed(3);
+            const latDir = latitude >= 0 ? 'N' : 'S';
+
+            const lonDeg = Math.abs(Math.floor(longitude));
+            const lonMin = Math.abs((longitude - lonDeg) * 60).toFixed(3);
+            const lonDir = longitude >= 0 ? 'E' : 'W';
+
+            return `${latDir} ${latDeg}° ${latMin} ${lonDir} ${lonDeg}° ${lonMin}`;
+        }
+
+        showPopup(coordinates, title, content) {
+            console.log("Showing popup:", { coordinates, title, content });
+            console.log("Popup targets:", {
+                popup: this.popupTarget,
+                content: this.popupContentTarget
+            });
+            
+            const element = this.popupTarget;
+            this.popupContentTarget.innerHTML = `<div style="color: black;">
+                <div class="font-bold mb-1 text-black" style="color: black;">${title}</div>
+                <div class="font-mono text-sm text-black" style="color: black;">${content}</div>
+            </div>`;
+            
+            const pixel = this.map.getPixelFromCoordinate(coordinates);
+            console.log("Popup pixel position:", pixel);
+            
+            if (pixel) {
+                const mapElement = this.map.getTargetElement();
+                const rect = mapElement.getBoundingClientRect();
+                const x = rect.left + pixel[0];
+                const y = rect.top + pixel[1] - 10; // Décalage vers le haut pour éviter de chevaucher le point
+                
+                element.style.left = `${x}px`;
+                element.style.top = `${y}px`;
+                element.style.display = 'block';
+            }
+        }
+
+        hidePopup() {
+            console.log("Hiding popup");
+            this.popupTarget.style.display = 'none';
+        }
+
+        clearMarkers() {
+            if (this.vectorSource) {
+                this.vectorSource.clear();
+            }
+        }
+
+        fitMapToMarkers() {
+            if (this.vectorSource && this.vectorSource.getFeatures().length > 0) {
+                const extent = this.vectorSource.getExtent();
+                this.map.getView().fit(extent, {
+                    padding: [50, 50, 50, 50],
+                    maxZoom: 15
+                });
+            }
         }
 
         async loadGeocacheCoordinates() {
@@ -161,55 +357,6 @@
                     })
                 })
             });
-        }
-
-        showPopup(coordinates, title, content) {
-            console.log("Showing popup:", { coordinates, title, content });
-            console.log("Popup targets:", {
-                popup: this.popupTarget,
-                content: this.popupContentTarget
-            });
-            
-            const element = this.popupTarget;
-            this.popupContentTarget.innerHTML = `<div style="color: black;">
-                <div class="font-bold mb-1 text-black" style="color: black;">${title}</div>
-                <div class="font-mono text-sm text-black" style="color: black;">${content}</div>
-            </div>`;
-            
-            const pixel = this.map.getPixelFromCoordinate(coordinates);
-            console.log("Popup pixel position:", pixel);
-            
-            if (pixel) {
-                const mapElement = this.map.getTargetElement();
-                const rect = mapElement.getBoundingClientRect();
-                const x = rect.left + pixel[0];
-                const y = rect.top + pixel[1] - 10; // Décalage vers le haut pour éviter de chevaucher le point
-                
-                element.style.left = `${x}px`;
-                element.style.top = `${y}px`;
-                element.style.display = 'block';
-            }
-        }
-
-        hidePopup() {
-            console.log("Hiding popup");
-            this.popupTarget.style.display = 'none';
-        }
-
-        clearMarkers() {
-            if (this.vectorSource) {
-                this.vectorSource.clear();
-            }
-        }
-
-        fitMapToMarkers() {
-            if (this.vectorSource && this.vectorSource.getFeatures().length > 0) {
-                const extent = this.vectorSource.getExtent();
-                this.map.getView().fit(extent, {
-                    padding: [50, 50, 50, 50],
-                    maxZoom: 15
-                });
-            }
         }
     })
 })()
