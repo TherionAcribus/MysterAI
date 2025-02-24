@@ -140,8 +140,8 @@
         showContextMenu(x, y, geocache) {
             // Créer les éléments du menu
             this.contextMenu.innerHTML = `
-                <div class="cursor-pointer hover:bg-gray-100 px-4 py-2" data-action="open-details">
-                    <i class="fas fa-info-circle mr-2"></i>Détails
+                <div class="cursor-pointer hover:bg-gray-100 px-4 py-2 text-black" data-action="open-details">
+                    <i class="fas fa-info-circle mr-2"></i>Ouvrir la Géocache
                 </div>
             `;
 
