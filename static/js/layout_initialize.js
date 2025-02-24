@@ -140,7 +140,62 @@ function initializeLayout() {
             }
         });
 
-        // Enregistrer les composants avant l'initialisation
+        // Gestionnaire d'événements pour les messages postMessage
+        window.addEventListener('message', function(event) {
+            // Ignorer les messages de React DevTools
+            if (event.data.source === 'react-devtools-content-script') {
+                return;
+            }
+            
+            // Ne logger que les messages pertinents
+            if (event.data.type === 'openGeocacheDetails') {
+                console.log('=== Layout: Message reçu ===', event.data);
+                
+                const { geocacheId, gcCode, name } = event.data;
+                
+                // Trouver le conteneur parent
+                const containerId = event.source.frameElement?.closest('.lm_content')?.parentElement?.id;
+                
+                // Charger les détails de la géocache
+                fetch(`http://127.0.0.1:3000/geocaches/${geocacheId}/details-panel`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        const root = mainLayout.root;
+                        const newItemConfig = {
+                            type: 'component',
+                            componentName: 'geocache-details',
+                            title: `${gcCode} - ${name}`,
+                            componentState: { 
+                                html: html,
+                                geocacheId: geocacheId,
+                                gcCode: gcCode,
+                                name: name
+                            }
+                        };
+                        
+                        // Ajouter le composant au parent ou à la racine
+                        if (containerId) {
+                            const container = mainLayout.root.getItemsById(containerId)[0];
+                            if (container && container.parent) {
+                                container.parent.addChild(newItemConfig);
+                                return;
+                            }
+                        }
+                        root.contentItems[0].addChild(newItemConfig);
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors du chargement des détails:", error);
+                        alert("Erreur lors du chargement des détails de la géocache");
+                    });
+            }
+        });
+
+        // Enregistrer les composants
         mainLayout.registerComponent('welcome', function(container, state) {
             const welcomeHtml = `
                 <div class="p-8 max-w-4xl mx-auto">
@@ -149,6 +204,15 @@ function initializeLayout() {
                 </div>
             `;
             container.getElement().html(welcomeHtml);
+        });
+
+        
+        // Enregistrer le composant Analyse
+        mainLayout.registerComponent('GeocacheAnalysis', function(container, state) {
+            container.getElement().load('/geocache-analysis', {
+                geocache_id: state.geocacheId,
+                gc_code: state.gcCode
+            });
         });
 
         // Enregistrer le composant Alphabets
@@ -529,343 +593,11 @@ function initializeLayout() {
                 });
         });
 
-        function initializeTools(canvas) {
-            // État des outils
-            let currentTool = null;
-            let isDrawing = false;
-            let startX = 0;
-            startY = 0;
-            let activeShape = null;
-
-            const toolState = {
-                brush: {
-                    color: '#000000',
-                    size: 5
-                },
-                shape: {
-                    color: '#000000',
-                    border: 2,
-                    fill: false,
-                    fillColor: '#000000'
-                }
-            };
-
-            // Gestion des outils
-            const tools = document.querySelectorAll('[data-tool]');
-            const brushControls = document.querySelector('.brush-controls');
-            const shapeControls = document.querySelector('.shape-controls');
-            
-            // Contrôles du pinceau
-            const brushColor = document.querySelector('#brush-color');
-            const brushSize = document.querySelector('#brush-size');
-            const brushSizeValue = document.querySelector('#brush-size-value');
-
-            // Contrôles des formes
-            const shapeColor = document.querySelector('#shape-color');
-            const shapeBorder = document.querySelector('#shape-border');
-            const shapeBorderValue = document.querySelector('#shape-border-value');
-            const shapeFill = document.querySelector('#shape-fill');
-            const shapeFillColor = document.querySelector('#shape-fill-color');
-            const shapeFillColorContainer = document.querySelector('.shape-fill-color');
-
-            // Initialiser les contrôles
-            if (brushColor) brushColor.value = toolState.brush.color;
-            if (brushSize) brushSize.value = toolState.brush.size;
-            if (brushSizeValue) brushSizeValue.textContent = `${toolState.brush.size}px`;
-            if (shapeColor) shapeColor.value = toolState.shape.color;
-            if (shapeBorder) shapeBorder.value = toolState.shape.border;
-            if (shapeBorderValue) shapeBorderValue.textContent = `${toolState.shape.border}px`;
-            if (shapeFillColor) shapeFillColor.value = toolState.shape.fillColor;
-
-            // Gérer les contrôles des formes
-            shapeColor?.addEventListener('change', (e) => {
-                toolState.shape.color = e.target.value;
-                if (activeShape) {
-                    activeShape.set('stroke', e.target.value);
-                    canvas.renderAll();
-                }
-            });
-
-            shapeBorder?.addEventListener('input', (e) => {
-                const size = parseInt(e.target.value);
-                toolState.shape.border = size;
-                shapeBorderValue.textContent = `${size}px`;
-                if (activeShape) {
-                    activeShape.set('strokeWidth', size);
-                    canvas.renderAll();
-                }
-            });
-
-            shapeFill?.addEventListener('change', (e) => {
-                toolState.shape.fill = e.target.checked;
-                shapeFillColorContainer?.classList.toggle('hidden', !e.target.checked);
-                if (activeShape) {
-                    activeShape.set('fill', e.target.checked ? toolState.shape.fillColor : 'transparent');
-                    canvas.renderAll();
-                }
-            });
-
-            shapeFillColor?.addEventListener('change', (e) => {
-                toolState.shape.fillColor = e.target.value;
-                if (activeShape && toolState.shape.fill) {
-                    activeShape.set('fill', e.target.value);
-                    canvas.renderAll();
-                }
-            });
-
-            // Gérer les changements de couleur du pinceau
-            brushColor?.addEventListener('change', (e) => {
-                toolState.brush.color = e.target.value;
-                if (currentTool === 'brush') {
-                    canvas.freeDrawingBrush.color = e.target.value;
-                }
-            });
-
-            // Gérer les changements de taille du pinceau
-            brushSize?.addEventListener('input', (e) => {
-                const size = parseInt(e.target.value);
-                toolState.brush.size = size;
-                brushSizeValue.textContent = `${size}px`;
-                if (currentTool === 'brush') {
-                    canvas.freeDrawingBrush.width = size;
-                }
-            });
-
-            // Désactiver la sélection par défaut
-            canvas.selection = false;
-
-            // Gérer le dessin des formes
-            canvas.on('mouse:down', (o) => {
-                if (currentTool === 'rect' || currentTool === 'circle') {
-                    isDrawing = true;
-                    const pointer = canvas.getPointer(o.e);
-                    startX = pointer.x;
-                    startY = pointer.y;
-
-                    // Désactiver la sélection pendant le dessin
-                    canvas.selection = false;
-                    canvas.discardActiveObject();
-                    canvas.renderAll();
-
-                    const shapeOptions = {
-                        left: startX,
-                        top: startY,
-                        stroke: toolState.shape.color,
-                        strokeWidth: toolState.shape.border,
-                        fill: toolState.shape.fill ? toolState.shape.fillColor : 'transparent',
-                        width: 0,
-                        height: 0,
-                        selectable: true,
-                        evented: true
-                    };
-
-                    if (currentTool === 'rect') {
-                        activeShape = new fabric.Rect(shapeOptions);
-                    } else if (currentTool === 'circle') {
-                        activeShape = new fabric.Circle({
-                            ...shapeOptions,
-                            radius: 0
-                        });
-                    }
-
-                    if (activeShape) {
-                        canvas.add(activeShape);
-                        canvas.setActiveObject(activeShape);
-                    }
-                }
-            });
-
-            canvas.on('mouse:move', (o) => {
-                if (!isDrawing) return;
-
-                const pointer = canvas.getPointer(o.e);
-                if (currentTool === 'rect' && activeShape) {
-                    const width = Math.abs(pointer.x - startX);
-                    const height = Math.abs(pointer.y - startY);
-                    activeShape.set({
-                        width: width,
-                        height: height,
-                        left: Math.min(startX, pointer.x),
-                        top: Math.min(startY, pointer.y)
-                    });
-                } else if (currentTool === 'circle' && activeShape) {
-                    const radius = Math.sqrt(
-                        Math.pow(pointer.x - startX, 2) +
-                        Math.pow(pointer.y - startY, 2)
-                    ) / 2;
-                    const center = {
-                        x: (startX + pointer.x) / 2,
-                        y: (startY + pointer.y) / 2
-                    };
-                    activeShape.set({
-                        radius: radius,
-                        left: center.x - radius,
-                        top: center.y - radius
-                    });
-                }
-                canvas.renderAll();
-            });
-
-            canvas.on('mouse:up', () => {
-                isDrawing = false;
-                if (activeShape) {
-                    activeShape.setCoords();
-                    canvas.setActiveObject(activeShape);
-                }
-                activeShape = null;
-                // Réactiver la sélection après le dessin
-                canvas.selection = true;
-                canvas.renderAll();
-            });
-
-            // Gérer la sélection des outils
-            tools.forEach(tool => {
-                tool.addEventListener('click', () => {
-                    const toolName = tool.dataset.tool;
-                    
-                    // Désactiver l'outil précédent
-                    if (currentTool) {
-                        tools.forEach(t => t.classList.remove('active'));
-                        canvas.isDrawingMode = false;
-                        brushControls?.classList.add('hidden');
-                        shapeControls?.classList.add('hidden');
-                    }
-
-                    // Activer le nouvel outil
-                    if (toolName === currentTool) {
-                        currentTool = null;
-                    } else {
-                        currentTool = toolName;
-                        tool.classList.add('active');
-
-                        switch (toolName) {
-                            case 'select':
-                                canvas.isDrawingMode = false;
-                                canvas.selection = true;
-                                break;
-                            case 'brush':
-                                canvas.isDrawingMode = true;
-                                canvas.freeDrawingBrush.color = toolState.brush.color;
-                                canvas.freeDrawingBrush.width = toolState.brush.size;
-                                brushControls?.classList.remove('hidden');
-                                break;
-                            case 'eraser':
-                                canvas.isDrawingMode = true;
-                                canvas.freeDrawingBrush.color = '#2D3748'; // bg-gray-700
-                                canvas.freeDrawingBrush.width = 20;
-                                break;
-                            case 'rect':
-                            case 'circle':
-                                canvas.isDrawingMode = false;
-                                canvas.selection = false;
-                                shapeControls?.classList.remove('hidden');
-                                break;
-                        }
-                    }
-                });
-            });
-        }
-
-        // Fonction pour ouvrir l'éditeur d'image
-        window.exposeOpenImageEditor = function(imageId, imageName) {
-            console.log('=== DEBUG: Exposition de openImageEditor appelée ===', { imageId, imageName });
-            
-            try {
-                // Trouver le conteneur principal (row)
-                const rootContentItem = mainLayout.root.contentItems[0];
-                
-                // Configuration du composant
-                const componentConfig = {
-                    type: 'component',
-                    componentName: 'image-editor',
-                    componentState: { 
-                        imageId: imageId,
-                        imageName: imageName
-                    },
-                    title: `Éditeur - ${imageName || `Image ${imageId}`}`,
-                    id: `image-editor-${imageId}`
-                };
-
-                // Si c'est un stack, ajouter directement
-                if (rootContentItem.isStack) {
-                    rootContentItem.addChild(componentConfig);
-                } else {
-                    // Sinon, trouver ou créer un stack
-                    let stack = rootContentItem.contentItems.find(item => item.isStack);
-                    if (!stack) {
-                        stack = mainLayout.createContentItem({
-                            type: 'stack',
-                            content: []
-                        });
-                        rootContentItem.addChild(stack);
-                    }
-                    stack.addChild(componentConfig);
-                }
-
-                console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
-            } catch (error) {
-                console.error('=== DEBUG: Erreur lors de l\'ajout du composant ===', error);
-            }
-        };
-
-        // Fonction pour ouvrir les détails d'une géocache
-        window.openGeocacheDetails = function(geocacheId, gcCode, name) {
-            const componentId = `geocache-details-${geocacheId}`;
-            
-            // Vérifier si le composant existe déjà
-            let existingComponent = null;
-            mainLayout.root.contentItems.forEach(item => {
-                item.contentItems.forEach(subItem => {
-                    if (subItem.config.id === componentId) {
-                        existingComponent = subItem;
-                    }
-                });
-            });
-
-            if (existingComponent) {
-                existingComponent.parent.setActiveContentItem(existingComponent);
-                return;
-            }
-
-            const componentConfig = {
-                type: 'component',
-                componentName: 'geocache-details',
-                title: `${gcCode} - ${name}`,
-                id: componentId,
-                componentState: {
-                    geocacheId: geocacheId,
-                    gcCode: gcCode,
-                    name: name
-                }
-            };
-
-            if (mainLayout.root.contentItems[0].type === 'row') {
-                mainLayout.root.contentItems[0].addChild(componentConfig);
-            } else {
-                mainLayout.root.contentItems[0].addChild({
-                    type: 'row',
-                    content: [componentConfig]
-                });
-            }
-        };
-
-        // Exposer l'instance Golden Layout globalement
-        window.goldenlayout = mainLayout;
-
-        // Écouter l'événement openGeocacheDetails depuis les iframes
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.type === 'openGeocacheDetails') {
-                const geocacheId = event.data.geocacheId;
-                const gcCode = event.data.gcCode;
-                const name = event.data.name;
-                console.log("Réception de l'événement openGeocacheDetails", { geocacheId, gcCode, name });
-                
-                // Utiliser la fonction openGeocacheDetails
-                window.openGeocacheDetails(geocacheId, gcCode, name);
-            }
+        // Enregistrer le composant Plugin
+        mainLayout.registerComponent('plugin', function(container, state) {
+            container.getElement().load(`/api/plugins/${state.pluginName}/interface`);
         });
 
-        // Initialiser le layout
         mainLayout.init();
 
         // Ajuster la taille lors du redimensionnement de la fenêtre
@@ -899,6 +631,41 @@ function initializeLayout() {
         console.error('Erreur lors de l\'initialisation du layout:', error);
     }
 }
+
+// Fonction pour ouvrir un onglet de plugin
+window.openPluginTab = function(pluginName, title) {
+    try {
+        const componentState = {
+            pluginName: pluginName
+        };
+        
+        // Chercher si un onglet avec ce plugin existe déjà
+        let existingComponent = null;
+        mainLayout.root.contentItems.forEach(function(item) {
+            item.contentItems.forEach(function(subItem) {
+                if (subItem.config.componentName === 'plugin' && 
+                    subItem.config.componentState.pluginName === pluginName) {
+                    existingComponent = subItem;
+                }
+            });
+        });
+
+        if (existingComponent) {
+            // Si l'onglet existe, le mettre en focus
+            existingComponent.parent.setActiveContentItem(existingComponent);
+        } else {
+            // Sinon, créer un nouvel onglet
+            mainLayout.root.contentItems[0].addChild({
+                type: 'component',
+                componentName: 'plugin',
+                title: title,
+                componentState: componentState
+            });
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'ouverture du plugin:', error);
+    }
+};
 
 window.openGeocachesTab = function(zoneId, zoneName) {
     const componentId = `geocaches-${zoneId}`;

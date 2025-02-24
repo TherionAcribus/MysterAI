@@ -77,7 +77,20 @@
 
         <!-- Description -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h2 class="text-lg font-semibold text-gray-100 mb-4">Description</h2>
+            <h2 class="text-lg font-semibold text-gray-100 mb-4 flex justify-between items-center">
+                <span>Description</span>
+                <button 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
+                    data-action="click->geocache-coordinates#openAnalysis"
+                    data-geocache-coordinates-target="analyzeButton"
+                    data-geocache-id="{{ geocache.id }}"
+                    data-gc-code="{{ geocache.gc_code }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.96-.421-2.632-1.102l-.547-.547z" />
+                    </svg>
+                    <span>Analyser</span>
+                </button>
+            </h2>
             <div class="prose prose-invert max-w-none">
                 {{ geocache.description|safe }}
             </div>
@@ -152,6 +165,20 @@
             <div class="text-gray-300">{{ geocache.logs_count }} logs enregistrés</div>
         </div>
         {% endif %}
+
+        <div class="flex justify-end mt-6">
+            <button
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+                data-action="click->geocache-coordinates#openAnalysis"
+                data-geocache-id="{{ geocache.id }}"
+                data-gc-code="{{ geocache.gc_code }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                </svg>
+                Analyser
+            </button>
+        </div>
 
     </div>
 </div>

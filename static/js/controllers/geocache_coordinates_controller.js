@@ -165,6 +165,15 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
     }
 
     coordinatesUpdated() {
-        console.log("Coordinates updated event received")
+        console.log("Coordinates updated event received");
+    }
+
+    openAnalysis(event) {
+        const button = event.currentTarget;
+        const geocacheId = button.dataset.geocacheId;
+        const gcCode = button.dataset.gcCode;
+
+        // Utiliser la nouvelle fonction openPluginTab
+        window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`);
     }
 }

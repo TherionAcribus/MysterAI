@@ -109,17 +109,33 @@
 function executePlugin(mode) {
     const form = document.getElementById('plugin-form');
     const formData = new FormData(form);
-    formData.append('mode', mode);
+    
+    // Convertir FormData en objet JSON
+    const jsonData = {};
+    formData.forEach((value, key) => {
+        jsonData[key] = value;
+    });
+    jsonData.mode = mode;
     
     // Afficher l'indicateur de chargement
     document.getElementById('loading-indicator').classList.remove('hidden');
     
-    // Faire l'appel AJAX
+    // Faire l'appel AJAX avec le bon Content-Type
     fetch('/api/plugins/{{ plugin.name }}/execute', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jsonData)
     })
-    .then(response => response.text())
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(text || response.statusText);
+            });
+        }
+        return response.text();
+    })
     .then(html => {
         document.getElementById('plugin-output').innerHTML = html;
     })

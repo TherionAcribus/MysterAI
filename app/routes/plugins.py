@@ -186,25 +186,67 @@ def execute_plugin(plugin_name):
         if not plugin:
             return jsonify({'error': 'Plugin non trouvé'}), 404
 
-        # Récupérer les paramètres du formulaire
-        inputs = {}
-        for key, value in request.form.items():
-            if key != 'mode':  # Exclure le mode (encode/decode/bruteforce)
-                inputs[key] = value
+        # Récupérer les inputs JSON
+        inputs = request.get_json()
+        if not inputs:
+            return jsonify({'error': 'Aucune donnée JSON reçue'}), 400
 
-        # Récupérer le mode d'exécution
-        mode = request.form.get('mode', 'decode')
-        inputs['mode'] = mode
+        print("Executing plugin", plugin_name, "with inputs:", inputs)
+
+        # Charger les métadonnées du plugin pour la conversion des types
+        plugin_json_path = os.path.join(plugin.path, 'plugin.json')
+        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+            input_types = metadata.get('input_types', {})
+
+        # Convertir les types selon la configuration du plugin.json
+        converted_inputs = {}
+        for key, value in inputs.items():
+            if key in input_types:
+                type_info = input_types[key]
+                if type_info['type'] == 'number':
+                    converted_inputs[key] = float(value)
+                elif type_info['type'] == 'select':
+                    converted_inputs[key] = str(value)
+                else:
+                    converted_inputs[key] = value
+            else:
+                converted_inputs[key] = value
 
         # Exécuter le plugin via le plugin manager
         from app import get_plugin_manager
         plugin_manager = get_plugin_manager()
-        result = plugin_manager.execute_plugin(plugin.name, inputs)
-
-        # Renvoyer les résultats sous forme de HTML
-        return render_template('plugin_output.html', 
-                            result=result,
-                            output_types=json.loads(plugin.metadata_json)['output_types'])
+        
+        try:
+            result = plugin_manager.execute_plugin(plugin_name, converted_inputs)
+            
+            # Formater le résultat en HTML
+            output_html = '<div class="bg-gray-700 p-4 rounded-lg">'
+            
+            if isinstance(result, dict):
+                for key, value in result.items():
+                    output_html += f'<div class="mb-2"><span class="font-semibold text-blue-400">{key}:</span> <span class="text-gray-200">{value}</span></div>'
+            else:
+                output_html += f'<div class="text-gray-200">{result}</div>'
+                
+            output_html += '</div>'
+            
+            return output_html
+            
+        except Exception as e:
+            error_html = f'<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur lors de l\'exécution du plugin: {str(e)}</div>'
+            return error_html, 500
+            
     except Exception as e:
         print(f"Error executing plugin: {str(e)}")
-        return f'<div class="text-red-500">Erreur lors de l\'exécution du plugin: {str(e)}</div>', 500
+        return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/geocache-analysis', methods=['GET', 'POST'])
+def geocache_analysis():
+    """Renvoie la page d'analyse d'une géocache."""
+    print("geocache_analysis", request.values)
+    geocache_id = request.values.get('geocache_id')  # Works for both GET and POST
+    gc_code = request.values.get('gc_code')
+    return render_template('geocache_analysis.html',
+                         geocache_id=geocache_id,
+                         gc_code=gc_code)
