@@ -29,7 +29,7 @@
         <!-- Formulaire des inputs -->
         {% if not plugin.params.get('geocacheId') %}
         <form class="bg-gray-800 rounded-lg p-6 mb-6"
-              id="plugin-form">
+              id="plugin-form-{{ plugin.params.get('geocacheId', 'default') }}">
             
             {% for input_name, input_config in plugin.input_types.items() %}
                 <div class="mb-4">
@@ -57,13 +57,13 @@
             </div>
         </form>
         {% else %}
-        <form id="plugin-form" class="hidden">
+        <form id="plugin-form-{{ plugin.params.get('geocacheId') }}" class="hidden">
             <input type="hidden" name="geocache_id" value="{{ plugin.params.get('geocacheId') }}">
         </form>
         {% endif %}
 
         <!-- Zone de résultat -->
-        <div id="plugin-output" class="bg-gray-800 rounded-lg p-6">
+        <div id="plugin-output-{{ plugin.params.get('geocacheId', 'default') }}" class="bg-gray-800 rounded-lg p-6">
             <div class="text-gray-400">Analyse en cours...</div>
         </div>
     </div>
@@ -71,7 +71,8 @@
 
 <script>
     function executePlugin(mode = 'decode') {
-        const form = document.getElementById('plugin-form');
+        const geocacheId = '{{ plugin.params.get('geocacheId', 'default') }}';
+        const form = document.getElementById('plugin-form-' + geocacheId);
         const formData = new FormData(form);
         const data = {};
         
@@ -84,7 +85,7 @@
         data.mode = mode;
         
         // Montrer le chargement
-        const output = document.getElementById('plugin-output');
+        const output = document.getElementById('plugin-output-' + geocacheId);
         output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
         
         // Exécuter le plugin
@@ -102,11 +103,17 @@
             return response.text();
         })
         .then(html => {
-            output.innerHTML = html;
+            const output = document.getElementById('plugin-output-' + geocacheId);
+            if (output) {
+                output.innerHTML = html;
+            }
         })
         .catch(error => {
             console.error('Error:', error);
-            output.innerHTML = `<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur: ${error.message}</div>`;
+            const output = document.getElementById('plugin-output-' + geocacheId);
+            if (output) {
+                output.innerHTML = `<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur: ${error.message}</div>`;
+            }
         });
     }
 
