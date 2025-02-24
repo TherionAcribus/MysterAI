@@ -279,7 +279,7 @@ function initializeLayout() {
             console.log('=== DEBUG: Initialisation du composant image-editor ===', state);
             
             // Charger le template de l'éditeur d'image
-            fetch(`http://127.0.0.1:3000/geocaches/image-editor/${state.imageId}`)
+            fetch(`/geocaches/image-editor/${state.imageId}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -290,6 +290,172 @@ function initializeLayout() {
                     // Injecter le HTML dans le conteneur
                     container.getElement().html(html);
                     console.log('=== DEBUG: HTML injecté dans le conteneur ===');
+                    
+                    // Fonction d'initialisation des outils
+                    function initializeTools(canvas) {
+                        console.log('=== DEBUG: Initialisation des outils ===');
+                        
+                        // État des outils
+                        let currentTool = null;
+                        let isDrawing = false;
+                        let startX = 0;
+                        let startY = 0;
+                        let activeShape = null;
+
+                        const toolState = {
+                            brush: {
+                                color: '#000000',
+                                size: 5
+                            },
+                            shape: {
+                                color: '#000000',
+                                border: 2,
+                                fill: false,
+                                fillColor: '#000000'
+                            }
+                        };
+
+                        // Sélecteurs des éléments DOM
+                        const tools = container.getElement().find('[data-tool]');
+                        const brushControls = container.getElement().find('#brushControls');
+                        const shapeControls = container.getElement().find('#shapeControls');
+                        
+                        // Contrôles du pinceau
+                        const brushColor = container.getElement().find('#brushColor');
+                        const brushSize = container.getElement().find('#brushSize');
+
+                        // Contrôles des formes
+                        const shapeStrokeColor = container.getElement().find('#shapeStrokeColor');
+                        const shapeFillColor = container.getElement().find('#shapeFillColor');
+                        const shapeStrokeWidth = container.getElement().find('#shapeStrokeWidth');
+
+                        // Initialiser les valeurs par défaut
+                        brushColor.val(toolState.brush.color);
+                        brushSize.val(toolState.brush.size);
+                        shapeStrokeColor.val(toolState.shape.color);
+                        shapeFillColor.val(toolState.shape.fillColor);
+                        shapeStrokeWidth.val(toolState.shape.border);
+
+                        // Gestionnaire de clic sur les outils
+                        tools.on('click', function() {
+                            const tool = $(this).data('tool');
+                            
+                            // Retirer la classe active de tous les outils
+                            tools.removeClass('active');
+                            // Ajouter la classe active à l'outil sélectionné
+                            $(this).addClass('active');
+                            
+                            // Cacher tous les contrôles
+                            brushControls.hide();
+                            shapeControls.hide();
+                            
+                            // Afficher les contrôles appropriés
+                            if (tool === 'brush') {
+                                brushControls.show();
+                            } else if (tool === 'rectangle' || tool === 'circle') {
+                                shapeControls.show();
+                            }
+                            
+                            currentTool = tool;
+                            canvas.isDrawingMode = (tool === 'brush');
+                            
+                            if (canvas.isDrawingMode) {
+                                canvas.freeDrawingBrush.color = toolState.brush.color;
+                                canvas.freeDrawingBrush.width = parseInt(toolState.brush.size);
+                            }
+                        });
+
+                        // Gestionnaires d'événements pour les contrôles
+                        brushColor.on('input', function() {
+                            toolState.brush.color = this.value;
+                            if (canvas.isDrawingMode) {
+                                canvas.freeDrawingBrush.color = this.value;
+                            }
+                        });
+
+                        brushSize.on('input', function() {
+                            toolState.brush.size = parseInt(this.value);
+                            if (canvas.isDrawingMode) {
+                                canvas.freeDrawingBrush.width = parseInt(this.value);
+                            }
+                        });
+
+                        // Gestionnaires d'événements du canvas
+                        canvas.on('mouse:down', function(options) {
+                            if (!currentTool || currentTool === 'brush') return;
+                            
+                            isDrawing = true;
+                            const pointer = canvas.getPointer(options.e);
+                            startX = pointer.x;
+                            startY = pointer.y;
+
+                            if (currentTool === 'rectangle') {
+                                activeShape = new fabric.Rect({
+                                    left: startX,
+                                    top: startY,
+                                    width: 0,
+                                    height: 0,
+                                    stroke: toolState.shape.color,
+                                    strokeWidth: toolState.shape.border,
+                                    fill: toolState.shape.fill ? toolState.shape.fillColor : 'transparent'
+                                });
+                            } else if (currentTool === 'circle') {
+                                activeShape = new fabric.Circle({
+                                    left: startX,
+                                    top: startY,
+                                    radius: 0,
+                                    stroke: toolState.shape.color,
+                                    strokeWidth: toolState.shape.border,
+                                    fill: toolState.shape.fill ? toolState.shape.fillColor : 'transparent'
+                                });
+                            }
+
+                            if (activeShape) {
+                                canvas.add(activeShape);
+                            }
+                        });
+
+                        canvas.on('mouse:move', function(options) {
+                            if (!isDrawing || !activeShape) return;
+
+                            const pointer = canvas.getPointer(options.e);
+                            if (currentTool === 'rectangle') {
+                                const width = pointer.x - startX;
+                                const height = pointer.y - startY;
+                                
+                                activeShape.set({
+                                    width: Math.abs(width),
+                                    height: Math.abs(height),
+                                    left: width > 0 ? startX : pointer.x,
+                                    top: height > 0 ? startY : pointer.y
+                                });
+                            } else if (currentTool === 'circle') {
+                                const radius = Math.sqrt(
+                                    Math.pow(pointer.x - startX, 2) + 
+                                    Math.pow(pointer.y - startY, 2)
+                                ) / 2;
+                                
+                                const centerX = (startX + pointer.x) / 2;
+                                const centerY = (startY + pointer.y) / 2;
+                                
+                                activeShape.set({
+                                    radius: radius,
+                                    left: centerX - radius,
+                                    top: centerY - radius
+                                });
+                            }
+
+                            canvas.renderAll();
+                        });
+
+                        canvas.on('mouse:up', function() {
+                            isDrawing = false;
+                            activeShape = null;
+                        });
+
+                        // Sélectionner l'outil pinceau par défaut
+                        tools.filter('[data-tool="brush"]').click();
+                    }
                     
                     // Attendre que le DOM et Fabric.js soient chargés
                     const waitForFabric = () => {
@@ -320,80 +486,56 @@ function initializeLayout() {
                         console.log('=== DEBUG: Canvas trouvé ===', canvas);
                         console.log('=== DEBUG: URL de l\'image ===', imageUrl);
 
-                        // Vérifier que l'URL est accessible
-                        fetch(imageUrl)
-                            .then(response => {
-                                console.log('=== DEBUG: Réponse de l\'image ===', response.status, response.statusText);
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
-                                }
-                                return response.blob();
-                            })
-                            .then(() => {
-                                // L'image est accessible, on peut l'utiliser avec Fabric
-                                const containerWidth = container.width;
-                                const containerHeight = container.height;
-                                console.log('=== DEBUG: Dimensions du conteneur ===', containerWidth, containerHeight);
+                        // Créer le canvas avec les dimensions du conteneur
+                        const fabricCanvas = new fabric.Canvas('canvas', {
+                            width: container.width,
+                            height: container.height,
+                            backgroundColor: '#2D3748' // bg-gray-700
+                        });
 
-                                // Créer le canvas avec les dimensions du conteneur
-                                const fabricCanvas = new fabric.Canvas('canvas', {
-                                    width: containerWidth,
-                                    height: containerHeight,
-                                    backgroundColor: '#2D3748' // bg-gray-700
-                                });
-
-                                // Charger l'image
-                                fabric.Image.fromURL(imageUrl, function(img) {
-                                    if (!img) {
-                                        console.error('Erreur lors du chargement de l\'image');
-                                        return;
-                                    }
-                                    console.log('=== DEBUG: Image Fabric.js créée ===', img.width, img.height);
-                                    
-                                    // Calculer le ratio pour ajuster l'image au canvas
-                                    const scaleX = containerWidth / img.width;
-                                    const scaleY = containerHeight / img.height;
-                                    const scale = Math.min(scaleX, scaleY);
-                                    
-                                    // Appliquer l'échelle et centrer l'image
-                                    img.set({
-                                        scaleX: scale,
-                                        scaleY: scale,
-                                        left: (containerWidth - img.width * scale) / 2,
-                                        top: (containerHeight - img.height * scale) / 2,
-                                        selectable: false,
-                                        evented: false
-                                    });
-
-                                    // Ajouter l'image au canvas
-                                    fabricCanvas.add(img);
-                                    fabricCanvas.renderAll();
-                                    
-                                    console.log('=== DEBUG: Image chargée avec succès ===');
-                                    console.log('=== DEBUG: Dimensions finales ===', {
-                                        canvas: { width: containerWidth, height: containerHeight },
-                                        image: { 
-                                            width: img.width * scale, 
-                                            height: img.height * scale,
-                                            scale: scale,
-                                            position: { left: img.left, top: img.top }
-                                        }
-                                    });
-
-                                    // Initialiser les outils
-                                    initializeTools(fabricCanvas);
-                                }, {
-                                    crossOrigin: 'anonymous'
-                                });
-                            })
-                            .catch(error => {
-                                console.error('=== DEBUG: Erreur lors de la vérification de l\'image ===', error);
-                                container.getElement().html(`
-                                    <div class="p-4 text-red-500">
-                                        Erreur lors du chargement de l'image: ${error.message}
-                                    </div>
-                                `);
+                        // Charger l'image
+                        fabric.Image.fromURL(imageUrl, function(img) {
+                            if (!img) {
+                                console.error('=== DEBUG: Erreur lors du chargement de l\'image ===');
+                                return;
+                            }
+                            console.log('=== DEBUG: Image Fabric.js créée ===', img.width, img.height);
+                            
+                            // Calculer le ratio pour ajuster l'image au canvas
+                            const scaleX = container.width / img.width;
+                            const scaleY = container.height / img.height;
+                            const scale = Math.min(scaleX, scaleY);
+                            
+                            // Appliquer l'échelle et centrer l'image
+                            img.set({
+                                scaleX: scale,
+                                scaleY: scale,
+                                left: (container.width - img.width * scale) / 2,
+                                top: (container.height - img.height * scale) / 2,
+                                selectable: false,
+                                evented: false
                             });
+
+                            // Ajouter l'image au canvas
+                            fabricCanvas.add(img);
+                            fabricCanvas.renderAll();
+                            
+                            console.log('=== DEBUG: Image chargée avec succès ===');
+                            console.log('=== DEBUG: Dimensions finales ===', {
+                                canvas: { width: container.width, height: container.height },
+                                image: { 
+                                    width: img.width * scale, 
+                                    height: img.height * scale,
+                                    scale: scale,
+                                    position: { left: img.left, top: img.top }
+                                }
+                            });
+
+                            // Initialiser les outils une fois l'image chargée
+                            initializeTools(fabricCanvas);
+                        }, {
+                            crossOrigin: 'anonymous'
+                        });
                     };
 
                     // Démarrer l'initialisation

@@ -14,7 +14,7 @@ import requests
 import secrets
 import base64
 import time
-from flask import make_response
+from flask import make_response, send_from_directory
 
 logger = setup_logger()
 
@@ -543,8 +543,8 @@ def save_modified_image():
             return jsonify({'error': 'Parent image not found'}), 404
 
         # Créer le dossier de la geocache si nécessaire
-        geocache_folder = os.path.join('uploads', parent_image.geocache.gc_code)
-        os.makedirs(os.path.join('static', geocache_folder), exist_ok=True)
+        geocache_folder = os.path.join('geocaches_images', parent_image.geocache.gc_code)
+        os.makedirs(geocache_folder, exist_ok=True)
 
         # Générer un nom de fichier unique
         filename = f"modified_{int(time.time())}_{secure_filename(os.path.basename(parent_image.filename))}"
@@ -554,7 +554,7 @@ def save_modified_image():
         image_data = image_data.split(',')[1]  # Enlever le préfixe data:image/...
         image_bytes = base64.b64decode(image_data)
         
-        with open(os.path.join('static', file_path), 'wb') as f:
+        with open(file_path, 'wb') as f:
             f.write(image_bytes)
 
         # Créer une nouvelle entrée dans la base de données
@@ -701,3 +701,21 @@ def get_zone_map(zone_id):
     zone = Zone.query.get_or_404(zone_id)
     logger.debug(f"=== DEBUG: Zone trouvée: {zone.id} - {zone.name} ===")
     return render_template('zone_map.html', zone=zone)
+
+
+@geocaches_bp.route('/geocaches/image-editor/<int:image_id>')
+def get_image_editor(image_id):
+    """Renvoie le template de l'éditeur d'image."""
+    # Récupérer l'image depuis la base de données
+    image = GeocacheImage.query.get_or_404(image_id)
+    
+    # Utiliser la même URL que celle générée par la propriété url de GeocacheImage
+    image_url = url_for('geocaches.serve_image', filename=f'{image.geocache.gc_code}/{image.filename}')
+    
+    return render_template('image_editor.html', image_url=image_url)
+
+
+@geocaches_bp.route('/geocaches_images/<path:filename>')
+def serve_image(filename):
+    """Sert une image depuis le dossier geocaches_images."""
+    return send_from_directory('../geocaches_images', filename, as_attachment=False)

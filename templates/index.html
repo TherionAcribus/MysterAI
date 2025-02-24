@@ -16,6 +16,8 @@
     <!-- Third-party Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
     <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
+    <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <!-- Initialize Stimulus -->
     <script>
@@ -34,6 +36,7 @@
     </script>
     
     <!-- Application Scripts -->
+    <script src="/js/layout_initialize.js"></script>
     <script src="/js/contextual_menu.js"></script>
     <script src="/js/controllers/map_controller.js"></script>
     <script src="/js/controllers/zone_map_controller.js"></script>
@@ -44,51 +47,31 @@
         window.openImageEditor = function(imageId, imageName) {
             console.log('=== DEBUG: Tentative d\'ouverture de l\'éditeur d\'image ===');
             console.log('Params:', { imageId, imageName });
-            console.log('Layout actuel:', mainLayout);
-            console.log('Root items:', mainLayout.root.contentItems);
             
             // Vérifier si GoldenLayout est initialisé
-            if (!window.goldenlayout) {
-                console.error('=== DEBUG: GoldenLayout n\'est pas encore initialisé ===');
+            if (!window.mainLayout) {
+                console.log('=== DEBUG: GoldenLayout n\'est pas encore initialisé ===');
                 return;
             }
 
-            try {
-                // Trouver le conteneur principal (row)
-                const rootContentItem = mainLayout.root.contentItems[0];
-                
-                // Configuration du composant
-                const componentConfig = {
-                    type: 'component',
-                    componentName: 'image-editor',
-                    componentState: { 
-                        imageId: imageId,
-                        imageName: imageName
-                    },
-                    title: `Éditeur - ${imageName || `Image ${imageId}`}`,
-                    id: `image-editor-${imageId}`
-                };
-
-                // Si c'est un stack, ajouter directement
-                if (rootContentItem.isStack) {
-                    rootContentItem.addChild(componentConfig);
-                } else {
-                    // Sinon, trouver ou créer un stack
-                    let stack = rootContentItem.contentItems.find(item => item.isStack);
-                    if (!stack) {
-                        stack = mainLayout.createContentItem({
-                            type: 'stack',
-                            content: []
-                        });
-                        rootContentItem.addChild(stack);
-                    }
-                    stack.addChild(componentConfig);
-                }
-
-                console.log('=== DEBUG: Composant éditeur ajouté avec succès ===');
-            } catch (error) {
-                console.error('=== DEBUG: Erreur lors de l\'ajout de l\'éditeur ===', error);
+            const root = window.mainLayout.root;
+            if (!root || !root.contentItems || root.contentItems.length === 0) {
+                console.log('=== DEBUG: Root items non disponibles ===');
+                return;
             }
+
+            // Créer un nouvel onglet pour l'éditeur d'image
+            const newItemConfig = {
+                type: 'component',
+                componentName: 'image-editor',
+                title: `Éditeur - ${imageName}`,
+                componentState: { 
+                    imageId: imageId
+                }
+            };
+
+            // Ajouter le composant au premier élément de contenu
+            root.contentItems[0].addChild(newItemConfig);
         };
 
         // Écouter l'événement open-image-editor depuis le main process
