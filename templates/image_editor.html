@@ -4,7 +4,7 @@
         <div class="flex-1 p-4">
             <div class="w-full h-full flex flex-col">
                 <!-- Barre d'outils -->
-                <div class="bg-gray-800 p-4">
+                <div class="bg-gray-800 p-4 mb-4">
                     <h3 class="text-lg font-semibold mb-4">Outils</h3>
                     
                     <!-- Outils de base -->
@@ -66,87 +66,99 @@
                             <div class="grid grid-cols-2 gap-2">
                                 <div class="flex flex-col">
                                     <label class="text-xs mb-1">Couleur</label>
-                                    <input type="color" id="color-picker" class="w-full h-8">
+                                    <input type="color" id="stroke-color" class="w-full h-8">
                                 </div>
                                 <div class="flex flex-col">
                                     <label class="text-xs mb-1">Taille</label>
-                                    <input type="range" id="size-picker" min="1" max="50" value="5" class="w-full">
+                                    <input type="range" id="brush-size" min="1" max="50" value="5" class="w-full">
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="tool-group">
+                            <h4 class="text-sm font-medium mb-2">Actions</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="clear-canvas" class="tool-btn bg-red-600 hover:bg-red-700">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Effacer</span>
+                                </button>
+                                <button id="save-image" class="tool-btn bg-green-600 hover:bg-green-700">
+                                    <i class="fas fa-save"></i>
+                                    <span>Sauvegarder</span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Conteneur du canvas -->
-                <div class="flex-grow relative bg-gray-700">
-                    <canvas id="canvas" class="absolute inset-0 w-full h-full" data-image-url="{{ image_url }}" data-save-url="{{ save_url }}"></canvas>
+                <div class="canvas-container flex-grow relative bg-gray-800">
+                    <canvas id="editor-canvas" data-image-url="{{ image_url }}"></canvas>
                 </div>
             </div>
         </div>
-
-        <!-- Barre d'état -->
-        <div class="h-8 bg-gray-800 border-t border-gray-700 flex items-center px-4 text-sm">
-            <div class="flex-1">
-                <span id="status">Prêt</span>
-            </div>
-        </div>
     </div>
-
-    <style>
-        /* Styles pour les boutons d'outils */
-        .tool-btn {
-            @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300;
-        }
-        
-        .tool-btn i {
-            @apply text-lg mb-1;
-        }
-        
-        .tool-btn span {
-            @apply text-xs;
-        }
-        
-        .tool-btn.active {
-            @apply bg-blue-600;
-        }
-        
-        /* Styles pour les contrôles de couleur et de taille */
-        input[type="color"] {
-            @apply rounded border border-gray-600 bg-gray-700;
-            -webkit-appearance: none;
-        }
-        
-        input[type="color"]::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-        
-        input[type="color"]::-webkit-color-swatch {
-            border: none;
-        }
-        
-        input[type="range"] {
-            @apply rounded-lg overflow-hidden appearance-none bg-gray-700;
-            height: 32px;
-        }
-        
-        input[type="range"]::-webkit-slider-runnable-track {
-            @apply bg-gray-700;
-            height: 32px;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            @apply appearance-none w-4 h-8 bg-blue-500;
-            border-radius: 3px;
-        }
-        
-        input[type="range"]::-moz-range-track {
-            @apply bg-gray-700;
-            height: 32px;
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-            @apply w-4 h-8 bg-blue-500 border-0;
-            border-radius: 3px;
-        }
-    </style>
 </div>
+
+<!-- Load Fabric.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<!-- Load Font Awesome for icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+<style>
+    /* Styles pour les boutons d'outils */
+    .tool-btn {
+        @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300;
+    }
+    
+    .tool-btn i {
+        @apply text-lg mb-1;
+    }
+    
+    .tool-btn span {
+        @apply text-xs;
+    }
+    
+    .tool-btn.active {
+        @apply bg-blue-600;
+    }
+    
+    /* Styles pour les contrôles de couleur et de taille */
+    input[type="color"] {
+        @apply rounded border border-gray-600 bg-gray-700;
+        -webkit-appearance: none;
+    }
+    
+    input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+    
+    input[type="color"]::-webkit-color-swatch {
+        border: none;
+    }
+    
+    input[type="range"] {
+        @apply rounded-lg overflow-hidden appearance-none bg-gray-700;
+        height: 32px;
+    }
+    
+    input[type="range"]::-webkit-slider-runnable-track {
+        @apply bg-gray-700;
+        height: 32px;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+        @apply appearance-none w-4 h-8 bg-blue-500;
+        border-radius: 3px;
+    }
+    
+    input[type="range"]::-moz-range-track {
+        @apply bg-gray-700;
+        height: 32px;
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+        @apply w-4 h-8 bg-blue-500 border-0;
+        border-radius: 3px;
+    }
+</style>
