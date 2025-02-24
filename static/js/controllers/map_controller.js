@@ -30,42 +30,6 @@
             document.addEventListener('click', () => {
                 this.contextMenu.style.display = 'none';
             });
-
-            // Ajouter la fonction de copie au window pour pouvoir l'appeler depuis le menu
-            window.handleCoordinatesCopy = (event) => {
-                const coords = event.currentTarget.getAttribute('data-coords');
-                navigator.clipboard.writeText(coords).then(() => {
-                    const element = event.currentTarget;
-                    const copyText = element.querySelector('.copy-text');
-                    
-                    if (!copyText) return;
-                    
-                    // Stocker les styles originaux
-                    const originalBgColor = element.style.backgroundColor;
-                    const originalColor = element.style.color;
-                    const originalText = copyText.textContent;
-                    
-                    // Appliquer le feedback visuel
-                    element.style.backgroundColor = '#4CAF50';
-                    element.style.color = 'white';
-                    copyText.textContent = 'Copié !';
-                    
-                    // Attendre avant de cacher le menu
-                    setTimeout(() => {
-                        // Restaurer les styles originaux au cas où le menu est encore visible
-                        element.style.backgroundColor = originalBgColor;
-                        element.style.color = originalColor;
-                        copyText.textContent = originalText;
-                        
-                        // Cacher le menu s'il existe encore
-                        if (this.contextMenu && this.contextMenu.style) {
-                            this.contextMenu.style.display = 'none';
-                        }
-                    }, 500);
-                }).catch(error => {
-                    console.error('Erreur lors de la copie:', error);
-                });
-            };
         }
 
         disconnect() {
@@ -98,7 +62,24 @@
             // Create vector layer for markers
             const vectorLayer = new ol.layer.Vector({
                 source: this.vectorSource,
-                style: (feature) => this.createMarkerStyle(feature)
+                style: (feature) => this.createMarkerStyle(feature),
+                zIndex: 2  // S'assurer que les points sont au-dessus du cercle
+            });
+
+            // Create vector source and layer for the circle
+            this.circleSource = new ol.source.Vector();
+            this.circleLayer = new ol.layer.Vector({
+                source: this.circleSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'rgba(0, 0, 255, 0.8)',
+                        width: 2
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(0, 0, 255, 0.1)'
+                    })
+                }),
+                zIndex: 1  // S'assurer que le cercle est en dessous des points
             });
 
             // Initialize map
@@ -106,8 +87,10 @@
                 target: this.containerTarget,
                 layers: [
                     new ol.layer.Tile({
-                        source: new ol.source.OSM()
+                        source: new ol.source.OSM(),
+                        zIndex: 0  // La carte en arrière-plan
                     }),
+                    this.circleLayer,
                     vectorLayer
                 ],
                 view: new ol.View({
@@ -118,22 +101,17 @@
 
             // Add click handler
             this.map.on('singleclick', (evt) => {
-                console.log("Map clicked at pixel:", evt.pixel);
-                
                 const feature = this.map.forEachFeatureAtPixel(evt.pixel, 
                     (feature) => feature,
                     {
-                        hitTolerance: 5
+                        hitTolerance: 5,
+                        layerFilter: (layer) => layer === vectorLayer // Ne considérer que les points, pas le cercle
                     }
                 );
                 
-                console.log("Feature found:", feature);
-                
                 if (feature) {
-                    const properties = feature.getProperties();
                     const coordinates = feature.getGeometry().getCoordinates();
-                    console.log("Feature properties:", properties);
-                    console.log("Feature coordinates:", coordinates);
+                    const properties = feature.getProperties();
                     this.showPopup(coordinates, properties.title, properties.content);
                 } else {
                     this.hidePopup();
@@ -146,14 +124,14 @@
                 const feature = this.map.forEachFeatureAtPixel(pixel, 
                     (feature) => feature,
                     {
-                        hitTolerance: 5
+                        hitTolerance: 5,
+                        layerFilter: (layer) => layer === vectorLayer // Ne considérer que les points, pas le cercle
                     }
                 );
 
                 if (feature) {
                     evt.preventDefault();
-                    const properties = feature.getProperties();
-                    this.showContextMenu(evt, properties);
+                    this.showContextMenu(evt, feature);
                 }
             });
 
@@ -161,19 +139,20 @@
             this.map.on('pointermove', (evt) => {
                 const pixel = this.map.getEventPixel(evt.originalEvent);
                 const hit = this.map.hasFeatureAtPixel(pixel, {
-                    hitTolerance: 5
+                    hitTolerance: 5,
+                    layerFilter: (layer) => layer === vectorLayer // Ne considérer que les points, pas le cercle
                 });
                 this.map.getViewport().style.cursor = hit ? 'pointer' : '';
             });
 
             // Load geocache coordinates
-            await this.loadGeocacheCoordinates();
+            this.loadGeocacheCoordinates();
         }
 
-        showContextMenu(event, properties) {
-            // Récupérer les coordonnées transformées comme dans showPopup
-            const coordinates = ol.proj.transform(properties.geometry.getCoordinates(), 'EPSG:3857', 'EPSG:4326');
-            const [longitude, latitude] = coordinates;
+        showContextMenu(event, feature) {
+            // Récupérer les coordonnées transformées
+            const coordinates = feature.getGeometry().getCoordinates();
+            const [longitude, latitude] = ol.proj.transform(coordinates, 'EPSG:3857', 'EPSG:4326');
             
             // Formater les coordonnées
             const coords = this.formatCoordinates(latitude, longitude);
@@ -182,6 +161,10 @@
             menuItem.className = 'px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer';
             menuItem.style.cssText = 'color: black; background-color: white;';
             menuItem.setAttribute('data-coords', coords);
+
+            // Vérifier si un cercle existe déjà
+            const hasCircle = this.circleSource.getFeatures().length > 0;
+
             menuItem.innerHTML = `
                 <div class="font-bold text-black copy-text" style="color: black;">
                     Copier les coordonnées
@@ -189,9 +172,15 @@
                 <div class="font-mono text-sm text-black" style="color: black;">
                     ${coords}
                 </div>
+                <hr class="my-2">
+                <div class="text-sm text-black circle-action" style="color: black; cursor: pointer;">
+                    ${hasCircle ? 'Supprimer le cercle de 2 miles' : 'Ajouter un cercle de 2 miles'}
+                </div>
             `;
 
             const copyHandler = (event) => {
+                if (!event.target.closest('.copy-text')) return;
+                
                 const element = event.currentTarget;
                 const coords = element.getAttribute('data-coords');
                 const copyText = element.querySelector('.copy-text');
@@ -226,7 +215,31 @@
                 });
             };
 
+            const circleHandler = (event) => {
+                if (!event.target.closest('.circle-action')) return;
+
+                if (hasCircle) {
+                    this.circleSource.clear();
+                } else {
+                    // Convertir 2 miles en mètres (1 mile = 1609.34 mètres)
+                    const radius = 2 * 1609.34;
+                    
+                    // Créer un cercle en utilisant les coordonnées du point
+                    const circleFeature = new ol.Feature({
+                        geometry: new ol.geom.Circle(
+                            feature.getGeometry().getCoordinates(),
+                            radius
+                        )
+                    });
+                    
+                    this.circleSource.addFeature(circleFeature);
+                }
+                
+                this.contextMenu.style.display = 'none';
+            };
+
             menuItem.addEventListener('click', copyHandler);
+            menuItem.addEventListener('click', circleHandler);
 
             this.contextMenu.innerHTML = '';
             this.contextMenu.appendChild(menuItem);
