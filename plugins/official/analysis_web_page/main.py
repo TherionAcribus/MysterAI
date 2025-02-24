@@ -19,7 +19,7 @@ class AnalysisWebPagePlugin:
             return {"error": "Missing 'geocache_id' in inputs."}
         
         # Récupérer la géocache depuis la base de données
-        from app.models.models import Geocache
+        from app.models.geocache import Geocache
         from app import db
         
         geocache = db.session.query(Geocache).get(geocache_id)

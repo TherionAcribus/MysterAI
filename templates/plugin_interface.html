@@ -27,6 +27,7 @@
         </div>
 
         <!-- Formulaire des inputs -->
+        {% if not plugin.params.get('geocacheId') %}
         <form class="bg-gray-800 rounded-lg p-6 mb-6"
               id="plugin-form">
             
@@ -42,110 +43,75 @@
                                name="{{ input_name }}"
                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                placeholder="{{ input_config.placeholder|default('') }}"
-                               {% if input_config.default %}value="{{ input_config.default }}"{% endif %}>
-
-                    {% elif input_config.type == "select" %}
-                        <select id="{{ input_name }}"
-                                name="{{ input_name }}"
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {% for option in input_config.options %}
-                                <option value="{{ option }}" {% if option == input_config.default %}selected{% endif %}>
-                                    {{ option }}
-                                </option>
-                            {% endfor %}
-                        </select>
-
-                    {% elif input_config.type == "number" %}
-                        <input type="number"
-                               id="{{ input_name }}"
-                               name="{{ input_name }}"
-                               class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               {% if input_config.min is defined %}min="{{ input_config.min }}"{% endif %}
-                               {% if input_config.max is defined %}max="{{ input_config.max }}"{% endif %}
-                               {% if input_config.step is defined %}step="{{ input_config.step }}"{% endif %}
-                               {% if input_config.default %}value="{{ input_config.default }}"{% endif %}>
+                               value="{{ plugin.params.get(input_name, input_config.default|default('')) }}">
                     {% endif %}
                 </div>
             {% endfor %}
 
-            <div class="flex justify-end gap-4 mt-6">
-                {% if plugin.brute_force %}
-                    <button type="button"
-                            onclick="executePlugin('bruteforce')"
-                            class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                        Bruteforce
-                    </button>
-                {% endif %}
-                
-                <button type="button"
-                        onclick="executePlugin('encode')"
-                        class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
-                    Encoder
-                </button>
-                
-                <button type="button"
+            <div class="mt-6 flex justify-end space-x-4">
+                <button type="button" 
                         onclick="executePlugin('decode')"
                         class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     Décoder
                 </button>
             </div>
         </form>
-
-        <!-- Indicateur de chargement -->
-        <div id="loading-indicator" class="hidden">
-            <div class="flex justify-center items-center">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-        </div>
+        {% else %}
+        <form id="plugin-form" class="hidden">
+            <input type="hidden" name="geocache_id" value="{{ plugin.params.get('geocacheId') }}">
+        </form>
+        {% endif %}
 
         <!-- Zone de résultat -->
         <div id="plugin-output" class="bg-gray-800 rounded-lg p-6">
-            <div class="text-gray-400">Les résultats s'afficheront ici...</div>
+            <div class="text-gray-400">Analyse en cours...</div>
         </div>
     </div>
 </div>
 
 <script>
-function executePlugin(mode) {
-    const form = document.getElementById('plugin-form');
-    const formData = new FormData(form);
-    
-    // Convertir FormData en objet JSON
-    const jsonData = {};
-    formData.forEach((value, key) => {
-        jsonData[key] = value;
-    });
-    jsonData.mode = mode;
-    
-    // Afficher l'indicateur de chargement
-    document.getElementById('loading-indicator').classList.remove('hidden');
-    
-    // Faire l'appel AJAX avec le bon Content-Type
-    fetch('/api/plugins/{{ plugin.name }}/execute', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(jsonData)
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.text().then(text => {
-                throw new Error(text || response.statusText);
-            });
+    function executePlugin(mode = 'decode') {
+        const form = document.getElementById('plugin-form');
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Convertir FormData en objet
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
         }
-        return response.text();
-    })
-    .then(html => {
-        document.getElementById('plugin-output').innerHTML = html;
-    })
-    .catch(error => {
-        document.getElementById('plugin-output').innerHTML = 
-            '<div class="text-red-500">Erreur lors de l\'exécution du plugin: ' + error.message + '</div>';
-    })
-    .finally(() => {
-        // Cacher l'indicateur de chargement
-        document.getElementById('loading-indicator').classList.add('hidden');
-    });
-}
+        
+        // Ajouter le mode
+        data.mode = mode;
+        
+        // Montrer le chargement
+        const output = document.getElementById('plugin-output');
+        output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
+        
+        // Exécuter le plugin
+        fetch(`/api/plugins/{{ plugin.name }}/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text();
+        })
+        .then(html => {
+            output.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            output.innerHTML = `<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur: ${error.message}</div>`;
+        });
+    }
+
+    // Si on a un ID de géocache, exécuter automatiquement
+    {% if plugin.params.get('geocacheId') %}
+        executePlugin();
+    {% endif %}
 </script>

@@ -595,7 +595,10 @@ function initializeLayout() {
 
         // Enregistrer le composant Plugin
         mainLayout.registerComponent('plugin', function(container, state) {
-            container.getElement().load(`/api/plugins/${state.pluginName}/interface`);
+            // Construire l'URL avec les paramètres
+            const params = new URLSearchParams(state);
+            const url = `/api/plugins/${state.pluginName}/interface?${params.toString()}`;
+            container.getElement().load(url);
         });
 
         mainLayout.init();
@@ -633,10 +636,11 @@ function initializeLayout() {
 }
 
 // Fonction pour ouvrir un onglet de plugin
-window.openPluginTab = function(pluginName, title) {
+window.openPluginTab = function(pluginName, title, params = {}) {
     try {
         const componentState = {
-            pluginName: pluginName
+            pluginName: pluginName,
+            ...params  // Ajouter les paramètres supplémentaires
         };
         
         // Chercher si un onglet avec ce plugin existe déjà

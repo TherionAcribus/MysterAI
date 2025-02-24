@@ -173,7 +173,9 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         const geocacheId = button.dataset.geocacheId;
         const gcCode = button.dataset.gcCode;
 
-        // Utiliser la nouvelle fonction openPluginTab
-        window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`);
+        // Utiliser la nouvelle fonction openPluginTab avec l'ID de la géocache
+        window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+            geocacheId: geocacheId
+        });
     }
 }

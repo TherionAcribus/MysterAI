@@ -172,6 +172,14 @@ def get_plugin_interface(plugin_name):
             'author': plugin.author,
             'categories': json.loads(plugin.categories)
         })
+
+        # Récupérer les paramètres de l'URL
+        params = {}
+        for key, value in request.args.items():
+            params[key] = value
+            
+        # Ajouter les paramètres aux données du plugin
+        plugin_data['params'] = params
         
         return render_template('plugin_interface.html', plugin=plugin_data)
     except Exception as e:
@@ -221,19 +229,160 @@ def execute_plugin(plugin_name):
             result = plugin_manager.execute_plugin(plugin_name, converted_inputs)
             
             # Formater le résultat en HTML
-            output_html = '<div class="bg-gray-700 p-4 rounded-lg">'
+            output_html = '<div class="space-y-4">'
             
-            if isinstance(result, dict):
-                for key, value in result.items():
-                    output_html += f'<div class="mb-2"><span class="font-semibold text-blue-400">{key}:</span> <span class="text-gray-200">{value}</span></div>'
+            if isinstance(result, dict) and 'combined_results' in result:
+                combined_results = result['combined_results']
+                
+                # Coordonnées détectées
+                coordinates = []
+                if 'coordinates_finder' in combined_results and combined_results['coordinates_finder']:
+                    coordinates.extend(combined_results['coordinates_finder'])
+                if 'formula_parser' in combined_results and combined_results['formula_parser'].get('coordinates'):
+                    coordinates.extend(combined_results['formula_parser']['coordinates'])
+                
+                if coordinates:
+                    output_html += '''
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-blue-400 mb-3">Coordonnées détectées</h3>
+                            <div class="space-y-2">
+                    '''
+                    for coord in coordinates:
+                        output_html += f'''
+                            <div class="bg-gray-600 p-3 rounded">
+                                <div class="text-gray-200">{coord.get('original_text', '')}</div>
+                                <div class="text-sm text-gray-400 mt-1">{coord.get('lat', '')}, {coord.get('lng', '')}</div>
+                            </div>
+                        '''
+                    output_html += '</div></div>'
+
+                # Textes intéressants
+                interesting_texts = []
+                
+                # Textes colorés
+                if 'color_text_detector' in combined_results:
+                    findings = combined_results['color_text_detector'].get('findings', [])
+                    for finding in findings:
+                        interesting_texts.append({
+                            'text': finding,
+                            'type': 'Texte invisible',
+                            'icon': '🎨'
+                        })
+
+                # Commentaires HTML
+                if 'html_comments_finder' in combined_results:
+                    findings = combined_results['html_comments_finder'].get('findings', [])
+                    for finding in findings:
+                        interesting_texts.append({
+                            'text': finding,
+                            'type': 'Commentaire HTML',
+                            'icon': '💬'
+                        })
+
+                # Textes alternatifs d'images
+                if 'image_alt_text_extractor' in combined_results:
+                    findings = combined_results['image_alt_text_extractor'].get('findings', [])
+                    for finding in findings:
+                        if finding.get('isInteresting'):
+                            interesting_texts.append({
+                                'text': finding['content'],
+                                'type': finding.get('description', 'Texte d\'image'),
+                                'icon': '🖼️'
+                            })
+
+                if interesting_texts:
+                    output_html += '''
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-blue-400 mb-3">Textes intéressants</h3>
+                            <div class="space-y-2">
+                    '''
+                    for text in interesting_texts:
+                        output_html += f'''
+                            <div class="bg-gray-600 p-3 rounded">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl">{text['icon']}</span>
+                                    <span class="text-gray-400 text-sm">{text['type']}</span>
+                                </div>
+                                <div class="text-gray-200 mt-1">{text['text']}</div>
+                            </div>
+                        '''
+                    output_html += '</div></div>'
+
+                # Points de passage
+                if 'additional_waypoints_analyzer' in combined_results and combined_results['additional_waypoints_analyzer']:
+                    waypoints = combined_results['additional_waypoints_analyzer']
+                    output_html += '''
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-blue-400 mb-3">Points de passage</h3>
+                            <div class="space-y-2">
+                    '''
+                    for wp in waypoints:
+                        output_html += f'''
+                            <div class="bg-gray-600 p-3 rounded">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-200">{wp.get('name', '')}</span>
+                                    <span class="text-gray-400">{wp.get('prefix', '')}</span>
+                                </div>
+                                <div class="text-sm text-gray-400 mt-1">{wp.get('coordinates', '')}</div>
+                            </div>
+                        '''
+                    output_html += '</div></div>'
+
+                # Si aucun résultat intéressant
+                if not coordinates and not interesting_texts and not (combined_results.get('additional_waypoints_analyzer')):
+                    output_html += '''
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <div class="text-gray-400">Aucun élément intéressant trouvé dans l'analyse.</div>
+                        </div>
+                    '''
+
+                # Liste des analyseurs sans résultats
+                empty_analyzers = []
+                analyzer_names = {
+                    'coordinates_finder': 'Détecteur de coordonnées',
+                    'color_text_detector': 'Détecteur de textes invisibles',
+                    'formula_parser': 'Analyseur de formules',
+                    'html_comments_finder': 'Détecteur de commentaires HTML',
+                    'image_alt_text_extractor': 'Analyseur de textes d\'images',
+                    'additional_waypoints_analyzer': 'Analyseur de points de passage'
+                }
+
+                for analyzer, name in analyzer_names.items():
+                    result = combined_results.get(analyzer)
+                    if result is None or result == [] or result == {} or (
+                        isinstance(result, dict) and (
+                            (result.get('findings', []) == [] and result.get('coordinates', []) == []) or
+                            (result.get('coordinates', []) == [] and result.get('details', {}).get('info') == 'Aucune coordonnée détectée')
+                        )
+                    ):
+                        empty_analyzers.append(name)
+
+                if empty_analyzers:
+                    output_html += '''
+                        <div class="bg-gray-700 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-blue-400 mb-3">Analyseurs sans résultats</h3>
+                            <div class="text-gray-400">
+                    '''
+                    for analyzer in empty_analyzers:
+                        output_html += f'<div class="mb-1">• {analyzer}</div>'
+                    output_html += '</div></div>'
+
             else:
-                output_html += f'<div class="text-gray-200">{result}</div>'
+                output_html += f'''
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="text-gray-200">{result}</div>
+                    </div>
+                '''
                 
             output_html += '</div>'
             
             return output_html
             
         except Exception as e:
+            import traceback
+            print(f"Error executing plugin: {str(e)}")
+            print("Traceback:")
+            print(traceback.format_exc())
             error_html = f'<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur lors de l\'exécution du plugin: {str(e)}</div>'
             return error_html, 500
             
