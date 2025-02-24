@@ -499,27 +499,27 @@ def add_geocache():
 def update_solved_status(geocache_id):
     """Met à jour le statut de résolution d'une geocache."""
     try:
-        data = request.get_json()
-        new_status = data.get('status')
+        solved_status = request.form.get('solved_status')
+        logger.info(f"Updating solved status for geocache {geocache_id}. Form data: {request.form}")
         
-        if new_status not in ['solved', 'not_solved', 'ongoing']:
+        if solved_status not in ['solved', 'not_solved', 'in_progress']:
+            logger.error(f"Invalid status received: {solved_status}")
             return jsonify({'error': 'Invalid status'}), 400
             
         geocache = Geocache.query.get_or_404(geocache_id)
-        geocache.solved = new_status
+        logger.info(f"Found geocache {geocache_id}. Current status: {geocache.solved}")
         
-        if new_status == 'solved':
+        geocache.solved = solved_status
+        
+        if solved_status == 'solved':
             geocache.solved_date = datetime.now()
-        elif new_status == 'not_solved':
+        elif solved_status == 'not_solved':
             geocache.solved_date = None
             
         db.session.commit()
+        logger.info(f"Successfully updated geocache {geocache_id} status to {solved_status}")
         
-        return jsonify({
-            'status': 'success',
-            'solved': geocache.solved,
-            'solved_date': geocache.solved_date.isoformat() if geocache.solved_date else None
-        })
+        return '', 204  # No content needed for HTMX
         
     except Exception as e:
         logger.error(f"Error updating solved status: {str(e)}")

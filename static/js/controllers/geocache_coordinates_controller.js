@@ -1,29 +1,62 @@
 // Geocache coordinates controller
 window.GeocacheCoordinatesController = class extends Stimulus.Controller {
     static targets = ["container"]
+    static values = {
+        geocacheId: String
+    }
 
     connect() {
         console.log("Geocache Coordinates Controller connected", {
             element: this.element,
-            geocacheId: this.element.dataset.geocacheId,
+            geocacheId: this.geocacheIdValue,
             hasContainer: this.hasContainerTarget,
             containerContent: this.containerTarget?.innerHTML
         })
+    }
+
+    updateSolvedStatus(event) {
+        const select = event.target;
+        const status = select.value;
+        
+        console.log("Updating solved status", {
+            geocacheId: this.geocacheIdValue,
+            status: status
+        });
+
+        const formData = new FormData();
+        formData.append('solved_status', status);
+
+        fetch(`/geocaches/${this.geocacheIdValue}/solved-status`, {
+            method: 'PUT',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            console.log("Status updated successfully");
+            // Store current value after successful update
+            select.setAttribute('data-previous-value', status);
+        })
+        .catch(error => {
+            console.error("Error updating status:", error);
+            // Revert the select to its previous value
+            select.value = select.getAttribute('data-previous-value');
+        });
     }
 
     edit(event) {
         console.log("Edit button clicked", {
             event,
             currentTarget: event.currentTarget,
-            geocacheId: this.element.dataset.geocacheId
+            geocacheId: this.geocacheIdValue
         })
         
         event.preventDefault()
-        const geocacheId = this.element.dataset.geocacheId
 
-        console.log("Sending edit request to:", `/geocaches/${geocacheId}/coordinates/edit`)
+        console.log("Sending edit request to:", `/geocaches/${this.geocacheIdValue}/coordinates/edit`)
 
-        fetch(`/geocaches/${geocacheId}/coordinates/edit`, {
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates/edit`, {
             headers: {
                 'X-Layout-Component': 'true',
                 'Accept': 'text/html'
@@ -59,10 +92,9 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         
         event.preventDefault()
         const form = event.target
-        const geocacheId = this.element.dataset.geocacheId
         const formData = new FormData(form)
 
-        fetch(`/geocaches/${geocacheId}/coordinates`, {
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates`, {
             method: 'PUT',
             body: formData,
             headers: {
@@ -95,13 +127,12 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         console.log("Cancel button clicked", {
             event,
             currentTarget: event.currentTarget,
-            geocacheId: this.element.dataset.geocacheId
+            geocacheId: this.geocacheIdValue
         })
         
         event.preventDefault()
-        const geocacheId = this.element.dataset.geocacheId
 
-        fetch(`/geocaches/${geocacheId}/coordinates/edit`, {
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates/edit`, {
             headers: {
                 'X-Layout-Component': 'true',
                 'Accept': 'text/html'

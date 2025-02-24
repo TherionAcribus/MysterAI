@@ -2,7 +2,7 @@
      hx-ext="include-vals" 
      hx-headers='{"X-Layout-Component": "true"}'
      data-controller="geocache-coordinates"
-     data-geocache-id="{{ geocache.id }}"
+     data-geocache-coordinates-geocache-id-value="{{ geocache.id }}"
      x-init="console.log('Component initialized with geocache ID:', '{{ geocache.id }}')"
      data-action="coordinatesFormLoaded@window->geocache-coordinates#formLoaded coordinatesUpdated@window->geocache-coordinates#coordinatesUpdated">
     <div class="max-w-4xl mx-auto">
@@ -46,13 +46,28 @@
                         <span class="text-gray-400">Favoris</span>
                         <div class="text-purple-400">{{ geocache.favorites_count }}</div>
                     </div>
+                    <div class="col-span-2">
+                        <span class="text-gray-400">Statut</span>
+                        <select class="mt-1 bg-gray-700 text-white rounded px-2 py-1 w-full"
+                                data-action="change->geocache-coordinates#updateSolvedStatus"
+                                name="solved_status"
+                                data-previous-value="{{ geocache.solved }}">
+                            <option value="not_solved" {% if geocache.solved == 'not_solved' %}selected{% endif %}>
+                                Non résolu
+                            </option>
+                            <option value="in_progress" {% if geocache.solved == 'in_progress' %}selected{% endif %}>
+                                En cours
+                            </option>
+                            <option value="solved" {% if geocache.solved == 'solved' %}selected{% endif %}>
+                                Résolu
+                            </option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- Coordonnées -->
-            <div class="bg-gray-800 rounded-lg p-4"
-                 data-controller="geocache-coordinates"
-                 data-geocache-id="{{ geocache.id }}">
+            <div class="bg-gray-800 rounded-lg p-4">
                 <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
                 <div id="coordinates-container" data-geocache-coordinates-target="container">
                     {% include 'partials/coordinates_display.html' %}

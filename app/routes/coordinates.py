@@ -7,8 +7,6 @@ from app.models.geocache import Geocache
 
 coordinates_bp = Blueprint('coordinates', __name__)
 
-# ...
-
 @coordinates_bp.route('/api/geocaches/save/<int:geocache_id>/coordinates', methods=['POST'])
 def save_geocache_coordinates(geocache_id):
     """

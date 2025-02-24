@@ -154,7 +154,54 @@ layout.registerComponent('mon-composant', function(container, state) {
 });
 ```
 
-## 6. Dépannage
+## 6. Gestion des Formulaires
+
+### Selects et Formulaires
+
+1. **Gestion des Selects avec État**
+```javascript
+// Dans le template
+<select data-action="change->mon-controller#updateStatus"
+        data-previous-value="{{ current_value }}"
+        name="status">
+    <option value="value1" {% if current_value == 'value1' %}selected{% endif %}>Option 1</option>
+    <option value="value2" {% if current_value == 'value2' %}selected{% endif %}>Option 2</option>
+</select>
+
+// Dans le contrôleur
+updateStatus(event) {
+    const select = event.target;
+    const formData = new FormData();
+    formData.append('status', select.value);
+
+    fetch('/update-endpoint', {
+        method: 'PUT',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        // Mise à jour de la valeur précédente après succès
+        select.setAttribute('data-previous-value', select.value);
+    })
+    .catch(error => {
+        // Retour à la valeur précédente en cas d'erreur
+        select.value = select.getAttribute('data-previous-value');
+    });
+}
+```
+
+2. **Bonnes Pratiques pour les Formulaires**
+   - Utiliser `FormData` pour l'envoi de données de formulaire
+   - Ne pas définir d'en-tête `Content-Type` avec `FormData` (il est automatiquement défini)
+   - Stocker l'état précédent pour permettre un retour en arrière en cas d'erreur
+   - Mettre à jour l'état uniquement après une réponse réussie du serveur
+
+3. **Gestion des Erreurs**
+   - Implémenter un mécanisme de rollback pour revenir à l'état précédent
+   - Fournir un feedback visuel à l'utilisateur en cas d'erreur
+   - Logger les erreurs pour le débogage
+
+## 7. Dépannage
 
 ### Problèmes Courants
 
