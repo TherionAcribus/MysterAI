@@ -4,7 +4,16 @@
      data-map-geocache-id-value="{{ geocache_id }}"
      data-map-geocache-code-value="{{ geocache.gc_code }}"
      class="h-full">
-    <div class="map-container h-full" data-map-target="container"></div>
+    <div class="map-container h-full relative" data-map-target="container"></div>
+    <div id="popup" 
+         data-map-target="popup"
+         class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
+         style="display: none; pointer-events: none; background-color: white; color: black;">
+        <div data-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+        <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+            <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
+        </div>
+    </div>
 </div>
 {% else %}
 <div class="flex items-center justify-center h-full text-gray-500">
