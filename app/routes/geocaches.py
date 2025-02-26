@@ -560,7 +560,7 @@ def save_modified_image():
         # Créer une nouvelle entrée dans la base de données
         new_image = GeocacheImage(
             geocache_id=parent_image.geocache_id,
-            filename=file_path,
+            filename=filename,  # Stocker uniquement le nom du fichier, pas le chemin complet
             original_url=parent_image.original_url,
             is_original=False,
             parent_image_id=parent_image_id
