@@ -25,6 +25,7 @@ function initializeEditor() {
         if (container) {
             canvas.setWidth(container.offsetWidth);
             canvas.setHeight(container.offsetHeight);
+            canvas.renderAll();
         }
     }
     resizeCanvas();
@@ -39,7 +40,7 @@ function initializeEditor() {
             const scale = Math.min(
                 canvas.width / img.width,
                 canvas.height / img.height
-            );
+            ) * 0.9; // 90% pour laisser une marge
             img.scale(scale);
             
             // Centrer l'image
@@ -55,55 +56,68 @@ function initializeEditor() {
         });
     }
 
-    // Gestionnaire pour les outils
-    const tools = document.querySelectorAll('.tool-btn');
-    tools.forEach(tool => {
-        tool.addEventListener('click', function() {
-            const toolType = this.dataset.tool;
-            currentTool = toolType;
-            
-            // Désactiver tous les boutons
-            tools.forEach(t => t.classList.remove('active'));
-            // Activer le bouton courant
-            this.classList.add('active');
+    // Le gestionnaire de la barre d'outils a été supprimé
 
-            switch(toolType) {
-                case 'select':
-                    canvas.isDrawingMode = false;
-                    canvas.selection = true;
-                    break;
-                case 'move':
-                    canvas.isDrawingMode = false;
-                    canvas.selection = true;
-                    break;
-                case 'brush':
-                    canvas.isDrawingMode = true;
-                    updateBrushStyle();
-                    break;
-                case 'eraser':
-                    canvas.isDrawingMode = true;
-                    canvas.freeDrawingBrush.color = '#ffffff';
-                    break;
-                case 'rect':
-                    canvas.isDrawingMode = false;
-                    addRect();
-                    break;
-                case 'circle':
-                    canvas.isDrawingMode = false;
-                    addCircle();
-                    break;
-                case 'text':
-                    canvas.isDrawingMode = false;
-                    addText();
-                    break;
-            }
-        });
+    // Gestionnaire pour les outils
+    const tools = {
+        'select-tool': 'select',
+        'draw-tool': 'brush',
+        'rect-tool': 'rect',
+        'circle-tool': 'circle',
+        'text-tool': 'text',
+        'line-tool': 'line'
+    };
+    
+    Object.keys(tools).forEach(toolId => {
+        const toolButton = document.getElementById(toolId);
+        if (toolButton) {
+            toolButton.addEventListener('click', function() {
+                const toolType = tools[toolId];
+                currentTool = toolType;
+                
+                // Désactiver tous les boutons
+                Object.keys(tools).forEach(id => {
+                    const button = document.getElementById(id);
+                    if (button) button.classList.remove('active');
+                });
+                
+                // Activer le bouton courant
+                this.classList.add('active');
+
+                switch(toolType) {
+                    case 'select':
+                        canvas.isDrawingMode = false;
+                        canvas.selection = true;
+                        break;
+                    case 'brush':
+                        canvas.isDrawingMode = true;
+                        updateBrushStyle();
+                        break;
+                    case 'rect':
+                        canvas.isDrawingMode = false;
+                        addRect();
+                        break;
+                    case 'circle':
+                        canvas.isDrawingMode = false;
+                        addCircle();
+                        break;
+                    case 'line':
+                        canvas.isDrawingMode = false;
+                        addLine();
+                        break;
+                    case 'text':
+                        canvas.isDrawingMode = false;
+                        addText();
+                        break;
+                }
+            });
+        }
     });
 
     // Gestionnaire pour la couleur
-    const strokeColor = document.getElementById('stroke-color');
-    if (strokeColor) {
-        strokeColor.addEventListener('input', function(e) {
+    const colorPicker = document.getElementById('color-picker');
+    if (colorPicker) {
+        colorPicker.addEventListener('input', function(e) {
             toolConfig.brush.color = e.target.value;
             if (currentTool === 'brush') {
                 canvas.freeDrawingBrush.color = e.target.value;
@@ -112,9 +126,9 @@ function initializeEditor() {
     }
 
     // Gestionnaire pour la taille du pinceau
-    const brushSize = document.getElementById('brush-size');
-    if (brushSize) {
-        brushSize.addEventListener('input', function(e) {
+    const sizeInput = document.getElementById('size-input');
+    if (sizeInput) {
+        sizeInput.addEventListener('input', function(e) {
             const size = parseInt(e.target.value);
             toolConfig.brush.width = size;
             if (currentTool === 'brush') {
@@ -123,13 +137,19 @@ function initializeEditor() {
         });
     }
 
-    // Gestionnaire pour le bouton Clear
-    const clearBtn = document.getElementById('clear-canvas');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', function() {
-            canvas.clear();
+    // Gestionnaire pour le bouton Undo
+    const undoBtn = document.getElementById('undo');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', function() {
+            if (canvas._objects.length > 0) {
+                const lastObject = canvas._objects.pop();
+                canvas.renderAll();
+            }
         });
     }
+
+    // Gestionnaire pour le bouton Redo
+    // Note: Une implémentation complète nécessiterait une pile d'historique
 
     // Gestionnaire pour le bouton Save
     const saveBtn = document.getElementById('save-image');
@@ -165,14 +185,14 @@ function initializeEditor() {
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('Error saving image: ' + data.error);
+                    alert('Erreur lors de l\'enregistrement: ' + data.error);
                 } else {
-                    alert('Image saved successfully!');
+                    alert('Image enregistrée avec succès!');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Error saving image');
+                console.error('Erreur:', error);
+                alert('Erreur lors de l\'enregistrement de l\'image');
             });
         });
     }
@@ -186,7 +206,7 @@ function initializeEditor() {
             stroke: toolConfig.brush.color,
             width: 100,
             height: 100,
-            strokeWidth: 2
+            strokeWidth: toolConfig.brush.width || 2
         });
         canvas.add(rect);
         canvas.setActiveObject(rect);
@@ -199,14 +219,26 @@ function initializeEditor() {
             fill: 'transparent',
             stroke: toolConfig.brush.color,
             radius: 50,
-            strokeWidth: 2
+            strokeWidth: toolConfig.brush.width || 2
         });
         canvas.add(circle);
         canvas.setActiveObject(circle);
     }
+    
+    function addLine() {
+        const line = new fabric.Line([
+            canvas.width / 2 - 50, canvas.height / 2, 
+            canvas.width / 2 + 50, canvas.height / 2
+        ], {
+            stroke: toolConfig.brush.color,
+            strokeWidth: toolConfig.brush.width || 2
+        });
+        canvas.add(line);
+        canvas.setActiveObject(line);
+    }
 
     function addText() {
-        const text = new fabric.IText('Double-click to edit', {
+        const text = new fabric.IText('Double-cliquez pour éditer', {
             left: canvas.width / 2,
             top: canvas.height / 2,
             fontFamily: 'Arial',
@@ -225,7 +257,7 @@ function initializeEditor() {
     }
 
     // Sélectionner l'outil par défaut
-    const defaultTool = document.querySelector('[data-tool="select"]');
+    const defaultTool = document.getElementById('select-tool');
     if (defaultTool) {
         defaultTool.click();
     }

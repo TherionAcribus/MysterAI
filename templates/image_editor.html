@@ -1,167 +1,182 @@
-<div class="h-full flex flex-col bg-gray-900 text-gray-300">
-    <div class="flex-1 flex">
-        <!-- Zone de l'image -->
-        <div class="flex-1 p-4">
-            <div class="w-full h-full flex flex-col">
-                <!-- Barre d'outils -->
-                <div class="bg-gray-800 p-4 mb-4">
-                    <h3 class="text-lg font-semibold mb-4">Outils</h3>
-                    
-                    <!-- Outils de base -->
-                    <div class="space-y-4">
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Basique</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button class="tool-btn" data-tool="select">
-                                    <i class="fas fa-mouse-pointer"></i>
-                                    <span>Sélection</span>
-                                </button>
-                                <button class="tool-btn" data-tool="move">
-                                    <i class="fas fa-arrows-alt"></i>
-                                    <span>Déplacer</span>
-                                </button>
-                            </div>
-                        </div>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Editor</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .editor-container {
+            display: flex;
+            height: 100vh;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
 
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Dessin</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button class="tool-btn" data-tool="brush">
-                                    <i class="fas fa-paint-brush"></i>
-                                    <span>Pinceau</span>
-                                </button>
-                                <button class="tool-btn" data-tool="eraser">
-                                    <i class="fas fa-eraser"></i>
-                                    <span>Gomme</span>
-                                </button>
-                            </div>
-                        </div>
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+            background-color: #2d2d2d;
+            border-right: 1px solid #3d3d3d;
+            width: 50px; /* Barre d'outils légèrement plus large */
+            overflow: hidden;
+        }
 
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Formes</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button class="tool-btn" data-tool="rect">
-                                    <i class="fas fa-square"></i>
-                                    <span>Rectangle</span>
-                                </button>
-                                <button class="tool-btn" data-tool="circle">
-                                    <i class="fas fa-circle"></i>
-                                    <span>Cercle</span>
-                                </button>
-                            </div>
-                        </div>
+        .toolbar-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 5px 0;
+            border-bottom: 1px solid #3d3d3d;
+        }
 
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Texte</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button class="tool-btn" data-tool="text">
-                                    <i class="fas fa-font"></i>
-                                    <span>Texte</span>
-                                </button>
-                            </div>
-                        </div>
+        .toolbar-group:last-child {
+            border-bottom: none;
+        }
 
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Couleur et taille</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="flex flex-col">
-                                    <label class="text-xs mb-1">Couleur</label>
-                                    <input type="color" id="stroke-color" class="w-full h-8">
-                                </div>
-                                <div class="flex flex-col">
-                                    <label class="text-xs mb-1">Taille</label>
-                                    <input type="range" id="brush-size" min="1" max="50" value="5" class="w-full">
-                                </div>
-                            </div>
-                        </div>
+        .tool-button {
+            background-color: #3d3d3d;
+            border: none;
+            color: #ffffff;
+            padding: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
 
-                        <div class="tool-group">
-                            <h4 class="text-sm font-medium mb-2">Actions</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="clear-canvas" class="tool-btn bg-red-600 hover:bg-red-700">
-                                    <i class="fas fa-trash"></i>
-                                    <span>Effacer</span>
-                                </button>
-                                <button id="save-image" class="tool-btn bg-green-600 hover:bg-green-700">
-                                    <i class="fas fa-save"></i>
-                                    <span>Sauvegarder</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        .tool-button:hover {
+            background-color: #4d4d4d;
+        }
 
-                <!-- Conteneur du canvas -->
-                <div class="canvas-container flex-grow relative bg-gray-800">
-                    <canvas id="editor-canvas" data-image-url="{{ image_url }}"></canvas>
-                </div>
+        .tool-button.active {
+            background-color: #0078d4;
+        }
+
+        /* Bouton de basculement supprimé */
+
+        .canvas-container {
+            flex-grow: 1;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #2d2d2d;
+        }
+
+        #editor-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .color-picker {
+            width: 38px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid #4d4d4d;
+            background: none;
+            margin: 2px auto;
+            display: block;
+        }
+
+        .size-input {
+            width: 38px;
+            background-color: #3d3d3d;
+            border: 1px solid #4d4d4d;
+            color: #ffffff;
+            padding: 4px 2px;
+            text-align: center;
+            margin: 4px auto;
+            display: block;
+            font-size: 14px;
+        }
+
+        /* Ajouter des tooltips pour compenser la perte des labels */
+        .tool-button {
+            position: relative;
+        }
+        
+        .tool-button:hover::after {
+            content: attr(title);
+            position: absolute;
+            left: 52px;
+            top: 0;
+            background-color: #2d2d2d;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="toolbar" id="editor-toolbar">
+            <div class="toolbar-group">
+                <button class="tool-button" id="select-tool" title="Sélectionner">
+                    <i class="fas fa-mouse-pointer"></i>
+                </button>
+                <button class="tool-button" id="draw-tool" title="Dessiner">
+                    <i class="fas fa-pencil-alt"></i>
+                </button>
+                <button class="tool-button" id="text-tool" title="Ajouter du texte">
+                    <i class="fas fa-font"></i>
+                </button>
+            </div>
+            
+            <div class="toolbar-group">
+                <button class="tool-button" id="rect-tool" title="Rectangle">
+                    <i class="far fa-square"></i>
+                </button>
+                <button class="tool-button" id="circle-tool" title="Cercle">
+                    <i class="far fa-circle"></i>
+                </button>
+                <button class="tool-button" id="line-tool" title="Ligne">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <input type="color" id="color-picker" class="color-picker" title="Couleur">
+                <input type="number" id="size-input" class="size-input" value="2" min="1" max="50" title="Taille" style="margin-top: 6px;">
+            </div>
+
+            <div class="toolbar-group">
+                <button class="tool-button" id="undo" title="Annuler">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="tool-button" id="redo" title="Rétablir">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <button class="tool-button" id="save-image" title="Enregistrer">
+                    <i class="fas fa-save"></i>
+                </button>
             </div>
         </div>
+        
+        <div class="canvas-container">
+            <canvas id="editor-canvas" data-image-url="{{ image_url }}" data-image-id="{{ image_id }}"></canvas>
+        </div>
+
     </div>
-</div>
 
-<!-- Load Fabric.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-<!-- Load Font Awesome for icons -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-<!-- Load our image editor script -->
-<script src="{{ url_for('static', filename='js/image_editor.js') }}"></script>
-
-
-<style>
-    /* Styles pour les boutons d'outils */
-    .tool-btn {
-        @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300;
-    }
-    
-    .tool-btn i {
-        @apply text-lg mb-1;
-    }
-    
-    .tool-btn span {
-        @apply text-xs;
-    }
-    
-    .tool-btn.active {
-        @apply bg-blue-600;
-    }
-    
-    /* Styles pour les contrôles de couleur et de taille */
-    input[type="color"] {
-        @apply rounded border border-gray-600 bg-gray-700;
-        -webkit-appearance: none;
-    }
-    
-    input[type="color"]::-webkit-color-swatch-wrapper {
-        padding: 0;
-    }
-    
-    input[type="color"]::-webkit-color-swatch {
-        border: none;
-    }
-    
-    input[type="range"] {
-        @apply rounded-lg overflow-hidden appearance-none bg-gray-700;
-        height: 32px;
-    }
-    
-    input[type="range"]::-webkit-slider-runnable-track {
-        @apply bg-gray-700;
-        height: 32px;
-    }
-    
-    input[type="range"]::-webkit-slider-thumb {
-        @apply appearance-none w-4 h-8 bg-blue-500;
-        border-radius: 3px;
-    }
-    
-    input[type="range"]::-moz-range-track {
-        @apply bg-gray-700;
-        height: 32px;
-    }
-    
-    input[type="range"]::-moz-range-thumb {
-        @apply w-4 h-8 bg-blue-500 border-0;
-        border-radius: 3px;
-    }
-</style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="{{ url_for('static', filename='js/image_editor.js') }}"></script>
+</body>
+</html>
