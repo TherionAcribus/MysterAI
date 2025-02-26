@@ -2,6 +2,9 @@
 let canvas;
 let currentTool = 'select';
 let isDrawing = false;
+let zoomLevel = 1; // Niveau de zoom initial
+let panX = 0;      // Décalage X pour le panning
+let panY = 0;      // Décalage Y pour le panning
 
 // Configuration des outils
 const toolConfig = {
@@ -56,7 +59,114 @@ function initializeEditor() {
         });
     }
 
-    // Le gestionnaire de la barre d'outils a été supprimé
+    // Gestionnaire pour les boutons de zoom
+    const zoomIn = document.getElementById('zoom-in');
+    const zoomOut = document.getElementById('zoom-out');
+    const zoomReset = document.getElementById('zoom-reset');
+    
+    if (zoomIn) {
+        zoomIn.addEventListener('click', function() {
+            applyZoom(0.1); // Augmenter le zoom de 10%
+        });
+    }
+    
+    if (zoomOut) {
+        zoomOut.addEventListener('click', function() {
+            applyZoom(-0.1); // Diminuer le zoom de 10%
+        });
+    }
+    
+    if (zoomReset) {
+        zoomReset.addEventListener('click', function() {
+            resetZoom(); // Réinitialiser le zoom à 100%
+        });
+    }
+    
+    // Fonction pour appliquer le zoom
+    function applyZoom(delta) {
+        // Limiter le zoom entre 0.5 et 5 (50% à 500%)
+        const newZoom = Math.min(Math.max(zoomLevel + delta, 0.5), 5);
+        
+        // Si le zoom n'a pas changé, sortir
+        if (newZoom === zoomLevel) return;
+        
+        // Calculer le point central actuel du canvas
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        // Mettre à jour le niveau de zoom
+        zoomLevel = newZoom;
+        
+        // Appliquer le zoom au canvas
+        canvas.setZoom(zoomLevel);
+        
+        // Recentrer le canvas (pour éviter que le zoom déplace la vue)
+        canvas.absolutePan(new fabric.Point(
+            panX + (centerX - centerX * zoomLevel),
+            panY + (centerY - centerY * zoomLevel)
+        ));
+        
+        // Mettre à jour les variables de panning
+        panX = canvas.viewportTransform[4];
+        panY = canvas.viewportTransform[5];
+    }
+    
+    // Fonction pour réinitialiser le zoom
+    function resetZoom() {
+        zoomLevel = 1;
+        panX = 0;
+        panY = 0;
+        
+        canvas.setZoom(1);
+        canvas.absolutePan(new fabric.Point(0, 0));
+    }
+    
+    // Ajouter la possibilité de faire un pan (déplacement) lorsque l'outil de sélection est actif
+    canvas.on('mouse:down', function(opt) {
+        if (currentTool === 'select' && opt.e.altKey) {
+            this.isDragging = true;
+            this.lastPosX = opt.e.clientX;
+            this.lastPosY = opt.e.clientY;
+            this.selection = false;
+        }
+    });
+    
+    canvas.on('mouse:move', function(opt) {
+        if (this.isDragging) {
+            const deltaX = opt.e.clientX - this.lastPosX;
+            const deltaY = opt.e.clientY - this.lastPosY;
+            
+            this.lastPosX = opt.e.clientX;
+            this.lastPosY = opt.e.clientY;
+            
+            // Mettre à jour la position
+            const vpt = this.viewportTransform;
+            vpt[4] += deltaX;
+            vpt[5] += deltaY;
+            
+            // Mettre à jour les variables de panning
+            panX = vpt[4];
+            panY = vpt[5];
+            
+            this.requestRenderAll();
+        }
+    });
+    
+    canvas.on('mouse:up', function() {
+        this.isDragging = false;
+        this.selection = true;
+    });
+    
+    // Ajouter le support du zoom avec la molette de la souris
+    canvas.on('mouse:wheel', function(opt) {
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+        
+        const delta = opt.e.deltaY;
+        const zoomDelta = delta > 0 ? -0.05 : 0.05; // Plus petit incrément pour la molette
+        
+        applyZoom(zoomDelta);
+    });
 
     // Gestionnaire pour les outils
     const tools = {
