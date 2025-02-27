@@ -18,9 +18,9 @@ def load_alphabet_config(alphabet_id):
         config['id'] = alphabet_id
         return config
 
-@alphabets_bp.route('/api/alphabets', methods=['GET'])
-def get_alphabets():
-    """Récupère la liste de tous les alphabets disponibles."""
+@alphabets_bp.route('/api/alphabets/template', methods=['GET'])
+def get_alphabets_template():
+    """Récupère le template complet avec la liste de tous les alphabets disponibles."""
     alphabets = []
     
     # Parcourir le répertoire des alphabets
@@ -32,12 +32,72 @@ def get_alphabets():
                 if config:
                     alphabets.append(config)
     
-    # Si la requête demande du JSON (pour l'API)
-    if request.headers.get('Accept') == 'application/json':
-        return jsonify(alphabets)
-        
-    # Sinon, retourner le HTML pour HTMX
-    return render_template('components/alphabets_list.html', alphabets=alphabets)
+    # Récupérer les paramètres
+    show_examples = request.args.get('show_examples', 'false').lower() == 'true'
+    example_text = request.args.get('example_text', 'ABCDEFGHIJKLM')
+    font_size = request.args.get('font_size', '32')
+    custom_text = request.args.get('custom_text', '')
+    
+    # Déterminer le texte à afficher (prédéfini ou personnalisé)
+    display_text = custom_text if example_text == 'custom' and custom_text else example_text
+    
+    # Retourner le template complet
+    return render_template('components/alphabets_list.html',
+                           alphabets=alphabets, 
+                           show_examples=show_examples,
+                           example_text=example_text,
+                           custom_text=custom_text,
+                           display_text=display_text,
+                           font_size=font_size)
+
+@alphabets_bp.route('/api/alphabets/list', methods=['GET'])
+def get_alphabets_list():
+    """Récupère uniquement la liste des alphabets (contenu) pour les mises à jour HTMX."""
+    alphabets = []
+    
+    # Parcourir le répertoire des alphabets
+    if os.path.exists(ALPHABETS_DIR):
+        for dirname in os.listdir(ALPHABETS_DIR):
+            alphabet_dir = os.path.join(ALPHABETS_DIR, dirname)
+            if os.path.isdir(alphabet_dir):
+                config = load_alphabet_config(dirname)
+                if config:
+                    alphabets.append(config)
+    
+    # Récupérer les paramètres
+    show_examples = request.args.get('show_examples', 'false').lower() == 'true'
+    example_text = request.args.get('example_text', 'ABCDEFGHIJKLM')
+    font_size = request.args.get('font_size', '32')
+    custom_text = request.args.get('custom_text', '')
+    
+    # Déterminer le texte à afficher (prédéfini ou personnalisé)
+    display_text = custom_text if example_text == 'custom' and custom_text else example_text
+    
+    # Retourner uniquement le contenu de la liste
+    return render_template('components/alphabets_list_content.html',
+                          alphabets=alphabets, 
+                          show_examples=show_examples,
+                          example_text=example_text,
+                          custom_text=custom_text,
+                          display_text=display_text,
+                          font_size=font_size)
+
+@alphabets_bp.route('/api/alphabets', methods=['GET'])
+def get_alphabets():
+    """Récupère la liste de tous les alphabets disponibles au format JSON."""
+    alphabets = []
+    
+    # Parcourir le répertoire des alphabets
+    if os.path.exists(ALPHABETS_DIR):
+        for dirname in os.listdir(ALPHABETS_DIR):
+            alphabet_dir = os.path.join(ALPHABETS_DIR, dirname)
+            if os.path.isdir(alphabet_dir):
+                config = load_alphabet_config(dirname)
+                if config:
+                    alphabets.append(config)
+    
+    # Retourner le JSON
+    return jsonify(alphabets)
 
 @alphabets_bp.route('/api/alphabets/<alphabet_id>/resource/<path:resource_path>')
 def get_alphabet_resource(alphabet_id, resource_path):

@@ -1,62 +1,153 @@
-<div class="panel-header border-b border-gray-700 p-2">
-    <h2 class="text-lg font-semibold">Alphabets</h2>
-</div>
-<div class="panel-body mt-4 space-y-4">
-    {% if alphabets %}
-        {% for alphabet in alphabets %}
-            <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 cursor-pointer transition-colors"
-                 data-alphabet-id="{{ alphabet.id }}"
-                 onclick="openAlphabetTab('{{ alphabet.id }}', '{{ alphabet.name }}')">
-                <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
-                <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
-                <div class="flex items-center mt-2 text-xs text-gray-400">
-                    <span class="mr-2">Type: {{ alphabet.alphabetConfig.type }}</span>
-                    {% if alphabet.alphabetConfig.type == 'images' %}
-                        <i class="fas fa-images"></i>
-                    {% elif alphabet.alphabetConfig.type == 'font' %}
-                        <i class="fas fa-font"></i>
-                    {% endif %}
-                </div>
+<div id="alphabets-panel-content">
+    <div class="panel-header border-b border-gray-700 p-2">
+        <h2 class="text-lg font-semibold">Alphabets</h2>
+        <div class="mt-2 space-y-2" data-controller="alphabet-display">
+            <!-- Contrôle d'affichage des exemples -->
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-300">Exemples:</label>
+                <select class="bg-gray-800 text-white rounded px-2 py-1 text-sm" 
+                        data-alphabet-display-target="showSelector"
+                        onchange="toggleExampleControls(this.value)"
+                        name="show_examples">
+                    <option value="false" {% if not show_examples %}selected{% endif %}>Masquer</option>
+                    <option value="true" {% if show_examples %}selected{% endif %}>Afficher</option>
+                </select>
             </div>
-        {% endfor %}
-    {% else %}
-        <div class="text-gray-400 text-center py-4">
-            Aucun alphabet disponible
+            
+            <!-- Contrôle du texte d'exemple -->
+            <div class="flex items-center gap-2 {% if not show_examples %}hidden{% endif %}" data-alphabet-display-target="exampleControl" id="text-control">
+                <label class="text-sm text-gray-300">Texte:</label>
+                <select class="bg-gray-800 text-white rounded px-2 py-1 text-sm flex-grow"
+                        data-alphabet-display-target="textSelector"
+                        onchange="toggleCustomText(this.value); updateAlphabetsList();"
+                        name="example_text">
+                    <option value="ABCDEFGHIJKLM" {% if example_text == 'ABCDEFGHIJKLM' %}selected{% endif %}>ABC...</option>
+                    <option value="GEOCACHING" {% if example_text == 'GEOCACHING' %}selected{% endif %}>GEOCACHING</option>
+                    <option value="MYSTERY AI" {% if example_text == 'MYSTERY AI' %}selected{% endif %}>MYSTERY AI</option>
+                    <option value="12345 67890" {% if example_text == '12345 67890' %}selected{% endif %}>12345 67890</option>
+                    <option value="custom" {% if example_text == 'custom' or custom_text %}selected{% endif %}>Personnalisé</option>
+                </select>
+            </div>
+            
+            <!-- Champ de texte personnalisé -->
+            <div class="flex items-center gap-2 {% if not show_examples or (example_text != 'custom' and not custom_text) %}hidden{% endif %}" 
+                data-alphabet-display-target="customTextControls" id="custom-text-control">
+                <input type="text" 
+                    class="bg-gray-800 text-white rounded px-2 py-1 text-sm flex-grow"
+                    placeholder="Saisir votre texte ici..."
+                    name="custom_text"
+                    value="{{ custom_text|default('') }}"
+                    data-alphabet-display-target="customText"
+                    onkeyup="if(event.keyCode==13) updateAlphabetsList();">
+            </div>
+            
+            <!-- Contrôle de taille -->
+            <div class="flex items-center gap-2 {% if not show_examples %}hidden{% endif %}" data-alphabet-display-target="exampleControl" id="size-control">
+                <label class="text-sm text-gray-300">Taille:</label>
+                <select class="bg-gray-800 text-white rounded px-2 py-1 text-sm"
+                        data-alphabet-display-target="sizeSelector"
+                        onchange="updateAlphabetsList();"
+                        name="font_size">
+                    <option value="16" {% if font_size == '16' %}selected{% endif %}>Petite</option>
+                    <option value="24" {% if font_size == '24' %}selected{% endif %}>Moyenne</option>
+                    <option value="32" {% if font_size == '32' or not font_size %}selected{% endif %}>Grande</option>
+                    <option value="48" {% if font_size == '48' %}selected{% endif %}>Très grande</option>
+                </select>
+            </div>
         </div>
-    {% endif %}
-</div>
+    </div>
 
-<script>
-function openAlphabetTab(alphabetId, alphabetName) {
-    // Trouver le conteneur principal (row)
-    const rootContentItem = window.mainLayout.root.contentItems[0];
-    
-    // Configuration du composant
-    const componentConfig = {
-        type: 'component',
-        componentName: 'alphabet-viewer',
-        componentState: { 
-            alphabetId: alphabetId,
-            alphabetName: alphabetName
-        },
-        title: `Alphabet - ${alphabetName}`,
-        id: `alphabet-${alphabetId}`
-    };
+    <div id="alphabets-list-container" class="panel-body mt-4 space-y-4">
+        {% include 'components/alphabets_list_content.html' %}
+    </div>
 
-    // Si c'est un stack, ajouter directement
-    if (rootContentItem.isStack) {
-        rootContentItem.addChild(componentConfig);
-    } else {
-        // Sinon, trouver ou créer un stack
-        let stack = rootContentItem.contentItems.find(item => item.isStack);
-        if (!stack) {
-            stack = window.mainLayout.createContentItem({
-                type: 'stack',
-                content: []
-            });
-            rootContentItem.addChild(stack);
+    <script>
+    function openAlphabetTab(alphabetId, alphabetName) {
+        // Trouver le conteneur principal (row)
+        const rootContentItem = window.mainLayout.root.contentItems[0];
+        
+        // Configuration du composant
+        const componentConfig = {
+            type: 'component',
+            componentName: 'alphabet-viewer',
+            componentState: { 
+                alphabetId: alphabetId,
+                alphabetName: alphabetName
+            },
+            title: `Alphabet - ${alphabetName}`,
+            id: `alphabet-${alphabetId}`
+        };
+
+        // Si c'est un stack, ajouter directement
+        if (rootContentItem.isStack) {
+            rootContentItem.addChild(componentConfig);
+        } else {
+            // Sinon, trouver ou créer un stack
+            let stack = rootContentItem.contentItems.find(item => item.isStack);
+            if (!stack) {
+                stack = window.mainLayout.createContentItem({
+                    type: 'stack',
+                    content: []
+                });
+                rootContentItem.addChild(stack);
+            }
+            stack.addChild(componentConfig);
         }
-        stack.addChild(componentConfig);
     }
-}
-</script>
+
+    // Fonctions pour gérer l'affichage des exemples
+    function toggleExampleControls(value) {
+        const showExamples = value === 'true';
+        const textControl = document.getElementById('text-control');
+        const sizeControl = document.getElementById('size-control');
+        const customTextControl = document.getElementById('custom-text-control');
+        
+        if (showExamples) {
+            textControl.classList.remove('hidden');
+            sizeControl.classList.remove('hidden');
+            
+            // Vérifier si on doit aussi afficher le contrôle de texte personnalisé
+            const textSelector = document.querySelector('[data-alphabet-display-target="textSelector"]');
+            if (textSelector && textSelector.value === 'custom') {
+                customTextControl.classList.remove('hidden');
+            } else {
+                customTextControl.classList.add('hidden');
+            }
+        } else {
+            textControl.classList.add('hidden');
+            sizeControl.classList.add('hidden');
+            customTextControl.classList.add('hidden');
+        }
+        
+        // Mettre à jour la liste
+        updateAlphabetsList();
+    }
+
+    function toggleCustomText(value) {
+        const customTextControl = document.getElementById('custom-text-control');
+        
+        if (value === 'custom') {
+            customTextControl.classList.remove('hidden');
+        } else {
+            customTextControl.classList.add('hidden');
+        }
+    }
+
+    function updateAlphabetsList() {
+        const showExamples = document.querySelector('[name="show_examples"]').value;
+        const exampleText = document.querySelector('[name="example_text"]').value;
+        const fontSize = document.querySelector('[name="font_size"]').value;
+        const customText = document.querySelector('[name="custom_text"]').value || '';
+        
+        // Construire l'URL avec les paramètres
+        const url = `/api/alphabets/list?show_examples=${showExamples}&example_text=${exampleText}&font_size=${fontSize}&custom_text=${encodeURIComponent(customText)}`;
+        
+        // Effectuer la requête HTMX manuellement
+        fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('alphabets-list-container').innerHTML = html;
+            });
+    }
+    </script>
+</div>

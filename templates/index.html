@@ -22,15 +22,10 @@
     <!-- Initialize Stimulus -->
     <script>
         (function() {
-            window.Stimulus = window.Stimulus || {};
-            window.Stimulus.Controller = window.Stimulus.Controller || {};
+            // Créer l'application Stimulus
+            window.Stimulus = Stimulus.Application.start();
             
-            const application = window.Stimulus.Application.start();
-            window.Stimulus.register = function(name, controller) {
-                console.log(`=== DEBUG: Registering controller: ${name} ===`);
-                return application.register(name, controller);
-            };
-            
+            // Debug logs
             console.log('=== DEBUG: Stimulus initialized ===');
         })();
     </script>
@@ -40,6 +35,7 @@
     <script src="/js/contextual_menu.js"></script>
     <script src="/js/controllers/map_controller.js"></script>
     <script src="/js/controllers/zone_map_controller.js"></script>
+    <script src="/js/controllers/alphabet_display_controller.js"></script>
     
     <title>MysteryAI - Geocaching</title>
     <script>
@@ -249,15 +245,8 @@
                         </div>
                     </div>
                     <div id="alphabets-panel" class="h-full p-4 panel-content"
-                         hx-get="/api/alphabets"
-                         hx-trigger="load"
-                         hx-swap="innerHTML">
-                        <div class="panel-header border-b border-gray-700 p-2">
-                            <h2 class="text-lg font-semibold">Alphabets</h2>
-                        </div>
-                        <div class="panel-body mt-4 space-y-4">
-                            <div class="animate-pulse">Chargement des alphabets...</div>
-                        </div>
+                         hx-get="/api/alphabets/template" 
+                         hx-trigger="load">
                     </div>
                     <div id="settings-panel" class="h-full p-4 panel-content">
                         <div class="panel-header border-b border-gray-700 p-2">
