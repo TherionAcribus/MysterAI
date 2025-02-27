@@ -141,20 +141,10 @@
 
         <!-- Galerie d'images -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6"
-             data-controller="geocache-gallery"
-             data-action="contextmenu->geocache-gallery#handleContextMenu">
+             data-controller="geocache-gallery">
             <h2 class="text-lg font-semibold text-gray-100 mb-4">Images</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {% for image in geocache.images %}
-                <div class="relative aspect-square">
-                    <img src="{{ image.url }}"
-                         alt="{{ image.name or 'Image de la géocache' }}"
-                         class="geocache-image w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90"
-                         data-geocache-gallery-target="image"
-                         data-image-id="{{ image.id }}"
-                         data-image-name="{{ image.name or '' }}">
-                </div>
-                {% endfor %}
+            <div id="geocache-gallery-container" data-geocache-id="{{ geocache.id }}">
+                {% include 'partials/geocache_gallery.html' %}
             </div>
         </div>
 

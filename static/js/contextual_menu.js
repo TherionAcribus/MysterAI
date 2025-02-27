@@ -27,6 +27,16 @@ function initContextMenu() {
             
             const imageId = targetImage.dataset.imageId;
             const imageName = targetImage.dataset.imageName || 'Sans nom';
+            const isOriginalRaw = targetImage.dataset.isOriginal;
+            const isOriginal = isOriginalRaw === "true";
+            
+            console.log('Image sélectionnée:', {
+                id: imageId,
+                name: imageName,
+                isOriginalRaw: isOriginalRaw,
+                isOriginal: isOriginal,
+                datasetComplete: JSON.stringify(targetImage.dataset)
+            });
             
             // Créer le menu contextuel avec le style Tailwind
             const menu = document.createElement('div');
@@ -48,7 +58,14 @@ function initContextMenu() {
                 if (window.electron) {
                     window.electron.openImageEditor(imageId, imageName);
                 } else {
-                    window.openImageEditor(imageId, imageName);
+                    // Fallback si Electron n'est pas disponible
+                    // Par exemple, ouvrir dans un nouvel onglet ou utiliser un éditeur web
+                    console.log('Édition de l\'image (mode web):', imageId, imageName);
+                    if (typeof window.openImageEditor === 'function') {
+                        window.openImageEditor(imageId, imageName);
+                    } else {
+                        alert('L\'éditeur d\'image n\'est pas disponible dans cette version.');
+                    }
                 }
                 menu.remove();
             };
@@ -63,6 +80,59 @@ function initContextMenu() {
                 menu.remove();
             };
             menu.appendChild(copyOption);
+            
+            // Option de suppression uniquement pour les images non originales
+            if (!isOriginal) {
+                console.log('=== DEBUG: Ajout de l\'option de suppression ===');
+                const deleteOption = document.createElement('div');
+                deleteOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center text-red-400';
+                deleteOption.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Supprimer';
+                deleteOption.onclick = () => {
+                    if (confirm('Êtes-vous sûr de vouloir supprimer cette image ?')) {
+                        // Appeler l'API pour supprimer l'image
+                        fetch(`/api/geocaches/images/${imageId}/delete`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Erreur lors de la suppression de l\'image');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Image supprimée avec succès:', data);
+                            
+                            // Trouver le conteneur de la galerie et l'ID du géocache
+                            const galleryContainer = document.getElementById('geocache-gallery-container');
+                            const geocacheId = galleryContainer.dataset.geocacheId;
+                            
+                            // Utiliser HTMX pour rafraîchir uniquement la galerie
+                            if (htmx) {
+                                htmx.ajax('GET', `/api/geocaches/${geocacheId}/gallery`, {
+                                    target: '#geocache-gallery-container',
+                                    swap: 'innerHTML'
+                                });
+                            } else {
+                                // Fallback si HTMX n'est pas disponible
+                                fetch(`/api/geocaches/${geocacheId}/gallery`)
+                                    .then(response => response.text())
+                                    .then(html => {
+                                        galleryContainer.innerHTML = html;
+                                    });
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erreur:', error);
+                            alert('Erreur lors de la suppression de l\'image.');
+                        });
+                    }
+                    menu.remove();
+                };
+                menu.appendChild(deleteOption);
+            }
             
             // Ajouter le menu au document
             document.body.appendChild(menu);
@@ -79,6 +149,9 @@ function initContextMenu() {
             setTimeout(() => {
                 document.addEventListener('click', closeMenu);
             }, 0);
+        } else {
+            // Restaurer le menu contextuel HTML natif
+            console.log('=== DEBUG: Menu contextuel HTML natif restauré ===');
         }
     });
 }

@@ -138,7 +138,9 @@ def get_geocache(geocache_id):
         } if geocache.zone else None,
         'images': [{
             'id': image.id,
-            'url': image.url
+            'url': image.url,
+            'filename': image.filename,
+            'is_original': image.is_original
         } for image in geocache.images]
     })
 
@@ -266,7 +268,7 @@ def get_geocache_details(geocache_id):
                 'url': image.url,
                 'filename': image.filename,
                 'is_original': image.is_original
-            } for image in geocache.images if image.is_original]
+            } for image in geocache.images],
         })
     except Exception as e:
         logger.error(f"Error getting geocache {geocache_id}: {str(e)}")
@@ -588,7 +590,14 @@ def save_modified_image():
 def get_geocache_details_panel(geocache_id):
     """Renvoie le panneau HTML des détails d'une géocache."""
     print("GCID", geocache_id)
-    geocache = Geocache.query.get_or_404(geocache_id)
+    # Utiliser joinedload pour s'assurer que toutes les relations nécessaires sont chargées
+    geocache = Geocache.query.options(
+        db.joinedload(Geocache.additional_waypoints),
+        db.joinedload(Geocache.attributes),
+        db.joinedload(Geocache.checkers),
+        db.joinedload(Geocache.zone),
+        db.joinedload(Geocache.images)
+    ).get_or_404(geocache_id)
     return render_template('geocache_details.html', geocache=geocache)
 
 
@@ -719,3 +728,40 @@ def get_image_editor(image_id):
 def serve_image(filename):
     """Sert une image depuis le dossier geocaches_images."""
     return send_from_directory('../geocaches_images', filename, as_attachment=False)
+
+
+@geocaches_bp.route('/api/geocaches/images/<int:image_id>/delete', methods=['DELETE'])
+def delete_image(image_id):
+    """Supprime une image non originale d'une géocache."""
+    try:
+        # Récupérer l'image
+        image = GeocacheImage.query.get_or_404(image_id)
+        
+        # Vérifier que l'image n'est pas une image originale
+        if image.is_original:
+            return jsonify({'error': 'Cannot delete original images'}), 403
+        
+        # Chemin du fichier à supprimer
+        file_path = os.path.join('../geocaches_images', image.geocache.gc_code, image.filename)
+        
+        # Supprimer le fichier si il existe
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # Supprimer l'entrée de la base de données
+        db.session.delete(image)
+        db.session.commit()
+        
+        return jsonify({'message': 'Image deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting image: {str(e)}")
+        return jsonify({'error': 'Failed to delete image'}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/gallery', methods=['GET'])
+def get_geocache_gallery(geocache_id):
+    """Renvoie uniquement le HTML de la galerie d'images pour un géocache."""
+    geocache = Geocache.query.options(db.joinedload(Geocache.images)).get_or_404(geocache_id)
+    
+    return render_template('partials/geocache_gallery.html', geocache=geocache)

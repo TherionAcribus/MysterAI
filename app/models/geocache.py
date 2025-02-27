@@ -5,6 +5,7 @@ from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import Point
 from bs4 import BeautifulSoup
 from flask import url_for, current_app
+import os
 
 def decimal_to_dm(decimal_degrees):
     """Convertit des degrés décimaux en degrés et minutes décimales"""
@@ -131,6 +132,21 @@ class GeocacheImage(db.Model):
     def url(self):
         # Utiliser la route pour servir l'image avec le code GC
         return url_for('geocaches.serve_image', filename=f'{self.geocache.gc_code}/{self.filename}')
+        
+    @property
+    def name(self):
+        # Retourner un nom d'affichage pour l'image basé sur le nom de fichier
+        # Enlever les préfixes (comme "modified_") et l'extension
+        basename = os.path.basename(self.filename)
+        # Enlever les préfixes communs
+        clean_name = basename
+        if basename.startswith("modified_"):
+            # Enlever le préfixe "modified_" et le timestamp qui suit (format: modified_1234567890_...)
+            parts = basename.split("_", 2)
+            if len(parts) > 2:
+                clean_name = parts[2]
+        # Enlever l'extension
+        return os.path.splitext(clean_name)[0]
 
 class Geocache(db.Model):
     __table_args__ = {'extend_existing': True}
