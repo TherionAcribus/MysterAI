@@ -536,6 +536,8 @@ function initializeLayout() {
 // Fonction pour ouvrir un onglet de plugin
 window.openPluginTab = function(pluginName, title, params = {}) {
     try {
+        console.log('openPluginTab called with:', { pluginName, title, params });
+        
         const componentState = {
             pluginName: pluginName,
             ...params  // Ajouter les paramètres supplémentaires
@@ -560,7 +562,7 @@ window.openPluginTab = function(pluginName, title, params = {}) {
             mainLayout.root.contentItems[0].addChild({
                 type: 'component',
                 componentName: 'plugin',
-                title: title,
+                title: title || pluginName,
                 componentState: componentState
             });
         }

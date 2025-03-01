@@ -23,10 +23,10 @@
     <script>
         (function() {
             // Créer l'application Stimulus
-            window.Stimulus = Stimulus.Application.start();
+            window.StimulusApp = Stimulus.Application.start();
             
             // Debug logs
-            console.log('=== DEBUG: Stimulus initialized ===');
+            console.log('=== DEBUG: Stimulus initialized ===', window.StimulusApp);
         })();
     </script>
     
@@ -396,7 +396,8 @@
             });
             
             // Initialize Stimulus application
-            const application = Stimulus.Application.start()
+            const application = window.StimulusApp;
+            window.application = application;
             
             // Load controllers
             fetch('/js/controllers/geocache_coordinates_controller.js')

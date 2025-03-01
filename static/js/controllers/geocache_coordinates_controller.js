@@ -1,6 +1,6 @@
 // Geocache coordinates controller
 window.GeocacheCoordinatesController = class extends Stimulus.Controller {
-    static targets = ["container"]
+    static targets = ["container", "analyzeButton"]
     static values = {
         geocacheId: String
     }
@@ -169,9 +169,15 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
     }
 
     openAnalysis(event) {
+        console.log("openAnalysis method called");
         const button = event.currentTarget;
         const geocacheId = button.dataset.geocacheId;
         const gcCode = button.dataset.gcCode;
+        
+        console.log("Opening analysis for", {
+            geocacheId: geocacheId,
+            gcCode: gcCode
+        });
 
         // Utiliser la nouvelle fonction openPluginTab avec l'ID de la géocache
         window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
