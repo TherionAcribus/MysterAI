@@ -228,6 +228,70 @@ def execute_plugin(plugin_name):
         try:
             result = plugin_manager.execute_plugin(plugin_name, converted_inputs)
             
+            # Vérifier si le client a demandé du JSON 
+            accept_header = request.headers.get('Accept', '')
+            wants_json = 'application/json' in accept_header or inputs.get('_format') == 'json'
+            
+            # Normaliser les résultats pour une interface unifiée
+            normalized_result = {}
+            
+            # Cas 1: Plugin standard avec text_output
+            if isinstance(result, dict) and 'text_output' in result:
+                normalized_result = result
+            # Cas 2: Plugin avec structure {result: {text: {text_output: ...}}}
+            elif isinstance(result, dict) and 'result' in result and isinstance(result['result'], dict) and 'text' in result['result']:
+                normalized_result = {
+                    'text_output': result['result']['text'].get('text_output', ''),
+                    'original_result': result  # Garder le résultat original pour référence
+                }
+            # Cas 3: Plugin avec juste 'output' au lieu de 'text_output'
+            elif isinstance(result, dict) and 'output' in result:
+                normalized_result = {
+                    'text_output': result['output'],
+                    'original_result': result
+                }
+            else:
+                # Pour tout autre format de résultat
+                normalized_result = result
+            
+            # S'assurer que les coordonnées sont gérées correctement
+            if isinstance(normalized_result, dict) and 'coordinates' not in normalized_result:
+                normalized_result['coordinates'] = {
+                    'exist': False,
+                    'ddm_lat': None,
+                    'ddm_lon': None,
+                    'ddm': None
+                }
+            
+            # Si c'est un résultat d'analyse complexe (qui contient combined_results)
+            if isinstance(result, dict) and 'combined_results' in result:
+                if wants_json:
+                    return jsonify(result)
+                    
+                # Sinon, on continue avec le format HTML pour la rétrocompatibilité
+                # (Le reste du code reste inchangé)
+            else:
+                # Pour les résultats normalisés standard
+                return jsonify(normalized_result)
+            
+            # Vérifier si le plugin est standard (comme Caesar)
+            if isinstance(result, dict) and not 'combined_results' in result:
+                # S'assurer que les coordonnées sont gérées s'il n'y en a pas
+                if 'coordinates' not in result:
+                    result['coordinates'] = {
+                        'exist': False,
+                        'ddm_lat': None,
+                        'ddm_lon': None,
+                        'ddm': None
+                    }
+                # Renvoyer directement le JSON
+                return jsonify(result)
+            
+            # Si c'est un résultat combiné (outil d'analyse complexe)
+            if isinstance(result, dict) and 'combined_results' in result and wants_json:
+                return jsonify(result)
+                
+            # Sinon, on continue avec le format HTML pour la rétrocompatibilité
             # Formater le résultat en HTML
             output_html = '<div class="space-y-4">'
             
