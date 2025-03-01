@@ -58,5 +58,5 @@
     }
     
     // Enregistrer le contrôleur
-    window.Stimulus.register("alphabet-display", AlphabetDisplayController);
+    window.StimulusApp.register("alphabet-display", AlphabetDisplayController);
 })();

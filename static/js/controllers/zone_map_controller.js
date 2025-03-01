@@ -2,7 +2,7 @@
 (() => {
     console.log('=== DEBUG: Preparing Zone Map Controller ===');
     
-    class ZoneMapController extends window.Stimulus.Controller {
+    class ZoneMapController extends Stimulus.Controller {
         static targets = ["container"]
         static values = {
             zoneId: String
@@ -235,7 +235,7 @@
 
     // Enregistrer le contrôleur
     try {
-        window.Stimulus.register('zone-map', ZoneMapController);
+        window.StimulusApp.register('zone-map', ZoneMapController);
         console.log('=== DEBUG: Zone Map Controller enregistré ===');
     } catch (error) {
         console.error('Erreur lors de l\'enregistrement du contrôleur:', error);

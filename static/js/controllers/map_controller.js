@@ -1,6 +1,6 @@
 // Map Controller
 (() => {
-    class MapController extends window.Stimulus.Controller {
+    class MapController extends Stimulus.Controller {
         static targets = ["container", "popup", "popupContent"]
         static values = {
             geocacheId: String,
@@ -465,7 +465,7 @@
 
     // Register the controller
     try {
-        window.Stimulus.register('map', MapController);
+        window.StimulusApp.register('map', MapController);
     } catch (error) {
         console.error('Error registering map controller:', error);
     }
