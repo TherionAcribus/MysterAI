@@ -1,0 +1,48 @@
+<div class="w-full h-full bg-gray-900 overflow-auto p-4"
+     hx-ext="include-vals"
+     hx-headers='{"X-Layout-Component": "true"}'
+     data-controller="geocache-solver"
+     data-geocache-solver-geocache-id-value="{{ geocache_id }}"
+     data-geocache-solver-gc-code-value="{{ gc_code }}">
+    
+    <div class="max-w-4xl mx-auto">
+        <!-- En-tête -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-100 mb-2">Solver pour {{ gc_code }}</h1>
+            <div class="text-gray-400">
+                Outil de résolution pour l'énigme de la géocache
+            </div>
+        </div>
+
+        <!-- Contenu du Solver -->
+        <div id="solver-content" class="space-y-4">
+            <!-- Section de chargement -->
+            <div class="animate-pulse" data-geocache-solver-target="loading">
+                <div class="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
+                <div class="h-4 bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div class="h-4 bg-gray-700 rounded w-2/3"></div>
+            </div>
+
+            <!-- Contenu de la description -->
+            <div data-geocache-solver-target="description" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-3">Description de la géocache</h2>
+                    <textarea 
+                        data-geocache-solver-target="descriptionText"
+                        class="w-full h-64 bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        readonly
+                    ></textarea>
+                </div>
+            </div>
+
+            <!-- Message d'erreur -->
+            <div data-geocache-solver-target="error" class="hidden">
+                <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                    Une erreur est survenue lors du chargement des données.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/controllers/geocache_solver_controller.js"></script>

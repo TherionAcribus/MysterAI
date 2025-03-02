@@ -765,3 +765,16 @@ def get_geocache_gallery(geocache_id):
     geocache = Geocache.query.options(db.joinedload(Geocache.images)).get_or_404(geocache_id)
     
     return render_template('partials/geocache_gallery.html', geocache=geocache)
+
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/solver/panel', methods=['GET'])
+def get_geocache_solver_panel(geocache_id):
+    """Renvoie le panneau HTML du solver d'une géocache."""
+    try:
+        geocache = Geocache.query.get_or_404(geocache_id)
+        return render_template('geocache_solver.html',
+                             geocache_id=geocache.id,
+                             gc_code=geocache.gc_code)
+    except Exception as e:
+        logger.error(f"Error getting geocache solver panel for {geocache_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500

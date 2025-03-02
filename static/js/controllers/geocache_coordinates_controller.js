@@ -184,4 +184,27 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             geocacheId: geocacheId
         });
     }
+
+    openSolver(event) {
+        console.log("openSolver method called");
+        const button = event.currentTarget;
+        const geocacheId = button.dataset.geocacheId;
+        const gcCode = button.dataset.gcCode;
+        
+        console.log("Opening solver for", {
+            geocacheId: geocacheId,
+            gcCode: gcCode
+        });
+
+        // Ajouter un nouvel onglet avec le composant geocache-solver
+        mainLayout.root.contentItems[0].addChild({
+            type: 'component',
+            componentName: 'geocache-solver',
+            title: `Solver ${gcCode}`,
+            componentState: { 
+                geocacheId: geocacheId,
+                gcCode: gcCode
+            }
+        });
+    }
 }

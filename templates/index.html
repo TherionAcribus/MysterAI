@@ -418,6 +418,25 @@
                 })
                 .catch(error => console.error('Error loading controller:', error));
             
+            // Load Solver controller
+            fetch('/js/controllers/geocache_solver_controller.js')
+                .then(response => response.text())
+                .then(code => {
+                    // Create a new script element and add it to the page
+                    const script = document.createElement('script');
+                    script.textContent = code;
+                    document.head.appendChild(script);
+                    
+                    // Now register the controller
+                    if (typeof GeocacheSolverController !== 'undefined') {
+                        application.register('geocache-solver', GeocacheSolverController);
+                        console.log('Geocache solver controller registered');
+                    } else {
+                        console.error('GeocacheSolverController not found after loading');
+                    }
+                })
+                .catch(error => console.error('Error loading controller:', error));
+            
             // Initialize layout state manager
             const layoutStateManager = new LayoutStateManager();
             
@@ -478,6 +497,25 @@
                 
                 // Charger le contenu via HTMX
                 htmx.ajax('GET', `/geocaches/${state.geocacheId}/details/panel`, {
+                    target: container.getElement(),
+                    swap: 'innerHTML'
+                }).then(() => {
+                    // Réinitialiser les contrôleurs Stimulus dans le composant
+                    const element = container.getElement();
+                    application.controllers.forEach(controller => {
+                        if (element.contains(controller.element)) {
+                            controller.disconnect();
+                        }
+                    });
+                    application.start();
+                });
+            });
+            
+            layout.registerComponent('geocache-solver', function(container, state) {
+                container.getElement().innerHTML = '<div class="loading">Loading...</div>';
+                
+                // Charger le contenu du solver via HTMX
+                htmx.ajax('GET', `/geocaches/${state.geocacheId}/solver/panel`, {
                     target: container.getElement(),
                     swap: 'innerHTML'
                 }).then(() => {

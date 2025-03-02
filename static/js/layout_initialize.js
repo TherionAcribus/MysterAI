@@ -491,6 +491,44 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant geocache-solver
+        mainLayout.registerComponent('geocache-solver', function(container, state) {
+            container.getElement().html('<div class="loading">Loading...</div>');
+            
+            // Charger le contenu du solver via HTMX
+            fetch(`/geocaches/${state.geocacheId}/solver/panel`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    container.getElement().html(html);
+                    
+                    // Réinitialiser les contrôleurs Stimulus dans le composant
+                    const $element = container.getElement();
+                    const domElement = $element[0]; // Obtenir l'élément DOM à partir de jQuery
+                    
+                    if (window.StimulusApp && window.StimulusApp.controllers) {
+                        window.StimulusApp.controllers.forEach(controller => {
+                            if (controller.element && domElement.contains(controller.element)) {
+                                controller.disconnect();
+                            }
+                        });
+                    }
+                    
+                    // Démarrer Stimulus
+                    if (window.StimulusApp) {
+                        window.StimulusApp.start();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur de chargement du solver:', error);
+                    container.getElement().html(`<div class="error">Erreur: ${error.message}</div>`);
+                });
+        });
+
         // Enregistrer le composant Plugin
         mainLayout.registerComponent('plugin', function(container, state) {
             // Construire l'URL avec les paramètres
