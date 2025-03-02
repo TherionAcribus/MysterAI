@@ -1,0 +1,88 @@
+<!-- Template pour l'interface du plugin sélectionné dans le Solver -->
+<div class="w-full bg-gray-800 rounded-lg p-4 mt-4">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-100">{{ plugin.name }} <span class="text-xs text-gray-400">v{{ plugin.version }}</span></h2>
+        <button 
+            class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md text-sm"
+            data-action="click->geocache-solver#closePlugin">
+            Retour
+        </button>
+    </div>
+    
+    <div class="plugin-description mb-4">
+        <p class="text-gray-300">{{ plugin.description }}</p>
+    </div>
+    
+    <form class="space-y-4" data-action="submit->geocache-solver#executePlugin" data-plugin-id="{{ plugin.id }}" data-plugin-name="{{ plugin.name }}">
+        {% if plugin.input_types %}
+            <div class="plugin-inputs space-y-3">
+                {% for name, info in plugin.input_types.items() %}
+                    <div class="form-group">
+                        <label for="input-{{ name }}" class="block text-sm font-medium text-gray-300 mb-1">{{ info.label }}</label>
+                        
+                        {% if info.type == 'textarea' %}
+                            <textarea 
+                                id="input-{{ name }}" 
+                                name="{{ name }}" 
+                                rows="4"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                {% if info.required %}required{% endif %}
+                            ></textarea>
+                        {% elif info.type == 'select' %}
+                            <select 
+                                id="input-{{ name }}" 
+                                name="{{ name }}" 
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                {% if info.required %}required{% endif %}
+                            >
+                                {% for option in info.options %}
+                                    <option value="{{ option.value }}">{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elif info.type == 'number' %}
+                            <input 
+                                type="number" 
+                                id="input-{{ name }}" 
+                                name="{{ name }}" 
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                {% if info.min is defined %}min="{{ info.min }}"{% endif %}
+                                {% if info.max is defined %}max="{{ info.max }}"{% endif %}
+                                {% if info.step is defined %}step="{{ info.step }}"{% endif %}
+                                {% if info.required %}required{% endif %}
+                            >
+                        {% else %}
+                            <input 
+                                type="text" 
+                                id="input-{{ name }}" 
+                                name="{{ name }}" 
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                {% if info.required %}required{% endif %}
+                            >
+                        {% endif %}
+                        
+                        {% if info.description %}
+                            <p class="text-xs text-gray-400 mt-1">{{ info.description }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        
+        <div class="flex justify-end">
+            <button 
+                type="submit" 
+                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors">
+                Exécuter
+            </button>
+        </div>
+    </form>
+    
+    <div class="plugin-result mt-4 hidden" data-geocache-solver-target="pluginResult">
+        <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+            <div class="text-sm text-gray-300 whitespace-pre-wrap" data-geocache-solver-target="pluginResultText"></div>
+        </div>
+    </div>
+</div>
