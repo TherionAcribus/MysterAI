@@ -146,7 +146,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 if (this.hasLastPluginOutputValue && this.lastPluginOutputValue) {
                     this.pluginInputTextTarget.value = this.lastPluginOutputValue;
                 } else {
-                    // Sinon, utiliser le contenu de la description
+                    // Sinon, utiliser le contenu actuel de la description
                     this.pluginInputTextTarget.value = this.descriptionTextTarget.value;
                 }
             }
@@ -183,6 +183,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         formData.forEach((value, key) => {
             data[key] = value;
         });
+        
+        // Ajouter le texte actuel de la description
+        if (this.hasDescriptionTextTarget) {
+            data['text'] = this.descriptionTextTarget.value;
+        }
         
         try {
             // Afficher un indicateur de chargement dans la zone de résultat
