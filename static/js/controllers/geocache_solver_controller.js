@@ -8,13 +8,16 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         "pluginsPanel", 
         "togglePluginsButton",
         "pluginList",
-        "pluginResult"
+        "pluginResult",
+        "pluginResultText",
+        "pluginInputText"
     ]
     
     static values = {
         geocacheId: String,
         gcCode: String,
-        selectedPlugin: String
+        selectedPlugin: String,
+        lastPluginOutput: String
     }
 
     connect() {
@@ -129,7 +132,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             this.selectedPluginValue = pluginName;
             
             // Charger l'interface du plugin
-            const response = await fetch(`/api/plugins/${pluginName}/interface`);
+            const response = await fetch(`/api/plugins/${pluginName}/interface?from_solver=true`);
             if (!response.ok) {
                 throw new Error(`Erreur lors du chargement de l'interface du plugin: ${response.statusText}`);
             }
@@ -137,11 +140,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             const html = await response.text();
             this.pluginsPanelTarget.innerHTML = html;
             
-            // Pré-remplir la zone de texte avec le contenu de la description si nécessaire
-            const textInputs = this.pluginsPanelTarget.querySelectorAll('textarea');
-            if (textInputs.length > 0) {
-                // Utiliser seulement le premier textarea trouvé
-                textInputs[0].value = this.descriptionTextTarget.value;
+            // Remplir automatiquement le champ de texte caché
+            if (this.hasPluginInputTextTarget) {
+                // Si nous avons déjà un résultat de plugin précédent, l'utiliser
+                if (this.hasLastPluginOutputValue && this.lastPluginOutputValue) {
+                    this.pluginInputTextTarget.value = this.lastPluginOutputValue;
+                } else {
+                    // Sinon, utiliser le contenu de la description
+                    this.pluginInputTextTarget.value = this.descriptionTextTarget.value;
+                }
             }
         } catch (error) {
             console.error('Erreur:', error);
@@ -152,17 +159,32 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     async executePlugin(event) {
         event.preventDefault();
         
-        const form = event.currentTarget;
-        const pluginName = form.dataset.pluginName;
+        // Récupérer les données du formulaire
+        let pluginName;
+        let formData;
+        
+        if (event.currentTarget.tagName === 'FORM') {
+            // Si c'est un formulaire
+            const form = event.currentTarget;
+            pluginName = form.dataset.pluginName;
+            formData = new FormData(form);
+        } else {
+            // Si c'est un bouton
+            const button = event.currentTarget;
+            pluginName = button.dataset.pluginName;
+            
+            // Trouver le formulaire dans le panneau des plugins
+            const form = this.pluginsPanelTarget.querySelector('form');
+            formData = new FormData(form);
+        }
+        
+        // Convertir FormData en objet
+        const data = {};
+        formData.forEach((value, key) => {
+            data[key] = value;
+        });
         
         try {
-            // Récupérer les données du formulaire
-            const formData = new FormData(form);
-            const data = {};
-            formData.forEach((value, key) => {
-                data[key] = value;
-            });
-            
             // Afficher un indicateur de chargement dans la zone de résultat
             if (this.hasPluginResultTarget) {
                 this.pluginResultTarget.classList.remove('hidden');
@@ -187,19 +209,37 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             // Afficher le résultat
             if (this.hasPluginResultTarget) {
                 this.pluginResultTarget.classList.remove('hidden');
+                let resultText = '';
+                
                 if (result.text_output) {
+                    resultText = result.text_output;
                     this.pluginResultTarget.innerHTML = `
                         <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
-                            <div class="text-sm text-gray-300 whitespace-pre-wrap">${result.text_output}</div>
+                            <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultText}</div>
                         </div>
                     `;
                 } else {
+                    resultText = JSON.stringify(result, null, 2);
                     this.pluginResultTarget.innerHTML = `
                         <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
-                            <div class="text-sm text-gray-300">Résultat: ${JSON.stringify(result, null, 2)}</div>
+                            <div class="text-sm text-gray-300">Résultat: ${resultText}</div>
                         </div>
                     `;
                 }
+                
+                // Stocker le résultat pour le prochain plugin
+                this.lastPluginOutputValue = resultText;
+                
+                // Ajouter un bouton pour appliquer un autre plugin sur ce résultat
+                this.pluginResultTarget.innerHTML += `
+                    <div class="mt-3 flex justify-end">
+                        <button 
+                            data-action="click->geocache-solver#loadPluginsList"
+                            class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors">
+                            Appliquer un autre plugin
+                        </button>
+                    </div>
+                `;
             }
         } catch (error) {
             console.error('Erreur:', error);

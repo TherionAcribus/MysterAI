@@ -11,7 +11,7 @@
                     <p class="text-gray-400">Version {{ plugin.version }}</p>
                 </div>
                 <div class="text-gray-400">
-                    <p>Auteur: {{ plugin.author }}</p>
+                    <p>Auteur!: {{ plugin.author }}</p>
                 </div>
             </div>
             
@@ -32,40 +32,48 @@
               id="plugin-form-{{ plugin.params.get('geocacheId', 'default') }}">
             
             {% for input_name, input_config in plugin.input_types.items() %}
-                <div class="mb-4">
-                    <label for="{{ input_name }}" class="block text-sm font-medium text-gray-300 mb-2">
-                        {{ input_config.label }}
-                    </label>
+                {% if input_name == 'mode' and 'solver' in plugin.categories %}
+                    <!-- Mode caché mais toujours présent avec valeur "decode" pour les plugins Solver -->
+                    <input type="hidden" id="{{ input_name }}" name="{{ input_name }}" value="decode">
+                {% elif (input_name == 'text' or input_name == 'input_text') and 'solver' in plugin.categories %}
+                    <!-- Texte à traiter caché mais présent pour les plugins Solver -->
+                    <input type="hidden" id="{{ input_name }}" name="{{ input_name }}" data-geocache-solver-target="pluginInputText">
+                {% else %}
+                    <div class="mb-4">
+                        <label for="{{ input_name }}" class="block text-sm font-medium text-gray-300 mb-2">
+                            {{ input_config.label }}
+                        </label>
 
-                    {% if input_config.type == "string" %}
-                        <input type="text" 
-                               id="{{ input_name }}"
-                               name="{{ input_name }}"
-                               class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="{{ input_config.placeholder|default('') }}"
-                               value="{{ plugin.params.get(input_name, input_config.default|default('')) }}">
-                    {% elif input_config.type == "select" %}
-                        <select id="{{ input_name }}"
+                        {% if input_config.type == "string" %}
+                            <input type="text" 
+                                id="{{ input_name }}"
                                 name="{{ input_name }}"
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {% for option in input_config.options %}
-                                <option value="{{ option }}" 
-                                        {% if option == input_config.default %}selected{% endif %}>
-                                    {{ option }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    {% elif input_config.type == "checkbox" or input_config.type == "boolean" %}
-                        <div class="flex items-center">
-                            <input type="checkbox" 
-                                   id="{{ input_name }}"
-                                   name="{{ input_name }}"
-                                   class="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                                   {% if input_config.default %}checked{% endif %}>
-                            <span class="ml-2 text-sm text-gray-300">{{ input_config.description|default('') }}</span>
-                        </div>
-                    {% endif %}
-                </div>
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="{{ input_config.placeholder|default('') }}"
+                                value="{{ plugin.params.get(input_name, input_config.default|default('')) }}">
+                        {% elif input_config.type == "select" %}
+                            <select id="{{ input_name }}"
+                                    name="{{ input_name }}"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                {% for option in input_config.options %}
+                                    <option value="{{ option }}" 
+                                            {% if option == input_config.default %}selected{% endif %}>
+                                        {{ option }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% elif input_config.type == "checkbox" or input_config.type == "boolean" %}
+                            <div class="flex items-center">
+                                <input type="checkbox" 
+                                        id="{{ input_name }}"
+                                        name="{{ input_name }}"
+                                        class="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                                        {% if input_config.default %}checked{% endif %}>
+                                <span class="ml-2 text-sm text-gray-300">{{ input_config.description|default('') }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
             {% endfor %}
 
             <!-- Option brute-force si disponible -->
@@ -73,9 +81,9 @@
                 <div class="mb-4 mt-6 border-t border-gray-700 pt-4">
                     <div class="flex items-center">
                         <input type="checkbox" 
-                               id="brute_force"
-                               name="brute_force"
-                               class="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500">
+                                id="brute_force"
+                                name="brute_force"
+                                class="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500">
                         <label for="brute_force" class="ml-2 text-sm font-medium text-gray-300">
                             Utiliser le mode force brute
                         </label>
@@ -84,23 +92,44 @@
             {% endif %}
 
             <div class="mt-6 flex justify-end space-x-4">
-                <button type="button" 
-                        onclick="executePlugin()"
-                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    Exécuter
-                </button>
+                {% if 'solver' in plugin.categories %}
+                    <button type="button" 
+                            data-action="click->geocache-solver#closePlugin"
+                            class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        Retour
+                    </button>
+                    <button type="button" 
+                            data-action="click->geocache-solver#executePlugin"
+                            data-plugin-id="{{ plugin.id }}"
+                            data-plugin-name="{{ plugin.name }}"
+                            class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        Exécuter
+                    </button>
+                {% else %}
+                    <button type="button" 
+                            onclick="executePlugin()"
+                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Exécuter
+                    </button>
+                {% endif %}
             </div>
-        </form>
-        {% else %}
-        <form id="plugin-form-{{ plugin.params.get('geocacheId') }}" class="hidden">
-            <input type="hidden" name="geocache_id" value="{{ plugin.params.get('geocacheId') }}">
         </form>
         {% endif %}
 
         <!-- Zone de résultat -->
-        <div id="plugin-output-{{ plugin.params.get('geocacheId', 'default') }}" class="bg-gray-800 rounded-lg p-6 hidden">
+        <div id="plugin-output-{{ plugin.params.get('geocacheId', 'default') }}" 
+             class="bg-gray-800 rounded-lg p-6 {% if not plugin.params.get('geocacheId') %}hidden{% endif %} {% if 'solver' in plugin.categories %}hidden{% endif %}"
+             {% if 'solver' in plugin.categories %}data-geocache-solver-target="pluginResult"{% endif %}>
             <!-- La zone sera remplie dynamiquement par le JavaScript -->
         </div>
+        
+        {% if 'solver' in plugin.categories %}
+        <div class="plugin-result mt-4 hidden" data-geocache-solver-target="pluginResult">
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                <div class="text-sm text-gray-300 whitespace-pre-wrap" data-geocache-solver-target="pluginResultText"></div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

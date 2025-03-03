@@ -17,56 +17,64 @@
         {% if plugin.input_types %}
             <div class="plugin-inputs space-y-3">
                 {% for name, info in plugin.input_types.items() %}
-                    <div class="form-group">
-                        <label for="input-{{ name }}" class="block text-sm font-medium text-gray-300 mb-1">{{ info.label }}</label>
-                        
-                        {% if info.type == 'textarea' %}
-                            <textarea 
-                                id="input-{{ name }}" 
-                                name="{{ name }}" 
-                                rows="4"
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
-                                {% if info.required %}required{% endif %}
-                            ></textarea>
-                        {% elif info.type == 'select' %}
-                            <select 
-                                id="input-{{ name }}" 
-                                name="{{ name }}" 
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                {% if info.required %}required{% endif %}
-                            >
-                                {% for option in info.options %}
-                                    <option value="{{ option.value }}">{{ option.label }}</option>
-                                {% endfor %}
-                            </select>
-                        {% elif info.type == 'number' %}
-                            <input 
-                                type="number" 
-                                id="input-{{ name }}" 
-                                name="{{ name }}" 
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
-                                {% if info.min is defined %}min="{{ info.min }}"{% endif %}
-                                {% if info.max is defined %}max="{{ info.max }}"{% endif %}
-                                {% if info.step is defined %}step="{{ info.step }}"{% endif %}
-                                {% if info.required %}required{% endif %}
-                            >
-                        {% else %}
-                            <input 
-                                type="text" 
-                                id="input-{{ name }}" 
-                                name="{{ name }}" 
-                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
-                                {% if info.required %}required{% endif %}
-                            >
-                        {% endif %}
-                        
-                        {% if info.description %}
-                            <p class="text-xs text-gray-400 mt-1">{{ info.description }}</p>
-                        {% endif %}
-                    </div>
+                    {% if name == 'mode' %}
+                        <!-- Mode caché mais toujours présent avec valeur "decode" -->
+                        <input type="hidden" name="mode" value="decode">
+                    {% elif name == 'text' or name == 'input_text' %}
+                        <!-- Texte à traiter caché mais présent -->
+                        <input type="hidden" name="{{ name }}" data-geocache-solver-target="pluginInputText">
+                    {% else %}
+                        <div class="form-group">
+                            <label for="input-{{ name }}" class="block text-sm font-medium text-gray-300 mb-1">{{ info.label }}</label>
+                            
+                            {% if info.type == 'textarea' %}
+                                <textarea 
+                                    id="input-{{ name }}" 
+                                    name="{{ name }}" 
+                                    rows="4"
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                    {% if info.required %}required{% endif %}
+                                ></textarea>
+                            {% elif info.type == 'select' %}
+                                <select 
+                                    id="input-{{ name }}" 
+                                    name="{{ name }}" 
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    {% if info.required %}required{% endif %}
+                                >
+                                    {% for option in info.options %}
+                                        <option value="{{ option.value }}">{{ option.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% elif info.type == 'number' %}
+                                <input 
+                                    type="number" 
+                                    id="input-{{ name }}" 
+                                    name="{{ name }}" 
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                    {% if info.min is defined %}min="{{ info.min }}"{% endif %}
+                                    {% if info.max is defined %}max="{{ info.max }}"{% endif %}
+                                    {% if info.step is defined %}step="{{ info.step }}"{% endif %}
+                                    {% if info.required %}required{% endif %}
+                                >
+                            {% else %}
+                                <input 
+                                    type="text" 
+                                    id="input-{{ name }}" 
+                                    name="{{ name }}" 
+                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    {% if info.placeholder %}placeholder="{{ info.placeholder }}"{% endif %}
+                                    {% if info.required %}required{% endif %}
+                                >
+                            {% endif %}
+                            
+                            {% if info.description %}
+                                <p class="text-xs text-gray-400 mt-1">{{ info.description }}</p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endif %}

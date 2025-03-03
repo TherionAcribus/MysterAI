@@ -184,6 +184,16 @@ def get_plugin_interface(plugin_name):
         with open(plugin_json_path, 'r', encoding='utf-8') as f:
             plugin_data = json.load(f)
             
+        # Récupérer les catégories existantes
+        categories = json.loads(plugin.categories)
+        
+        # Vérifier si la requête provient du Solver
+        referer = request.headers.get('Referer', '')
+        if 'geocache_solver' in referer or request.args.get('from_solver'):
+            # Ajouter la catégorie "solver" si elle n'existe pas déjà
+            if 'solver' not in categories:
+                categories.append('solver')
+            
         # Fusionner les données de la base avec celles du plugin.json
         plugin_data.update({
             'id': plugin.id,
@@ -191,7 +201,7 @@ def get_plugin_interface(plugin_name):
             'version': plugin.version,
             'description': plugin.description,
             'author': plugin.author,
-            'categories': json.loads(plugin.categories)
+            'categories': categories
         })
 
         # Récupérer les paramètres de l'URL
