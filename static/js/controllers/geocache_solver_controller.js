@@ -310,7 +310,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         // Récupérer l'ID et le nom du plugin
         const pluginId = event.currentTarget.dataset.pluginId;
         const pluginName = event.currentTarget.dataset.pluginName;
-        const useDescription = event.currentTarget.hasAttribute('data-use-description');
         const pluginZoneId = event.currentTarget.dataset.pluginZoneId;
         
         console.log("Exécution du plugin:", pluginName, "dans la zone:", pluginZoneId);
@@ -320,7 +319,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             // Récupérer le texte à traiter (soit le résultat du plugin précédent, soit le texte de la description)
             let textToProcess = '';
             
-            if (useDescription || !this.lastPluginOutputValue) {
+            if (!this.lastPluginOutputValue) {
                 // Utiliser le texte de la description
                 textToProcess = this.descriptionTextTarget.value;
                 console.log("Utilisation du texte de la description:", textToProcess);
@@ -487,15 +486,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             </svg>
                             Appliquer un nouveau plugin
                         </button>
-                        <button 
-                            id="use-description-btn"
-                            class="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-                            data-action="click->geocache-solver#addNewPluginZoneWithDescription">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-                            </svg>
-                            Utiliser la description
-                        </button>
                     </div>
                 `;
                 
@@ -649,87 +639,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             data-plugin-id="${plugin.id}"
                             data-plugin-name="${plugin.name}"
                             data-plugin-zone-id="${newPluginZoneId}"
-                            class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-medium transition-colors">
-                            Sélectionner
-                        </button>
-                    </div>
-                `;
-            });
-            
-            pluginsListHtml += `
-                </div>
-            `;
-            
-            // Mettre à jour le contenu de la nouvelle zone
-            document.getElementById(newPluginZoneId).innerHTML = pluginsListHtml;
-            
-        } catch (error) {
-            console.error('Erreur lors de l\'ajout d\'une nouvelle zone de plugin:', error);
-        }
-    }
-    
-    async addNewPluginZoneWithDescription() {
-        console.log("addNewPluginZoneWithDescription appelé");
-        
-        try {
-            // Créer une nouvelle zone de recherche de plugins
-            const newPluginZoneId = `plugin-zone-${Date.now()}`;
-            const newPluginZone = document.createElement('div');
-            newPluginZone.id = newPluginZoneId;
-            newPluginZone.className = 'bg-gray-800 rounded-lg p-4 mb-4 mt-4';
-            newPluginZone.setAttribute('data-plugin-selection-zone', 'true');
-            
-            // Afficher un loader pendant le chargement
-            newPluginZone.innerHTML = `
-                <h2 class="text-lg font-semibold text-gray-100 mb-3">Appliquer un nouveau plugin</h2>
-                <div class="animate-pulse">
-                    <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                    <div class="h-4 bg-gray-700 rounded w-1/2 mb-2"></div>
-                    <div class="h-4 bg-gray-700 rounded w-2/3"></div>
-                </div>
-            `;
-            
-            // Ajouter la nouvelle zone à la fin du conteneur de résultats
-            this.resultsContainerTarget.appendChild(newPluginZone);
-            
-            // Charger la liste des plugins dans cette nouvelle zone
-            const response = await fetch('/api/plugins?context=solver');
-            
-            if (!response.ok) {
-                throw new Error('Erreur lors du chargement des plugins');
-            }
-            
-            const plugins = await response.json();
-            
-            // Générer le HTML pour la liste des plugins (similaire à loadPluginsList)
-            let pluginsListHtml = `
-                <h2 class="text-lg font-semibold text-gray-100 mb-3">Plugins disponibles</h2>
-                
-                <div class="mb-4">
-                    <input 
-                        type="text" 
-                        placeholder="Rechercher un plugin..." 
-                        class="w-full px-3 py-2 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                        data-action="input->geocache-solver#filterPlugins">
-                </div>
-                
-                <div class="space-y-2 plugin-list">
-            `;
-            
-            // Ajouter chaque plugin à la liste
-            plugins.forEach(plugin => {
-                pluginsListHtml += `
-                    <div class="plugin-item flex items-center justify-between p-2 rounded-md hover:bg-gray-700 transition-colors" data-plugin-name="${plugin.name.toLowerCase()}">
-                        <div>
-                            <div class="font-medium text-gray-200">${plugin.name}</div>
-                            <div class="text-xs text-gray-400">${plugin.description || 'Aucune description'}</div>
-                        </div>
-                        <button 
-                            data-action="click->geocache-solver#selectPlugin" 
-                            data-plugin-id="${plugin.id}"
-                            data-plugin-name="${plugin.name}"
-                            data-plugin-zone-id="${newPluginZoneId}"
-                            data-use-description
                             class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-medium transition-colors">
                             Sélectionner
                         </button>
