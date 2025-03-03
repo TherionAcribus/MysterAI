@@ -189,7 +189,9 @@ def get_plugin_interface(plugin_name):
         
         # Vérifier si la requête provient du Solver
         referer = request.headers.get('Referer', '')
-        if 'geocache_solver' in referer or request.args.get('from_solver'):
+        context = request.args.get('context', '')
+        
+        if 'geocache_solver' in referer or request.args.get('from_solver') or context == 'solver':
             # Ajouter la catégorie "solver" si elle n'existe pas déjà
             if 'solver' not in categories:
                 categories.append('solver')

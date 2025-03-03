@@ -92,12 +92,12 @@
             {% endif %}
 
             <div class="mt-6 flex justify-end space-x-4">
+                <button type="button" 
+                        data-action="click->geocache-solver#cancelPlugin"
+                        class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    Annuler
+                </button>
                 {% if 'solver' in plugin.categories %}
-                    <button type="button" 
-                            data-action="click->geocache-solver#closePlugin"
-                            class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                        Retour
-                    </button>
                     <button type="button" 
                             data-action="click->geocache-solver#executePlugin"
                             data-plugin-id="{{ plugin.id }}"
@@ -118,8 +118,7 @@
 
         <!-- Zone de résultat -->
         <div id="plugin-output-{{ plugin.params.get('geocacheId', 'default') }}" 
-             class="bg-gray-800 rounded-lg p-6 {% if not plugin.params.get('geocacheId') %}hidden{% endif %} {% if 'solver' in plugin.categories %}hidden{% endif %}"
-             {% if 'solver' in plugin.categories %}data-geocache-solver-target="pluginResult"{% endif %}>
+             class="bg-gray-800 rounded-lg p-6 {% if not plugin.params.get('geocacheId') %}hidden{% endif %} {% if 'solver' in plugin.categories %}hidden{% endif %}">
             <!-- La zone sera remplie dynamiquement par le JavaScript -->
         </div>
         

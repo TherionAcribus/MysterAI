@@ -47,8 +47,36 @@
                 </div>
                 
                 <!-- Zone de recherche de plugins (masquée par défaut) -->
-                <div data-geocache-solver-target="pluginsPanel" class="hidden">
-                    <!-- Sera remplacé par la liste des plugins ou l'interface d'un plugin -->
+                <div data-geocache-solver-target="pluginsPanel" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-3">Sélectionner un plugin</h2>
+                    <div class="mb-3">
+                        <input type="text" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-gray-200 text-sm" 
+                            placeholder="Rechercher un plugin..." 
+                            data-action="input->geocache-solver#filterPlugins">
+                    </div>
+                    <div class="plugin-list grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        <div class="animate-pulse">
+                            <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                            <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Conteneur pour les résultats et les nouvelles zones de plugin -->
+                <div data-geocache-solver-target="resultsContainer" class="space-y-4">
+                    <!-- Résultat du plugin -->
+                    <div data-geocache-solver-target="pluginResult" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
+                        <h2 class="text-lg font-semibold text-gray-100 mb-3">Résultat du plugin</h2>
+                        <div data-geocache-solver-target="pluginResultText" class="bg-gray-900 rounded-lg p-3 border border-gray-700 text-sm text-gray-300 whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+                
+                <!-- Historique des plugins -->
+                <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-3">Historique des plugins</h2>
+                    <div data-geocache-solver-target="pluginsResults" class="space-y-3">
+                        <!-- Sera rempli dynamiquement avec l'historique des plugins -->
+                    </div>
                 </div>
             </div>
 
