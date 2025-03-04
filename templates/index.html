@@ -23,10 +23,11 @@
     <script>
         (function() {
             // Créer l'application Stimulus
-            window.StimulusApp = Stimulus.Application.start();
+            window.application = Stimulus.Application.start();
+            window.StimulusApp = window.application; // Pour compatibilité
             
             // Debug logs
-            console.log('=== DEBUG: Stimulus initialized ===', window.StimulusApp);
+            console.log('=== DEBUG: Stimulus initialized ===', window.application);
         })();
     </script>
     
@@ -36,6 +37,7 @@
     <script src="/js/controllers/map_controller.js"></script>
     <script src="/js/controllers/zone_map_controller.js"></script>
     <script src="/js/controllers/alphabet_display_controller.js"></script>
+    <script src="/js/controllers/waypoint_form_controller.js"></script>
     
     <title>MysteryAI - Geocaching</title>
     <script>
@@ -396,8 +398,7 @@
             });
             
             // Initialize Stimulus application
-            const application = window.StimulusApp;
-            window.application = application;
+            const application = window.application;
             
             // Load controllers
             fetch('/js/controllers/geocache_coordinates_controller.js')
@@ -502,12 +503,12 @@
                 }).then(() => {
                     // Réinitialiser les contrôleurs Stimulus dans le composant
                     const element = container.getElement();
-                    application.controllers.forEach(controller => {
+                    window.application.controllers.forEach(controller => {
                         if (element.contains(controller.element)) {
                             controller.disconnect();
                         }
                     });
-                    application.start();
+                    window.application.start();
                 });
             });
             
@@ -521,12 +522,12 @@
                 }).then(() => {
                     // Réinitialiser les contrôleurs Stimulus dans le composant
                     const element = container.getElement();
-                    application.controllers.forEach(controller => {
+                    window.application.controllers.forEach(controller => {
                         if (element.contains(controller.element)) {
                             controller.disconnect();
                         }
                     });
-                    application.start();
+                    window.application.start();
                 });
             });
         };

@@ -1,12 +1,12 @@
 {
     "name": "metadetection",
-    "version": "1.1.0",
+    "version": "1.1.2",
     "description": "Plugin de détection de meta-informations sur une cache",
     "author": "MysterAI",
     "plugin_type": "python",
     "entry_point": "main.py",
     "dependencies": [],
-    "categories": ["Meta"],
+    "categories": ["AlphabetsDecryption", "Decryption"],
     "input_types": {
         "text": {
             "type": "string",

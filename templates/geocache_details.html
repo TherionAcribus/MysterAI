@@ -109,39 +109,115 @@
         </div>
 
         <!-- Waypoints -->
-        {% if geocache.additional_waypoints %}
-        <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h2 class="text-lg font-semibold text-gray-100 mb-4">Waypoints</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-700">
-                    <thead>
-                        <tr>
-                            <th class="px-4 py-2 text-left text-gray-300">Préfixe</th>
-                            <th class="px-4 py-2 text-left text-gray-300">Lookup</th>
-                            <th class="px-4 py-2 text-left text-gray-300">Nom</th>
-                            <th class="px-4 py-2 text-left text-gray-300">Coordonnées</th>
-                            <th class="px-4 py-2 text-left text-gray-300">Note</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-700">
-                        {% for wp in geocache.additional_waypoints %}
-                        <tr>
-                            <td class="px-4 py-2 text-gray-300">{{ wp.prefix }}</td>
-                            <td class="px-4 py-2 text-gray-300">{{ wp.lookup }}</td>
-                            <td class="px-4 py-2 text-gray-300">{{ wp.name }}</td>
-                            <td class="px-4 py-2 text-gray-300">
-                                {% if wp.latitude and wp.longitude %}
-                                    {{ wp.latitude }}, {{ wp.longitude }}
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-2 text-gray-300">{{ wp.note }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="waypoints-section" data-controller="waypoint-form">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Waypoints</h3>
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                    type="button"
+                    data-action="click->waypoint-form#toggleForm">
+              Ajouter un waypoint
+            </button>
+          </div>
+          
+          <!-- Formulaire d'ajout de waypoint (initialement caché) -->
+          <div class="waypoint-form-container bg-gray-700 p-4 rounded-lg mb-4 hidden" data-waypoint-form-target="formContainer">
+            <h4 class="text-white text-md font-medium mb-3">Nouveau Waypoint</h4>
+            <form>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpPrefix">
+                    Préfixe
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpPrefix" type="text" placeholder="Préfixe">
+                </div>
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLookup">
+                    Lookup
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLookup" type="text" placeholder="Lookup">
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-bold mb-2" for="wpName">
+                  Nom
+                </label>
+                <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                       id="wpName" type="text" placeholder="Nom du waypoint">
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLatitude">
+                    Latitude
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLatitude" type="text" placeholder="N 48° 51.402">
+                </div>
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLongitude">
+                    Longitude
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLongitude" type="text" placeholder="E 002° 21.048">
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-bold mb-2" for="wpNote">
+                  Note
+                </label>
+                <textarea class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                          id="wpNote" rows="3" placeholder="Notes sur le waypoint"></textarea>
+              </div>
+              
+              <div class="flex items-center justify-end">
+                <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline" 
+                        type="button"
+                        data-action="click->waypoint-form#toggleForm">
+                  Annuler
+                </button>
+                <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                        type="button">
+                  Sauvegarder
+                </button>
+              </div>
+            </form>
+          </div>
+          
+          {% if geocache.additional_waypoints %}
+          <table class="min-w-full bg-white">
+            <thead>
+              <tr>
+                <th class="px-4 py-2 text-left text-gray-300">Préfixe</th>
+                <th class="px-4 py-2 text-left text-gray-300">Lookup</th>
+                <th class="px-4 py-2 text-left text-gray-300">Nom</th>
+                <th class="px-4 py-2 text-left text-gray-300">Coordonnées</th>
+                <th class="px-4 py-2 text-left text-gray-300">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for wp in geocache.additional_waypoints %}
+              <tr>
+                <td class="px-4 py-2 text-gray-300">{{ wp.prefix }}</td>
+                <td class="px-4 py-2 text-gray-300">{{ wp.lookup }}</td>
+                <td class="px-4 py-2 text-gray-300">{{ wp.name }}</td>
+                <td class="px-4 py-2 text-gray-300">
+                  {% if wp.latitude and wp.longitude %}
+                      {{ wp.latitude }}, {{ wp.longitude }}
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2 text-gray-300">{{ wp.note }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="text-gray-600">Aucun waypoint supplémentaire n'a été ajouté.</p>
+          {% endif %}
         </div>
-        {% endif %}
 
         <!-- Indices -->
         {% if geocache.hints %}
@@ -186,7 +262,7 @@
                 data-geocache-id="{{ geocache.id }}"
                 data-gc-code="{{ geocache.gc_code }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+                    <path d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
                 </svg>
                 Solver
             </button>
