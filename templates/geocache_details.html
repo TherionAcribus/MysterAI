@@ -120,24 +120,25 @@
           </div>
           
           <!-- Formulaire d'ajout de waypoint (initialement caché) -->
-          <div class="waypoint-form-container bg-gray-700 p-4 rounded-lg mb-4 hidden" data-waypoint-form-target="formContainer">
-            <h4 class="text-white text-md font-medium mb-3">Nouveau Waypoint</h4>
+          <div class="waypoint-form-container bg-gray-700 p-4 rounded-lg mb-4 hidden" data-waypoint-form-target="form">
+            <h4 class="text-white text-md font-medium mb-3" data-waypoint-form-target="formTitle">Nouveau Waypoint</h4>
             <form data-action="submit->waypoint-form#submitForm">
-              <input type="hidden" name="geocache_id" value="{{ geocache.id }}">
+              <input type="hidden" name="geocache_id" value="{{ geocache.id }}" data-waypoint-form-target="geocacheIdInput">
+              <input type="hidden" name="waypoint_id" value="" data-waypoint-form-target="waypointIdInput">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label class="block text-gray-300 text-sm font-bold mb-2" for="wpPrefix">
                     Préfixe
                   </label>
                   <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                         id="wpPrefix" name="prefix" type="text" placeholder="Préfixe" data-waypoint-form-target="prefix">
+                         id="wpPrefix" name="prefix" type="text" placeholder="Préfixe" data-waypoint-form-target="prefixInput">
                 </div>
                 <div>
                   <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLookup">
                     Lookup
                   </label>
                   <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                         id="wpLookup" name="lookup" type="text" placeholder="Lookup" data-waypoint-form-target="lookup">
+                         id="wpLookup" name="lookup" type="text" placeholder="Lookup" data-waypoint-form-target="lookupInput">
                 </div>
               </div>
               
@@ -146,27 +147,27 @@
                   Nom
                 </label>
                 <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                       id="wpName" name="name" type="text" placeholder="Nom du waypoint" data-waypoint-form-target="name">
+                       id="wpName" name="name" type="text" placeholder="Nom du waypoint" data-waypoint-form-target="nameInput">
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLatitude">
-                    Latitude
+                    Latitude (format GC)
                   </label>
                   <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                         id="wpLatitude" name="latitude" type="text" 
+                         id="wpLatitude" name="gc_lat" type="text" 
                          placeholder="N 48° 51.402"
-                         value="{{ geocache.gc_lat }}" data-waypoint-form-target="latitude">
+                         value="{{ geocache.gc_lat }}" data-waypoint-form-target="gcLatInput">
                 </div>
                 <div>
                   <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLongitude">
-                    Longitude
+                    Longitude (format GC)
                   </label>
                   <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                         id="wpLongitude" name="longitude" type="text" 
+                         id="wpLongitude" name="gc_lon" type="text" 
                          placeholder="E 002° 21.048"
-                         value="{{ geocache.gc_lon }}" data-waypoint-form-target="longitude">
+                         value="{{ geocache.gc_lon }}" data-waypoint-form-target="gcLonInput">
                 </div>
               </div>
               
@@ -175,7 +176,7 @@
                   Note
                 </label>
                 <textarea class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                          id="wpNote" name="note" rows="3" placeholder="Notes sur le waypoint" data-waypoint-form-target="note"></textarea>
+                          id="wpNote" name="note" rows="3" placeholder="Notes sur le waypoint" data-waypoint-form-target="noteInput"></textarea>
               </div>
               
               <div class="flex items-center justify-end">
@@ -185,14 +186,10 @@
                   Annuler
                 </button>
                 <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
-                        type="submit">
-                  Sauvegarder
+                        type="submit"
+                        data-waypoint-form-target="submitButton">
+                  Ajouter le waypoint
                 </button>
-              </div>
-              
-              <!-- Indicateur de chargement -->
-              <div id="waypoint-form-indicator" class="flex justify-center mt-4 hidden" data-waypoint-form-target="indicator">
-                <div class="loader">Chargement...</div>
               </div>
             </form>
           </div>

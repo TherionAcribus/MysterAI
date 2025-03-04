@@ -118,6 +118,7 @@ def get_geocache(geocache_id):
             'longitude': wp.longitude,
             'gc_lat': wp.gc_lat,
             'gc_lon': wp.gc_lon,
+            'type': 'waypoint',
             'note': wp.note
         } for wp in geocache.additional_waypoints if wp.latitude is not None and wp.longitude is not None],
         'attributes': [{
@@ -785,15 +786,19 @@ def add_waypoint(geocache_id):
     """Ajoute un nouveau waypoint à une géocache."""
     logger.info(f"Route /api/geocaches/{geocache_id}/waypoints appelée avec méthode {request.method}")
     logger.info(f"Headers: {request.headers}")
-    logger.info(f"Form data: {request.form}")
     
     try:
         # Vérifier si la géocache existe
         geocache = Geocache.query.get_or_404(geocache_id)
         logger.info(f"Geocache trouvée: {geocache.gc_code} - {geocache.name}")
         
-        # Récupérer les données du formulaire
-        data = request.form
+        # Récupérer les données JSON ou du formulaire selon le Content-Type
+        if request.is_json:
+            data = request.json
+            logger.info(f"JSON data: {data}")
+        else:
+            data = request.form
+            logger.info(f"Form data: {data}")
         
         # Créer un nouveau waypoint
         waypoint = AdditionalWaypoint(
@@ -805,8 +810,9 @@ def add_waypoint(geocache_id):
         )
         
         # Définir les coordonnées
-        gc_lat = data.get('latitude', '')
-        gc_lon = data.get('longitude', '')
+        gc_lat = data.get('gc_lat')
+        gc_lon = data.get('gc_lon')
+        
         logger.info(f"Coordonnées reçues: {gc_lat}, {gc_lon}")
         
         # Convertir les coordonnées au format GC en coordonnées décimales
@@ -837,5 +843,114 @@ def add_waypoint(geocache_id):
         
     except Exception as e:
         logger.error(f"Erreur lors de l'ajout d'un waypoint: {e}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints/<int:waypoint_id>', methods=['DELETE'])
+def delete_waypoint(geocache_id, waypoint_id):
+    """Supprime un waypoint d'une géocache."""
+    logger.info(f"Route /api/geocaches/{geocache_id}/waypoints/{waypoint_id} appelée avec méthode {request.method}")
+    
+    try:
+        # Vérifier si la géocache existe
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier si le waypoint existe et appartient à la géocache
+        waypoint = AdditionalWaypoint.query.filter_by(id=waypoint_id, geocache_id=geocache_id).first_or_404()
+        
+        # Supprimer le waypoint
+        db.session.delete(waypoint)
+        db.session.commit()
+        
+        # Journaliser la suppression du waypoint
+        logger.info(f"Waypoint {waypoint_id} supprimé avec succès de la geocache {geocache_id}")
+        
+        # Renvoyer le HTML mis à jour pour la section des waypoints
+        return render_template('partials/waypoints_list.html', geocache=geocache)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du waypoint: {e}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints/<int:waypoint_id>', methods=['GET'])
+def get_waypoint(geocache_id, waypoint_id):
+    """Récupère les détails d'un waypoint."""
+    logger.info(f"Route GET /api/geocaches/{geocache_id}/waypoints/{waypoint_id} appelée")
+    
+    try:
+        # Vérifier si la géocache existe
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier si le waypoint existe et appartient à la géocache
+        waypoint = AdditionalWaypoint.query.filter_by(id=waypoint_id, geocache_id=geocache_id).first_or_404()
+        
+        # Renvoyer les détails du waypoint au format JSON
+        return jsonify({
+            'id': waypoint.id,
+            'geocache_id': waypoint.geocache_id,
+            'name': waypoint.name,
+            'prefix': waypoint.prefix,
+            'lookup': waypoint.lookup,
+            'gc_lat': waypoint.gc_lat,
+            'gc_lon': waypoint.gc_lon,
+            'note': waypoint.note
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération du waypoint: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints/<int:waypoint_id>', methods=['PUT'])
+def update_waypoint(geocache_id, waypoint_id):
+    """Met à jour un waypoint existant."""
+    logger.info(f"Route PUT /api/geocaches/{geocache_id}/waypoints/{waypoint_id} appelée")
+    
+    try:
+        # Vérifier si la géocache existe
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier si le waypoint existe et appartient à la géocache
+        waypoint = AdditionalWaypoint.query.filter_by(id=waypoint_id, geocache_id=geocache_id).first_or_404()
+        
+        # Récupérer les données du formulaire
+        data = request.json
+        
+        # Mettre à jour les champs du waypoint
+        waypoint.name = data.get('name', waypoint.name)
+        waypoint.prefix = data.get('prefix', waypoint.prefix)
+        waypoint.lookup = data.get('lookup', waypoint.lookup)
+        waypoint.note = data.get('note', waypoint.note)
+        
+        # Traiter les coordonnées
+        gc_lat = data.get('gc_lat')
+        gc_lon = data.get('gc_lon')
+        
+        if gc_lat and gc_lon:
+            # Convertir les coordonnées GC en coordonnées décimales
+            try:
+                # Importer la fonction de conversion
+                from app.models.geocache import gc_coords_to_decimal
+                lat_decimal, lon_decimal = gc_coords_to_decimal(gc_lat, gc_lon)
+                
+                # Utiliser la méthode set_location du modèle
+                waypoint.set_location(lat_decimal, lon_decimal, gc_lat, gc_lon)
+                
+                logger.info(f"Coordonnées converties: {gc_lat}, {gc_lon} -> {lat_decimal}, {lon_decimal}")
+            except Exception as e:
+                logger.error(f"Erreur lors de la conversion des coordonnées: {e}")
+                return jsonify({'error': f"Erreur lors de la conversion des coordonnées: {e}"}), 400
+        
+        # Enregistrer les modifications
+        db.session.commit()
+        
+        # Récupérer la liste mise à jour des waypoints
+        return render_template('partials/waypoints_list.html', geocache=geocache)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la mise à jour du waypoint: {e}")
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
