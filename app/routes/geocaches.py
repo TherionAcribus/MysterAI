@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
 import json
-from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage
+from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal
 from app.database import db
 from app.utils.geocache_scraper import scrape_geocache
 from shapely.geometry import Point
@@ -777,4 +777,65 @@ def get_geocache_solver_panel(geocache_id):
                              gc_code=geocache.gc_code)
     except Exception as e:
         logger.error(f"Error getting geocache solver panel for {geocache_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints', methods=['POST'])
+def add_waypoint(geocache_id):
+    """Ajoute un nouveau waypoint à une géocache."""
+    logger.info(f"Route /api/geocaches/{geocache_id}/waypoints appelée avec méthode {request.method}")
+    logger.info(f"Headers: {request.headers}")
+    logger.info(f"Form data: {request.form}")
+    
+    try:
+        # Vérifier si la géocache existe
+        geocache = Geocache.query.get_or_404(geocache_id)
+        logger.info(f"Geocache trouvée: {geocache.gc_code} - {geocache.name}")
+        
+        # Récupérer les données du formulaire
+        data = request.form
+        
+        # Créer un nouveau waypoint
+        waypoint = AdditionalWaypoint(
+            geocache_id=geocache_id,
+            name=data.get('name', ''),
+            prefix=data.get('prefix', ''),
+            lookup=data.get('lookup', ''),
+            note=data.get('note', '')
+        )
+        
+        # Définir les coordonnées
+        gc_lat = data.get('latitude', '')
+        gc_lon = data.get('longitude', '')
+        logger.info(f"Coordonnées reçues: {gc_lat}, {gc_lon}")
+        
+        # Convertir les coordonnées au format GC en coordonnées décimales
+        try:
+            # Utiliser la fonction utilitaire pour convertir les coordonnées
+            from app.models.geocache import gc_coords_to_decimal
+            lat_decimal, lon_decimal = gc_coords_to_decimal(gc_lat, gc_lon)
+            
+            logger.info(f"Coordonnées converties: {lat_decimal}, {lon_decimal}")
+            
+            # Définir les coordonnées
+            waypoint.set_location(lat_decimal, lon_decimal, gc_lat, gc_lon)
+        except Exception as e:
+            logger.error(f"Erreur lors de la conversion des coordonnées: {e}")
+            # En cas d'erreur de conversion, on utilise quand même les coordonnées GC
+            waypoint.gc_lat = gc_lat
+            waypoint.gc_lon = gc_lon
+        
+        # Ajouter et sauvegarder le waypoint
+        db.session.add(waypoint)
+        db.session.commit()
+        
+        # Journaliser l'ajout du waypoint
+        logger.info(f"Waypoint ajouté avec succès: {waypoint.name} pour geocache {geocache_id}")
+        
+        # Renvoyer le HTML mis à jour pour la section des waypoints
+        return render_template('partials/waypoints_list.html', geocache=geocache)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de l'ajout d'un waypoint: {e}")
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500

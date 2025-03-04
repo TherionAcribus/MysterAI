@@ -17,6 +17,43 @@ def dm_to_decimal(degrees, minutes):
     """Convertit des degrés et minutes décimales en degrés décimaux"""
     return degrees + (minutes / 60) * (1 if degrees >= 0 else -1)
 
+def gc_coords_to_decimal(gc_lat, gc_lon):
+    """Convertit des coordonnées au format Geocaching.com en coordonnées décimales
+    
+    Format attendu:
+    - gc_lat: "N 48° 51.402" ou "S 48° 51.402"
+    - gc_lon: "E 002° 21.048" ou "W 002° 21.048"
+    
+    Retourne:
+    - (latitude_decimal, longitude_decimal) ou (None, None) en cas d'erreur
+    """
+    try:
+        lat_decimal = None
+        lon_decimal = None
+        
+        if gc_lat and gc_lon:
+            # Latitude
+            lat_parts = gc_lat.split('°')
+            if len(lat_parts) == 2:
+                lat_deg = float(lat_parts[0].replace('N', '').replace('S', '').strip())
+                lat_min = float(lat_parts[1].strip())
+                lat_decimal = lat_deg + (lat_min / 60)
+                if 'S' in gc_lat:
+                    lat_decimal = -lat_decimal
+            
+            # Longitude
+            lon_parts = gc_lon.split('°')
+            if len(lon_parts) == 2:
+                lon_deg = float(lon_parts[0].replace('E', '').replace('W', '').strip())
+                lon_min = float(lon_parts[1].strip())
+                lon_decimal = lon_deg + (lon_min / 60)
+                if 'W' in gc_lon:
+                    lon_decimal = -lon_decimal
+        
+        return lat_decimal, lon_decimal
+    except Exception:
+        return None, None
+
 class Zone(db.Model):
     __table_args__ = {'extend_existing': True}
     id = db.Column(db.Integer, primary_key=True)
