@@ -57,6 +57,23 @@
                 // Créer la source de données pour les points
                 this.vectorSource = new ol.source.Vector();
 
+                // Créer la source de données pour les cercles
+                this.circlesSource = new ol.source.Vector();
+
+                // Créer la couche vectorielle pour les cercles
+                this.circlesLayer = new ol.layer.Vector({
+                    source: this.circlesSource,
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'rgba(255, 0, 0, 0.8)',
+                            width: 1
+                        }),
+                        fill: new ol.style.Fill({
+                            color: 'rgba(255, 0, 0, 0.1)'
+                        })
+                    })
+                });
+
                 // Créer la couche vectorielle pour les points
                 this.vectorLayer = new ol.layer.Vector({
                     source: this.vectorSource,
@@ -81,6 +98,7 @@
                         new ol.layer.Tile({
                             source: this.tileSources['OSM Standard']
                         }),
+                        this.circlesLayer,
                         this.vectorLayer
                     ],
                     view: new ol.View({
@@ -173,12 +191,107 @@
             });
 
             selector.appendChild(select);
+
+            // Ajouter une case à cocher pour les cercles
+            const circleDiv = document.createElement('div');
+            circleDiv.className = 'mt-2';
+
+            const circleCheckbox = document.createElement('input');
+            circleCheckbox.type = 'checkbox';
+            circleCheckbox.id = 'show-circles';
+            circleCheckbox.className = 'mr-2';
+            circleCheckbox.addEventListener('change', (e) => this.toggleCircles(e.target.checked));
+
+            const circleLabel = document.createElement('label');
+            circleLabel.htmlFor = 'show-circles';
+            circleLabel.className = 'text-sm';
+            circleLabel.textContent = 'Cercles 161m (Traditional)';
+
+            circleDiv.appendChild(circleCheckbox);
+            circleDiv.appendChild(circleLabel);
+            selector.appendChild(circleDiv);
+
             this.containerTarget.appendChild(selector);
         }
 
         changeBaseLayer(sourceName) {
             const tileLayer = this.map.getLayers().getArray().find(layer => layer instanceof ol.layer.Tile);
             tileLayer.setSource(this.tileSources[sourceName]);
+        }
+
+        toggleCircles(show) {
+            console.log('Toggle circles:', show);
+            if (show) {
+                this.createCirclesForTraditionals();
+            } else {
+                this.circlesSource.clear();
+            }
+        }
+
+        createCirclesForTraditionals() {
+            console.log('Creating circles for traditional caches');
+            // Effacer les cercles existants
+            this.circlesSource.clear();
+            
+            // Parcourir toutes les features
+            const features = this.vectorSource.getFeatures();
+            console.log('Total features:', features.length);
+            
+            let traditionalCount = 0;
+            
+            features.forEach(feature => {
+                const geocache = feature.get('geocache');
+                
+                // Vérifier si c'est une cache de type Traditional
+                if (geocache && geocache.cache_type === 'Traditional') {
+                    traditionalCount++;
+                    console.log('Found Traditional cache:', geocache.gc_code);
+                    
+                    const center = feature.getGeometry().getCoordinates();
+                    console.log('Center coordinates:', center);
+                    
+                    // Créer un cercle de 161m autour du point (convertir en mètres)
+                    // Note: OpenLayers utilise les mètres pour les projections métriques
+                    // 161m = 0.1 mile
+                    const circleRadius = 161;
+                    
+                    // Créer un cercle polygone (plus compatible avec différentes projections)
+                    const circlePolygon = this.createCirclePolygon(center, circleRadius);
+                    
+                    // Créer une feature pour le cercle
+                    const circleFeature = new ol.Feature({
+                        geometry: circlePolygon,
+                        name: `Circle for ${geocache.gc_code}`
+                    });
+                    
+                    // Ajouter la feature à la source
+                    this.circlesSource.addFeature(circleFeature);
+                    console.log('Added circle for:', geocache.gc_code);
+                }
+            });
+            
+            console.log('Traditional caches found:', traditionalCount);
+            console.log('Circles created:', this.circlesSource.getFeatures().length);
+        }
+        
+        // Créer un polygone circulaire (plus compatible avec différentes projections)
+        createCirclePolygon(center, radius) {
+            const points = 64; // Nombre de points pour approximer le cercle
+            const circle = new ol.geom.Polygon([]);
+            const coordinates = [];
+            
+            for (let i = 0; i < points; i++) {
+                const angle = (i * 2 * Math.PI) / points;
+                const x = center[0] + radius * Math.cos(angle);
+                const y = center[1] + radius * Math.sin(angle);
+                coordinates.push([x, y]);
+            }
+            
+            // Fermer le polygone
+            coordinates.push(coordinates[0]);
+            
+            circle.setCoordinates([coordinates]);
+            return circle;
         }
 
         showContextMenu(x, y, geocache) {
