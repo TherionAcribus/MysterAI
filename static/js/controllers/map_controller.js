@@ -59,6 +59,20 @@
         async initMap() {
             console.log("Initializing map...");
             
+            // Sources de tuiles OSM
+            this.tileSources = {
+                'OSM Standard': new ol.source.OSM(),
+                'OSM Cyclo': new ol.source.OSM({
+                    url: 'https://{a-c}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png'
+                }),
+                'OSM Topo': new ol.source.OSM({
+                    url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png'
+                })
+            };
+
+            // Créer le menu de sélection des fonds de carte
+            this.createBaseLayerSelector();
+
             // Create vector source for markers
             this.vectorSource = new ol.source.Vector();
 
@@ -90,7 +104,7 @@
                 target: this.containerTarget,
                 layers: [
                     new ol.layer.Tile({
-                        source: new ol.source.OSM(),
+                        source: this.tileSources['OSM Standard'],
                         zIndex: 0  // La carte en arrière-plan
                     }),
                     this.circleLayer,
@@ -460,6 +474,36 @@
                     })
                 })
             });
+        }
+
+        createBaseLayerSelector() {
+            const selector = document.createElement('div');
+            selector.className = 'absolute top-2 right-2 bg-white shadow-lg rounded-lg p-2';
+            selector.style.cssText = 'background-color: white; color: black; z-index: 1001;';
+
+            const title = document.createElement('label');
+            title.className = 'block text-sm font-medium mb-1';
+            title.textContent = 'Fond de carte';
+            selector.appendChild(title);
+
+            const select = document.createElement('select');
+            select.className = 'block w-full p-1 border border-gray-300 rounded-md text-sm';
+            select.addEventListener('change', (e) => this.changeBaseLayer(e.target.value));
+
+            Object.keys(this.tileSources).forEach(sourceName => {
+                const option = document.createElement('option');
+                option.value = sourceName;
+                option.textContent = sourceName;
+                select.appendChild(option);
+            });
+
+            selector.appendChild(select);
+            this.containerTarget.appendChild(selector);
+        }
+
+        changeBaseLayer(sourceName) {
+            const tileLayer = this.map.getLayers().getArray().find(layer => layer instanceof ol.layer.Tile);
+            tileLayer.setSource(this.tileSources[sourceName]);
         }
     }
 

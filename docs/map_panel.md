@@ -24,6 +24,16 @@ Chaque point affiche dans sa popup :
 - Ses coordonnées au format géocaching (ex: N 48° 44.976 E 6° 4.051)
 - Des informations supplémentaires (nom pour les waypoints)
 
+## Changer le fond de carte
+
+Le panneau de carte propose un menu permettant de sélectionner différents fonds de carte OpenStreetMap :
+
+- **OSM Standard** : La carte OpenStreetMap classique
+- **OSM Cyclo** : Carte orientée cyclisme
+- **OSM Topo** : Carte topographique
+
+Le menu est accessible en haut à droite de la carte.
+
 ## Architecture Technique
 
 ### Composants Frontend
