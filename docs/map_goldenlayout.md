@@ -70,6 +70,23 @@ showContextMenu(x, y, geocache) {
 }
 
 
+## Changer le fond de carte
+
+Un menu de sélection permet de choisir entre différents fonds de carte OpenStreetMap :
+
+- **OSM Standard** : La carte OpenStreetMap classique
+- **OSM Cyclo** : Carte orientée cyclisme
+- **OSM Topo** : Carte topographique
+
+Le menu est accessible en haut à droite de la carte.
+
+### Utilisation
+
+1. Cliquez sur le menu déroulant en haut à droite
+2. Sélectionnez le fond de carte souhaité
+3. La carte se met à jour immédiatement
+
+
 ## Styles
 Les styles principaux incluent :
 
