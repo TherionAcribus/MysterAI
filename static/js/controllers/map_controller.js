@@ -498,12 +498,113 @@
             });
 
             selector.appendChild(select);
+            
+            // Ajouter une case à cocher pour afficher les géocaches proches
+            const nearbyDiv = document.createElement('div');
+            nearbyDiv.className = 'mt-2';
+
+            const nearbyCheckbox = document.createElement('input');
+            nearbyCheckbox.type = 'checkbox';
+            nearbyCheckbox.id = 'show-nearby';
+            nearbyCheckbox.className = 'mr-2';
+            nearbyCheckbox.addEventListener('change', (e) => this.toggleNearbyGeocaches(e.target.checked));
+
+            const nearbyLabel = document.createElement('label');
+            nearbyLabel.htmlFor = 'show-nearby';
+            nearbyLabel.className = 'text-sm';
+            nearbyLabel.textContent = 'Afficher géocaches proches';
+
+            nearbyDiv.appendChild(nearbyCheckbox);
+            nearbyDiv.appendChild(nearbyLabel);
+            selector.appendChild(nearbyDiv);
+            
             this.containerTarget.appendChild(selector);
         }
 
         changeBaseLayer(sourceName) {
             const tileLayer = this.map.getLayers().getArray().find(layer => layer instanceof ol.layer.Tile);
             tileLayer.setSource(this.tileSources[sourceName]);
+        }
+        
+        // Création d'une source et d'une couche pour les géocaches proches
+        createNearbyGeocachesLayer() {
+            // Créer la source de données pour les géocaches proches
+            this.nearbySource = new ol.source.Vector();
+            
+            // Créer la couche vectorielle pour les géocaches proches
+            this.nearbyLayer = new ol.layer.Vector({
+                source: this.nearbySource,
+                style: (feature) => {
+                    return new ol.style.Style({
+                        image: new ol.style.Circle({
+                            radius: 5,
+                            fill: new ol.style.Fill({
+                                color: 'rgba(128, 0, 128, 0.8)' // Violet
+                            }),
+                            stroke: new ol.style.Stroke({
+                                color: 'white',
+                                width: 2
+                            })
+                        })
+                    });
+                },
+                zIndex: 3 // Au-dessus des autres couches
+            });
+            
+            // Ajouter la couche à la carte
+            this.map.addLayer(this.nearbyLayer);
+        }
+        
+        async toggleNearbyGeocaches(show) {
+            console.log("Toggle nearby geocaches:", show);
+            
+            // Créer la couche si elle n'existe pas encore
+            if (!this.nearbyLayer) {
+                this.createNearbyGeocachesLayer();
+            }
+            
+            if (show) {
+                await this.loadNearbyGeocaches();
+            } else {
+                // Effacer les géocaches proches
+                if (this.nearbySource) {
+                    this.nearbySource.clear();
+                }
+            }
+        }
+        
+        async loadNearbyGeocaches() {
+            try {
+                console.log("Loading nearby geocaches for geocache ID:", this.geocacheIdValue);
+                
+                // Effacer les géocaches proches existants
+                this.nearbySource.clear();
+                
+                // Charger les géocaches proches depuis l'API
+                const response = await fetch(`/api/geocaches/${this.geocacheIdValue}/nearby?distance=5`);
+                const geocaches = await response.json();
+                
+                console.log("Loaded nearby geocaches:", geocaches);
+                
+                // Ajouter chaque géocache comme un point sur la carte
+                geocaches.forEach(geocache => {
+                    if (geocache.latitude && geocache.longitude) {
+                        const feature = new ol.Feature({
+                            geometry: new ol.geom.Point(ol.proj.fromLonLat([geocache.longitude, geocache.latitude])),
+                            id: geocache.id,
+                            title: `${geocache.gc_code} - ${geocache.name}`,
+                            content: `Type: ${geocache.cache_type}<br>D: ${geocache.difficulty} / T: ${geocache.terrain}`,
+                            geocache: geocache
+                        });
+                        
+                        this.nearbySource.addFeature(feature);
+                    }
+                });
+                
+                console.log("Added nearby geocaches to map:", this.nearbySource.getFeatures().length);
+            } catch (error) {
+                console.error("Error loading nearby geocaches:", error);
+            }
         }
     }
 

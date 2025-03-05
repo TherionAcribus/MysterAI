@@ -4,6 +4,7 @@
 - Affichage des géocaches d'une zone sous forme de points sur une carte OpenLayers
 - Clic gauche : affiche les informations basiques de la géocache dans un popup
 - Clic droit : ouvre un menu contextuel avec l'option "Ouvrir la Géocache"
+- Affichage des géocaches proches d'une géocache sélectionnée
 
 ## Structure du code
 
@@ -69,23 +70,37 @@ showContextMenu(x, y, geocache) {
     // Gestion du clic sur l'option
 }
 
+## Fonctionnalités de la carte
 
-## Changer le fond de carte
+### Changement de fond de carte
 
-Un menu de sélection permet de choisir entre différents fonds de carte OpenStreetMap :
+La carte permet de changer le fond de carte (base layer) en utilisant un sélecteur dans le coin supérieur droit. Les options disponibles sont :
 
-- **OSM Standard** : La carte OpenStreetMap classique
-- **OSM Cyclo** : Carte orientée cyclisme
-- **OSM Topo** : Carte topographique
+- OSM Standard : Fond de carte OpenStreetMap standard
+- OSM Cyclo : Fond de carte optimisé pour le cyclisme
+- OSM Topo : Fond de carte topographique
 
-Le menu est accessible en haut à droite de la carte.
+Le changement de fond de carte est implémenté dans les deux contrôleurs de carte :
+- `map_controller.js` pour la carte principale
+- `zone_map_controller.js` pour la carte de zone
 
-### Utilisation
+### Affichage des cercles de 161m
 
-1. Cliquez sur le menu déroulant en haut à droite
-2. Sélectionnez le fond de carte souhaité
-3. La carte se met à jour immédiatement
+Pour les géocaches de type "Traditional", il est possible d'afficher un cercle de 161m (0.1 mile) autour de chaque point. Cette fonctionnalité est utile pour visualiser la zone de recherche potentielle.
 
+Une case à cocher dans le menu de sélection permet d'activer/désactiver cette fonctionnalité.
+
+### Affichage des géocaches proches
+
+Il est possible d'afficher les géocaches proches d'une géocache sélectionnée. Cette fonctionnalité est disponible via une case à cocher dans le menu de sélection.
+
+Lorsque cette option est activée :
+- Dans la carte principale : les géocaches proches de la géocache actuellement affichée sont chargées et affichées
+- Dans la carte de zone : les géocaches proches de la première géocache de la zone sont chargées et affichées
+
+Les géocaches proches sont affichées avec un style différent (points violets) pour les distinguer des géocaches de la zone.
+
+Par défaut, la distance utilisée pour déterminer les géocaches "proches" est de 5 km.
 
 ## Styles
 Les styles principaux incluent :

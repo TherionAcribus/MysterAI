@@ -15,6 +15,7 @@ import secrets
 import base64
 import time
 from flask import make_response, send_from_directory
+import math
 
 logger = setup_logger()
 
@@ -954,3 +955,71 @@ def update_waypoint(geocache_id, waypoint_id):
         logger.error(f"Erreur lors de la mise à jour du waypoint: {e}")
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/nearby', methods=['GET'])
+def get_nearby_geocaches(geocache_id):
+    """Récupère les géocaches proches d'une géocache donnée."""
+    logger.debug(f"Récupération des géocaches proches de {geocache_id}")
+    
+    # Récupérer la géocache de référence
+    geocache = Geocache.query.get_or_404(geocache_id)
+    
+    # Récupérer la distance maximale depuis les paramètres de requête (par défaut 5km)
+    distance_km = float(request.args.get('distance', 5))
+    
+    # Convertir les km en degrés (approximation: 1 degré = 111km à l'équateur)
+    distance_degrees = distance_km / 111.0
+    
+    # Calculer les limites de la boîte englobante (bounding box)
+    min_lat = geocache.latitude - distance_degrees
+    max_lat = geocache.latitude + distance_degrees
+    # Ajuster la longitude en fonction de la latitude (la distance en longitude varie selon la latitude)
+    # cos(latitude) donne le facteur de correction
+    lon_correction = math.cos(math.radians(geocache.latitude))
+    min_lon = geocache.longitude - (distance_degrees / lon_correction)
+    max_lon = geocache.longitude + (distance_degrees / lon_correction)
+    
+    # Trouver les géocaches dans la boîte englobante
+    # Nous utilisons les propriétés latitude et longitude qui sont calculées à partir du champ location
+    nearby_geocaches = []
+    
+    # Récupérer toutes les géocaches (sauf celle de référence)
+    all_geocaches = Geocache.query.filter(Geocache.id != geocache_id).all()
+    
+    # Filtrer manuellement les géocaches qui sont dans la boîte englobante
+    for cache in all_geocaches:
+        if (cache.latitude and cache.longitude and 
+            min_lat <= cache.latitude <= max_lat and 
+            min_lon <= cache.longitude <= max_lon):
+            
+            # Calculer la distance approximative en km (formule de la distance euclidienne)
+            # Pour une précision accrue, on pourrait utiliser la formule de Haversine
+            lat_diff = cache.latitude - geocache.latitude
+            lon_diff = (cache.longitude - geocache.longitude) * lon_correction
+            distance = math.sqrt(lat_diff**2 + lon_diff**2) * 111.0
+            
+            # Ne garder que les géocaches dans le rayon spécifié
+            if distance <= distance_km:
+                # Ajouter la distance au dictionnaire de la géocache
+                cache_dict = {
+                    'id': cache.id,
+                    'gc_code': cache.gc_code,
+                    'name': cache.name,
+                    'cache_type': cache.cache_type,
+                    'latitude': cache.latitude,
+                    'longitude': cache.longitude,
+                    'gc_lat': cache.gc_lat,
+                    'gc_lon': cache.gc_lon,
+                    'difficulty': cache.difficulty,
+                    'terrain': cache.terrain,
+                    'distance': round(distance, 2)  # Distance en km, arrondie à 2 décimales
+                }
+                nearby_geocaches.append(cache_dict)
+    
+    # Trier par distance
+    nearby_geocaches.sort(key=lambda x: x['distance'])
+    
+    logger.debug(f"Nombre de géocaches proches trouvées: {len(nearby_geocaches)}")
+    
+    return jsonify(nearby_geocaches)
