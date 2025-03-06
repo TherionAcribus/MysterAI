@@ -495,8 +495,13 @@ function initializeLayout() {
         mainLayout.registerComponent('geocache-solver', function(container, state) {
             container.getElement().html('<div class="loading">Loading...</div>');
             
+            // Déterminer l'URL en fonction de la présence d'un ID de géocache
+            const url = state.geocacheId ? 
+                `/geocaches/${state.geocacheId}/solver/panel` : 
+                '/geocaches/solver/panel';
+            
             // Charger le contenu du solver via HTMX
-            fetch(`/geocaches/${state.geocacheId}/solver/panel`)
+            fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok');
@@ -609,6 +614,46 @@ window.openPluginTab = function(pluginName, title, params = {}) {
     }
 };
 
+// Fonction pour ouvrir le Solver dans un nouvel onglet
+window.openSolverTab = function(geocacheId = null, gcCode = null) {
+    try {
+        console.log('openSolverTab called with:', { geocacheId, gcCode });
+        
+        // Titre par défaut si aucune géocache n'est spécifiée
+        const title = geocacheId ? `Solver - ${gcCode}` : "Solver";
+        
+        // Chercher si un onglet Solver existe déjà (sans géocache spécifique)
+        let existingComponent = null;
+        mainLayout.root.contentItems.forEach(function(item) {
+            item.contentItems.forEach(function(subItem) {
+                if (subItem.config.componentName === 'geocache-solver' && 
+                    !subItem.config.componentState.geocacheId) {
+                    existingComponent = subItem;
+                }
+            });
+        });
+
+        if (existingComponent && !geocacheId) {
+            // Si l'onglet existe et qu'on n'a pas spécifié de géocache, le mettre en focus
+            existingComponent.parent.setActiveContentItem(existingComponent);
+        } else {
+            // Sinon, créer un nouvel onglet
+            mainLayout.root.contentItems[0].addChild({
+                type: 'component',
+                componentName: 'geocache-solver',
+                title: title,
+                componentState: { 
+                    geocacheId: geocacheId,
+                    gcCode: gcCode
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'ouverture du Solver:', error);
+    }
+};
+
+// Fonction pour ouvrir un onglet de géocaches
 window.openGeocachesTab = function(zoneId, zoneName) {
     const componentId = `geocaches-${zoneId}`;
     

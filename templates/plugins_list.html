@@ -1,5 +1,16 @@
 <!-- Template pour la liste des plugins -->
 <div class="p-4">
+    <!-- Bouton pour ouvrir le Solver -->
+    <div class="mb-6 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-blue-400">Plugins</h2>
+        <button 
+            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors flex items-center"
+            onclick="window.openSolverTab()">
+            <i class="fas fa-tools mr-2"></i>
+            Ouvrir le Solver
+        </button>
+    </div>
+    
     {% if categories %}
         <div class="space-y-4">
             {% for category in categories %}

@@ -7,6 +7,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         "error", 
         "pluginsPanel", 
         "togglePluginsButton",
+        "togglePluginsText",
         "pluginList",
         "pluginResult",
         "pluginResultText",
@@ -32,7 +33,16 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         // Initialiser l'historique des plugins
         this.pluginsHistoryValue = [];
         
-        this.loadGeocacheData();
+        // Vérifier si une géocache est spécifiée
+        if (this.geocacheIdValue && this.geocacheIdValue.trim() !== '') {
+            this.loadGeocacheData();
+        } else {
+            // Aucune géocache spécifiée, initialiser un panneau vide
+            console.log("Aucune géocache spécifiée, initialisation d'un panneau vide");
+            this.hideLoading();
+            this.descriptionTarget.classList.remove('hidden');
+            this.descriptionTextTarget.value = '';
+        }
     }
 
     async loadGeocacheData() {

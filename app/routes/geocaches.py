@@ -782,6 +782,18 @@ def get_geocache_solver_panel(geocache_id):
         return jsonify({'error': str(e)}), 500
 
 
+@geocaches_bp.route('/geocaches/solver/panel', methods=['GET'])
+def get_standalone_solver_panel():
+    """Renvoie le panneau HTML du solver sans géocache associée."""
+    try:
+        return render_template('geocache_solver.html',
+                             geocache_id=None,
+                             gc_code=None)
+    except Exception as e:
+        logger.error(f"Error getting standalone solver panel: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 @geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints', methods=['POST'])
 def add_waypoint(geocache_id):
     """Ajoute un nouveau waypoint à une géocache."""
