@@ -1006,6 +1006,7 @@ def get_nearby_geocaches(geocache_id):
                     'id': cache.id,
                     'gc_code': cache.gc_code,
                     'name': cache.name,
+                    'owner': cache.owner,
                     'cache_type': cache.cache_type,
                     'latitude': cache.latitude,
                     'longitude': cache.longitude,

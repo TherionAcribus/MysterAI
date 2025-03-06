@@ -593,7 +593,7 @@
                             geometry: new ol.geom.Point(ol.proj.fromLonLat([geocache.longitude, geocache.latitude])),
                             id: geocache.id,
                             title: `${geocache.gc_code} - ${geocache.name}`,
-                            content: `Type: ${geocache.cache_type}<br>D: ${geocache.difficulty} / T: ${geocache.terrain}`,
+                            content: `Type: ${geocache.cache_type}<br>Owner: ${geocache.owner || 'Non spécifié'}<br>D: ${geocache.difficulty} / T: ${geocache.terrain}<br>Distance: ${geocache.distance} km`,
                             geocache: geocache
                         });
                         
@@ -602,9 +602,207 @@
                 });
                 
                 console.log("Added nearby geocaches to map:", this.nearbySource.getFeatures().length);
+                
+                // Ajouter un gestionnaire de clic pour les géocaches proches si ce n'est pas déjà fait
+                if (!this.nearbyClickHandlerAdded) {
+                    this.addNearbyGeocachesClickHandler();
+                    this.nearbyClickHandlerAdded = true;
+                }
             } catch (error) {
                 console.error("Error loading nearby geocaches:", error);
             }
+        }
+        
+        // Ajouter un gestionnaire de clic pour les géocaches proches
+        addNearbyGeocachesClickHandler() {
+            // Créer l'élément popup s'il n'existe pas déjà
+            if (!this.nearbyPopupElement) {
+                this.nearbyPopupElement = document.createElement('div');
+                this.nearbyPopupElement.className = 'ol-popup';
+                this.nearbyPopupElement.style.cssText = `
+                    position: absolute;
+                    background-color: white;
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+                    padding: 15px;
+                    border-radius: 10px;
+                    border: 1px solid #cccccc;
+                    bottom: 12px;
+                    left: -50px;
+                    min-width: 250px;
+                    z-index: 1000;
+                    color: black;
+                `;
+                
+                // Ajouter un bouton de fermeture
+                const closeButton = document.createElement('a');
+                closeButton.className = 'ol-popup-closer';
+                closeButton.style.cssText = `
+                    text-decoration: none;
+                    position: absolute;
+                    top: 2px;
+                    right: 8px;
+                    color: #666;
+                    font-size: 16px;
+                `;
+                closeButton.innerHTML = '&times;';
+                closeButton.href = '#';
+                closeButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.nearbyPopup.setPosition(undefined);
+                    return false;
+                });
+                
+                this.nearbyPopupElement.appendChild(closeButton);
+                
+                // Créer un élément pour le contenu
+                this.nearbyPopupContent = document.createElement('div');
+                this.nearbyPopupElement.appendChild(this.nearbyPopupContent);
+                
+                // Créer l'overlay pour la popup
+                this.nearbyPopup = new ol.Overlay({
+                    element: this.nearbyPopupElement,
+                    positioning: 'bottom-center',
+                    stopEvent: false,
+                    offset: [0, -10]
+                });
+                
+                this.map.addOverlay(this.nearbyPopup);
+            }
+            
+            // Ajouter un gestionnaire de clic sur la carte
+            this.map.on('click', (evt) => {
+                const feature = this.map.forEachFeatureAtPixel(evt.pixel, (feature) => {
+                    // Vérifier si la feature appartient à la source des géocaches proches
+                    if (this.nearbySource.getFeatures().includes(feature)) {
+                        return feature;
+                    }
+                    return null;
+                });
+                
+                if (feature) {
+                    const coordinates = feature.getGeometry().getCoordinates();
+                    const geocache = feature.get('geocache');
+                    
+                    // Mettre à jour le contenu de la popup
+                    this.nearbyPopupContent.innerHTML = `
+                        <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #333;">
+                            ${geocache.gc_code}
+                        </div>
+                        <div style="font-size: 14px; margin-bottom: 10px; color: #333;">
+                            ${geocache.name}
+                        </div>
+                        <div style="font-size: 13px; color: #666; margin-bottom: 5px;">
+                            <strong>Type:</strong> ${geocache.cache_type}
+                        </div>
+                        <div style="font-size: 13px; color: #666; margin-bottom: 5px;">
+                            <strong>Owner:</strong> ${geocache.owner || 'Non spécifié'}
+                        </div>
+                        <div style="font-size: 13px; color: #666; margin-bottom: 5px;">
+                            <strong>Difficulté:</strong> ${geocache.difficulty} / <strong>Terrain:</strong> ${geocache.terrain}
+                        </div>
+                        <div style="font-size: 13px; color: #666;">
+                            <strong>Distance:</strong> ${geocache.distance} km
+                        </div>
+                    `;
+                    
+                    // Positionner la popup
+                    this.nearbyPopup.setPosition(coordinates);
+                } else {
+                    // Ne pas fermer la popup si on clique ailleurs
+                    // La popup se ferme uniquement avec le bouton de fermeture
+                }
+            });
+            
+            // Ajouter un gestionnaire de clic droit pour les géocaches proches
+            this.map.getViewport().addEventListener('contextmenu', (evt) => {
+                evt.preventDefault();
+                const pixel = this.map.getEventPixel(evt);
+                const feature = this.map.forEachFeatureAtPixel(pixel, (feature) => {
+                    // Vérifier si la feature appartient à la source des géocaches proches
+                    if (this.nearbySource && this.nearbySource.getFeatures().includes(feature)) {
+                        return feature;
+                    }
+                    return null;
+                });
+                
+                if (feature) {
+                    this.showNearbyGeocacheContextMenu(evt, feature);
+                }
+            });
+        }
+        
+        // Afficher le menu contextuel pour une géocache proche
+        showNearbyGeocacheContextMenu(event, feature) {
+            const geocache = feature.get('geocache');
+            const coordinates = feature.getGeometry().getCoordinates();
+            const [longitude, latitude] = ol.proj.transform(coordinates, 'EPSG:3857', 'EPSG:4326');
+            
+            // Formater les coordonnées
+            const coords = this.formatCoordinates(latitude, longitude);
+            
+            const menuItem = document.createElement('div');
+            menuItem.className = 'px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer';
+            menuItem.style.cssText = 'color: black; background-color: white;';
+            menuItem.setAttribute('data-coords', coords);
+            
+            menuItem.innerHTML = `
+                <div class="font-bold text-black" style="color: black; margin-bottom: 5px;">
+                    ${geocache.gc_code} - ${geocache.name}
+                </div>
+                <div class="text-sm text-black copy-text" style="color: black; cursor: pointer; margin-bottom: 8px;">
+                    Copier les coordonnées
+                </div>
+                <div class="font-mono text-sm text-black" style="color: black;">
+                    ${coords}
+                </div>
+            `;
+            
+            const copyHandler = (event) => {
+                if (!event.target.closest('.copy-text')) return;
+                
+                const element = event.currentTarget;
+                const coords = element.getAttribute('data-coords');
+                const copyText = element.querySelector('.copy-text');
+                
+                if (!copyText) return;
+                
+                navigator.clipboard.writeText(coords).then(() => {
+                    // Stocker les styles originaux
+                    const originalBgColor = element.style.backgroundColor;
+                    const originalColor = element.style.color;
+                    const originalText = copyText.textContent;
+                    
+                    // Appliquer le feedback visuel
+                    element.style.backgroundColor = '#4CAF50';
+                    element.style.color = 'white';
+                    copyText.textContent = 'Copié !';
+                    
+                    // Attendre avant de cacher le menu
+                    setTimeout(() => {
+                        // Restaurer les styles originaux au cas où le menu est encore visible
+                        element.style.backgroundColor = originalBgColor;
+                        element.style.color = originalColor;
+                        copyText.textContent = originalText;
+                        
+                        // Cacher le menu s'il existe encore
+                        if (this.contextMenu && this.contextMenu.style) {
+                            this.contextMenu.style.display = 'none';
+                        }
+                    }, 500);
+                }).catch(error => {
+                    console.error('Erreur lors de la copie:', error);
+                });
+            };
+            
+            menuItem.addEventListener('click', copyHandler);
+            
+            this.contextMenu.innerHTML = '';
+            this.contextMenu.appendChild(menuItem);
+            
+            // Positionner le menu
+            this.contextMenu.style.left = (event.clientX) + 'px';
+            this.contextMenu.style.top = (event.clientY) + 'px';
+            this.contextMenu.style.display = 'block';
         }
     }
 

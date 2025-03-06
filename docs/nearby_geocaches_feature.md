@@ -73,20 +73,55 @@ Une implémentation similaire a été ajoutée au contrôleur de carte de zone, 
 - La géocache de référence est la première géocache de la zone
 - L'affichage est synchronisé avec la couche de cercles de 161m
 
+## Affichage des informations détaillées
+
+Lorsque l'utilisateur clique sur une géocache proche (représentée par un point violet), une popup s'affiche avec les informations suivantes :
+
+- **Code GC** : Le code unique de la géocache (ex: GC12345)
+- **Nom** : Le nom de la géocache
+- **Type** : Le type de géocache (Traditionnelle, Multi, Mystery, etc.)
+- **Owner** : Le propriétaire de la géocache
+- **Difficulté et Terrain** : Les cotations de difficulté et de terrain (échelle de 1 à 5)
+- **Distance** : La distance en kilomètres par rapport à la géocache de référence
+
+Cette fonctionnalité permet aux utilisateurs d'obtenir rapidement des informations essentielles sur les géocaches proches sans avoir à ouvrir la page détaillée de chaque géocache.
+
+## Menu contextuel pour les géocaches proches
+
+Un menu contextuel a été implémenté pour les géocaches proches, accessible par un clic droit sur un point violet. Ce menu offre les fonctionnalités suivantes :
+
+- Affichage du code GC et du nom de la géocache
+- Affichage des coordonnées au format N DD° MM.MMM E DD° MM.MMM
+- Option pour copier les coordonnées dans le presse-papiers
+
+Cette fonctionnalité facilite la planification d'itinéraires en permettant aux utilisateurs de copier rapidement les coordonnées des géocaches proches pour les utiliser dans d'autres applications (GPS, planificateurs d'itinéraires, etc.).
+
+### Implémentation technique
+
+Le menu contextuel est créé dynamiquement lors du clic droit sur une géocache proche. Il est implémenté à l'aide d'un élément HTML positionné aux coordonnées du clic et stylisé pour correspondre à l'interface utilisateur de l'application.
+
+Le code gère également les interactions suivantes :
+- Copie des coordonnées dans le presse-papiers via l'API Clipboard
+- Confirmation visuelle de la copie (changement de texte et de couleur)
+- Fermeture automatique du menu après la copie ou lors d'un clic ailleurs sur la page
+
+### Exemple d'utilisation
+
+1. Activez l'affichage des géocaches proches
+2. Effectuez un clic droit sur une géocache proche (point violet)
+3. Le menu contextuel apparaît avec les coordonnées de la géocache
+4. Cliquez sur "Copier les coordonnées" pour les copier dans le presse-papiers
+5. Le menu se ferme automatiquement après la copie
+
 ## Utilisation
 
 1. Ouvrir une carte (carte principale ou carte de zone)
 2. Cocher la case "Afficher géocaches proches" dans le menu en haut à droite
 3. Les géocaches proches s'afficheront sur la carte avec un style distinct (points violets)
-4. Décocher la case pour masquer les géocaches proches
-
-## Limitations actuelles et améliorations futures
-
-- La distance est actuellement fixée à 5 km. Une amélioration future pourrait permettre à l'utilisateur de définir cette distance.
-- Le calcul de la distance est approximatif (conversion degrés/km).
-- Dans la carte de zone, la géocache de référence est toujours la première de la liste. Une amélioration future pourrait permettre de sélectionner la géocache de référence.
-- Ajouter un indicateur de distance pour chaque géocache proche.
-- Ajouter un filtre par type de cache.
+4. Interagir avec les géocaches proches :
+   - **Clic gauche** : Affiche une popup avec les informations détaillées de la géocache
+   - **Clic droit** : Affiche un menu contextuel permettant de copier les coordonnées
+5. Décocher la case pour masquer les géocaches proches
 
 ## Tests
 
@@ -96,4 +131,14 @@ Pour tester cette fonctionnalité :
 2. Activer l'option "Afficher géocaches proches"
 3. Vérifier que des points violets apparaissent sur la carte
 4. Vérifier que ces points correspondent bien à des géocaches proches
-5. Désactiver l'option et vérifier que les points disparaissent
+5. Tester le clic gauche pour afficher les informations détaillées
+6. Tester le clic droit pour afficher le menu contextuel et copier les coordonnées
+7. Désactiver l'option et vérifier que les points disparaissent
+
+## Limitations actuelles et améliorations futures
+
+- La distance est actuellement fixée à 5 km. Une amélioration future pourrait permettre à l'utilisateur de définir cette distance.
+- Le calcul de la distance est approximatif (conversion degrés/km).
+- Dans la carte de zone, la géocache de référence est toujours la première de la liste. Une amélioration future pourrait permettre de sélectionner la géocache de référence.
+- Ajouter un indicateur de distance pour chaque géocache proche.
+- Ajouter un filtre par type de cache.
