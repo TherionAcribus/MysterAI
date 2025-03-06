@@ -368,12 +368,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     resultContainer.className = 'bg-gray-800 rounded-lg p-4 mb-4 mt-4';
                     resultContainer.innerHTML = `
                         <h2 class="text-lg font-semibold text-gray-100 mb-3">Résultat du plugin ${pluginName}</h2>
-                        <div id="${resultZoneId}-text" class="bg-gray-900 rounded-lg p-3 border border-gray-700 text-sm text-gray-300 whitespace-pre-wrap">
+                        <textarea id="${resultZoneId}-text" class="w-full min-h-[100px] bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap">
                             <div class="animate-pulse">
                                 <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
                                 <div class="h-4 bg-gray-700 rounded w-1/2"></div>
                             </div>
-                        </div>
+                        </textarea>
                     `;
                     
                     // Insérer la zone de résultat après la zone du plugin
@@ -384,11 +384,20 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 } else {
                     // Cas du premier plugin (utiliser la zone de résultat existante)
                     this.pluginResultTarget.classList.remove('hidden');
-                    this.pluginResultTextTarget.innerHTML = '<div class="animate-pulse"><div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div><div class="h-4 bg-gray-700 rounded w-1/2"></div></div>';
+                    this.pluginResultTextTarget.value = ''; // Vider le textarea
                     resultContainer = this.pluginResultTarget;
                     resultTextContainer = this.pluginResultTextTarget;
                     
                     console.log("Utilisation de la zone de résultat par défaut");
+                }
+                
+                // Afficher un indicateur de chargement
+                if (resultTextContainer) {
+                    if (resultTextContainer.tagName === 'TEXTAREA') {
+                        resultTextContainer.value = 'Chargement...';
+                    } else {
+                        resultTextContainer.innerHTML = '<div class="animate-pulse"><div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div><div class="h-4 bg-gray-700 rounded w-1/2"></div></div>';
+                    }
                 }
                 
                 // Appeler l'API pour exécuter le plugin
@@ -454,12 +463,24 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 
                 // Afficher le résultat dans un conteneur formaté
                 if (resultTextContainer) {
-                    resultTextContainer.innerHTML = `
-                        <div class="bg-gray-900 rounded-lg p-3 border border-gray-700 mb-3">
-                            <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultText}</div>
-                        </div>
-                    `;
+                    if (resultTextContainer.tagName === 'TEXTAREA') {
+                        resultTextContainer.value = resultText;
+                    } else {
+                        resultTextContainer.innerHTML = `
+                            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700 mb-3">
+                                <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultText}</div>
+                            </div>
+                        `;
+                    }
                     console.log("Résultat affiché dans le conteneur");
+                    
+                    // Ajouter un écouteur d'événement pour mettre à jour lastPluginOutputValue lorsque le texte est modifié
+                    if (resultTextContainer.tagName === 'TEXTAREA') {
+                        resultTextContainer.addEventListener('input', (e) => {
+                            this.lastPluginOutputValue = e.target.value;
+                            console.log("Valeur mise à jour après modification:", this.lastPluginOutputValue);
+                        });
+                    }
                 } else {
                     console.error("Le conteneur de résultat n'existe pas!");
                 }
@@ -485,26 +506,38 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 this.displayPluginsHistory();
                 
                 // Ajouter un bouton pour appliquer un autre plugin sur ce résultat
-                resultTextContainer.innerHTML += `
-                    <div class="flex flex-col md:flex-row justify-center gap-3 mt-4">
-                        <button 
-                            id="apply-new-plugin-btn"
-                            class="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors"
-                            data-action="click->geocache-solver#addNewPluginZone">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-                            </svg>
-                            Appliquer un nouveau plugin
-                        </button>
-                    </div>
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'flex flex-col md:flex-row justify-center gap-3 mt-4';
+                buttonContainer.innerHTML = `
+                    <button 
+                        id="apply-new-plugin-btn"
+                        class="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors"
+                        data-action="click->geocache-solver#addNewPluginZone">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Appliquer un nouveau plugin
+                    </button>
                 `;
                 
+                if (resultContainer.querySelector('button#apply-new-plugin-btn')) {
+                    resultContainer.querySelector('button#apply-new-plugin-btn').parentNode.remove();
+                }
+                resultContainer.appendChild(buttonContainer);
             } catch (error) {
                 console.error('Erreur lors de l\'exécution du plugin:', error);
                 if (resultTextContainer) {
-                    resultTextContainer.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
+                    if (resultTextContainer.tagName === 'TEXTAREA') {
+                        resultTextContainer.value = `Erreur: ${error.message}`;
+                    } else {
+                        resultTextContainer.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
+                    }
                 } else if (this.hasPluginResultTextTarget) {
-                    this.pluginResultTextTarget.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
+                    if (this.pluginResultTextTarget.tagName === 'TEXTAREA') {
+                        this.pluginResultTextTarget.value = `Erreur: ${error.message}`;
+                    } else {
+                        this.pluginResultTextTarget.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
+                    }
                 }
             }
         }
