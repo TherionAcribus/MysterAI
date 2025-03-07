@@ -752,8 +752,11 @@
                 <div class="text-sm text-black copy-text" style="color: black; cursor: pointer; margin-bottom: 8px;">
                     Copier les coordonnées
                 </div>
-                <div class="font-mono text-sm text-black" style="color: black;">
+                <div class="font-mono text-sm text-black" style="color: black; margin-bottom: 8px;">
                     ${coords}
+                </div>
+                <div class="text-sm text-black view-details" style="color: black; cursor: pointer; margin-bottom: 5px;">
+                    <i class="fas fa-info-circle mr-1"></i> Voir les détails
                 </div>
             `;
             
@@ -794,7 +797,33 @@
                 });
             };
             
+            // Gestionnaire pour ouvrir les détails de la géocache
+            const viewDetailsHandler = (event) => {
+                if (!event.target.closest('.view-details')) return;
+                
+                // Cacher le menu contextuel
+                this.contextMenu.style.display = 'none';
+                
+                // Ouvrir un nouvel onglet avec les détails de la géocache
+                if (window.mainLayout) {
+                    // Créer un nouvel onglet avec les détails de la géocache
+                    window.mainLayout.root.contentItems[0].addChild({
+                        type: 'component',
+                        componentName: 'geocache-details',
+                        title: `${geocache.gc_code} - ${geocache.name}`,
+                        componentState: { 
+                            geocacheId: geocache.id,
+                            gcCode: geocache.gc_code,
+                            name: geocache.name
+                        }
+                    });
+                } else {
+                    console.error("GoldenLayout n'est pas initialisé");
+                }
+            };
+            
             menuItem.addEventListener('click', copyHandler);
+            menuItem.addEventListener('click', viewDetailsHandler);
             
             this.contextMenu.innerHTML = '';
             this.contextMenu.appendChild(menuItem);
