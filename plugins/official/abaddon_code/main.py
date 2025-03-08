@@ -210,11 +210,16 @@ class AbaddonCodePlugin:
                     decoded = self.decode("".join([f["value"] for f in check["fragments"]]))
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars)
-                    decoded = (
-                        self.decode_fragments(text, check["fragments"])
-                        if check["is_match"]
-                        else text
-                    )
+                    if not check["is_match"]:
+                        # Si aucun fragment n'a été trouvé, on retourne une erreur
+                        return {"error": "Aucun code Abaddon détecté dans le texte"}
+                    
+                    # Décode les fragments trouvés
+                    decoded = self.decode_fragments(text, check["fragments"])
+                    
+                    # Vérifier si le texte décodé est différent du texte d'origine
+                    if decoded == text:
+                        return {"error": "Aucun code Abaddon n'a pu être décodé"}
 
                 # Format de retour compatible avec metadetection
                 return {

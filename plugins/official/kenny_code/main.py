@@ -233,11 +233,16 @@ class KennyCodePlugin:
                     decoded_text = self.decode(text)
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars)
-                    decoded_text = (
-                        self.decode_fragments(text, check["fragments"])
-                        if check["is_match"]
-                        else text
-                    )
+                    if not check["is_match"]:
+                        # Si aucun fragment n'a été trouvé, on retourne une erreur
+                        return {"error": "Aucun code Kenny détecté dans le texte"}
+                    
+                    # Décode les fragments trouvés
+                    decoded_text = self.decode_fragments(text, check["fragments"])
+                    
+                    # Vérifier si le texte décodé est différent du texte d'origine
+                    if decoded_text == text:
+                        return {"error": "Aucun code Kenny n'a pu être décodé"}
 
                 return {
                     "result": {

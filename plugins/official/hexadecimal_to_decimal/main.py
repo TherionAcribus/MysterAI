@@ -143,8 +143,17 @@ class HexadecimalEncoderDecoderPlugin:
                     # Si valide, on décode tout le texte
                     text_output = self.decode(text)
                 else:
-                    # En mode smooth, on décode par blocs
+                    # En mode smooth, on vérifie d'abord qu'il y a au moins un fragment à décoder
+                    check = self.check_code(text, strict=False, allowed_punct=allowed_punct)
+                    if not check["is_match"]:
+                        return {"error": "Aucun code hexadécimal détecté dans le texte"}
+                    
+                    # Décode les fragments trouvés
                     text_output = self.decode_hex_blocks(text, allowed_punct)
+                    
+                    # Vérifier si le texte décodé est différent du texte d'origine
+                    if text_output == text:
+                        return {"error": "Aucun code hexadécimal n'a pu être décodé"}
 
             else:
                 return {"error": f"Mode inconnu : {mode}"}
