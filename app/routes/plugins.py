@@ -511,6 +511,16 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         
+        # Récupérer les caractères autorisés s'ils sont fournis
+        allowed_chars_json = request.form.get('allowed_chars', None)
+        allowed_chars = None
+        if allowed_chars_json:
+            try:
+                allowed_chars = json.loads(allowed_chars_json)
+                print(f"Caractères autorisés: {allowed_chars}")
+            except json.JSONDecodeError:
+                print(f"Erreur de décodage JSON pour allowed_chars: {allowed_chars_json}")
+        
         if not text:
             return jsonify({'error': 'Aucun texte fourni'}), 400
             
@@ -523,8 +533,12 @@ def execute_metadetection():
         inputs = {
             'text': text,
             'mode': mode,
-            'strict': strict
+            'strict': strict  # Transmettre le paramètre strict tel quel ('strict' ou 'smooth')
         }
+        
+        # Ajouter les caractères autorisés si fournis
+        if allowed_chars:
+            inputs['allowed_chars'] = allowed_chars
         
         # Ajouter le plugin_name si fourni
         if plugin_name:

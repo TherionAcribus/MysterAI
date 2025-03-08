@@ -45,6 +45,22 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             this.descriptionTarget.classList.remove('hidden');
             this.descriptionTextTarget.value = '';
         }
+        
+        // Ajouter un écouteur pour le changement de type de caractères autorisés
+        document.addEventListener('DOMContentLoaded', () => {
+            const allowedCharsSelect = document.getElementById('metasolver-allowed-chars');
+            const customCharsContainer = document.getElementById('metasolver-custom-chars-container');
+            
+            if (allowedCharsSelect && customCharsContainer) {
+                allowedCharsSelect.addEventListener('change', (event) => {
+                    if (event.target.value === 'custom') {
+                        customCharsContainer.classList.remove('hidden');
+                    } else {
+                        customCharsContainer.classList.add('hidden');
+                    }
+                });
+            }
+        });
     }
 
     async loadGeocacheData() {
@@ -745,6 +761,20 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         const strict = document.getElementById('metasolver-strict').value;
         const embedded = document.getElementById('metasolver-embedded').checked;
         
+        // Récupérer les informations sur les caractères autorisés
+        const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
+        let allowedChars = [];
+        
+        if (allowedCharsType === 'special') {
+            allowedChars = ['°', '.', "'"];
+        } else if (allowedCharsType === 'custom') {
+            const customChars = document.getElementById('metasolver-custom-chars').value;
+            if (customChars) {
+                // Convertir la chaîne en tableau de caractères
+                allowedChars = customChars.split('');
+            }
+        }
+        
         // Récupérer le texte à analyser
         const text = this.descriptionTextTarget.value;
         
@@ -774,6 +804,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
             
+            // Ajouter les caractères autorisés si nécessaire
+            if (allowedCharsType !== 'all') {
+                formData.append('allowed_chars', JSON.stringify(allowedChars));
+            }
+            
             // Appeler l'API pour exécuter le MetaSolver
             const response = await fetch('/api/plugins/metadetection/execute', {
                 method: 'POST',
@@ -786,150 +821,206 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             const result = await response.json();
             
-            // Afficher les résultats
-            let resultHtml = '';
-            
-            if (mode === 'detect') {
-                if (result.result && result.result.possible_codes) {
-                    const possibleCodes = result.result.possible_codes;
-                    
-                    if (possibleCodes.length > 0) {
-                        resultHtml += '<div class="space-y-3">';
-                        resultHtml += '<h4 class="font-medium text-white">Codes détectés :</h4>';
-                        resultHtml += '<ul class="space-y-2">';
-                        
-                        possibleCodes.forEach(code => {
-                            resultHtml += `
-                                <li class="bg-gray-800 p-2 rounded">
-                                    <div class="flex justify-between items-center">
-                                        <span class="font-medium text-blue-400">${code.plugin_name}</span>
-                                        <div class="flex space-x-2">
-                                            ${code.can_decode ? 
-                                                `<button class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded" 
-                                                    onclick="document.querySelector('[data-controller=geocache-solver]').__stimulusRef.controllers[0].decodeWithPlugin('${code.plugin_name}')">
-                                                    Décoder
-                                                </button>` : 
-                                                '<span class="text-xs text-gray-400">Décodage non supporté</span>'
-                                            }
-                                        </div>
-                                    </div>
-                                    ${code.fragments && code.fragments.length > 0 ? 
-                                        `<div class="mt-1 text-xs text-gray-300">
-                                            <span class="text-gray-400">Fragments détectés :</span> 
-                                            ${code.fragments.map(f => `<span class="bg-gray-700 px-1 rounded">${f}</span>`).join(' ')}
-                                        </div>` : 
-                                        ''
-                                    }
-                                </li>
-                            `;
-                        });
-                        
-                        resultHtml += '</ul>';
-                        resultHtml += '</div>';
-                    } else {
-                        resultHtml += '<p class="text-yellow-400">Aucun code détecté</p>';
-                    }
-                } else {
-                    resultHtml += '<p class="text-yellow-400">Aucun résultat de détection</p>';
-                }
-            } else if (mode === 'decode') {
-                if (result.result && result.result.decoded_results) {
-                    const decodedResults = result.result.decoded_results;
-                    
-                    if (decodedResults.length > 0) {
-                        resultHtml += '<div class="space-y-3">';
-                        resultHtml += '<h4 class="font-medium text-white">Résultats de décodage :</h4>';
-                        resultHtml += '<ul class="space-y-2">';
-                        
-                        decodedResults.forEach(decoded => {
-                            resultHtml += `
-                                <li class="bg-gray-800 p-2 rounded">
-                                    <div class="flex justify-between items-center">
-                                        <span class="font-medium text-blue-400">${decoded.plugin_name}</span>
-                                    </div>
-                                    <div class="mt-1 text-sm text-gray-200 whitespace-pre-wrap">${decoded.decoded_text}</div>
-                                </li>
-                            `;
-                        });
-                        
-                        resultHtml += '</ul>';
-                        resultHtml += '</div>';
-                    } else {
-                        resultHtml += '<p class="text-yellow-400">Aucun résultat de décodage</p>';
-                    }
-                } else if (result.result && result.result.decoded_text) {
-                    resultHtml += `
-                        <div class="space-y-2">
-                            <h4 class="font-medium text-white">Résultat de décodage :</h4>
-                            <div class="bg-gray-800 p-3 rounded text-gray-200 whitespace-pre-wrap">${result.result.decoded_text}</div>
-                        </div>
-                    `;
-                } else {
-                    resultHtml += '<p class="text-yellow-400">Aucun résultat de décodage</p>';
-                }
-            }
-            
-            // Afficher les résultats
-            resultContentElement.innerHTML = resultHtml;
+            // Formater et afficher les résultats
+            resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
             
             // Ajouter à l'historique des plugins
             this.addToPluginsHistory({
-                plugin_name: "MetaSolver",
+                plugin: 'MetaSolver',
                 action: mode === 'detect' ? 'Analyse' : 'Décodage',
-                input: text,
-                output: JSON.stringify(result, null, 2),
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toLocaleTimeString(),
+                result: result
             });
             
         } catch (error) {
-            console.error('Erreur lors de l\'exécution du MetaSolver:', error);
-            
-            // Afficher l'erreur
+            console.error("Erreur lors de l'exécution du MetaSolver:", error);
             const resultElement = document.getElementById('metasolver-result');
             const resultContentElement = document.getElementById('metasolver-result-content');
             
             resultElement.classList.remove('hidden');
             resultContentElement.innerHTML = `
-                <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
-                    Erreur: ${error.message}
+                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
+                    Erreur lors de l'exécution du MetaSolver: ${error.message}
                 </div>
             `;
         }
     }
     
-    decodeWithPlugin(pluginName) {
-        console.log(`Décodage avec le plugin: ${pluginName}`);
+    async decodeWithPlugin(event) {
+        const pluginName = event.currentTarget.dataset.plugin;
+        const text = this.descriptionTextTarget.value;
         
-        // Mettre à jour le mode et exécuter le MetaSolver
-        document.getElementById('metasolver-mode').value = 'decode';
+        if (!text.trim()) {
+            alert("Veuillez entrer un texte à décoder");
+            return;
+        }
         
-        // Créer un événement personnalisé avec le dataset
-        const event = new CustomEvent('click', {
-            bubbles: true,
-            cancelable: true
-        });
-        
-        // Ajouter la propriété dataset avec le mode
-        event.currentTarget = {
-            dataset: {
-                mode: 'decode'
+        try {
+            // Récupérer les options du MetaSolver
+            const strict = document.getElementById('metasolver-strict').value;
+            const embedded = document.getElementById('metasolver-embedded').checked;
+            
+            // Récupérer les informations sur les caractères autorisés
+            const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
+            let allowedChars = [];
+            
+            if (allowedCharsType === 'special') {
+                allowedChars = ['°', '.', "'"];
+            } else if (allowedCharsType === 'custom') {
+                const customChars = document.getElementById('metasolver-custom-chars').value;
+                if (customChars) {
+                    allowedChars = customChars.split('');
+                }
             }
-        };
-        
-        // Ajouter le nom du plugin aux données du formulaire
-        const originalAppend = FormData.prototype.append;
-        FormData.prototype.append = function(key, value) {
-            if (key === 'mode' && value === 'decode') {
-                originalAppend.call(this, 'plugin_name', pluginName);
+            
+            // Afficher un indicateur de chargement
+            const resultElement = document.getElementById('metasolver-result');
+            const resultContentElement = document.getElementById('metasolver-result-content');
+            
+            resultElement.classList.remove('hidden');
+            resultContentElement.innerHTML = `
+                <div class="animate-pulse space-y-2">
+                    <div class="h-4 bg-gray-600 rounded w-3/4"></div>
+                    <div class="h-4 bg-gray-600 rounded w-1/2"></div>
+                    <div class="h-4 bg-gray-600 rounded w-2/3"></div>
+                </div>
+            `;
+            
+            // Préparer les données pour l'API
+            const formData = new FormData();
+            formData.append('text', text);
+            formData.append('mode', 'decode');
+            formData.append('strict', strict);
+            formData.append('embedded', embedded ? 'true' : 'false');
+            formData.append('plugin_name', pluginName);
+            
+            // Ajouter les caractères autorisés si nécessaire
+            if (allowedCharsType !== 'all') {
+                formData.append('allowed_chars', JSON.stringify(allowedChars));
             }
-            return originalAppend.call(this, key, value);
-        };
+            
+            // Appeler l'API pour exécuter le MetaSolver avec le plugin spécifié
+            const response = await fetch('/api/plugins/metadetection/execute', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Afficher le résultat
+            if (result.error) {
+                resultContentElement.innerHTML = `
+                    <div class="bg-red-900 text-red-100 p-4 rounded-lg">
+                        ${result.error}
+                    </div>
+                `;
+            } else if (result.result && result.result.decoded_text) {
+                resultContentElement.innerHTML = `
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage avec ${pluginName}</h3>
+                        <div class="text-gray-200">${result.result.decoded_text}</div>
+                    </div>
+                `;
+            } else {
+                resultContentElement.innerHTML = `
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat</h3>
+                        <div class="text-gray-200">Format de résultat non reconnu</div>
+                        <pre class="text-xs text-gray-400 mt-2 overflow-auto max-h-40">${JSON.stringify(result, null, 2)}</pre>
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error("Erreur lors du décodage:", error);
+            const resultElement = document.getElementById('metasolver-result');
+            const resultContentElement = document.getElementById('metasolver-result-content');
+            
+            resultElement.classList.remove('hidden');
+            resultContentElement.innerHTML = `
+                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
+                    Erreur lors du décodage: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    async formatMetaDetectionResults(result) {
+        if (result.error) {
+            return `
+                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
+                    ${result.error}
+                </div>
+            `;
+        }
         
-        // Exécuter le MetaSolver
-        this.executeMetaSolver(event);
-        
-        // Restaurer la méthode append originale
-        FormData.prototype.append = originalAppend;
+        if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
+            const codes = result.result.possible_codes;
+            let html = `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Codes détectés</h3>
+                    <div class="space-y-3">
+            `;
+            
+            for (const code of codes) {
+                const fragments = code.fragments || [];
+                const fragmentsText = fragments.map(f => f.value).join(', ');
+                
+                html += `
+                    <div class="bg-gray-600 p-3 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-200 font-medium">${code.plugin_name}</span>
+                            ${code.can_decode ? `<button 
+                                data-action="click->geocache-solver#decodeWithPlugin" 
+                                data-plugin="${code.plugin_name}" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded">
+                                Décoder
+                            </button>` : ''}
+                        </div>
+                        <div class="text-sm text-gray-400 mt-1">${fragments.length} fragment(s): ${fragmentsText}</div>
+                    </div>
+                `;
+            }
+            
+            html += `</div></div>`;
+            return html;
+        } else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
+            const decodedResults = result.result.decoded_results;
+            let html = `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats du décodage</h3>
+                    <div class="space-y-3">
+            `;
+            
+            for (const decoded of decodedResults) {
+                html += `
+                    <div class="bg-gray-600 p-3 rounded">
+                        <div class="text-gray-300 font-medium">${decoded.plugin_name}</div>
+                        <div class="text-gray-200 mt-1">${decoded.decoded_text}</div>
+                    </div>
+                `;
+            }
+            
+            html += `</div></div>`;
+            return html;
+        } else if (result.result && result.result.decoded_text) {
+            return `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>
+                    <div class="text-gray-200">${result.result.decoded_text}</div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <div class="text-gray-400">Aucun code détecté dans le texte.</div>
+                </div>
+            `;
+        }
     }
     
     addToPluginsHistory(entry) {
