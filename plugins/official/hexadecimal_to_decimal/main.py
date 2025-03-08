@@ -39,7 +39,12 @@ class HexadecimalEncoderDecoderPlugin:
             * is_match=True si au moins un bloc est hex
             * On renvoie la liste de fragments hex trouvés.
         """
-        logger.info(f'inputs : {text}, {strict}, {allowed_punct}')
+        import re
+        
+        # Si allowed_punct est fourni comme liste, on la convertit en chaîne
+        if allowed_punct is not None and isinstance(allowed_punct, list):
+            allowed_punct = ''.join(allowed_punct)
+            
         if allowed_punct is None:
             allowed_punct = " \t\r\n.:;,_-°"  # ponctuation par défaut
 
@@ -50,154 +55,95 @@ class HexadecimalEncoderDecoderPlugin:
 
             # Vérif : tous les caractères sont autorisés
             if not re.match(pattern_str, text):
-                return {"is_match": False, "fragments": []}
+                return {"is_match": False, "fragments": [], "score": 0.0}
 
-            # Vérif : au moins un caractère hex
-            has_hex = re.search(r"[0-9A-Fa-f]", text)
-            if not has_hex:
-                return {"is_match": False, "fragments": []}
+            # Vérif : il y a au moins un caractère hex
+            hex_chars = re.sub(f"[{esc_punct}x]", "", text)
+            if not hex_chars:
+                return {"is_match": False, "fragments": [], "score": 0.0}
 
-            # Construire le fragment final
-            strip_pattern = f"[{esc_punct}x]+"
-            stripped = re.sub(strip_pattern, "", text, flags=re.IGNORECASE)
-            stripped = re.sub(r"[^0-9A-Fa-f]", "", stripped)
-
-            if not stripped:
-                return {"is_match": False, "fragments": []}
-
+            # Tout est OK, on renvoie le texte "strippé" comme fragment
+            stripped_text = text.strip(allowed_punct)
             return {
                 "is_match": True,
-                "fragments": [{"value": stripped, "start": 0, "end": len(stripped)}]
+                "fragments": [{"value": stripped_text, "start": text.find(stripped_text), "end": text.find(stripped_text) + len(stripped_text)}],
+                "score": 1.0  # Ajout d'un score pour compatibilité avec metadetection
             }
+
         else:
-            # mode smooth : On va détecter les blocs hex avec decode_hex_blocks,
-            #   mais ici on renvoie juste s'il y a au moins un bloc hex
-            blocks_info = self._split_and_check_blocks(text, allowed_punct)
-            # On récupère uniquement ceux qui sont hex
-            hex_fragments = [b for b in blocks_info if b["is_hex"]]
+            # Mode "smooth" : on recherche des blocs hexadécimaux
+            esc_punct = re.escape(allowed_punct)
+            pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
+            fragments = []
+
+            for m in re.finditer(pattern, text):
+                block = m.group(0)
+                start, end = m.span()
+
+                # Ignorer les blocs de ponctuation
+                if re.match(f"^[{esc_punct}]+$", block):
+                    continue
+
+                # Vérifier si le bloc est 100% hex (sans 'x')
+                if re.fullmatch(r"[0-9A-Fa-f]+", block):
+                    fragments.append({"value": block, "start": start, "end": end})
+
+            # Calculer un score basé sur le nombre de fragments trouvés
+            score = 1.0 if fragments else 0.0
+            
             return {
-                "is_match": len(hex_fragments) > 0,
-                "fragments": [
-                    {
-                        "value": b["block"],
-                        "start": b["start"],
-                        "end": b["end"]
-                    }
-                    for b in hex_fragments
-                ]
+                "is_match": bool(fragments),
+                "fragments": fragments,
+                "score": score  # Ajout d'un score pour compatibilité avec metadetection
             }
-
-    def _split_and_check_blocks(self, text: str, allowed_punct: str) -> list:
-        """
-        Découpe le texte par séquences de ponctuation (autorisée) et détecte si le bloc est 100% hex.
-        Retourne une liste de dicts :
-        [
-          {
-            "block": str,       # le bloc
-            "start": int,       # position de début
-            "end": int,         # position de fin
-            "is_hex": bool,     # True si 100% hex
-          },
-          ...
-        ]
-        """
-        esc_punct = re.escape(allowed_punct)
-        # On va capturer soit "une suite de ponctuation" soit "tout autre bloc"
-        # pattern = (bloc non ponct) | (bloc ponct)
-        # pour mieux localiser, on utilise finditer
-        pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
-
-        blocks_info = []
-        for m in re.finditer(pattern, text):
-            block = m.group(0)
-            start, end = m.span()
-
-            # Vérif si c'est un bloc ponctuation ou un bloc "texte"
-            # si c'est ponctuation, is_hex=False
-            # si c'est "texte", on check si tout [0-9A-Fa-f],
-            #   (on autorise le 'x' ? => up to you)
-            #   Exclure si c'est vide
-
-            # On check si c'est ponctuation en comparant par ex. re.match
-            if re.match(f"^[{esc_punct}]+$", block):
-                # c'est un bloc de ponctuation
-                blocks_info.append({
-                    "block": block,
-                    "start": start,
-                    "end": end,
-                    "is_hex": False
-                })
-            else:
-                # c'est un bloc "texte"
-                # check si tout hex (autorise x ? => adapt if needed)
-                if re.match("^[0-9A-Fa-f]+$", block):
-                    is_hex = True
-                else:
-                    is_hex = False
-                blocks_info.append({
-                    "block": block,
-                    "start": start,
-                    "end": end,
-                    "is_hex": is_hex
-                })
-        return blocks_info
 
     # -------------------------------------------------------------------------
     # 2) Méthode principale d'exécution
     # -------------------------------------------------------------------------
 
-    def execute(self, inputs):
+    def execute(self, inputs: dict) -> dict:
         """
-        Inputs attendus :
-          - text (str) : texte source
-          - mode (str) : "encode" ou "decode"
-          - strict (bool) : True ou False (défaut=False)
-          - allowed_punct (str ou None) : caractères autorisés en mode strict
-
-        Sortie :
-          {
-            "result": {
-              "text": {
-                "text_output": "...",
-                "text_input": "...",
-                "mode": "encode"/"decode"
-              }
-            }
-          }
-
-        En mode "decode":
-          - strict=True => on vérifie que TOUT est autorisé ([0-9A-Fa-fx] + ponctuation autorisée)
-                          si oui, on décode le bloc "pur" en décimal
-          - strict=False (smooth) => on "split" le texte par ponctuation.
-                                     Si un bloc est 100% hex, on le décode.
-                                     Sinon on le laisse.
+        Point d'entrée principal du plugin.
+        
+        Args:
+            inputs: Dictionnaire contenant les paramètres d'entrée
+                - mode: "encode" ou "decode"
+                - text: Texte à encoder ou décoder
+                - strict: "strict" ou "smooth" pour le mode de décodage
+                - allowed_chars: Liste de caractères autorisés pour le mode smooth
+                
+        Returns:
+            Dictionnaire contenant le résultat de l'opération
         """
-        logger.info(inputs)
-
-        text = inputs.get("text", "")
-        mode = inputs.get("mode", "encode").lower()
-        strict_mode = inputs.get("strict", False)
-        allowed_punct = inputs.get("allowed_punct", None)
-
-        if not text:
-            return {"error": "Aucun texte fourni à traiter."}
-
         try:
+            mode = inputs.get("mode", "encode").lower()
+            text = inputs.get("text", "")
+            
+            # Récupération du mode strict/smooth
+            strict_mode = inputs.get("strict", "").lower() == "strict"
+            
+            # Récupération des caractères autorisés
+            allowed_chars = inputs.get("allowed_chars", None)
+            allowed_punct = allowed_chars  # Pour compatibilité avec le code existant
+            
+            if not text:
+                return {"error": "Aucun texte fourni à traiter."}
+                
+            text_output = ""
+            
             if mode == "encode":
-                # Encode le texte (UTF-8) en hexadécimal
                 text_output = self.encode(text)
-
+                
             elif mode == "decode":
                 if strict_mode:
-                    # Vérifie si tout est valide + recup le fragment stripped
+                    # En mode strict, on vérifie d'abord que le texte est valide
                     check = self.check_code(text, strict=True, allowed_punct=allowed_punct)
                     if not check["is_match"]:
-                        return {"error": "Le texte n'est pas valide hex (mode strict)."}
-                    # On récupère le bloc unique
-                    hex_block = check["fragments"][0]["value"]
-                    text_output = self.decode(hex_block)
+                        return {"error": "Code hexadécimal invalide en mode strict"}
+                    # Si valide, on décode tout le texte
+                    text_output = self.decode(text)
                 else:
-                    # mode smooth => decode block par block
+                    # En mode smooth, on décode par blocs
                     text_output = self.decode_hex_blocks(text, allowed_punct)
 
             else:
@@ -205,6 +151,7 @@ class HexadecimalEncoderDecoderPlugin:
 
             return {
                 "result": {
+                    "decoded_text": text_output,  # Ajout pour compatibilité avec metadetection
                     "text": {
                         "text_output": text_output,
                         "text_input": text,
