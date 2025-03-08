@@ -436,20 +436,15 @@ window.WaypointFormController = class extends Stimulus.Controller {
       const updatedHTML = await response.text();
       
       // Trouver l'élément à mettre à jour (le conteneur des coordonnées)
-      const coordsContainer = document.querySelector('#geocache-coordinates-container');
+      const coordsContainer = document.querySelector('[data-geocache-coordinates-target="container"]');
       if (coordsContainer) {
         // Mettre à jour le contenu
         coordsContainer.innerHTML = updatedHTML;
         
-        // Réinitialiser les contrôleurs Stimulus pour le nouvel élément
-        if (window.application) {
-          window.application.controllers.forEach(controller => {
-            if (controller.identifier === 'geocache-coordinates') {
-              controller.disconnect();
-            }
-          });
-          window.application.start();
-        }
+        // Déclencher un événement personnalisé pour notifier que les coordonnées ont été mises à jour
+        document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+      } else {
+        console.error("Conteneur de coordonnées non trouvé");
       }
       
       // Fermer le formulaire
