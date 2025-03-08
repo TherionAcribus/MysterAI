@@ -69,7 +69,7 @@
             <!-- Coordonnées -->
             <div class="bg-gray-800 rounded-lg p-4">
                 <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
-                <div id="coordinates-container" data-geocache-coordinates-target="container">
+                <div id="geocache-coordinates-container" data-controller="geocache-coordinates" data-geocache-coordinates-target="container">
                     {% include 'partials/coordinates_display.html' %}
                 </div>
             </div>
@@ -263,6 +263,24 @@
                         data-action="click->waypoint-form#createNewFromCurrent">
                   Créer un nouveau point
                 </button>
+              </div>
+              
+              <!-- Bouton pour transformer le waypoint en coordonnées corrigées -->
+              <div class="mt-4 pt-4 border-t border-gray-700">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-300">
+                    <i class="fas fa-map-marker-alt mr-1"></i> Transformer en coordonnées corrigées
+                    <p class="text-xs text-gray-400 mt-1">
+                      Utiliser ce waypoint comme coordonnées corrigées pour cette géocache.
+                    </p>
+                  </div>
+                  <button class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                          type="button"
+                          data-waypoint-form-target="useAsCorrectCoordsButton"
+                          data-action="click->waypoint-form#useAsCorrectCoordinates">
+                    <i class="fas fa-check-circle mr-1"></i> Utiliser comme coordonnées corrigées
+                  </button>
+                </div>
               </div>
             </form>
           </div>

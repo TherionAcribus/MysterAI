@@ -5,7 +5,7 @@ window.WaypointFormController = class extends Stimulus.Controller {
     "lookupInput", "gcLatInput", "gcLonInput", "noteInput", "geocacheIdInput",
     "waypointIdInput", "submitButton", "formTitle", "projectionSection",
     "distanceInput", "distanceUnitInput", "bearingInput", "projectedCoordsInput",
-    "createNewButton", "addToNotesCheckbox"
+    "createNewButton", "addToNotesCheckbox", "useAsCorrectCoordsButton"
   ];
 
   connect() {
@@ -374,6 +374,94 @@ window.WaypointFormController = class extends Stimulus.Controller {
       const notification = document.createElement('div');
       notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
       notification.textContent = 'Coordonnées projetées avec succès !';
+      document.body.appendChild(notification);
+      
+      // Supprimer la notification après 3 secondes
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      alert(`Erreur: ${error.message}`);
+    }
+  }
+
+  /**
+   * Utilise les coordonnées du waypoint actuel comme coordonnées corrigées pour la géocache
+   */
+  async useAsCorrectCoordinates(event) {
+    event.preventDefault();
+    
+    // Récupérer les coordonnées actuelles du waypoint
+    const gc_lat = this.gcLatInputTarget.value;
+    const gc_lon = this.gcLonInputTarget.value;
+    
+    // Vérifier que les coordonnées sont valides
+    if (!gc_lat || !gc_lon) {
+      alert('Les coordonnées du waypoint sont incomplètes ou invalides.');
+      return;
+    }
+    
+    // Récupérer l'ID de la géocache
+    const geocacheId = this.geocacheIdInputTarget.value;
+    if (!geocacheId) {
+      alert('ID de géocache non trouvé.');
+      return;
+    }
+    
+    // Demander confirmation
+    if (!confirm('Êtes-vous sûr de vouloir utiliser les coordonnées de ce waypoint comme coordonnées corrigées pour cette géocache ?')) {
+      return;
+    }
+    
+    try {
+      // Créer un objet FormData pour envoyer les données au format form
+      const formData = new FormData();
+      formData.append('gc_lat', gc_lat);
+      formData.append('gc_lon', gc_lon);
+      
+      // Envoyer la requête pour mettre à jour les coordonnées corrigées
+      const response = await fetch(`/geocaches/${geocacheId}/coordinates`, {
+        method: 'PUT',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Une erreur est survenue lors de la mise à jour des coordonnées');
+      }
+      
+      // Récupérer le HTML mis à jour
+      const updatedHTML = await response.text();
+      
+      // Trouver l'élément à mettre à jour (le conteneur des coordonnées)
+      const coordsContainer = document.querySelector('#geocache-coordinates-container');
+      if (coordsContainer) {
+        // Mettre à jour le contenu
+        coordsContainer.innerHTML = updatedHTML;
+        
+        // Réinitialiser les contrôleurs Stimulus pour le nouvel élément
+        if (window.application) {
+          window.application.controllers.forEach(controller => {
+            if (controller.identifier === 'geocache-coordinates') {
+              controller.disconnect();
+            }
+          });
+          window.application.start();
+        }
+      }
+      
+      // Fermer le formulaire
+      this.formTarget.classList.add('hidden');
+      
+      // Réinitialiser le formulaire
+      this.resetForm();
+      
+      // Notification de succès
+      const notification = document.createElement('div');
+      notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+      notification.textContent = 'Coordonnées corrigées mises à jour avec succès !';
       document.body.appendChild(notification);
       
       // Supprimer la notification après 3 secondes
