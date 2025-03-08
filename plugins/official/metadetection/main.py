@@ -85,7 +85,8 @@ class MetaDetectionPlugin:
         included_plugins = [
             "abaddon_code",
             "kenny_code",
-            "hexadecimal_encoder_decoder"
+            "hexadecimal_encoder_decoder",
+            "roman_numerals"
         ]
         
         if not text:
@@ -167,7 +168,8 @@ class MetaDetectionPlugin:
         included_plugins = [
             "abaddon_code",
             "kenny_code",
-            "hexadecimal_encoder_decoder"
+            "hexadecimal_encoder_decoder",
+            "roman_numerals"
         ]
         
         if plugin_name:
