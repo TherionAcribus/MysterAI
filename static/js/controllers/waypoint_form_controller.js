@@ -3,7 +3,8 @@ window.WaypointFormController = class extends Stimulus.Controller {
   static targets = [
     "form", "formToggle", "waypointsList", "nameInput", "prefixInput", 
     "lookupInput", "gcLatInput", "gcLonInput", "noteInput", "geocacheIdInput",
-    "waypointIdInput", "submitButton", "formTitle"
+    "waypointIdInput", "submitButton", "formTitle", "projectionSection",
+    "distanceInput", "distanceUnitInput", "bearingInput", "projectedCoordsInput"
   ];
 
   connect() {
@@ -55,6 +56,11 @@ window.WaypointFormController = class extends Stimulus.Controller {
     // Vider le champ d'ID de waypoint
     if (this.hasWaypointIdInputTarget) {
       this.waypointIdInputTarget.value = '';
+    }
+    
+    // Vider le champ de coordonnées projetées
+    if (this.hasProjectedCoordsInputTarget) {
+      this.projectedCoordsInputTarget.value = '';
     }
   }
 
@@ -199,17 +205,106 @@ window.WaypointFormController = class extends Stimulus.Controller {
       this.isEditMode = true;
       
       // Changer le texte du bouton
-      this.submitButtonTarget.textContent = 'Mettre à jour le waypoint';
+      this.submitButtonTarget.textContent = "Mettre à jour";
       
       // Changer le titre du formulaire
       if (this.hasFormTitleTarget) {
-        this.formTitleTarget.textContent = 'Modifier le Waypoint';
+        this.formTitleTarget.textContent = "Modifier Waypoint";
       }
       
-      // Afficher le formulaire s'il est caché
-      if (this.formTarget.classList.contains('hidden')) {
-        this.formTarget.classList.remove('hidden');
+      // Afficher le formulaire
+      this.formTarget.classList.remove('hidden');
+      
+    } catch (error) {
+      console.error('Error:', error);
+      alert(`Erreur: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Calcule les nouvelles coordonnées en utilisant la projection
+   * basée sur la distance et l'angle fournis
+   */
+  async calculateProjection(event) {
+    event.preventDefault();
+    
+    // Récupérer les valeurs des champs de projection
+    const gc_lat = this.gcLatInputTarget.value;
+    const gc_lon = this.gcLonInputTarget.value;
+    const distance = this.distanceInputTarget.value;
+    const distance_unit = this.distanceUnitInputTarget.value;
+    const bearing_deg = this.bearingInputTarget.value;
+    
+    // Vérifier que toutes les valeurs nécessaires sont présentes
+    if (!gc_lat || !gc_lon || !distance || !bearing_deg) {
+      alert('Veuillez remplir tous les champs de coordonnées, distance et angle.');
+      return;
+    }
+    
+    try {
+      // Appeler l'API de projection
+      const response = await fetch('/api/waypoints/project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gc_lat,
+          gc_lon,
+          distance,
+          distance_unit,
+          bearing_deg
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Une erreur est survenue lors de la projection');
       }
+      
+      // Extraire les nouvelles coordonnées
+      const result = await response.json();
+      
+      // Afficher les coordonnées complètes dans le champ dédié
+      if (this.hasProjectedCoordsInputTarget && result.full_coords) {
+        this.projectedCoordsInputTarget.value = result.full_coords;
+      }
+      
+      // Créer un bouton pour appliquer les coordonnées projetées
+      const applyButton = document.createElement('button');
+      applyButton.className = 'bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded ml-2 focus:outline-none focus:shadow-outline';
+      applyButton.textContent = 'Appliquer';
+      applyButton.addEventListener('click', () => {
+        // Appliquer les coordonnées projetées aux champs de coordonnées
+        this.gcLatInputTarget.value = result.gc_lat;
+        this.gcLonInputTarget.value = result.gc_lon;
+        // Supprimer le bouton après utilisation
+        applyButton.remove();
+      });
+      
+      // Ajouter le bouton à côté du champ de coordonnées projetées
+      const projectionField = this.projectedCoordsInputTarget.parentElement;
+      
+      // Supprimer l'ancien bouton s'il existe
+      const existingApplyButton = projectionField.querySelector('.apply-projection-button');
+      if (existingApplyButton) {
+        existingApplyButton.remove();
+      }
+      
+      // Ajouter le nouveau bouton
+      applyButton.classList.add('apply-projection-button');
+      projectionField.appendChild(applyButton);
+      
+      // Notification de succès
+      const notification = document.createElement('div');
+      notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+      notification.textContent = 'Coordonnées projetées avec succès !';
+      document.body.appendChild(notification);
+      
+      // Supprimer la notification après 3 secondes
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
       
     } catch (error) {
       console.error('Error:', error);
@@ -221,12 +316,8 @@ window.WaypointFormController = class extends Stimulus.Controller {
 // Enregistrer le contrôleur dans l'application Stimulus
 (function() {
   if (window.application) {
-    window.application.register("waypoint-form", window.WaypointFormController);
-    console.log("Contrôleur WaypointForm enregistré dans l'application Stimulus");
-  } else if (window.StimulusApp) {
-    window.StimulusApp.register("waypoint-form", window.WaypointFormController);
-    console.log("Contrôleur WaypointForm enregistré dans StimulusApp");
+    window.application.register('waypoint-form', WaypointFormController);
   } else {
-    console.error("Impossible d'enregistrer le contrôleur WaypointForm : application Stimulus non trouvée");
+    console.error("Stimulus application not found");
   }
 })();

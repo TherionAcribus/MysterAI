@@ -148,6 +148,19 @@ class MovePointPlugin:
         # 4. Reformater la sortie => 'N 49° 12.XXX E 5° 52.XXX'
         new_coord_str = self.format_coord(new_lat, new_lon)
 
+        print('new_coord_str', new_coord_str)
+        
+        # Séparer la latitude et la longitude pour faciliter l'utilisation
+        parts = new_coord_str.split()
+        if len(parts) >= 6:
+            gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
+            gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
+        else:
+            gc_lat = ""
+            gc_lon = ""
+
         return {
-            "text_output": new_coord_str
+            "text_output": new_coord_str,
+            "gc_lat": gc_lat,
+            "gc_lon": gc_lon
         }

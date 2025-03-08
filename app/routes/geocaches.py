@@ -1036,3 +1036,77 @@ def get_nearby_geocaches(geocache_id):
     logger.debug(f"Nombre de géocaches proches trouvées: {len(nearby_geocaches)}")
     
     return jsonify(nearby_geocaches)
+
+
+@geocaches_bp.route('/api/waypoints/project', methods=['POST'])
+def project_waypoint():
+    """
+    Projette un waypoint en utilisant le plugin d'orientation
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Données JSON manquantes'}), 400
+        
+        # Récupérer les données nécessaires
+        gc_lat = data.get('gc_lat')
+        gc_lon = data.get('gc_lon')
+        distance = data.get('distance')
+        distance_unit = data.get('distance_unit', 'm')
+        bearing_deg = data.get('bearing_deg')
+        
+        # Vérifier que toutes les données nécessaires sont présentes
+        if not all([gc_lat, gc_lon, distance, bearing_deg]):
+            return jsonify({'error': 'Paramètres manquants'}), 400
+        
+        # Préparer les entrées pour le plugin
+        coord_str = f"{gc_lat} {gc_lon}"
+        
+        # Récupérer le plugin d'orientation
+        from app import get_plugin_manager
+        plugin_manager = get_plugin_manager()
+        
+        move_point_plugin = plugin_manager.get_plugin('move_point_plugin')
+        
+        if not move_point_plugin:
+            return jsonify({'error': 'Plugin de projection non disponible'}), 500
+        
+        # Exécuter le plugin
+        result = move_point_plugin.execute({
+            'text': coord_str,
+            'bearing_deg': float(bearing_deg),
+            'distance': float(distance),
+            'distance_unit': distance_unit
+        })
+        
+        # Extraire les nouvelles coordonnées
+        new_coord_str = result.get('text_output', '')
+        new_gc_lat = result.get('gc_lat', '')
+        new_gc_lon = result.get('gc_lon', '')
+        
+        # Vérifier que les coordonnées ont été correctement extraites
+        if new_gc_lat and new_gc_lon:
+            return jsonify({
+                'success': True,
+                'gc_lat': new_gc_lat,
+                'gc_lon': new_gc_lon,
+                'full_coords': new_coord_str
+            }), 200
+        else:
+            # Fallback: essayer de séparer manuellement la chaîne complète
+            parts = new_coord_str.split()
+            if len(parts) >= 6:
+                new_gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
+                new_gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
+                return jsonify({
+                    'success': True,
+                    'gc_lat': new_gc_lat,
+                    'gc_lon': new_gc_lon,
+                    'full_coords': new_coord_str
+                }), 200
+            else:
+                return jsonify({'error': 'Format de coordonnées invalide'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la projection du waypoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
