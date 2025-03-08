@@ -496,3 +496,53 @@ def geocache_analysis():
     return render_template('geocache_analysis.html',
                          geocache_id=geocache_id,
                          gc_code=gc_code)
+
+@plugins_bp.route('/api/plugins/metadetection/execute', methods=['POST'])
+def execute_metadetection():
+    """
+    Route spécifique pour exécuter le plugin metadetection avec des fonctionnalités étendues.
+    Ce plugin est un méta-plugin qui peut analyser et décoder du texte en utilisant d'autres plugins.
+    """
+    try:
+        # Récupérer les inputs du formulaire
+        text = request.form.get('text', '')
+        mode = request.form.get('mode', 'detect')  # 'detect' ou 'decode'
+        strict = request.form.get('strict', 'smooth')  # 'strict' ou 'smooth'
+        embedded = request.form.get('embedded', 'false').lower() == 'true'
+        plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
+        
+        if not text:
+            return jsonify({'error': 'Aucun texte fourni'}), 400
+            
+        # Vérifier que le plugin metadetection existe
+        plugin = Plugin.query.filter_by(name='metadetection').first()
+        if not plugin:
+            return jsonify({'error': 'Plugin metadetection non trouvé'}), 404
+            
+        # Préparer les inputs pour le plugin
+        inputs = {
+            'text': text,
+            'mode': mode,
+            'strict': strict
+        }
+        
+        # Ajouter le plugin_name si fourni
+        if plugin_name:
+            inputs['plugin_name'] = plugin_name
+            
+        # Obtenir le plugin manager
+        from app import get_plugin_manager
+        plugin_manager = get_plugin_manager()
+        
+        # Exécuter le plugin
+        result = plugin_manager.execute_plugin('metadetection', inputs)
+        
+        # Retourner le résultat en JSON
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        print(f"Error executing metadetection plugin: {str(e)}")
+        print("Traceback:")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
