@@ -4,7 +4,8 @@ window.WaypointFormController = class extends Stimulus.Controller {
     "form", "formToggle", "waypointsList", "nameInput", "prefixInput", 
     "lookupInput", "gcLatInput", "gcLonInput", "noteInput", "geocacheIdInput",
     "waypointIdInput", "submitButton", "formTitle", "projectionSection",
-    "distanceInput", "distanceUnitInput", "bearingInput", "projectedCoordsInput"
+    "distanceInput", "distanceUnitInput", "bearingInput", "projectedCoordsInput",
+    "createNewButton"
   ];
 
   connect() {
@@ -61,6 +62,11 @@ window.WaypointFormController = class extends Stimulus.Controller {
     // Vider le champ de coordonnées projetées
     if (this.hasProjectedCoordsInputTarget) {
       this.projectedCoordsInputTarget.value = '';
+    }
+    
+    // Cacher le bouton "Créer un nouveau point"
+    if (this.hasCreateNewButtonTarget) {
+      this.createNewButtonTarget.classList.add('hidden');
     }
   }
 
@@ -212,6 +218,11 @@ window.WaypointFormController = class extends Stimulus.Controller {
         this.formTitleTarget.textContent = "Modifier Waypoint";
       }
       
+      // Afficher le bouton "Créer un nouveau point"
+      if (this.hasCreateNewButtonTarget) {
+        this.createNewButtonTarget.classList.remove('hidden');
+      }
+      
       // Afficher le formulaire
       this.formTarget.classList.remove('hidden');
       
@@ -219,6 +230,56 @@ window.WaypointFormController = class extends Stimulus.Controller {
       console.error('Error:', error);
       alert(`Erreur: ${error.message}`);
     }
+  }
+  
+  /**
+   * Crée un nouveau waypoint à partir des données actuelles du formulaire
+   * en mode édition, sans modifier le waypoint existant
+   */
+  createNewFromCurrent(event) {
+    event.preventDefault();
+    
+    // Conserver les données du formulaire actuel
+    const currentData = {
+      name: this.nameInputTarget.value,
+      prefix: this.prefixInputTarget.value,
+      lookup: this.lookupInputTarget.value,
+      gc_lat: this.gcLatInputTarget.value,
+      gc_lon: this.gcLonInputTarget.value,
+      note: this.noteInputTarget.value
+    };
+    
+    // Modifier légèrement le nom pour indiquer qu'il s'agit d'une copie
+    if (currentData.name) {
+      currentData.name = `${currentData.name} (copie)`;
+    }
+    
+    // Réinitialiser le formulaire pour passer en mode création
+    this.resetForm();
+    
+    // Remplir le formulaire avec les données conservées
+    this.nameInputTarget.value = currentData.name;
+    this.prefixInputTarget.value = currentData.prefix;
+    this.lookupInputTarget.value = currentData.lookup;
+    this.gcLatInputTarget.value = currentData.gc_lat;
+    this.gcLonInputTarget.value = currentData.gc_lon;
+    this.noteInputTarget.value = currentData.note;
+    
+    // Changer le titre du formulaire pour indiquer qu'on crée un nouveau waypoint
+    if (this.hasFormTitleTarget) {
+      this.formTitleTarget.textContent = "Nouveau Waypoint (à partir d'une copie)";
+    }
+    
+    // Notification pour informer l'utilisateur
+    const notification = document.createElement('div');
+    notification.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50';
+    notification.textContent = 'Création d\'un nouveau waypoint à partir des données actuelles';
+    document.body.appendChild(notification);
+    
+    // Supprimer la notification après 3 secondes
+    setTimeout(() => {
+      notification.remove();
+    }, 3000);
   }
   
   /**

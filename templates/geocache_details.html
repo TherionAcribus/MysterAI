@@ -244,6 +244,13 @@
                         data-waypoint-form-target="submitButton">
                   Ajouter le waypoint
                 </button>
+                <!-- Bouton pour créer un nouveau point, visible uniquement en mode édition -->
+                <button class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-2 hidden" 
+                        type="button"
+                        data-waypoint-form-target="createNewButton"
+                        data-action="click->waypoint-form#createNewFromCurrent">
+                  Créer un nouveau point
+                </button>
               </div>
             </form>
           </div>
