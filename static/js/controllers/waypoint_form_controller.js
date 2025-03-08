@@ -5,7 +5,7 @@ window.WaypointFormController = class extends Stimulus.Controller {
     "lookupInput", "gcLatInput", "gcLonInput", "noteInput", "geocacheIdInput",
     "waypointIdInput", "submitButton", "formTitle", "projectionSection",
     "distanceInput", "distanceUnitInput", "bearingInput", "projectedCoordsInput",
-    "createNewButton"
+    "createNewButton", "addToNotesCheckbox"
   ];
 
   connect() {
@@ -329,6 +329,20 @@ window.WaypointFormController = class extends Stimulus.Controller {
       // Afficher les coordonnées complètes dans le champ dédié
       if (this.hasProjectedCoordsInputTarget && result.full_coords) {
         this.projectedCoordsInputTarget.value = result.full_coords;
+      }
+      
+      // Ajouter les informations de projection dans les notes si la case est cochée
+      if (this.hasAddToNotesCheckboxTarget && this.addToNotesCheckboxTarget.checked) {
+        const currentDate = new Date().toLocaleDateString('fr-FR');
+        const currentTime = new Date().toLocaleTimeString('fr-FR');
+        const projectionInfo = `\n\n--- Projection (${currentDate} à ${currentTime}) ---\nDepuis: ${gc_lat} ${gc_lon}\nDistance: ${distance} ${distance_unit}\nAzimut: ${bearing_deg}°\nRésultat: ${result.full_coords}`;
+        
+        // Ajouter les informations à la fin des notes existantes
+        this.noteInputTarget.value = (this.noteInputTarget.value || '').trim() + projectionInfo;
+        
+        // Ajuster la hauteur du textarea pour afficher tout le contenu
+        this.noteInputTarget.style.height = 'auto';
+        this.noteInputTarget.style.height = (this.noteInputTarget.scrollHeight) + 'px';
       }
       
       // Créer un bouton pour appliquer les coordonnées projetées
