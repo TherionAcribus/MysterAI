@@ -24,6 +24,11 @@
             "label": "Mode strict",
             "options": ["strict", "smooth"],
             "default": "smooth"
+        },
+        "enable_gps_detection": {
+            "type": "boolean",
+            "label": "Détecter les coordonnées GPS",
+            "default": true
         }
     },
     "output_types": {

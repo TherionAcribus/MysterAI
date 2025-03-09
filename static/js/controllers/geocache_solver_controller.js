@@ -23,7 +23,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         gcCode: String,
         selectedPlugin: String,
         lastPluginOutput: String,
-        pluginsHistory: Array
+        pluginsHistory: Array,
+        lastDetectedCoordinates: Object
     }
 
     connect() {
@@ -760,6 +761,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         const mode = event.currentTarget.dataset.mode || document.getElementById('metasolver-mode').value;
         const strict = document.getElementById('metasolver-strict').value;
         const embedded = document.getElementById('metasolver-embedded').checked;
+        const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
         
         // Récupérer les informations sur les caractères autorisés
         const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
@@ -803,6 +805,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('mode', mode);
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
+            formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
             
             // Ajouter les caractères autorisés si nécessaire
             if (allowedCharsType !== 'all') {
@@ -958,6 +961,51 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         }
         
+        // Vérifier si des coordonnées GPS ont été détectées
+        let gpsCoordinatesHtml = '';
+        if (result.coordinates && result.coordinates.exist) {
+            // Stocker les coordonnées détectées pour une utilisation ultérieure
+            this.lastDetectedCoordinatesValue = result.coordinates;
+            
+            gpsCoordinatesHtml = `
+                <div class="bg-gray-700 rounded-lg p-4 mt-4">
+                    <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
+                    
+                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
+                        <div>
+                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                   value="${result.coordinates.ddm || ''}" readonly>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       value="${result.coordinates.ddm_lat || ''}" readonly>
+                            </div>
+                            <div>
+                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       value="${result.coordinates.ddm_lon || ''}" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between mt-2">
+                            <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                                    data-action="click->geocache-solver#useCoordinates">
+                                Utiliser ces coordonnées
+                            </button>
+                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
+                                    onclick="navigator.clipboard.writeText('${result.coordinates.ddm}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
+                                Copier
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
         if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
             const codes = result.result.possible_codes;
             let html = `
@@ -987,7 +1035,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             html += `</div></div>`;
-            return html;
+            return html + gpsCoordinatesHtml;
         } else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
             const decodedResults = result.result.decoded_results;
             let html = `
@@ -1006,18 +1054,20 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             html += `</div></div>`;
-            return html;
+            return html + gpsCoordinatesHtml;
         } else if (result.result && result.result.decoded_text) {
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>
                     <div class="text-gray-200">${result.result.decoded_text}</div>
+                    ${gpsCoordinatesHtml}
                 </div>
             `;
         } else {
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <div class="text-gray-400">Aucun code détecté dans le texte.</div>
+                    ${gpsCoordinatesHtml}
                 </div>
             `;
         }
@@ -1026,5 +1076,133 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     addToPluginsHistory(entry) {
         this.pluginsHistoryValue.push(entry);
         this.displayPluginsHistory();
+    }
+
+    // Méthode pour utiliser les coordonnées détectées
+    useCoordinates(event) {
+        event.preventDefault();
+        
+        if (!this.lastDetectedCoordinatesValue) {
+            alert("Aucune coordonnée GPS détectée.");
+            return;
+        }
+        
+        const coords = this.lastDetectedCoordinatesValue;
+        
+        // Si nous sommes dans le contexte d'une géocache
+        if (this.geocacheIdValue) {
+            if (confirm("Voulez-vous utiliser ces coordonnées comme coordonnées corrigées pour cette géocache?")) {
+                this.saveCoordinatesToGeocache(coords);
+            }
+        } else {
+            // Sinon, proposer de copier les coordonnées ou de les ouvrir dans une carte
+            const action = prompt(
+                "Que souhaitez-vous faire avec ces coordonnées?\n" +
+                "1: Copier dans le presse-papier\n" +
+                "2: Ouvrir dans Google Maps\n" +
+                "3: Ouvrir dans OpenStreetMap",
+                "1"
+            );
+            
+            switch (action) {
+                case "1":
+                    navigator.clipboard.writeText(coords.ddm)
+                        .then(() => alert("Coordonnées copiées dans le presse-papier"))
+                        .catch(err => alert("Erreur lors de la copie: " + err));
+                    break;
+                case "2":
+                    // Extraire les valeurs numériques pour Google Maps
+                    this.openInGoogleMaps(coords);
+                    break;
+                case "3":
+                    // Extraire les valeurs numériques pour OpenStreetMap
+                    this.openInOpenStreetMap(coords);
+                    break;
+                default:
+                    alert("Action annulée ou non reconnue.");
+            }
+        }
+    }
+    
+    // Méthode pour sauvegarder les coordonnées dans une géocache
+    async saveCoordinatesToGeocache(coords) {
+        try {
+            const response = await fetch(`/api/geocaches/save/${this.geocacheIdValue}/coordinates`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gc_lat: coords.ddm_lat,
+                    gc_lon: coords.ddm_lon
+                })
+            });
+            
+            if (response.ok) {
+                alert("Coordonnées enregistrées avec succès!");
+                // Déclencher un événement pour mettre à jour l'affichage des coordonnées
+                document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+            } else {
+                const error = await response.json();
+                alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
+            }
+        } catch (error) {
+            console.error("Erreur lors de l'enregistrement des coordonnées:", error);
+            alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
+        }
+    }
+    
+    // Méthode pour ouvrir les coordonnées dans Google Maps
+    openInGoogleMaps(coords) {
+        // Extraire les valeurs numériques des coordonnées
+        const lat = this.extractNumericCoordinate(coords.ddm_lat);
+        const lon = this.extractNumericCoordinate(coords.ddm_lon);
+        
+        if (lat && lon) {
+            const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+            window.open(url, '_blank');
+        } else {
+            alert("Impossible d'extraire les valeurs numériques des coordonnées.");
+        }
+    }
+    
+    // Méthode pour ouvrir les coordonnées dans OpenStreetMap
+    openInOpenStreetMap(coords) {
+        // Extraire les valeurs numériques des coordonnées
+        const lat = this.extractNumericCoordinate(coords.ddm_lat);
+        const lon = this.extractNumericCoordinate(coords.ddm_lon);
+        
+        if (lat && lon) {
+            const url = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=15`;
+            window.open(url, '_blank');
+        } else {
+            alert("Impossible d'extraire les valeurs numériques des coordonnées.");
+        }
+    }
+    
+    // Méthode pour extraire les valeurs numériques des coordonnées
+    extractNumericCoordinate(coordStr) {
+        try {
+            // Format attendu: "N 48° 32.296'" ou "E 6° 40.636'"
+            const direction = coordStr.charAt(0);
+            const parts = coordStr.substring(1).trim().split('°');
+            
+            if (parts.length !== 2) return null;
+            
+            const degrees = parseFloat(parts[0].trim());
+            const minutes = parseFloat(parts[1].replace("'", "").trim());
+            
+            let decimal = degrees + (minutes / 60);
+            
+            // Ajuster selon la direction
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            
+            return decimal;
+        } catch (error) {
+            console.error("Erreur lors de l'extraction des coordonnées numériques:", error);
+            return null;
+        }
     }
 }

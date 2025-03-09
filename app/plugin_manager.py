@@ -366,18 +366,37 @@ class PluginManager:
             return None
 
         # Exécute le plugin pour obtenir le texte décodé
+        print(f"[DEBUG] execute_plugin: Exécution du plugin {plugin_name} avec les inputs: {inputs}")
         result = plugin.execute(inputs)
-        print("RESULT", result)
+        print(f"[DEBUG] execute_plugin: Résultat brut du plugin: {result}")
+        
         decoded_text = result.get("text_output")
         if not decoded_text:
             decoded_text = result.get("result", {}).get("text", {}).get("text_output")
-        print(f"Decoded text: {decoded_text}")
+            if not decoded_text and "result" in result and "decoded_results" in result["result"]:
+                # Cas spécial pour metadetection qui retourne une liste de résultats
+                print(f"[DEBUG] execute_plugin: Détection de résultats multiples dans metadetection")
+                decoded_results = result["result"]["decoded_results"]
+                if decoded_results and isinstance(decoded_results, list) and len(decoded_results) > 0:
+                    # Prendre le premier résultat pour la détection GPS
+                    decoded_text = decoded_results[0].get("decoded_text", "")
+                    print(f"[DEBUG] execute_plugin: Utilisation du premier résultat décodé: {decoded_text[:100]}... (tronqué)")
+            elif not decoded_text and "result" in result and "decoded_text" in result["result"]:
+                # Cas où le texte décodé est directement dans result.decoded_text
+                decoded_text = result["result"]["decoded_text"]
+                print(f"[DEBUG] execute_plugin: Texte décodé trouvé dans result.decoded_text: {decoded_text[:100]}... (tronqué)")
+                
+        print(f"[DEBUG] execute_plugin: Texte décodé final: {decoded_text[:100] if decoded_text else None}... (tronqué)")
 
         # Vérifie si la détection GPS est activée
         enable_gps = inputs.get("enable_gps_detection", True)
-        print(f"GPS detection enabled: {enable_gps}")
+        print(f"[DEBUG] execute_plugin: Détection GPS activée: {enable_gps}")
+        
         if enable_gps and decoded_text:
+            print(f"[DEBUG] execute_plugin: Lancement de la détection GPS sur le texte décodé")
+            from app.routes.coordinates import detect_gps_coordinates
             gps_coordinates = detect_gps_coordinates(decoded_text)
+            print(f"[DEBUG] execute_plugin: Résultat de la détection GPS: {gps_coordinates}")
             result["coordinates"] = gps_coordinates
 
         return result

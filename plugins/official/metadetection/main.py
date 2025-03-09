@@ -27,6 +27,7 @@ class MetaDetectionPlugin:
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
                 - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 - plugin_name: Nom du plugin à utiliser (optionnel)
+                - enable_gps_detection: True pour activer la détection des coordonnées GPS (optionnel)
                 
         Returns:
             Dictionnaire contenant le résultat de l'opération
@@ -44,6 +45,9 @@ class MetaDetectionPlugin:
         # Récupération du mode embedded
         embedded = inputs.get("embedded", False)
         
+        # Récupération du paramètre de détection GPS
+        enable_gps_detection = inputs.get("enable_gps_detection", True)
+        
         if not text:
             return {"result": {"error": "Aucun texte fourni à traiter."}}
             
@@ -51,7 +55,11 @@ class MetaDetectionPlugin:
             return self.detect_codes(text, strict, allowed_chars, embedded)
         elif mode == "decode":
             strict_param = "strict" if strict else "smooth"
-            return self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded)
+            result = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded)
+            
+            # Ajouter le paramètre enable_gps_detection au résultat pour que le plugin_manager puisse l'utiliser
+            result["enable_gps_detection"] = enable_gps_detection
+            return result
         else:
             raise ValueError(f"Action inconnue: {mode}")
 
@@ -191,7 +199,8 @@ class MetaDetectionPlugin:
                     "text": text,
                     "strict": strict,
                     "mode": "decode",
-                    "embedded": embedded
+                    "embedded": embedded,
+                    "enable_gps_detection": False  # Désactiver la détection GPS pour les plugins individuels
                 }
                 
                 # Ajouter les caractères autorisés si fournis
@@ -236,7 +245,8 @@ class MetaDetectionPlugin:
                         "text": text,
                         "strict": strict,
                         "mode": "decode",
-                        "embedded": embedded
+                        "embedded": embedded,
+                        "enable_gps_detection": False  # Désactiver la détection GPS pour les plugins individuels
                     }
                     
                     # Ajouter les caractères autorisés si fournis
