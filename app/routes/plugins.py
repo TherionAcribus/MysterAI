@@ -511,6 +511,9 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         
+        # Normaliser le texte
+        text = normalize_text(text)
+        
         # Récupérer les caractères autorisés s'ils sont fournis
         allowed_chars_json = request.form.get('allowed_chars', None)
         allowed_chars = None
@@ -560,3 +563,28 @@ def execute_metadetection():
         print("Traceback:")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+# Fonction utilitaire pour normaliser le texte
+def normalize_text(text: str) -> str:
+    """
+    Normalise le texte avant de l'envoyer aux plugins.
+    Remplace les caractères spéciaux et normalise les espaces.
+    """
+    if not text:
+        return ""
+        
+    # Remplacer les espaces insécables par des espaces normaux
+    normalized = text.replace('\xa0', ' ')
+    
+    # Normaliser les retours à la ligne
+    normalized = normalized.replace('\r\n', '\n')
+    
+    # Supprimer les espaces multiples
+    import re
+    normalized = re.sub(r'\s+', ' ', normalized)
+    
+    # Supprimer les espaces en début et fin de chaîne
+    normalized = normalized.strip()
+    
+    print(f"Texte normalisé: {normalized}")
+    return normalized

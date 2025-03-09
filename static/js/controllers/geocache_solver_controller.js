@@ -342,6 +342,26 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         }
     }
     
+    // Fonction pour normaliser le texte avant de l'envoyer aux plugins
+    normalizeText(text) {
+        if (!text) return '';
+        
+        // Remplacer les espaces insécables par des espaces normaux
+        let normalized = text.replace(/\xa0/g, ' ');
+        
+        // Normaliser les retours à la ligne
+        normalized = normalized.replace(/\r\n/g, '\n');
+        
+        // Supprimer les espaces multiples
+        normalized = normalized.replace(/\s+/g, ' ');
+        
+        // Supprimer les espaces en début et fin de chaîne
+        normalized = normalized.trim();
+        
+        console.log("Texte normalisé:", normalized);
+        return normalized;
+    }
+    
     async executePlugin(event) {
         // Récupérer l'ID et le nom du plugin
         const pluginId = event.currentTarget.dataset.pluginId;
@@ -364,6 +384,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 textToProcess = this.lastPluginOutputValue;
                 console.log("Utilisation du résultat du plugin précédent:", textToProcess);
             }
+            
+            // Normaliser le texte avant de l'envoyer au plugin
+            textToProcess = this.normalizeText(textToProcess);
             
             try {
                 // Créer ou récupérer la zone de résultat pour ce plugin
@@ -777,8 +800,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
         }
         
-        // Récupérer le texte à analyser
-        const text = this.descriptionTextTarget.value;
+        // Récupérer le texte à analyser et le normaliser
+        let text = this.descriptionTextTarget.value;
+        text = this.normalizeText(text);
         
         if (!text.trim()) {
             alert("Veuillez entrer un texte à analyser");

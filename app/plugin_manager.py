@@ -365,6 +365,10 @@ class PluginManager:
             logger.error(f"Plugin {plugin_name} non disponible")
             return None
 
+        # Normaliser le texte d'entrée si présent
+        if "text" in inputs and isinstance(inputs["text"], str):
+            inputs["text"] = self._normalize_text(inputs["text"])
+            
         # Exécute le plugin pour obtenir le texte décodé
         print(f"[DEBUG] execute_plugin: Exécution du plugin {plugin_name} avec les inputs: {inputs}")
         result = plugin.execute(inputs)
@@ -440,6 +444,30 @@ class PluginManager:
     # ---------------------------------------------------------
     # Méthodes internes
     # ---------------------------------------------------------
+
+    def _normalize_text(self, text: str) -> str:
+        """
+        Normalise le texte avant de l'envoyer aux plugins.
+        Remplace les caractères spéciaux et normalise les espaces.
+        """
+        if not text:
+            return ""
+            
+        # Remplacer les espaces insécables par des espaces normaux
+        normalized = text.replace('\xa0', ' ')
+        
+        # Normaliser les retours à la ligne
+        normalized = normalized.replace('\r\n', '\n')
+        
+        # Supprimer les espaces multiples
+        import re
+        normalized = re.sub(r'\s+', ' ', normalized)
+        
+        # Supprimer les espaces en début et fin de chaîne
+        normalized = normalized.strip()
+        
+        logger.debug(f"Texte normalisé: {normalized}")
+        return normalized
 
     def _create_plugin_wrapper(self, plugin_record) -> Optional[PluginInterface]:
         """
