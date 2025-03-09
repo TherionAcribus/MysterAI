@@ -99,30 +99,171 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
 ### Structure de base d'un plugin Python
 
 ```python
-def execute(inputs):
-    """
-    Fonction principale du plugin.
-    
-    Args:
-        inputs (dict): Dictionnaire contenant les entrées du plugin
-                      selon la configuration dans plugin.json
-                      
-    Returns:
-        dict: Dictionnaire contenant les sorties selon la configuration
-              dans plugin.json
-    """
-    # Traitement des entrées
-    text = inputs.get('text', '')
-    mode = inputs.get('mode', 'decode')
-    
-    # Logique du plugin
-    result = process_text(text, mode)
-    
-    # Retour des résultats
-    return {
-        'result': result
-    }
+class MyPlugin:
+    def __init__(self):
+        self.name = "my_plugin"
+        self.description = "Description of the plugin"
+        
+    def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
+        """
+        Vérifie si le texte contient du code valide selon les paramètres spécifiés.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des caractères du code
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si du code valide a été trouvé
+            - fragments: Liste des fragments de code trouvés
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        # Implémentation de la vérification du code
+        pass
+        
+    def decode_fragments(self, text: str, fragments: list) -> str:
+        """
+        Décode uniquement les fragments valides dans leur contexte original.
+        
+        Args:
+            text: Texte original contenant les fragments
+            fragments: Liste des fragments à décoder
+            
+        Returns:
+            Texte avec les fragments décodés
+        """
+        # Implémentation du décodage des fragments
+        pass
+        
+    def encode(self, text: str) -> str:
+        """
+        Encode le texte selon l'algorithme du plugin.
+        
+        Args:
+            text: Texte à encoder
+            
+        Returns:
+            Texte encodé
+        """
+        # Implémentation de l'encodage
+        pass
+        
+    def decode(self, text: str) -> str:
+        """
+        Décode le texte selon l'algorithme du plugin.
+        
+        Args:
+            text: Texte à décoder
+            
+        Returns:
+            Texte décodé
+        """
+        # Implémentation du décodage
+        pass
+        
+    def execute(self, inputs: dict) -> dict:
+        """
+        Point d'entrée principal du plugin.
+        
+        Args:
+            inputs: Dictionnaire contenant les paramètres d'entrée
+                - mode: "encode", "decode" ou "detect"
+                - text: Texte à traiter
+                - strict: "strict" ou "smooth" pour le mode de décodage
+                - allowed_chars: Liste de caractères autorisés
+                - embedded: True si le texte peut contenir du code intégré
+                
+        Returns:
+            Dictionnaire contenant le résultat de l'opération
+        """
+        mode = inputs.get("mode", "encode").lower()
+        text = inputs.get("text", "")
+        strict_mode = inputs.get("strict", "").lower() == "strict"
+        allowed_chars = inputs.get("allowed_chars", None)
+        embedded = inputs.get("embedded", False)
+        
+        # Logique du plugin selon le mode
+        if mode == "encode":
+            result = self.encode(text)
+            return {
+                "result": {
+                    "text": {
+                        "text_output": result,
+                        "text_input": text,
+                        "mode": mode
+                    }
+                }
+            }
+        elif mode == "decode":
+            # Logique de décodage selon les paramètres
+            pass
+        elif mode == "detect":
+            # Logique de détection selon les paramètres
+            pass
+        else:
+            return {"error": f"Mode inconnu : {mode}"}
 ```
+
+
+## Modes de fonctionnement
+
+### Paramètres de traitement
+
+Les plugins de MysteryAI supportent plusieurs modes et paramètres pour répondre aux besoins spécifiques du géocaching :
+
+1. **Mode principal (mode):**
+
+encode: Convertit un texte normal en format encodé
+decode: Convertit un texte encodé en texte normal
+detect: Analyse un texte pour détecter la présence possible de code
+
+
+2. **Mode de décodage (strict):**
+
+strict: Applique des règles strictes de validation (tout le texte doit être du code valide, ou seuls les fragments explicitement valides sont traités)
+smooth: Mode plus souple qui tente de décoder des parties de texte même si tout n'est pas parfaitement conforme
+
+
+3. **Intégration dans le texte (embedded):**
+
+true: Le code peut être intégré dans un texte plus large (ex: "Voici un code: XXX")
+false: Le texte entier est considéré comme étant du code
+
+
+4. **Caractères autorisés (allowed_chars):**
+
+Liste de caractères autorisés en plus des caractères du code (espaces, ponctuation, etc.)
+Ces caractères sont ignorés lors de la validation en mode strict
+
+
+
+### Comportement attendu
+
+#### Mode DECODE
+Texte embedded (intégré dans un autre texte):
+
+Strict: Récupère uniquement les éléments codés
+Smooth: Récupère code + caractères spéciaux, mais uniquement si fragments décodés
+
+Texte non embedded:
+
+Strict: Décode uniquement si tout est codé
+Smooth: Récupère code + caractères spéciaux, mais uniquement si fragments décodés
+
+#### Mode DETECT
+Texte embedded:
+
+Strict: Indique si trouve fragment de texte potentiellement encodé
+Smooth: Indique si trouve fragment de texte potentiellement encodé + caractères spéciaux, mais uniquement si fragments décodés
+
+Texte non embedded:
+
+Strict: Indique si tout le texte est potentiellement encodé
+Smooth: Indique si tout le texte est potentiellement encodé avec ou sans caractères spéciaux, mais uniquement s'il y a des fragments potentiellement encodés
+
+
 
 ## Interface utilisateur
 
