@@ -24,106 +24,136 @@ class KennyCodePlugin:
         # Table de conversion pour le décodage (inversion de encode_table)
         self.decode_table = {v: k for k, v in self.encode_table.items()}
 
-    def check_code(self, text: str, strict: bool = False, allowed_chars=None) -> dict:
+    def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
         """
-        Vérifie si le texte correspond au code Kenny selon le mode spécifié.
-        - Mode strict : Tous les blocs séparés par les caractères autorisés doivent être valides.
-        - Mode smooth : Recherche des blocs valides dans le texte.
-
-        Paramètres :
-          - text : Texte à analyser.
-          - strict : Mode strict (True) ou smooth (False).
-          - allowed_chars : Liste (ou chaîne) de caractères à ignorer (ex. [' ', '-', '_']).
+        Vérifie si le texte contient du code Kenny valide.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des caractères Kenny
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si du code Kenny a été trouvé
+            - fragments: Liste des fragments de code Kenny trouvés
+            - score: Score de confiance (0.0 à 1.0)
         """
-        # Si allowed_chars est fourni comme liste, le convertir en chaîne.
+        # Si allowed_chars est fourni comme liste, on la convertit en chaîne
         if allowed_chars is not None and isinstance(allowed_chars, list):
             allowed_chars = ''.join(allowed_chars)
+            
+        # Caractères autorisés par défaut
+        if allowed_chars is None:
+            allowed_chars = " \t\r\n.:;,_-°"
+            
+        # Caractères Kenny valides (les triplets de m, p, f dans la table de conversion)
+        kenny_chars = "mpf"
         
-        # Définir l'ensemble des caractères autorisés
-        allowed_set = set(allowed_chars) if allowed_chars else set()
-        
-        # En mode strict, vérifier que le texte ne contient que les caractères autorisés et ceux du code (m, f, p)
+        # En mode strict, le comportement dépend du paramètre embedded
         if strict:
-            esc_chars = re.escape(allowed_chars) if allowed_chars else ""
-            # Le texte doit être composé uniquement des symboles du code (m, f, p) et des caractères autorisés
-            if not re.fullmatch(f"^[{esc_chars}mfp]*$", text):
-                return {"is_match": False, "fragments": []}
-            
-            # Découper le texte en blocs à l'aide des caractères autorisés
-            blocks = self._split_into_blocks(text, allowed_chars)
-            valid_blocks = []
-            
-            for block in blocks:
-                block_text = block["block"]
-                if len(block_text) % 3 != 0:
-                    return {"is_match": False, "fragments": []}
+            if embedded:
+                # En mode strict+embedded, on recherche des fragments de code Kenny valides dans le texte
+                return self._extract_kenny_fragments(text, allowed_chars)
+            else:
+                # En mode strict sans embedded, on vérifie que tout le texte est du code Kenny valide
+                import re
                 
-                # Valider chaque trio du bloc
-                for i in range(0, len(block_text), 3):
-                    trio = block_text[i:i+3]
-                    if trio not in self.decode_table:
-                        return {"is_match": False, "fragments": []}
+                # Échapper les caractères spéciaux pour l'expression régulière
+                esc_punct = re.escape(allowed_chars)
                 
-                valid_blocks.append({
-                    "value": block_text,
-                    "start": block["start"],
-                    "end": block["end"]
-                })
-            
-            return {"is_match": True, "fragments": valid_blocks, "score": 1.0}
-            
-        else:
-            # Mode smooth : recherche de blocs valides dans le texte
-            blocks = self._split_into_blocks(text, allowed_chars)
-            valid_fragments = []
-            
-            for block in blocks:
-                block_text = block["block"]
-                # On vérifie que le bloc ne contient que les symboles m, f, p
-                if not re.fullmatch(r"^[mfp]+$", block_text):
-                    continue
-                    
-                if len(block_text) % 3 != 0:
-                    continue
-                    
-                valid = True
-                for i in range(0, len(block_text), 3):
-                    trio = block_text[i:i+3]
-                    if trio not in self.decode_table:
-                        valid = False
-                        break
+                # Créer un pattern qui accepte uniquement les caractères Kenny et les caractères autorisés
+                pattern_str = f"^[{kenny_chars}{esc_punct}]*$"
+                
+                # Vérifier que tous les caractères sont autorisés
+                if not re.match(pattern_str, text.lower()):
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier qu'il y a au moins un caractère Kenny
+                kenny_chars_found = re.sub(f"[{esc_punct}]", "", text.lower())
+                if not kenny_chars_found:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier que le texte contient des triplets Kenny valides
+                # Supprimer les caractères autorisés
+                clean_text = re.sub(f"[{esc_punct}]", "", text.lower())
+                
+                # Vérifier si le texte contient des triplets Kenny valides
+                valid_triplets = []
+                for i in range(0, len(clean_text), 3):
+                    if i + 3 <= len(clean_text):
+                        triplet = clean_text[i:i+3]
+                        if triplet in self.decode_table:
+                            valid_triplets.append(triplet)
                         
-                if valid:
-                    valid_fragments.append({
-                        "value": block_text,
-                        "start": block["start"],
-                        "end": block["end"]
-                    })
-                    
-            return {"is_match": len(valid_fragments) > 0, "fragments": valid_fragments}
-
-    def _split_into_blocks(self, text: str, allowed_chars: str) -> list:
-        """
-        Découpe le texte en blocs en utilisant les caractères autorisés comme séparateurs.
-        Renvoie une liste de dictionnaires avec le bloc extrait et ses positions.
-        """
-        esc_chars = re.escape(allowed_chars) if allowed_chars else ""
-        pattern = f"([^{esc_chars}]+)|([{esc_chars}]+)"
-        blocks = []
-        
-        for match in re.finditer(pattern, text):
-            block = match.group(0)
-            start, end = match.span()
-            # Ignorer les blocs qui sont uniquement composés des caractères autorisés
-            if allowed_chars and re.fullmatch(f"^[{esc_chars}]+$", block):
-                continue
-            blocks.append({
-                "block": block,
-                "start": start,
-                "end": end
-            })
+                if not valid_triplets:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Tout est OK, on renvoie le texte "strippé" comme fragment
+                stripped_text = text.strip(allowed_chars)
+                return {
+                    "is_match": True,
+                    "fragments": [{"value": stripped_text, "start": text.find(stripped_text), "end": text.find(stripped_text) + len(stripped_text)}],
+                    "score": 1.0
+                }
+        else:
+            # En mode smooth, on recherche des fragments de code Kenny valides dans le texte
+            return self._extract_kenny_fragments(text, allowed_chars)
             
-        return blocks
+    def _extract_kenny_fragments(self, text: str, allowed_chars: str) -> dict:
+        """
+        Extrait les fragments de code Kenny valides dans le texte.
+        
+        Args:
+            text: Texte à analyser
+            allowed_chars: Caractères autorisés en plus des caractères Kenny
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si des fragments ont été trouvés
+            - fragments: Liste des fragments contenant du code Kenny
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        import re
+        
+        # Caractères Kenny valides
+        kenny_chars = "mpf"
+        
+        # Échapper les caractères spéciaux pour l'expression régulière
+        esc_punct = re.escape(allowed_chars)
+        
+        # Rechercher des blocs de texte séparés par des caractères autorisés
+        pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
+        fragments = []
+        
+        for m in re.finditer(pattern, text.lower()):
+            block = m.group(0)
+            start, end = m.span()
+            
+            # Ignorer les blocs de ponctuation
+            if re.match(f"^[{esc_punct}]+$", block):
+                continue
+            
+            # Vérifier si le bloc contient des triplets Kenny valides
+            valid_triplets = []
+            for i in range(0, len(block), 3):
+                if i + 3 <= len(block):
+                    triplet = block[i:i+3]
+                    if triplet in self.decode_table:
+                        valid_triplets.append(triplet)
+                    
+            if valid_triplets:
+                fragments.append({"value": text[start:end], "start": start, "end": end})
+        
+        # Calculer un score basé sur le nombre de fragments trouvés
+        score = 1.0 if fragments else 0.0
+        
+        return {
+            "is_match": bool(fragments),
+            "fragments": fragments,
+            "score": score
+        }
 
     def decode_fragments(self, text: str, fragments: list) -> str:
         """
@@ -198,26 +228,33 @@ class KennyCodePlugin:
                 - text: Texte à encoder ou décoder
                 - strict: "strict" ou "smooth" pour le mode de décodage
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
+                - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+                
         Returns:
-            Dictionnaire contenant le résultat de l'opération.
+            Dictionnaire contenant le résultat de l'opération
         """
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
-        # Considère le mode strict si le paramètre "strict" vaut exactement "strict" (en minuscule)
+        
+        # Considère le mode strict si la valeur du paramètre "strict" est exactement "strict"
         strict_mode = inputs.get("strict", "").lower() == "strict"
+        
         # Récupération de la liste des caractères autorisés sous la clé "allowed_chars"
         allowed_chars = inputs.get("allowed_chars", None)
+        
+        # Récupération du mode embedded
+        embedded = inputs.get("embedded", False)
 
         if not text:
             return {"error": "Aucun texte fourni à traiter."}
 
         try:
             if mode == "encode":
-                encoded_text = self.encode(text)
+                encoded = self.encode(text)
                 return {
                     "result": {
                         "text": {
-                            "text_output": encoded_text,
+                            "text_output": encoded,
                             "text_input": text,
                             "mode": mode
                         }
@@ -226,29 +263,30 @@ class KennyCodePlugin:
                 
             elif mode == "decode":
                 if strict_mode:
-                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         return {"error": "Code Kenny invalide en mode strict"}
-                    # En mode strict, on effectue un décodage complet du texte
-                    decoded_text = self.decode(text)
+                    # Concatène les fragments valides et effectue le décodage classique.
+                    decoded = self.decode_fragments(text, check["fragments"])
                 else:
-                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         # Si aucun fragment n'a été trouvé, on retourne une erreur
                         return {"error": "Aucun code Kenny détecté dans le texte"}
                     
                     # Décode les fragments trouvés
-                    decoded_text = self.decode_fragments(text, check["fragments"])
+                    decoded = self.decode_fragments(text, check["fragments"])
                     
                     # Vérifier si le texte décodé est différent du texte d'origine
-                    if decoded_text == text:
+                    if decoded == text:
                         return {"error": "Aucun code Kenny n'a pu être décodé"}
 
+                # Format de retour compatible avec metadetection
                 return {
                     "result": {
-                        "decoded_text": decoded_text,
+                        "decoded_text": decoded,
                         "text": {
-                            "text_output": decoded_text,
+                            "text_output": decoded,
                             "text_input": text,
                             "mode": mode
                         }

@@ -29,136 +29,190 @@ class AbaddonCodePlugin:
         """
         return text.replace("μ", "µ")
 
-    def check_code(self, text: str, strict: bool = False, allowed_chars=None) -> dict:
+    def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
         """
-        Analyse le texte selon le mode spécifié :
-        - strict = True : Tous les caractères (hors allowed_chars) doivent former des triplets valides.
-        - strict = False (smooth) : Itère sur le texte pour extraire les triplets valides, en ignorant les autres caractères.
-
-        Paramètres :
-          - text : Texte à analyser.
-          - strict : Mode strict (True) ou smooth (False).
-          - allowed_chars : Liste (ou chaîne) de caractères à ignorer.
+        Vérifie si le texte contient du code Abaddon valide.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des caractères Abaddon
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si du code Abaddon a été trouvé
+            - fragments: Liste des fragments de code Abaddon trouvés
+            - score: Score de confiance (0.0 à 1.0)
         """
-        # Si allowed_chars est fourni comme liste, on la convertit en chaîne.
+        # Si allowed_chars est fourni comme liste, on la convertit en chaîne
         if allowed_chars is not None and isinstance(allowed_chars, list):
             allowed_chars = ''.join(allowed_chars)
             
-        # Ensemble des caractères autorisés à ignorer.
-        allowed_set = set(allowed_chars) if allowed_chars else set()
-
-        if strict:
-            symbols = []
-            positions = []
-            # Parcourt le texte en ignorant les caractères autorisés.
-            for i, c in enumerate(text):
-                if c in allowed_set:
-                    continue
-                if c not in {'þ', 'µ', '¥'}:
-                    return {"is_match": False, "fragments": []}
-                symbols.append(c)
-                positions.append(i)
-                
-            if not symbols or len(symbols) % 3 != 0:
-                return {"is_match": False, "fragments": []}
-                
-            fragments = []
-            for i in range(0, len(symbols), 3):
-                triplet = ''.join(symbols[i:i+3])
-                if triplet not in self.code_to_letter:
-                    return {"is_match": False, "fragments": []}
-                start = positions[i]
-                end = positions[i+2] + 1
-                fragments.append({"value": triplet, "start": start, "end": end})
-                
-            return {"is_match": True, "fragments": fragments, "score": 1.0}
+        # Caractères autorisés par défaut
+        if allowed_chars is None:
+            allowed_chars = " \t\r\n.:;,_-°"
             
-        else:
-            # Mode smooth : on parcourt le texte pour extraire les séquences de symboles.
-            fragments = []
-            current_fragment = ""
-            current_fragment_start = None
-
-            for i, c in enumerate(text):
-                # Ignorer les caractères autorisés
-                if c in allowed_set:
-                    # Si on est au milieu d'un fragment, on traite ce qu'on a déjà
-                    if current_fragment:
-                        n_triplets = len(current_fragment) // 3
-                        for j in range(n_triplets):
-                            triplet = current_fragment[j*3:(j+1)*3]
-                            start = current_fragment_start + j*3
-                            end = start + 3
-                            if triplet in self.code_to_letter:
-                                fragments.append({"value": triplet, "start": start, "end": end})
-                        current_fragment = ""
-                        current_fragment_start = None
-                    continue
+        # Caractères Abaddon valides
+        abaddon_chars = "þµ¥"
+        
+        # En mode strict, le comportement dépend du paramètre embedded
+        if strict:
+            if embedded:
+                # En mode strict+embedded, on recherche des triplets valides dans le texte
+                return self._extract_triplets(text, allowed_chars)
+            else:
+                # En mode strict sans embedded, on vérifie que tout le texte est du code Abaddon valide
+                import re
                 
-                if c in {'þ', 'µ', '¥'}:
-                    if current_fragment == "":
-                        current_fragment_start = i
-                    current_fragment += c
-                else:
-                    # Fin d'une séquence de symboles : on découpe en triplets complets.
-                    if current_fragment:
-                        n_triplets = len(current_fragment) // 3
-                        for j in range(n_triplets):
-                            triplet = current_fragment[j*3:(j+1)*3]
-                            start = current_fragment_start + j*3
-                            end = start + 3
-                            if triplet in self.code_to_letter:
-                                fragments.append({"value": triplet, "start": start, "end": end})
-                        current_fragment = ""
-                        current_fragment_start = None
-            # Traiter le dernier fragment s'il reste incomplet.
-            if current_fragment:
-                n_triplets = len(current_fragment) // 3
-                for j in range(n_triplets):
-                    triplet = current_fragment[j*3:(j+1)*3]
-                    start = current_fragment_start + j*3
-                    end = start + 3
-                    if triplet in self.code_to_letter:
-                        fragments.append({"value": triplet, "start": start, "end": end})
-                        
-            # Ajouter un score basé sur le nombre de fragments trouvés
-            score = 1.0 if fragments else 0.0
-            return {"is_match": bool(fragments), "fragments": fragments, "score": score}
+                # Échapper les caractères spéciaux pour l'expression régulière
+                esc_punct = re.escape(allowed_chars)
+                pattern_str = f"^[{abaddon_chars}{esc_punct}]*$"
+                
+                # Vérifier que tous les caractères sont autorisés
+                if not re.match(pattern_str, text):
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier qu'il y a au moins un caractère Abaddon
+                abaddon_chars_found = re.sub(f"[{esc_punct}]", "", text)
+                if not abaddon_chars_found:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier que le nombre de caractères Abaddon est un multiple de 3
+                if len(abaddon_chars_found) % 3 != 0:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier que les triplets sont valides
+                for i in range(0, len(abaddon_chars_found), 3):
+                    if i + 3 <= len(abaddon_chars_found):
+                        triplet = abaddon_chars_found[i:i+3]
+                        if triplet not in self.code_to_letter:
+                            return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Tout est OK, on renvoie le texte "strippé" comme fragment
+                stripped_text = text.strip(allowed_chars)
+                return {
+                    "is_match": True,
+                    "fragments": [{"value": stripped_text, "start": text.find(stripped_text), "end": text.find(stripped_text) + len(stripped_text)}],
+                    "score": 1.0
+                }
+        else:
+            # En mode smooth, on recherche des triplets valides dans le texte
+            return self._extract_triplets(text, allowed_chars)
+            
+    def _extract_triplets(self, text: str, allowed_chars: str) -> dict:
+        """
+        Extrait les triplets valides dans le texte.
+        
+        Args:
+            text: Texte à analyser
+            allowed_chars: Caractères autorisés en plus des caractères Abaddon
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si des triplets ont été trouvés
+            - fragments: Liste des fragments contenant des triplets
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        import re
+        
+        # Caractères Abaddon valides
+        abaddon_chars = "þµ¥"
+        
+        # Échapper les caractères spéciaux pour l'expression régulière
+        esc_punct = re.escape(allowed_chars)
+        
+        # Rechercher des blocs de texte séparés par des caractères autorisés
+        pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
+        fragments = []
+        
+        for m in re.finditer(pattern, text):
+            block = m.group(0)
+            start, end = m.span()
+            
+            # Ignorer les blocs de ponctuation
+            if re.match(f"^[{esc_punct}]+$", block):
+                continue
+            
+            # Trouver tous les triplets valides dans le bloc
+            found_triplets = []
+            for i in range(0, len(block), 3):
+                if i + 3 <= len(block):
+                    triplet = block[i:i+3]
+                    if all(c in abaddon_chars for c in triplet):
+                        if triplet in self.code_to_letter:
+                            found_triplets.append((i, i+3))
+            
+            # Si des triplets valides ont été trouvés, les ajouter comme fragments
+            for start_triplet, end_triplet in found_triplets:
+                triplet_start = start + start_triplet
+                triplet_end = start + end_triplet
+                fragments.append({
+                    "value": text[triplet_start:triplet_end],
+                    "start": triplet_start,
+                    "end": triplet_end
+                })
+        
+        # Calculer un score basé sur le nombre de fragments trouvés
+        score = 1.0 if fragments else 0.0
+        
+        return {
+            "is_match": bool(fragments),
+            "fragments": fragments,
+            "score": score
+        }
 
     def decode_fragments(self, text: str, fragments: list) -> str:
         """
         Décode uniquement les fragments valides dans leur contexte original.
         Chaque fragment reconnu est remplacé par sa lettre correspondante.
         """
-        sorted_frags = sorted(fragments, key=lambda x: x["start"])
-        result = []
-        last_pos = 0
+        # Créer une copie du texte pour le résultat final
+        result = text
         
-        for frag in sorted_frags:
-            result.append(text[last_pos:frag["start"]])
-            # Recherche la lettre correspondante ou "?" si non trouvée.
-            decoded = self.code_to_letter.get(frag["value"], "?")
-            result.append(decoded)
-            last_pos = frag["end"]
-            
-        result.append(text[last_pos:])
-        return "".join(result)
+        # Trier les fragments par position (du dernier au premier)
+        # pour éviter les problèmes de décalage d'indices
+        sorted_fragments = sorted(fragments, key=lambda f: f["start"], reverse=True)
+        
+        # Remplacer chaque fragment par sa lettre correspondante
+        for fragment in sorted_fragments:
+            start, end = fragment["start"], fragment["end"]
+            # Utiliser la valeur stockée dans le fragment plutôt que de l'extraire du texte
+            abaddon_value = fragment["value"]
+            letter = self.code_to_letter.get(abaddon_value, "?")
+            result = result[:start] + letter + result[end:]
+        
+        return result
 
     def encode(self, text: str) -> str:
-        """Encodage classique inchangé."""
-        return "".join(
-            self.letter_to_code.get(c.upper(), "")
-            for c in text
-            if c.upper() in self.letter_to_code
-        )
+        """
+        Encode le texte en code Abaddon.
+        Les lettres sont converties selon la table d'encodage, les caractères non reconnus sont ignorés.
+        """
+        result = []
+        for char in text.upper():
+            if char in self.letter_to_code:
+                result.append(self.letter_to_code[char])
+        return ''.join(result)
 
     def decode(self, coded_text: str) -> str:
-        """Décodage classique lorsque le texte est uniquement constitué de codes."""
-        print('ABADDON DECODE', coded_text)
-        return "".join(
-            self.code_to_letter.get(coded_text[i:i+3], "?")
-            for i in range(0, len(coded_text), 3)
-        )
+        """
+        Décode un texte en code Abaddon en texte normal.
+        Parcourt le texte en groupes de trois caractères, en tentant de les décoder.
+        """
+        result = []
+        i = 0
+        
+        while i < len(coded_text):
+            if i + 3 <= len(coded_text):
+                triplet = coded_text[i:i+3]
+                result.append(self.code_to_letter.get(triplet, "?"))
+                i += 3
+            else:
+                # Si un groupe incomplet reste à la fin, on l'ignore
+                break
+        
+        return ''.join(result)
 
     def execute(self, inputs: dict) -> dict:
         """
@@ -170,17 +224,22 @@ class AbaddonCodePlugin:
                 - text: Texte à encoder ou décoder
                 - strict: "strict" ou "smooth" pour le mode de décodage
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
+                - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 
         Returns:
             Dictionnaire contenant le résultat de l'opération
         """
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
-        print('ABADDON INPUTS', inputs)
+        
         # Considère le mode strict si la valeur du paramètre "strict" est exactement "strict"
         strict_mode = inputs.get("strict", "").lower() == "strict"
+        
         # Récupération de la liste des caractères autorisés sous la clé "allowed_chars"
         allowed_chars = inputs.get("allowed_chars", None)
+        
+        # Récupération du mode embedded
+        embedded = inputs.get("embedded", False)
 
         if not text:
             return {"error": "Aucun texte fourni à traiter."}
@@ -203,13 +262,13 @@ class AbaddonCodePlugin:
                 
             elif mode == "decode":
                 if strict_mode:
-                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         return {"error": "Code Abaddon invalide en mode strict"}
-                    # Concatène les triplets valides et effectue le décodage classique.
-                    decoded = self.decode("".join([f["value"] for f in check["fragments"]]))
+                    # Décode les fragments trouvés
+                    decoded = self.decode_fragments(text, check["fragments"])
                 else:
-                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         # Si aucun fragment n'a été trouvé, on retourne une erreur
                         return {"error": "Aucun code Abaddon détecté dans le texte"}

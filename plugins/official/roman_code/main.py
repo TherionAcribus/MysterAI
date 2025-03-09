@@ -85,92 +85,133 @@ class RomanNumeralsPlugin:
         
         return total
         
-    def check_code(self, text: str, strict: bool = False, allowed_chars=None) -> dict:
+    def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
         """
         Vérifie si le texte contient des chiffres romains valides.
         
         Args:
-            text: Le texte à analyser
-            strict: Si True, vérifie que tout le texte est composé de chiffres romains valides.
-                   Si False, cherche des fragments de chiffres romains dans le texte.
-            allowed_chars: Liste des caractères autorisés en plus des chiffres romains
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des chiffres romains
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
             
         Returns:
             Un dictionnaire contenant:
             - is_match: True si des chiffres romains ont été trouvés
-            - fragments: Liste des fragments de chiffres romains trouvés
-            - score: Score de confiance (1.0 si match parfait, 0.0 sinon)
+            - fragments: Liste des fragments contenant des chiffres romains
+            - score: Score de confiance (0.0 à 1.0)
         """
-        import re
-        
-        # Caractères romains valides
-        roman_chars = "MDCLXVI"
-        
         # Si allowed_chars est fourni comme liste, on la convertit en chaîne
         if allowed_chars is not None and isinstance(allowed_chars, list):
             allowed_chars = ''.join(allowed_chars)
             
+        # Caractères autorisés par défaut
         if allowed_chars is None:
-            allowed_chars = " \t\r\n.:;,_-°"  # ponctuation par défaut
+            allowed_chars = " \t\r\n.:;,_-°"
+            
+        # Caractères romains valides
+        roman_chars = "IVXLCDM"
         
-        # Texte en majuscules pour la vérification
-        text_upper = text.upper()
-        
+        # En mode strict, le comportement dépend du paramètre embedded
         if strict:
-            # En mode strict, on vérifie que tous les caractères sont des chiffres romains
-            # ou des caractères autorisés
-            esc_punct = re.escape(allowed_chars)
-            pattern_str = f"^[{roman_chars}{esc_punct}]*$"
-            
-            # Vérif : tous les caractères sont autorisés
-            if not re.match(pattern_str, text_upper):
-                return {"is_match": False, "fragments": [], "score": 0.0}
+            if embedded:
+                # En mode strict+embedded, on recherche des fragments de chiffres romains valides dans le texte
+                return self._extract_roman_fragments(text, allowed_chars)
+            else:
+                # En mode strict sans embedded, on vérifie que tout le texte est composé de chiffres romains valides
+                import re
                 
-            # Vérif : il y a au moins un caractère romain
-            roman_chars_found = re.sub(f"[{esc_punct}]", "", text_upper)
-            if not roman_chars_found or not any(c in roman_chars for c in roman_chars_found):
-                return {"is_match": False, "fragments": [], "score": 0.0}
+                # Échapper les caractères spéciaux pour l'expression régulière
+                esc_punct = re.escape(allowed_chars)
+                pattern_str = f"^[{roman_chars}{esc_punct}]*$"
                 
-            # Tout est OK, on renvoie le texte "strippé" comme fragment
-            stripped_text = text.strip(allowed_chars)
-            return {
-                "is_match": True,
-                "fragments": [{"value": stripped_text, "start": text.find(stripped_text), "end": text.find(stripped_text) + len(stripped_text)}],
-                "score": 1.0
-            }
-        else:
-            # Mode "smooth" : on recherche des blocs de chiffres romains
-            esc_punct = re.escape(allowed_chars)
-            pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
-            fragments = []
-            
-            for m in re.finditer(pattern, text_upper):
-                block = m.group(0)
-                start, end = m.span()
+                # Vérifier que tous les caractères sont autorisés
+                if not re.match(pattern_str, text.upper()):
+                    return {"is_match": False, "fragments": [], "score": 0.0}
                 
-                # Ignorer les blocs de ponctuation
-                if re.match(f"^[{esc_punct}]+$", block):
-                    continue
+                # Vérifier qu'il y a au moins un caractère romain
+                roman_chars_found = re.sub(f"[{esc_punct}]", "", text.upper())
+                if not roman_chars_found:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Vérifier que le texte contient des chiffres romains valides
+                # Supprimer les caractères autorisés
+                clean_text = re.sub(f"[{esc_punct}]", "", text.upper())
+                
+                # Vérifier si le texte est un chiffre romain valide
+                try:
+                    self.decode_roman(clean_text)
+                    is_valid = True
+                except ValueError:
+                    is_valid = False
                     
-                # Vérifier si le bloc contient uniquement des caractères romains
-                if all(c in roman_chars for c in block):
-                    # Vérifier si le bloc est un nombre romain valide
-                    try:
-                        self.decode_roman(block)
-                        fragments.append({"value": text[start:end], "start": start, "end": end})
-                    except ValueError:
-                        # Ce n'est pas un nombre romain valide
-                        pass
+                if not is_valid:
+                    return {"is_match": False, "fragments": [], "score": 0.0}
+                
+                # Tout est OK, on renvoie le texte "strippé" comme fragment
+                stripped_text = text.strip(allowed_chars)
+                return {
+                    "is_match": True,
+                    "fragments": [{"value": stripped_text, "start": text.find(stripped_text), "end": text.find(stripped_text) + len(stripped_text)}],
+                    "score": 1.0
+                }
+        else:
+            # En mode smooth, on recherche des fragments de chiffres romains valides dans le texte
+            return self._extract_roman_fragments(text, allowed_chars)
             
-            # Calculer un score basé sur le nombre de fragments trouvés
-            score = 1.0 if fragments else 0.0
+    def _extract_roman_fragments(self, text: str, allowed_chars: str) -> dict:
+        """
+        Extrait les fragments de chiffres romains valides dans le texte.
+        
+        Args:
+            text: Texte à analyser
+            allowed_chars: Caractères autorisés en plus des chiffres romains
             
-            return {
-                "is_match": bool(fragments),
-                "fragments": fragments,
-                "score": score
-            }
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si des fragments ont été trouvés
+            - fragments: Liste des fragments contenant des chiffres romains
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        import re
+        
+        # Caractères romains valides
+        roman_chars = "IVXLCDM"
+        
+        # Échapper les caractères spéciaux pour l'expression régulière
+        esc_punct = re.escape(allowed_chars)
+        
+        # Rechercher des blocs de texte séparés par des caractères autorisés
+        pattern = f"([^{esc_punct}]+)|([{esc_punct}]+)"
+        fragments = []
+        
+        for m in re.finditer(pattern, text.upper()):
+            block = m.group(0)
+            start, end = m.span()
             
+            # Ignorer les blocs de ponctuation
+            if re.match(f"^[{esc_punct}]+$", block):
+                continue
+            
+            # Vérifier si le bloc contient uniquement des caractères romains
+            if all(c in roman_chars for c in block):
+                # Vérifier si le bloc est un chiffre romain valide
+                try:
+                    self.decode_roman(block)
+                    fragments.append({"value": text[start:end], "start": start, "end": end})
+                except ValueError:
+                    # Ce n'est pas un chiffre romain valide
+                    pass
+        
+        # Calculer un score basé sur le nombre de fragments trouvés
+        score = 1.0 if fragments else 0.0
+        
+        return {
+            "is_match": bool(fragments),
+            "fragments": fragments,
+            "score": score
+        }
+
     def decode_fragments(self, text: str, fragments: list) -> str:
         """
         Décode les fragments de chiffres romains dans le texte.
@@ -205,7 +246,7 @@ class RomanNumeralsPlugin:
 
     def execute(self, inputs: dict) -> dict:
         """
-        Méthode générique d'exécution, appelée par le PluginManager.
+        Point d'entrée principal du plugin.
         
         Args:
             inputs: Dictionnaire contenant les paramètres d'entrée
@@ -213,34 +254,41 @@ class RomanNumeralsPlugin:
                 - text: Texte à encoder ou décoder
                 - strict: "strict" ou "smooth" pour le mode de décodage
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
+                - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 
         Returns:
             Dictionnaire contenant le résultat de l'opération
         """
+        mode = inputs.get("mode", "encode").lower()
+        text = inputs.get("text", "")
+        
+        # Considère le mode strict si la valeur du paramètre "strict" est exactement "strict"
+        strict_mode = inputs.get("strict", "").lower() == "strict"
+        
+        # Récupération de la liste des caractères autorisés sous la clé "allowed_chars"
+        allowed_chars = inputs.get("allowed_chars", None)
+        
+        # Récupération du mode embedded
+        embedded = inputs.get("embedded", False)
+
+        if not text:
+            return {"error": "Aucun texte fourni à traiter."}
+
         try:
-            mode = inputs.get("mode", "encode").lower()
-            text = inputs.get("text", "")
-            
-            # Récupération du mode strict/smooth
-            strict_mode = inputs.get("strict", "").lower() == "strict"
-            
-            # Récupération des caractères autorisés
-            allowed_chars = inputs.get("allowed_chars", None)
-            
-            if not text:
-                return {"error": "Aucun texte fourni à traiter."}
-                
             if mode == "encode":
-                # On convertit text en entier
+                # Vérifier si le texte est un nombre valide
                 try:
-                    number = int(text)
+                    num = int(text)
+                    if num <= 0:
+                        return {"error": "Le nombre doit être positif pour l'encodage en chiffres romains."}
+                    encoded = self.encode_roman(num)
+                    text_output = encoded
                 except ValueError:
-                    return {"error": f"Impossible de convertir '{text}' en entier."}
-                
-                text_output = self.encode_roman(number)
+                    return {"error": "Le texte doit être un nombre entier pour l'encodage en chiffres romains."}
                 
                 return {
                     "result": {
+                        "decoded_text": text_output,
                         "text": {
                             "text_output": text_output,
                             "text_input": text,
@@ -251,43 +299,38 @@ class RomanNumeralsPlugin:
                 
             elif mode == "decode":
                 if strict_mode:
-                    # En mode strict, on vérifie d'abord que le texte est valide
-                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        return {"error": "Code romain invalide en mode strict"}
-                    
-                    # Si valide, on décode tout le texte
-                    try:
-                        decimal = self.decode_roman(text)
-                        text_output = str(decimal)
-                    except ValueError as e:
-                        return {"error": f"Erreur de décodage: {str(e)}"}
+                        return {"error": "Chiffres romains invalides en mode strict"}
+                    # Concatène les fragments valides et effectue le décodage classique.
+                    decoded = self.decode_fragments(text, check["fragments"])
                 else:
-                    # En mode smooth, on vérifie d'abord qu'il y a au moins un fragment à décoder
-                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars)
+                    check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        return {"error": "Aucun code romain détecté dans le texte"}
+                        # Si aucun fragment n'a été trouvé, on retourne une erreur
+                        return {"error": "Aucun chiffre romain détecté dans le texte"}
                     
                     # Décode les fragments trouvés
-                    text_output = self.decode_fragments(text, check["fragments"])
+                    decoded = self.decode_fragments(text, check["fragments"])
                     
                     # Vérifier si le texte décodé est différent du texte d'origine
-                    if text_output == text:
-                        return {"error": "Aucun code romain n'a pu être décodé"}
-                
+                    if decoded == text:
+                        return {"error": "Aucun chiffre romain n'a pu être décodé"}
+
+                # Format de retour compatible avec metadetection
                 return {
                     "result": {
-                        "decoded_text": text_output,  # Ajout pour compatibilité avec metadetection
+                        "decoded_text": decoded,
                         "text": {
-                            "text_output": text_output,
+                            "text_output": decoded,
                             "text_input": text,
                             "mode": mode
                         }
                     }
                 }
-            
+                
             else:
-                return {"error": f"Mode inconnu: {mode}"}
+                return {"error": f"Mode inconnu : {mode}"}
                 
         except Exception as e:
-            return {"error": f"Erreur pendant le traitement: {str(e)}"}
+            return {"error": f"Erreur pendant le traitement : {e}"}

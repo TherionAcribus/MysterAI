@@ -19,51 +19,43 @@ class MetaDetectionPlugin:
         """
         Point d'entrée principal du plugin.
         
-        Inputs :
-          - mode : "detect" ou "decode"
-          - text : le texte à analyser ou à décoder
-          - strict : "strict" ou "smooth"
-          - plugin_name : si on veut décoder via un plugin précis
-          - allowed_chars : liste de caractères autorisés pour le mode smooth
-
-        Renvoie un dict au format :
-          {
-            "result": {
-              "possible_codes": [
-                {
-                  "plugin_name": "...",
-                  "score": 1.0,
-                  "can_decode": true,
-                  "fragments": [...]
-                }
-              ]
-            }
-          }
-          
-          Ou pour le décodage :
-          {
-            "result": {
-              "decoded_text": "..."
-            }
-          }
+        Args:
+            inputs: Dictionnaire contenant les paramètres d'entrée
+                - mode: "detect" ou "decode"
+                - text: Texte à analyser ou décoder
+                - strict: "strict" ou "smooth" pour le mode d'analyse
+                - allowed_chars: Liste de caractères autorisés pour le mode smooth
+                - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+                - plugin_name: Nom du plugin à utiliser (optionnel)
+                
+        Returns:
+            Dictionnaire contenant le résultat de l'opération
         """
-        print('META INPUTS', inputs)
-        mode = inputs.get("mode", "detect")
+        mode = inputs.get("mode", "detect").lower()
         text = inputs.get("text", "")
-        strict = inputs.get("strict", "strict") == "strict" # "strict" ou "smooth"
-        plugin_name = inputs.get("plugin_name", None)
-        allowed_chars = inputs.get("allowed_chars", None)  # Liste de caractères autorisés pour le mode smooth
-
+        plugin_name = inputs.get("plugin_name")
+        
+        # Récupération du mode strict/smooth
+        strict = inputs.get("strict", "strict").lower() == "strict"
+        
+        # Récupération des caractères autorisés
+        allowed_chars = inputs.get("allowed_chars", None)
+        
+        # Récupération du mode embedded
+        embedded = inputs.get("embedded", False)
+        
+        if not text:
+            return {"result": {"error": "Aucun texte fourni à traiter."}}
+            
         if mode == "detect":
-            return self.detect_codes(text, strict, allowed_chars)
+            return self.detect_codes(text, strict, allowed_chars, embedded)
         elif mode == "decode":
-            # Transmettre le paramètre strict sous forme de chaîne "strict" ou "smooth"
             strict_param = "strict" if strict else "smooth"
-            return self.decode_code(plugin_name, text, strict_param, allowed_chars)
+            return self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded)
         else:
             raise ValueError(f"Action inconnue: {mode}")
 
-    def detect_codes(self, text: str, strict: bool = True, allowed_chars: list = None) -> dict:
+    def detect_codes(self, text: str, strict: bool = True, allowed_chars: list = None, embedded: bool = False) -> dict:
         """
         Détecte les codes potentiels dans un texte.
         
@@ -71,6 +63,7 @@ class MetaDetectionPlugin:
             text: Texte à analyser
             strict: Mode strict (True) ou smooth (False)
             allowed_chars: Liste de caractères autorisés pour le mode smooth
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
             
         Returns:
             Un dictionnaire contenant les codes détectés
@@ -119,7 +112,7 @@ class MetaDetectionPlugin:
                 strict_bool = strict if isinstance(strict, bool) else strict == "strict"
                 
                 # Appeler la méthode check_code avec les paramètres appropriés
-                check_result = p_instance.check_code(text, strict_bool, allowed_chars)
+                check_result = p_instance.check_code(text, strict_bool, allowed_chars, embedded)
                 
                 if check_result and isinstance(check_result, dict):
                     # Si le plugin a détecté quelque chose
@@ -145,7 +138,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -154,6 +147,7 @@ class MetaDetectionPlugin:
             text: Texte à décoder
             strict: Mode de décodage "strict" ou "smooth"
             allowed_chars: Liste de caractères autorisés pour le mode smooth
+            embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
             
         Returns:
             Un dictionnaire contenant le résultat du décodage
@@ -196,7 +190,8 @@ class MetaDetectionPlugin:
                 inputs = {
                     "text": text,
                     "strict": strict,
-                    "mode": "decode"
+                    "mode": "decode",
+                    "embedded": embedded
                 }
                 
                 # Ajouter les caractères autorisés si fournis
@@ -240,7 +235,8 @@ class MetaDetectionPlugin:
                     inputs = {
                         "text": text,
                         "strict": strict,
-                        "mode": "decode"
+                        "mode": "decode",
+                        "embedded": embedded
                     }
                     
                     # Ajouter les caractères autorisés si fournis
