@@ -21,7 +21,7 @@ function initializeLayout() {
             window.mainLayout.destroy();
         }
         
-        mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
+        let mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
         window.mainLayout = mainLayout;
 
         // Écouteurs d'événements pour le gestionnaire d'état
@@ -588,7 +588,7 @@ window.openPluginTab = function(pluginName, title, params = {}) {
         
         // Chercher si un onglet avec ce plugin existe déjà
         let existingComponent = null;
-        mainLayout.root.contentItems.forEach(function(item) {
+        window.mainLayout.root.contentItems.forEach(function(item) {
             item.contentItems.forEach(function(subItem) {
                 if (subItem.config.componentName === 'plugin' && 
                     subItem.config.componentState.pluginName === pluginName) {
@@ -602,7 +602,7 @@ window.openPluginTab = function(pluginName, title, params = {}) {
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
             // Sinon, créer un nouvel onglet
-            mainLayout.root.contentItems[0].addChild({
+            window.mainLayout.root.contentItems[0].addChild({
                 type: 'component',
                 componentName: 'plugin',
                 title: title || pluginName,
@@ -624,7 +624,7 @@ window.openSolverTab = function(geocacheId = null, gcCode = null) {
         
         // Chercher si un onglet Solver existe déjà (sans géocache spécifique)
         let existingComponent = null;
-        mainLayout.root.contentItems.forEach(function(item) {
+        window.mainLayout.root.contentItems.forEach(function(item) {
             item.contentItems.forEach(function(subItem) {
                 if (subItem.config.componentName === 'geocache-solver' && 
                     !subItem.config.componentState.geocacheId) {
@@ -638,7 +638,7 @@ window.openSolverTab = function(geocacheId = null, gcCode = null) {
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
             // Sinon, créer un nouvel onglet
-            mainLayout.root.contentItems[0].addChild({
+            window.mainLayout.root.contentItems[0].addChild({
                 type: 'component',
                 componentName: 'geocache-solver',
                 title: title,
@@ -658,7 +658,7 @@ window.openGeocachesTab = function(zoneId, zoneName) {
     const componentId = `geocaches-${zoneId}`;
     
     let existingComponent = null;
-    mainLayout.root.contentItems.forEach(item => {
+    window.mainLayout.root.contentItems.forEach(item => {
         item.contentItems.forEach(subItem => {
             if (subItem.config.id === componentId) {
                 existingComponent = subItem;
@@ -682,10 +682,10 @@ window.openGeocachesTab = function(zoneId, zoneName) {
         }
     };
 
-    if (mainLayout.root.contentItems[0].type === 'row') {
-        mainLayout.root.contentItems[0].addChild(componentConfig);
+    if (window.mainLayout.root.contentItems[0].type === 'row') {
+        window.mainLayout.root.contentItems[0].addChild(componentConfig);
     } else {
-        mainLayout.root.contentItems[0].addChild({
+        window.mainLayout.root.contentItems[0].addChild({
             type: 'row',
             content: [componentConfig]
         });

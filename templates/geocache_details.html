@@ -73,6 +73,31 @@
                          data-geocache-coordinates-target="container">
                         {% include 'partials/coordinates_display.html' %}
                     </div>
+                    
+                    <!-- Boutons d'action pour les coordonnées -->
+                    <div class="flex justify-end mt-3">
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+                            data-action="click->geocache-coordinates#openAnalysis"
+                            data-geocache-id="{{ geocache.id }}"
+                            data-gc-code="{{ geocache.gc_code }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                            </svg>
+                            Analyser
+                        </button>
+                        <button
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
+                            data-action="click->geocache-coordinates#openSolver"
+                            data-geocache-id="{{ geocache.id }}"
+                            data-gc-code="{{ geocache.gc_code }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                            </svg>
+                            Solver
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,8 +109,7 @@
                 <button 
                     id="analyze-geocache-button"
                     class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
-                    data-action="click->geocache-coordinates#openAnalysis"
-                    data-geocache-coordinates-target="analyzeButton"
+                    onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}'})"
                     data-geocache-id="{{ geocache.id }}"
                     data-gc-code="{{ geocache.gc_code }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +120,7 @@
                 <button 
                     id="solver-geocache-button"
                     class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                    data-action="click->geocache-coordinates#openSolver"
+                    onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
                     data-geocache-id="{{ geocache.id }}"
                     data-gc-code="{{ geocache.gc_code }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -317,30 +341,6 @@
             <div class="text-gray-300">{{ geocache.logs_count }} logs enregistrés</div>
         </div>
         {% endif %}
-
-        <div class="flex justify-end mt-6">
-            <button
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
-                data-action="click->geocache-coordinates#openAnalysis"
-                data-geocache-id="{{ geocache.id }}"
-                data-gc-code="{{ geocache.gc_code }}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
-                </svg>
-                Analyser
-            </button>
-            <button
-                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
-                data-action="click->geocache-coordinates#openSolver"
-                data-geocache-id="{{ geocache.id }}"
-                data-gc-code="{{ geocache.gc_code }}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
-                </svg>
-                Solver
-            </button>
-        </div>
 
     </div>
 </div>

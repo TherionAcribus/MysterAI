@@ -197,7 +197,7 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         });
 
         // Ajouter un nouvel onglet avec le composant geocache-solver
-        mainLayout.root.contentItems[0].addChild({
+        window.mainLayout.root.contentItems[0].addChild({
             type: 'component',
             componentName: 'geocache-solver',
             title: `Solver ${gcCode}`,
