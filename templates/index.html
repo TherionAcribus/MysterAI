@@ -12,6 +12,7 @@
     <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
     <link type="text/css" rel="stylesheet" href="/css/index.css">
+    <link type="text/css" rel="stylesheet" href="/css/chat_panel.css">
     
     <!-- Third-party Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
@@ -38,6 +39,7 @@
     <script src="/js/controllers/map_controller.js"></script>
     <script src="/js/controllers/zone_map_controller.js"></script>
     <script src="/js/controllers/alphabet_display_controller.js"></script>
+    <script src="/js/controllers/chat_controller.js"></script>
     
     <title>MysteryAI - Geocaching</title>
     <script>
@@ -318,17 +320,17 @@
             <!-- Right Panel -->
             <div class="side-panel right-panel bg-gray-800">
                 <div class="resizer"></div>
-                <div id="chat-panel" class="chat-container">
-                    <h2 class="text-sm font-semibold mb-4">CHAT IA</h2>
-                    <div class="chat-messages">
-                        <!-- Les messages du chat apparaîtront ici -->
-                    </div>
-                    <div class="chat-input-container">
-                        <textarea class="chat-input" rows="3" placeholder="Tapez votre message..."></textarea>
-                        <button class="chat-send-button">
-                            <i class="fas fa-paper-plane"></i>
+                <div id="chat-panel" class="chat-container" data-controller="chat">
+                    <div class="chat-tabs" data-chat-target="tabs">
+                        <!-- Les onglets de chat seront ajoutés ici dynamiquement -->
+                        <button class="chat-add-button" data-chat-target="addButton" data-action="click->chat#addChat">
+                            <i class="fas fa-plus"></i>
                         </button>
                     </div>
+                    <div class="chat-list" data-chat-target="chatList">
+                        <!-- Les instances de chat seront ajoutées ici dynamiquement -->
+                    </div>
+                    <input type="hidden" data-chat-target="activeChat">
                 </div>
             </div>
         </div>
@@ -534,3 +536,4 @@
     </script>
 </body>
 </html>
+

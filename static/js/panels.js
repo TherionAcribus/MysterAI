@@ -128,6 +128,20 @@ function showSidePanel(panelId, isRight) {
             mainContent.style.marginRight = currentWidth;
             activeRightButton = button;
             activeRightPanelId = panelId;
+            
+            // Cas spécial pour le panel de chat
+            if (panelId === 'chat') {
+                // Déclencher un événement pour ajuster les onglets
+                setTimeout(() => {
+                    const chatController = document.querySelector('[data-controller="chat"]');
+                    if (chatController && typeof chatController.adjustTabsPosition === 'function') {
+                        chatController.adjustTabsPosition();
+                    } else {
+                        // Fallback: déclencher un événement resize pour forcer l'ajustement
+                        window.dispatchEvent(new Event('resize'));
+                    }
+                }, 100);
+            }
         } else {
             mainContent.style.marginLeft = currentWidth;
             activeLeftButton = button;
@@ -148,6 +162,17 @@ function showSidePanel(panelId, isRight) {
 // Chargement du contenu des panneaux latéraux
 function loadPanelContent(panelId, isRight) {
     const panel = isRight ? rightPanel : leftPanel;
+    
+    // Cas spécial pour le panel de chat qui est géré différemment
+    if (panelId === 'chat' && isRight) {
+        const chatPanel = document.getElementById('chat-panel');
+        if (chatPanel) {
+            console.log('Panneau chat activé');
+            // Le chat est géré par le contrôleur Stimulus
+            return;
+        }
+    }
+    
     const panelContent = panel.querySelector('.side-panel-content');
     
     if (!panelContent) {

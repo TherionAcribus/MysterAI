@@ -55,6 +55,8 @@
     top: 0;
     bottom: 22px; /* Hauteur de la barre de statut */
     width: 250px;
+    padding-right: 48px; /* Ajouter un padding pour éviter le chevauchement avec la barre latérale */
+    box-sizing: border-box; /* S'assurer que le padding est inclus dans la largeur */
 }
 
 .side-panel.visible {
@@ -245,12 +247,16 @@
     flex-direction: column;
     height: 100%;
     padding: 1rem;
+    color: #e2e8f0;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .chat-messages {
     flex: 1;
     overflow-y: auto;
     margin-bottom: 1rem;
+    padding-right: 0.5rem;
 }
 
 .chat-input-container {
