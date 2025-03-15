@@ -40,6 +40,8 @@
     <script src="/js/controllers/zone_map_controller.js"></script>
     <script src="/js/controllers/alphabet_display_controller.js"></script>
     <script src="/js/controllers/chat_controller.js"></script>
+    <script src="/js/controllers/settings_controller.js"></script>
+    <script src="/js/controllers/ai_settings_controller.js"></script>
     
     <title>MysteryAI - Geocaching</title>
     <script>
@@ -252,12 +254,46 @@
                          hx-get="/api/alphabets/template" 
                          hx-trigger="load">
                     </div>
-                    <div id="settings-panel" class="h-full p-4 panel-content">
+                    <div id="settings-panel" class="h-full p-4 panel-content" data-controller="settings">
                         <div class="panel-header border-b border-gray-700 p-2">
                             <h2 class="text-lg font-semibold">Paramètres</h2>
                         </div>
                         <div class="panel-body">
-                            <!-- Contenu du panneau des paramètres -->
+                            <!-- Onglets de paramètres -->
+                            <div class="settings-tabs mb-4 border-b border-gray-700">
+                                <button class="settings-tab active" data-tab="general">Général</button>
+                                <button class="settings-tab" data-tab="ai">Intelligence Artificielle</button>
+                                <button class="settings-tab" data-tab="appearance">Apparence</button>
+                            </div>
+                            
+                            <!-- Contenu des onglets -->
+                            <div class="settings-content">
+                                <!-- Paramètres généraux -->
+                                <div id="general-settings" class="settings-section active">
+                                    <h2 class="text-lg font-semibold mb-4">Paramètres généraux</h2>
+                                    <p class="text-gray-400">Paramètres généraux de l'application.</p>
+                                    <!-- Contenu des paramètres généraux -->
+                                </div>
+                                
+                                <!-- Paramètres IA -->
+                                <div id="ai-settings" class="settings-section" 
+                                     data-controller="ai-settings"
+                                     hx-get="/api/ai/settings_panel" 
+                                     hx-trigger="load"
+                                     hx-swap="innerHTML">
+                                    <!-- Le contenu sera chargé via HTMX -->
+                                    <div class="flex items-center justify-center h-32">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Paramètres d'apparence -->
+                                <div id="appearance-settings" class="settings-section">
+                                    <h2 class="text-lg font-semibold mb-4">Paramètres d'apparence</h2>
+                                    <p class="text-gray-400">Personnalisez l'apparence de l'application.</p>
+                                    <!-- Contenu des paramètres d'apparence -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

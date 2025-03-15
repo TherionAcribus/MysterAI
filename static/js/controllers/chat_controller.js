@@ -12,10 +12,19 @@
         connect() {
             console.log('=== DEBUG: ChatController connecté ===');
             
+            // Vérifier que toutes les cibles requises sont disponibles
+            if (!this.hasRequiredTargets()) {
+                console.error('=== DEBUG: ChatController - cibles requises non disponibles ===');
+                return;
+            }
+            
             // Initialiser les valeurs par défaut
             if (!this.hasNextIdValue) {
                 this.nextIdValue = 1;
             }
+            
+            // Initialiser l'objet conversations
+            this.conversations = {};
             
             // Créer un premier chat s'il n'y en a pas
             if (this.chatListTarget.children.length === 0) {
@@ -29,20 +38,33 @@
             window.addEventListener('resize', this.adjustTabsPosition.bind(this));
         }
         
+        /**
+         * Vérifie si toutes les cibles requises sont disponibles
+         */
+        hasRequiredTargets() {
+            return this.hasTabsTarget && this.hasChatListTarget && this.hasAddButtonTarget;
+        }
+        
         // Méthode pour ajuster la position des onglets
         adjustTabsPosition() {
+            if (!this.hasTabsTarget) return;
+            
             // Obtenir la largeur de la barre latérale
             const sidebarWidth = 48; // Largeur fixe de la barre latérale
             
             // Ajuster la largeur du conteneur d'onglets
-            if (this.tabsTarget) {
-                this.tabsTarget.style.paddingRight = `${sidebarWidth + 10}px`;
-            }
+            this.tabsTarget.style.paddingRight = `${sidebarWidth + 10}px`;
         }
 
         addChat() {
-            const chatId = this.nextIdValue;
-            this.nextIdValue++;
+            if (!this.hasRequiredTargets()) return;
+            
+            const chatId = this.hasNextIdValue ? this.nextIdValue : 1;
+            
+            // Mettre à jour la valeur nextId
+            if (this.hasNextIdValue) {
+                this.nextIdValue = chatId + 1;
+            }
             
             // Créer un nouvel onglet
             const tabButton = document.createElement('button');
@@ -83,6 +105,18 @@
                 </div>
             `;
             this.chatListTarget.appendChild(chatContainer);
+            
+            // Initialiser la conversation pour ce chat
+            if (!this.conversations) {
+                this.conversations = {};
+            }
+            
+            this.conversations[chatId] = [
+                {
+                    role: "assistant",
+                    content: "Bonjour, je suis votre assistant IA. Comment puis-je vous aider aujourd'hui?"
+                }
+            ];
             
             // Activer ce nouveau chat
             this.switchToChat(chatId);
@@ -144,6 +178,9 @@
                 tabToRemove.remove();
                 chatToRemove.remove();
                 
+                // Supprimer la conversation
+                delete this.conversations[chatId];
+                
                 // S'il n'y a plus de chats, en créer un nouveau
                 if (this.chatListTarget.children.length === 0) {
                     this.addChat();
@@ -174,6 +211,7 @@
             const activeChat = this.chatListTarget.querySelector('.chat-instance.active');
             if (!activeChat) return;
             
+            const chatId = parseInt(activeChat.dataset.chatId);
             const textarea = activeChat.querySelector('.chat-input');
             const messagesContainer = activeChat.querySelector('.chat-messages');
             
@@ -182,7 +220,7 @@
             const message = textarea.value.trim();
             if (message === '') return;
             
-            // Ajouter le message de l'utilisateur
+            // Ajouter le message de l'utilisateur à l'interface
             const userMessageElement = document.createElement('div');
             userMessageElement.className = 'chat-message user';
             userMessageElement.innerHTML = `
@@ -190,17 +228,18 @@
             `;
             messagesContainer.appendChild(userMessageElement);
             
+            // Ajouter le message à la conversation
+            this.conversations[chatId].push({
+                role: "user",
+                content: message
+            });
+            
             // Effacer la zone de texte
             textarea.value = '';
             
             // Faire défiler vers le bas
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
-            // Simuler une réponse de l'IA (à remplacer par une vraie API)
-            this.simulateAiResponse(messagesContainer, message);
-        }
-        
-        simulateAiResponse(messagesContainer, userMessage) {
             // Ajouter un message "en cours de frappe"
             const typingElement = document.createElement('div');
             typingElement.className = 'chat-message system typing';
@@ -214,34 +253,55 @@
             messagesContainer.appendChild(typingElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
-            // Simuler un délai de réponse (1-2 secondes)
-            setTimeout(() => {
+            // Envoyer la requête à l'API
+            fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messages: this.conversations[chatId]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
                 // Supprimer l'indicateur de frappe
                 typingElement.remove();
                 
                 // Ajouter la réponse de l'IA
                 const aiMessageElement = document.createElement('div');
                 aiMessageElement.className = 'chat-message system';
-                
-                // Exemple de réponse simple (à remplacer par une vraie API)
-                let aiResponse = "Je suis désolé, je ne peux pas traiter cette demande pour le moment.";
-                
-                if (userMessage.toLowerCase().includes('bonjour') || userMessage.toLowerCase().includes('salut')) {
-                    aiResponse = "Bonjour ! Comment puis-je vous aider aujourd'hui ?";
-                } else if (userMessage.toLowerCase().includes('merci')) {
-                    aiResponse = "Je vous en prie ! N'hésitez pas si vous avez d'autres questions.";
-                } else if (userMessage.toLowerCase().includes('geocache') || userMessage.toLowerCase().includes('cache')) {
-                    aiResponse = "Je peux vous aider avec vos géocaches. Voulez-vous des informations sur une cache spécifique ?";
-                }
-                
                 aiMessageElement.innerHTML = `
-                    <div class="message-content">${this.escapeHtml(aiResponse)}</div>
+                    <div class="message-content">${this.escapeHtml(data.response)}</div>
                 `;
                 messagesContainer.appendChild(aiMessageElement);
                 
+                // Ajouter la réponse à la conversation
+                this.conversations[chatId].push({
+                    role: "assistant",
+                    content: data.response
+                });
+                
                 // Faire défiler vers le bas
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }, Math.random() * 1000 + 1000); // Délai aléatoire entre 1 et 2 secondes
+            })
+            .catch(error => {
+                // Supprimer l'indicateur de frappe
+                typingElement.remove();
+                
+                // Afficher l'erreur
+                const errorMessageElement = document.createElement('div');
+                errorMessageElement.className = 'chat-message system error';
+                errorMessageElement.innerHTML = `
+                    <div class="message-content">Erreur: ${this.escapeHtml(error.message)}</div>
+                `;
+                messagesContainer.appendChild(errorMessageElement);
+                
+                // Faire défiler vers le bas
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                console.error('Erreur lors de l\'appel à l\'API:', error);
+            });
         }
         
         escapeHtml(text) {

@@ -571,3 +571,96 @@
     width: 1rem;
     text-align: center;
 }
+
+/* Styles pour les onglets de paramètres */
+.settings-tabs {
+    display: flex;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+}
+
+.settings-tab {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    transition: color 0.2s;
+    position: relative;
+    outline: none;
+}
+
+.settings-tab:hover {
+    color: #c9d1d9;
+}
+
+.settings-tab.active {
+    color: #58a6ff;
+}
+
+.settings-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #58a6ff;
+}
+
+.settings-section {
+    display: none;
+    padding: 1rem 0;
+}
+
+.settings-section.active {
+    display: block;
+}
+
+/* Styles pour les formulaires de paramètres */
+.form-input, .form-select, .form-range {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    color: #e1e1e1;
+    width: 100%;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: #58a6ff;
+}
+
+.form-radio {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid #444;
+    border-radius: 50%;
+    background-color: #2d2d2d;
+    margin-right: 0.5rem;
+    position: relative;
+}
+
+.form-radio:checked {
+    border-color: #58a6ff;
+}
+
+.form-radio:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: #58a6ff;
+}
+
+/* Styles pour les messages d'erreur dans le chat */
+.chat-message.system.error .message-content {
+    background-color: #5a1d1d;
+    color: #ffa5a5;
+}
