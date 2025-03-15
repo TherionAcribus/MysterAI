@@ -1,0 +1,30 @@
+{
+    "name": "what3words_plugin",
+    "version": "1.1.0",
+    "description": "Plugin pour vérifier et suggérer des adresses What3Words via w3w-python-wrapper",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": ["what3words"],
+    "categories": ["Geolocation", "What3Words"],
+    "brute_force": false,
+  
+    "input_types": {
+      "action": {
+        "type": "select",
+        "label": "Action",
+        "options": ["verify_address", "autosuggest"],
+        "default": "verify_address"
+      },
+      "value": {
+        "type": "string",
+        "label": "Adresse ou texte à analyser"
+      }
+    },
+    "output_types": {
+      "result": {
+        "type": "object",
+        "label": "Résultat de l'action (validation ou suggestions)"
+      }
+    }
+  }

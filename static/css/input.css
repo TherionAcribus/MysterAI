@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .tool-btn {
+    @apply flex flex-col items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors duration-200;
+  }
+  
+  .tool-btn.active {
+    @apply bg-blue-500 hover:bg-blue-600;
+  }
+
+  .tool-btn i {
+    @apply text-lg mb-1;
+  }
+
+  .tool-btn span {
+    @apply text-xs;
+  }
+
+  .tool-controls {
+    @apply mt-2 p-3 bg-gray-800 rounded border border-gray-600;
+  }
+}
+
+.lm_goldenlayout {
+  background: theme('colors.vscode-bg');
+}
+
+.lm_content {
+  background: theme('colors.vscode-bg');
+  border: 1px solid theme('colors.vscode-border');
+}
+
+.lm_tab {
+  background: theme('colors.vscode-tab-inactive');
+  color: theme('colors.gray.300');
+  border: 1px solid theme('colors.vscode-border');
+}
+
+.lm_tab.lm_active {
+  background: theme('colors.vscode-tab-active');
+}
+
+.lm_header {
+  background: theme('colors.vscode-bg');
+}
+
+/* Context Menu Styles */
+.context-menu {
+  position: fixed;
+  background: theme('colors.gray.800');
+  border: 1px solid theme('colors.gray.700');
+  border-radius: theme('borderRadius.lg');
+  padding: theme('spacing.1');
+  min-width: 200px;
+  box-shadow: theme('boxShadow.lg');
+  z-index: 1000;
+}
+
+.context-menu-item {
+  padding: theme('spacing.2') theme('spacing.4');
+  color: theme('colors.gray.200');
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: theme('spacing.2');
+  border-radius: theme('borderRadius.md');
+}
+
+.context-menu-item:hover {
+  background: theme('colors.gray.700');
+  color: theme('colors.white');
+}
+
+.context-menu-item.text-gray-500 {
+  cursor: default;
+}
+
+.context-menu-item.text-gray-500:hover {
+  background: transparent;
+  color: theme('colors.gray.500');
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: theme('colors.gray.700');
+  margin: theme('spacing.1') 0;
+}

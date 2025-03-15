@@ -1,0 +1,70 @@
+<!-- Template pour la liste des plugins -->
+<div class="p-4">
+    <!-- Bouton pour ouvrir le Solver -->
+    <div class="mb-6 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-blue-400">Plugins</h2>
+        <button 
+            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors flex items-center"
+            onclick="window.openSolverTab()">
+            <i class="fas fa-tools mr-2"></i>
+            Ouvrir le Solver
+        </button>
+    </div>
+    
+    {% if categories %}
+        <div class="space-y-4">
+            {% for category in categories %}
+                {% set depth = category.name.count('/') %}
+                {% set category_name = category.name.split('/')[-1] %}
+                <div class="bg-gray-800 rounded-lg p-4" style="margin-left: {{ depth * 20 }}px">
+                    <div class="flex items-center cursor-pointer" onclick="toggleCategory('{{ category.name|replace('/', '_') }}')">
+                        <i class="fas fa-chevron-right mr-2 transform transition-transform" id="chevron-{{ category.name|replace('/', '_') }}"></i>
+                        <h3 class="text-lg font-semibold text-blue-400">{{ category_name }}</h3>
+                    </div>
+                    
+                    <div class="pl-4 mt-2 hidden" id="plugins-{{ category.name|replace('/', '_') }}">
+                        {% set category_plugins = [] %}
+                        {% for plugin in plugins %}
+                            {% for plugin_category in plugin.categories %}
+                                {% if plugin_category == category_name %}
+                                    {% set _ = category_plugins.append(plugin) %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                        
+                        {% if category_plugins %}
+                            {% for plugin in category_plugins %}
+                                <div class="bg-gray-700 rounded p-3 mb-2 hover:bg-gray-600 transition-colors cursor-pointer"
+                                     onclick="window.openPluginTab('{{ plugin.name }}', '{{ plugin.name | escape }}')">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h4 class="font-medium text-white">{{ plugin.name }}</h4>
+                                            <p class="text-sm text-gray-300">{{ plugin.description }}</p>
+                                        </div>
+                                        <div class="text-sm text-gray-400">
+                                            v{{ plugin.version }}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-gray-400">Aucun plugin dans cette catégorie</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-400">Aucune catégorie trouvée</p>
+    {% endif %}
+</div>
+
+<script>
+function toggleCategory(categoryName) {
+    const chevron = document.getElementById(`chevron-${categoryName}`);
+    const pluginsDiv = document.getElementById(`plugins-${categoryName}`);
+    
+    chevron.classList.toggle('rotate-90');
+    pluginsDiv.classList.toggle('hidden');
+}
+</script>

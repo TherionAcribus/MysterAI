@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Editor</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .editor-container {
+            display: flex;
+            height: 100vh;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+            background-color: #2d2d2d;
+            border-right: 1px solid #3d3d3d;
+            width: 50px; /* Barre d'outils légèrement plus large */
+            overflow: hidden;
+        }
+
+        .toolbar-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 5px 0;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .toolbar-group:last-child {
+            border-bottom: none;
+        }
+
+        .tool-button {
+            background-color: #3d3d3d;
+            border: none;
+            color: #ffffff;
+            padding: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
+
+        .tool-button:hover {
+            background-color: #4d4d4d;
+        }
+
+        .tool-button.active {
+            background-color: #0078d4;
+        }
+
+        /* Bouton de basculement supprimé */
+
+        .canvas-container {
+            flex-grow: 1;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #2d2d2d;
+        }
+
+        #editor-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .color-picker {
+            width: 38px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid #4d4d4d;
+            background: none;
+            margin: 2px auto;
+            display: block;
+        }
+
+        .size-input {
+            width: 38px;
+            background-color: #3d3d3d;
+            border: 1px solid #4d4d4d;
+            color: #ffffff;
+            padding: 4px 2px;
+            text-align: center;
+            margin: 4px auto;
+            display: block;
+            font-size: 14px;
+        }
+
+        /* Ajouter des tooltips pour compenser la perte des labels */
+        .tool-button {
+            position: relative;
+        }
+        
+        .tool-button:hover::after {
+            content: attr(title);
+            position: absolute;
+            left: 52px;
+            top: 0;
+            background-color: #2d2d2d;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="toolbar" id="editor-toolbar">
+            <div class="toolbar-group">
+                <button class="tool-button" id="zoom-in" title="Zoom +">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="tool-button" id="zoom-out" title="Zoom -">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button class="tool-button" id="zoom-reset" title="Réinitialiser le zoom">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <button class="tool-button" id="select-tool" title="Sélectionner">
+                    <i class="fas fa-mouse-pointer"></i>
+                </button>
+                <button class="tool-button" id="draw-tool" title="Dessiner">
+                    <i class="fas fa-pencil-alt"></i>
+                </button>
+                <button class="tool-button" id="text-tool" title="Ajouter du texte">
+                    <i class="fas fa-font"></i>
+                </button>
+            </div>
+            
+            <div class="toolbar-group">
+                <button class="tool-button" id="rect-tool" title="Rectangle">
+                    <i class="far fa-square"></i>
+                </button>
+                <button class="tool-button" id="circle-tool" title="Cercle">
+                    <i class="far fa-circle"></i>
+                </button>
+                <button class="tool-button" id="line-tool" title="Ligne">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <input type="color" id="color-picker" class="color-picker" title="Couleur">
+                <input type="number" id="size-input" class="size-input" value="2" min="1" max="50" title="Taille" style="margin-top: 6px;">
+            </div>
+
+            <div class="toolbar-group">
+                <button class="tool-button" id="undo" title="Annuler">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="tool-button" id="redo" title="Rétablir">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-group">
+                <button class="tool-button" id="save-image" title="Enregistrer">
+                    <i class="fas fa-save"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="editor-canvas" data-image-url="{{ image_url }}" data-image-id="{{ image_id }}"></canvas>
+        </div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="{{ url_for('static', filename='js/image_editor.js') }}"></script>
+</body>
+</html>

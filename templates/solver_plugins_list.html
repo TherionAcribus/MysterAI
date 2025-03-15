@@ -1,0 +1,36 @@
+<!-- Template pour la liste des plugins dans le Solver -->
+<div class="w-full bg-gray-800 rounded-lg p-4 mt-4">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-100">Plugins disponibles</h2>
+        <div class="relative">
+            <input type="text" 
+                   id="plugin-search" 
+                   placeholder="Rechercher un plugin..." 
+                   class="w-56 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   data-action="input->geocache-solver#filterPlugins">
+        </div>
+    </div>
+    
+    <div class="plugin-list space-y-2 max-h-60 overflow-y-auto pr-2" data-geocache-solver-target="pluginList">
+        {% if plugins %}
+            {% for plugin in plugins %}
+                <div class="plugin-item bg-gray-700 rounded p-3 hover:bg-gray-600 transition-colors cursor-pointer"
+                     data-plugin-id="{{ plugin.id }}"
+                     data-plugin-name="{{ plugin.name }}"
+                     data-action="click->geocache-solver#selectPlugin">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-medium text-white">{{ plugin.name }}</h4>
+                            <p class="text-sm text-gray-300">{{ plugin.description }}</p>
+                        </div>
+                        <div class="text-sm text-gray-400">
+                            v{{ plugin.version }}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-400">Aucun plugin disponible</p>
+        {% endif %}
+    </div>
+</div>

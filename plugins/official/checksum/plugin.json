@@ -1,0 +1,30 @@
+{
+  "name": "checksum_code",
+  "version": "1.4.0",
+  "description": "Plugin pour calculer la somme des valeurs des lettres (A=1, B=2, etc.) avec un décalage possible.",
+  "author": "MysterAI",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "dependencies": [],
+  "categories": ["Conversion"],
+  "input_types": {
+      "text": {
+          "type": "string",
+          "label": "Texte à traiter",
+          "placeholder": "Entrez votre texte..."
+      },
+      "shift": {
+          "type": "number",
+          "label": "Décalage",
+          "default": 1,
+          "min": 0,
+          "max": 26
+      }
+  },
+  "output_types": {
+      "checksum": {
+          "type": "number",
+          "label": "Résultat du checksum"
+      }
+  }
+}

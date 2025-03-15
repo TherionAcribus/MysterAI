@@ -1,0 +1,191 @@
+<!-- Template pour l'affichage d'un alphabet -->
+<div class="h-full bg-gray-900 p-6 overflow-y-auto"
+     data-controller="alphabet-viewer"
+     data-alphabet-viewer-alphabet-id-value="{{ alphabet.id }}"
+     data-action="keydown@window->alphabet-viewer#keydown">
+    
+    {% if alphabet.alphabetConfig.type == 'font' %}
+    <!-- Chargement de la police -->
+    <style>
+        @font-face {
+            font-family: "{{ alphabet.name }}";
+            src: url("/api/alphabets/{{ alphabet.id }}/font") format("truetype");
+            font-display: block;
+        }
+    </style>
+    {% endif %}
+    
+    <!-- En-tête -->
+    <div class="max-w-4xl mx-auto">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-white mb-2">{{ alphabet.name }}</h1>
+            <p class="text-gray-400">{{ alphabet.description }}</p>
+        </div>
+
+        <!-- Zone de saisie -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-8">
+            <h2 class="text-lg font-semibold text-white mb-4">Symboles entrés</h2>
+            <div class="flex flex-wrap gap-2 min-h-12 mb-4 p-2 bg-gray-700 rounded"
+                 data-alphabet-viewer-target="enteredSymbols">
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Texte décodé</label>
+                <textarea class="w-full h-24 bg-gray-700 text-white rounded-lg p-3 resize-none"
+                          readonly
+                          data-alphabet-viewer-target="decodedText"></textarea>
+            </div>
+        </div>
+
+        <!-- Symboles disponibles -->
+        <div class="bg-gray-800 rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-white mb-4">Symboles disponibles</h2>
+
+            <!-- Lettres minuscules -->
+            {% if alphabet.alphabetConfig.characters.letters %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">Lettres minuscules</h3>
+                <div class="flex flex-wrap gap-3">
+                    {% set letters = "abcdefghijklmnopqrstuvwxyz" %}
+                    {% for char in letters %}
+                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                             data-alphabet-viewer-target="availableSymbol"
+                             data-action="click->alphabet-viewer#addSymbol"
+                             data-char="{{ char }}">
+                            {% if alphabet.alphabetConfig.type == 'images' %}
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                     alt="{{ char }}"
+                                     class="w-full h-full object-contain p-3">
+                            {% else %}
+                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                    {{ char }}
+                                </span>
+                            {% endif %}
+                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                ⌗
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Lettres majuscules -->
+            {% if alphabet.alphabetConfig.hasUpperCase %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">Lettres majuscules</h3>
+                <div class="flex flex-wrap gap-3">
+                    {% set letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+                    {% for char in letters %}
+                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                             data-alphabet-viewer-target="availableSymbol"
+                             data-action="click->alphabet-viewer#addSymbol"
+                             data-char="{{ char }}">
+                            {% if alphabet.alphabetConfig.type == 'images' %}
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                     alt="{{ char }}"
+                                     class="w-full h-full object-contain p-3">
+                            {% else %}
+                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                    {{ char }}
+                                </span>
+                            {% endif %}
+                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                ⌗
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Chiffres -->
+            {% if alphabet.alphabetConfig.characters.numbers %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-2">Chiffres</h3>
+                <div class="flex flex-wrap gap-3">
+                    {% set numbers = "0123456789" %}
+                    {% for char in numbers %}
+                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                             data-alphabet-viewer-target="availableSymbol"
+                             data-action="click->alphabet-viewer#addSymbol"
+                             data-char="{{ char }}">
+                            {% if alphabet.alphabetConfig.type == 'images' %}
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                     alt="{{ char }}"
+                                     class="w-full h-full object-contain p-3">
+                            {% else %}
+                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                    {{ char }}
+                                </span>
+                            {% endif %}
+                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                ⌗
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Caractères spéciaux -->
+            {% if alphabet.alphabetConfig.characters.special %}
+            <div>
+                <h3 class="text-sm font-medium text-gray-400 mb-2">Caractères spéciaux</h3>
+                <div class="flex flex-wrap gap-3">
+                    {% for char, name in alphabet.alphabetConfig.characters.special.items() %}
+                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                             data-alphabet-viewer-target="availableSymbol"
+                             data-action="click->alphabet-viewer#addSymbol"
+                             data-char="{{ char }}"
+                             title="{{ name }}">
+                            {% if alphabet.alphabetConfig.type == 'images' %}
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                     alt="{{ char }}"
+                                     class="w-full h-full object-contain p-3">
+                            {% else %}
+                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                    {{ char }}
+                                </span>
+                            {% endif %}
+                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                ⌗
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if alphabet.alphabetConfig.type == 'font' %}
+<script>
+// Vérification du chargement de la police
+document.fonts.ready.then(function() {
+    console.log("Polices chargées !");
+    document.fonts.forEach(function(font) {
+        console.log("Police :", font.family, "Status :", font.status);
+    });
+});
+
+// Chargement explicite de la police
+const fontName = "{{ alphabet.name }}";
+const fontUrl = "/api/alphabets/{{ alphabet.id }}/font";
+console.log("Chargement de la police :", fontName, "depuis", fontUrl);
+
+const font = new FontFace(fontName, `url(${fontUrl})`);
+font.load().then(function(loadedFont) {
+    document.fonts.add(loadedFont);
+    console.log("Police chargée avec succès :", loadedFont.family);
+    // Ajouter une classe pour indiquer que la police est chargée
+    document.documentElement.classList.add(`font-loaded-${fontName.toLowerCase()}`);
+}).catch(function(error) {
+    console.error("Erreur lors du chargement de la police :", error);
+});
+</script>
+{% endif %}

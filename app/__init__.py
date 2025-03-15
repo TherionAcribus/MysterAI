@@ -1,49 +1,76 @@
 import logging
 import os
-from flask import Flask
+from flask import Flask, send_from_directory, jsonify, request, render_template, url_for
 from flask_cors import CORS
 from flask_migrate import Migrate
 from app.database import db
-#from app.utils.logger import setup_logger
-#from app.plugin_manager import PluginManager
 from app.config import Config
-from app.models.geocache import Zone
+from app.models.geocache import Zone, Geocache
+from app.plugin_manager import PluginManager
+from app.utils.logger import setup_logger
+import base64
 
-"""
+logger = setup_logger()
+
 def get_plugin_manager():
     from flask import current_app
     return current_app.plugin_manager
-"""
+
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, template_folder='../templates', static_folder='../static')
+    app = Flask(__name__, 
+                template_folder='../templates',
+                static_folder='../static',
+                static_url_path='')
     app.config.from_object(Config)
 
-    """
-    # Configuration des dossiers statiques
+    # Configuration du dossier des images GC
     logger.info("Configuring static folders...")
-    static_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
-    upload_folder = os.path.join(static_folder, 'uploads')
+    images_folder = os.path.abspath(os.path.join(app.config['BASEDIR'], 'geocaches_images'))
+    logger.info(f"Images folder path: {images_folder}")
+    app.images_folder = images_folder
+    app.config['UPLOAD_FOLDER'] = images_folder
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 
     # Créer les dossiers s'ils n'existent pas
-    for folder in [static_folder, upload_folder]:
+    for folder in [images_folder]:
         if not os.path.exists(folder):
             os.makedirs(folder)
+            logger.info(f"Created folder: {folder}")
 
-    app.static_folder = static_folder
-    app.config['UPLOAD_FOLDER'] = upload_folder
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
-    """
-
-    # Initialisation de CORS
-    CORS(app)
+    # Initialisation de CORS avec les options appropriées
+    CORS(app, resources={
+        r"/*": {
+            "origins": ["http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.1:8080"],  # Autoriser les deux ports et leurs équivalents 127.0.0.1
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "HX-Request", "HX-Current-URL", "HX-Target", "HX-Trigger"],
+            "supports_credentials": True
+        }
+    })
 
     # Initialisation de la base de données
     db.init_app(app)
 
     # Initialisation de Flask-Migrate
     migrate = Migrate(app, db)
+
+    # Route pour servir les images des géocaches
+    @app.route('/geocaches_images/<gc_code>/<filename>')
+    def serve_geocache_image(gc_code, filename):
+        logger.debug(f"Tentative d'accès à l'image: {gc_code}/{filename}")
+        try:
+            # Construire le chemin complet
+            full_path = os.path.join(app.images_folder, gc_code, filename)
+            logger.debug(f"Chemin complet: {full_path}")
+            logger.debug(f"Le fichier existe: {os.path.exists(full_path)}")
+            
+            # Obtenir le répertoire contenant l'image et le nom du fichier
+            directory = os.path.dirname(full_path)
+            return send_from_directory(directory=directory, path=filename)
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi de l'image: {str(e)}")
+            return f"Erreur: {str(e)}", 404
 
     # Enregistrer tous les blueprints
     try:
@@ -67,14 +94,12 @@ def create_app():
             db.session.add(default_zone)
             db.session.commit()
 
-        # Initialisation de la configuration de l'application
-        #logger.info("Initializing application configuration...")
-
         # Initialisation du gestionnaire de plugins
-        #logger.info("Initializing PluginManager...")
-        #plugins_dir = os.path.join(app.config['BASEDIR'], 'plugins')
-        #app.plugin_manager = PluginManager(plugins_dir, app)
-        #logger.info("Loading plugins...")
-        #app.plugin_manager.load_plugins()
+        logger.info("Initializing PluginManager...")
+        plugins_dir = os.path.join(app.config['BASEDIR'], 'plugins')
+        app.plugin_manager = PluginManager(plugins_dir, app)
+        logger.info("Loading plugins...")
+        app.plugin_manager.load_plugins()
+        logger.info("PluginManager initialized.")
 
     return app

@@ -1,0 +1,39 @@
+{
+    "name": "kenny_code",
+    "version": "1.2.0",
+    "description": "Plugin de chiffrement et déchiffrement utilisant le code Kenny",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": [],
+    "categories": ["AlphabetsDecryption"],
+    "input_types": {
+        "text": {
+            "type": "string",
+            "label": "Texte à traiter",
+            "placeholder": "Entrez le texte ici..."
+        },
+        "mode": {
+            "type": "select",
+            "label": "Mode",
+            "options": ["decode", "encode"],
+            "default": "decode"
+        },
+        "strict": {
+            "type": "select",
+            "label": "Mode strict",
+            "options": ["strict", "smooth"],
+            "default": "smooth"
+        }
+    },
+    "output_types": {
+        "encoded_text": {
+            "type": "string",
+            "label": "Texte chiffré"
+        },
+        "decoded_text": {
+            "type": "string",
+            "label": "Texte déchiffré"
+        }
+    }
+}

@@ -3,63 +3,386 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MysteryAI - Géocaching</title>
     
     <!-- Styles -->
-    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='dist/output.css') }}">
-    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='node_modules/golden-layout/dist/css/goldenlayout-base.css') }}">
-    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='node_modules/golden-layout/dist/css/themes/goldenlayout-dark-theme.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='node_modules/@fortawesome/fontawesome-free/css/all.min.css') }}">
+    <link type="text/css" rel="stylesheet" href="/css/output.css">
+    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-base.css">
+    <link type="text/css" rel="stylesheet" href="/vendor/golden-layout/goldenlayout-dark-theme.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link href="https://unpkg.com/tabulator-tables@6.3.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
+    <link type="text/css" rel="stylesheet" href="/css/index.css">
+    <link type="text/css" rel="stylesheet" href="/css/chat_panel.css">
+    
+    <!-- Third-party Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
+    <script src="https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.umd.js"></script>
+    <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Initialize Stimulus -->
+    <script>
+        (function() {
+            // Créer l'application Stimulus
+            window.application = Stimulus.Application.start();
+            window.StimulusApp = window.application; // Pour compatibilité
+            
+            // Debug logs
+            console.log('=== DEBUG: Stimulus initialized ===', window.application);
+        })();
+    </script>
+    
+    <!-- Application Scripts -->
+    <script src="/js/layout_initialize.js"></script>
+    <script src="/js/contextual_menu.js"></script>
+    <script src="/js/controllers/waypoint_form_controller.js"></script>
+    <script src="/js/controllers/map_controller.js"></script>
+    <script src="/js/controllers/zone_map_controller.js"></script>
+    <script src="/js/controllers/alphabet_display_controller.js"></script>
+    <script src="/js/controllers/chat_controller.js"></script>
+    <script src="/js/controllers/settings_controller.js"></script>
+    <script src="/js/controllers/ai_settings_controller.js"></script>
+    
+    <title>MysteryAI - Geocaching</title>
+    <script>
+        // Définir openImageEditor globalement avant tout
+        window.openImageEditor = function(imageId, imageName) {
+            console.log('=== DEBUG: Tentative d\'ouverture de l\'éditeur d\'image ===');
+            console.log('Params:', { imageId, imageName });
+            
+            // Vérifier si GoldenLayout est initialisé
+            if (!window.mainLayout) {
+                console.log('=== DEBUG: GoldenLayout n\'est pas encore initialisé ===');
+                return;
+            }
+
+            const root = window.mainLayout.root;
+            if (!root || !root.contentItems || root.contentItems.length === 0) {
+                console.log('=== DEBUG: Root items non disponibles ===');
+                return;
+            }
+
+            // Créer un nouvel onglet pour l'éditeur d'image
+            const newItemConfig = {
+                type: 'component',
+                componentName: 'image-editor',
+                title: `Éditeur - ${imageName}`,
+                componentState: { 
+                    imageId: imageId
+                }
+            };
+
+            // Ajouter le composant au premier élément de contenu
+            root.contentItems[0].addChild(newItemConfig);
+        };
+
+        // Écouter l'événement open-image-editor depuis le main process
+        if (window.electron) {
+            window.electron.on('open-image-editor', (data) => {
+                console.log('=== DEBUG: Événement open-image-editor reçu ===', data);
+                window.openImageEditor(data.imageId, data.imageName);
+            });
+        }
+
+        console.log('=== DEBUG: Index.html commence à charger ===');  
+
+        // Initialiser le menu contextuel au chargement du DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initContextMenu);
+        } else {
+            initContextMenu();
+        }
+    </script>
+    
+    <style>
+        /* Styles pour les polices d'alphabet */
+        @font-face {
+            font-family: 'Aurebesh';
+            src: url('/api/alphabets/aurebesh/font') format('truetype');
+        }
+        
+        /* Ajoutez d'autres polices ici */
+        
+        .lm_goldenlayout {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .lm_content {
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        .sidebar {
+            width: 48px;
+            background: #1a1a1a;
+            border-right: 1px solid #333;
+        }
+        
+        .sidebar-button {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .sidebar-button:hover {
+            color: white;
+            background: #333;
+        }
+        
+        .sidebar-button.active {
+            color: white;
+            background: #444;
+        }
+        
+        .bottom-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgb(31, 41, 55);
+            border-bottom: 1px solid rgb(55, 65, 81);
+            padding: 0.5rem;
+        }
+        
+        .bottom-panel-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .geocache-code {
+            color: rgb(156, 163, 175);
+            font-family: monospace;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.5rem;
+            background-color: rgb(17, 24, 39);
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+        }
+    </style>
     
     <!-- Scripts -->
-    <script src="{{ url_for('static', filename='node_modules/golden-layout/dist/bundle/umd/golden-layout.min.js') }}"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
+    <script src="/js/context_menu.js"></script>
+    
+    <!-- Ancien zone avec le CSS -->
+    <style>
+    </style>
+    
+    <script src="/js/controllers/alphabet_viewer_controller.js" defer></script>
 </head>
-<body class="bg-vscode-bg text-gray-300 h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
     <!-- Main Container -->
-    <div class="flex-1 flex">
+    <div class="workspace-container">
         <!-- Left Sidebar -->
-        <div id="left-sidebar" class="w-12 bg-vscode-sidebar border-r border-vscode-border flex flex-col">
+        <div class="sidebar bg-gray-800 border-r border-gray-700 flex flex-col">
             <div class="flex-1 flex flex-col items-center py-2 space-y-4">
-                <button class="text-gray-400 hover:text-white" title="Explorer">
-                    <i class="fas fa-folder text-xl"></i>
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="geocaches" data-side="left"
+                        hx-get="/api/zones"
+                        hx-target="#geocaches-panel-content"
+                        hx-swap="innerHTML"
+                        hx-trigger="load">
+                    <i class="fas fa-map-marker-alt"></i>
                 </button>
-                <button class="text-gray-400 hover:text-white" title="Search">
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="search" data-side="left">
                     <i class="fas fa-search text-xl"></i>
                 </button>
-                <button class="text-gray-400 hover:text-white" title="Git">
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="git" data-side="left">
                     <i class="fas fa-code-branch text-xl"></i>
+                </button>
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="decrypt" data-side="left"
+                        hx-get="/api/plugins_list"
+                        hx-target="#decrypt-panel .panel-body"
+                        hx-trigger="load">
+                    <i class="fas fa-key text-xl"></i>
+                </button>
+                <button class="sidebar-button p-3 hover:bg-gray-700 relative" data-panel="alphabets" data-side="left">
+                    <i class="fas fa-font"></i>
                 </button>
             </div>
             <div class="mt-auto flex flex-col items-center py-2 space-y-4">
-                <button class="text-gray-400 hover:text-white" title="Settings">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Settings" data-panel="settings" data-side="left">
                     <i class="fas fa-cog text-xl"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Left Panel -->
-        <div id="left-panel" class="w-64 bg-vscode-sidebar border-r border-vscode-border hidden">
-            <!-- Content will be managed by Golden Layout -->
+        <div class="panel-container">
+            <!-- Left Panel -->
+            <div id="left-panel" class="side-panel bg-gray-800 border-r border-gray-700">
+                <div class="resizer"></div>
+                <div class="side-panel-content">
+                    <div id="geocaches-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Géocaches</h2>
+                        </div>
+                        <div id="geocaches-panel-content" class="panel-body">
+                            <!-- Le contenu sera chargé ici par HTMX -->
+                        </div>
+                    </div>
+                    <div id="search-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Recherche</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau de recherche -->
+                        </div>
+                    </div>
+                    <div id="git-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Source Control</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau git -->
+                        </div>
+                    </div>
+                    <div id="decrypt-panel" class="h-full p-4 panel-content">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Décryptage</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Contenu du panneau de décryptage -->
+                        </div>
+                    </div>
+                    <div id="alphabets-panel" class="h-full p-4 panel-content"
+                         hx-get="/api/alphabets/template" 
+                         hx-trigger="load">
+                    </div>
+                    <div id="settings-panel" class="h-full p-4 panel-content" data-controller="settings">
+                        <div class="panel-header border-b border-gray-700 p-2">
+                            <h2 class="text-lg font-semibold">Paramètres</h2>
+                        </div>
+                        <div class="panel-body">
+                            <!-- Onglets de paramètres -->
+                            <div class="settings-tabs mb-4 border-b border-gray-700">
+                                <button class="settings-tab active" data-tab="general">Général</button>
+                                <button class="settings-tab" data-tab="ai">Intelligence Artificielle</button>
+                                <button class="settings-tab" data-tab="appearance">Apparence</button>
+                            </div>
+                            
+                            <!-- Contenu des onglets -->
+                            <div class="settings-content">
+                                <!-- Paramètres généraux -->
+                                <div id="general-settings" class="settings-section active">
+                                    <h2 class="text-lg font-semibold mb-4">Paramètres généraux</h2>
+                                    <p class="text-gray-400">Paramètres généraux de l'application.</p>
+                                    <!-- Contenu des paramètres généraux -->
+                                </div>
+                                
+                                <!-- Paramètres IA -->
+                                <div id="ai-settings" class="settings-section" 
+                                     data-controller="ai-settings"
+                                     hx-get="/api/ai/settings_panel" 
+                                     hx-trigger="load"
+                                     hx-swap="innerHTML">
+                                    <!-- Le contenu sera chargé via HTMX -->
+                                    <div class="flex items-center justify-center h-32">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Paramètres d'apparence -->
+                                <div id="appearance-settings" class="settings-section">
+                                    <h2 class="text-lg font-semibold mb-4">Paramètres d'apparence</h2>
+                                    <p class="text-gray-400">Personnalisez l'apparence de l'application.</p>
+                                    <!-- Contenu des paramètres d'apparence -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div id="main-content" class="main-content bg-gray-900">
+                <div id="layoutContainer" class="golden-layout-container"></div>
+                
+                <!-- Bottom Panel -->
+                <div class="bottom-panel-container expanded" style="height: 300px;">
+                    <div class="bottom-panel-resizer"></div>
+                    <div class="bottom-panel-header">
+                        <div class="bottom-panel-tabs">
+                            <button class="bottom-panel-tab active" 
+                                    data-panel="map-panel"
+                                    onclick="switchTab(this, 'map-panel')">
+                                <i class="fas fa-map-marked-alt"></i>Map
+                            </button>
+                            <button class="bottom-panel-tab" 
+                                    data-panel="notes-panel"
+                                    onclick="switchTab(this, 'notes-panel')">
+                                <i class="fas fa-sticky-note"></i>Notes
+                            </button>
+                            <button class="bottom-panel-tab" 
+                                    data-panel="informations-panel"
+                                    onclick="switchTab(this, 'informations-panel')">
+                                <i class="fas fa-info-circle"></i>Informations
+                            </button>
+                        </div>
+                        <div class="geocache-code"></div>
+                    </div>
+                    <div class="bottom-panel-content">
+                        <div id="map-panel" 
+                             class="panel-content active"
+                             data-controller="map"
+                             data-action="tab-activated@window->map#onActivated"
+                             hx-get="/api/logs/map_panel"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
+                        </div>
+                        <div id="notes-panel" class="panel-content" data-controller="notes" data-action="tab-activated@window->notes#onActivated">
+                            <template id="notes-panel-template">
+                                <div class="notes-panel h-full"
+                                     data-controller="notes"
+                                     data-geocache-id=""
+                                     data-notes-target="content">
+                                    <!-- Le contenu sera chargé dynamiquement -->
+                                </div>
+                            </template>
+                        </div>
+                        <div id="informations-panel" class="panel-content">
+                            <h3>Panneau d'Informations</h3>
+                            <p>Retrouvez ici toutes les informations importantes sur le système et les mises à jour.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="side-panel right-panel bg-gray-800">
+                <div class="resizer"></div>
+                <div id="chat-panel" class="chat-container" data-controller="chat">
+                    <div class="chat-tabs" data-chat-target="tabs">
+                        <!-- Les onglets de chat seront ajoutés ici dynamiquement -->
+                        <button class="chat-add-button" data-chat-target="addButton" data-action="click->chat#addChat">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="chat-list" data-chat-target="chatList">
+                        <!-- Les instances de chat seront ajoutées ici dynamiquement -->
+                    </div>
+                    <input type="hidden" data-chat-target="activeChat">
+                </div>
+            </div>
         </div>
 
-        <!-- Main Content -->
-        <div id="main-content" class="flex-1">
-            <!-- Golden Layout will manage this area -->
+        <!-- Right Sidebar -->
+        <div class="sidebar right-sidebar bg-gray-800 flex flex-col">
+            <div class="flex-1 flex flex-col items-center py-2 space-y-4">
+                <button class="text-gray-400 hover:text-white w-full py-2 flex justify-center sidebar-button" title="Chat IA" data-panel="chat" data-side="right">
+                    <i class="fas fa-comments text-xl"></i>
+                </button>
+            </div>
         </div>
-
-        <!-- Right Panel -->
-        <div id="right-panel" class="w-64 bg-vscode-sidebar border-l border-vscode-border hidden">
-            <!-- Content will be managed by Golden Layout -->
-        </div>
-    </div>
-
-    <!-- Bottom Panel -->
-    <div id="bottom-panel" class="h-48 bg-vscode-sidebar border-t border-vscode-border hidden">
-        <!-- Content will be managed by Golden Layout -->
     </div>
 
     <!-- Status Bar -->
-    <div class="h-6 bg-vscode-sidebar border-t border-vscode-border flex items-center px-2 text-sm">
+    <div class="status-bar flex items-center px-2 text-sm">
         <div class="flex-1">Ready</div>
         <div class="flex items-center space-x-4">
             <span>UTF-8</span>
@@ -68,50 +391,185 @@
         </div>
     </div>
 
+    <!-- Scripts -->
+    <script src="/vendor/jquery/jquery.min.js"></script>
+    <script src="/vendor/golden-layout/goldenlayout.min.js"></script>
+    <script src="https://unpkg.com/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
+    
+    <!-- Layout State Manager -->
+    <script src="/js/layout_state_manager.js"></script>
+    
+    <!-- Initialisation ET gestion des panneaux -->
+    <script src="/js/panels.js"></script>
+
+    <!-- Initialisation du layout et gestion-->
+    <script src="/js/layout_initialize.js"></script>
+
+        
     <script>
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeLayout);
+        } else {
+            initializeLayout();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Golden Layout
-            const config = {
-                settings: {
-                    showPopoutIcon: false,
-                    showMaximiseIcon: true,
-                    showCloseIcon: true,
-                },
-                content: [{
-                    type: 'row',
-                    content: [{
-                        type: 'component',
-                        componentName: 'example',
-                        title: 'Main Editor',
-                        isClosable: false,
-                        componentState: { label: 'A' }
-                    }]
-                }]
-            };
+            // Vérifier que HTMX est chargé
+            if (typeof htmx === 'undefined') {
+                console.error('HTMX n\'est pas chargé !');
+            } else {
+                console.log('HTMX est chargé correctement');
+            }
 
-            const layout = new GoldenLayout(config, document.getElementById('main-content'));
-
-            // Register components
-            layout.registerComponent('example', function(container, state) {
-                container.getElement().html('<div class="p-4">Content goes here</div>');
+            // Logger les événements HTMX
+            document.body.addEventListener('htmx:beforeRequest', function(evt) {
+                console.log('HTMX - Avant la requête:', evt.detail);
             });
-
-            // Initialize layout
-            layout.init();
-
-            // Handle window resize
-            window.addEventListener('resize', () => {
-                layout.updateSize();
+            
+            document.body.addEventListener('htmx:afterRequest', function(evt) {
+                console.log('HTMX - Après la requête:', evt.detail);
             });
-
-            // Toggle panels
-            document.querySelectorAll('#left-sidebar button').forEach(button => {
-                button.addEventListener('click', function() {
-                    const leftPanel = document.getElementById('left-panel');
-                    leftPanel.classList.toggle('hidden');
+            
+            document.body.addEventListener('htmx:error', function(evt) {
+                console.error('HTMX - Erreur:', evt.detail);
+            });
+            
+            // Initialize Stimulus application
+            const application = window.application;
+            
+            // Load controllers
+            fetch('/js/controllers/geocache_coordinates_controller.js')
+                .then(response => response.text())
+                .then(code => {
+                    // Create a new script element and add it to the page
+                    const script = document.createElement('script');
+                    script.textContent = code;
+                    document.head.appendChild(script);
+                    
+                    // Now register the controller
+                    if (typeof GeocacheCoordinatesController !== 'undefined') {
+                        application.register('geocache-coordinates', GeocacheCoordinatesController);
+                        console.log('Geocache coordinates controller registered');
+                    } else {
+                        console.error('GeocacheCoordinatesController not found after loading');
+                    }
+                })
+                .catch(error => console.error('Error loading controller:', error));
+            
+            // Load Solver controller
+            fetch('/js/controllers/geocache_solver_controller.js')
+                .then(response => response.text())
+                .then(code => {
+                    // Create a new script element and add it to the page
+                    const script = document.createElement('script');
+                    script.textContent = code;
+                    document.head.appendChild(script);
+                    
+                    // Now register the controller
+                    if (typeof GeocacheSolverController !== 'undefined') {
+                        application.register('geocache-solver', GeocacheSolverController);
+                        console.log('Geocache solver controller registered');
+                    } else {
+                        console.error('GeocacheSolverController not found after loading');
+                    }
+                })
+                .catch(error => console.error('Error loading controller:', error));
+            
+            // Initialize layout state manager
+            const layoutStateManager = new LayoutStateManager();
+            
+            // Listen for geocache selection changes
+            document.addEventListener('geocacheSelected', function(event) {
+                const geocacheId = event.detail.geocacheId;
+                
+                // Update geocache code display
+                const geocacheCodeElement = document.querySelector('.geocache-code');
+                if (geocacheCodeElement) {
+                    geocacheCodeElement.textContent = event.detail.gcCode;
+                }
+                
+                // Update both map and notes panels
+                htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                    target: '#map-panel',
+                    swap: 'innerHTML'
+                });
+                
+                htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+                    target: '#notes-panel',
+                    swap: 'innerHTML'
                 });
             });
         });
     </script>
+    <script>
+        // Fonction pour gérer le changement d'onglet
+        function switchTab(button, panelId) {
+            // Mettre à jour les classes des onglets
+            document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            button.classList.add('active');
+
+            // Mettre à jour les classes des panneaux
+            document.querySelectorAll('.bottom-panel-container .panel-content').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            const targetPanel = document.getElementById(panelId);
+            targetPanel.classList.add('active');
+
+            // Déclencher l'événement tab-activated
+            window.dispatchEvent(new CustomEvent('tab-activated', {
+                detail: { panelId: panelId }
+            }));
+        }
+    </script>
+    <script>
+        // Register components with GoldenLayout
+        window.registerComponents = function(layout) {
+            layout.registerComponent('map-panel', function(container, state) {
+                return new MapComponent(container, state);
+            });
+            
+            layout.registerComponent('geocache-details', function(container, state) {
+                container.getElement().innerHTML = '<div class="loading">Loading...</div>';
+                
+                // Charger le contenu via HTMX
+                htmx.ajax('GET', `/geocaches/${state.geocacheId}/details/panel`, {
+                    target: container.getElement(),
+                    swap: 'innerHTML'
+                }).then(() => {
+                    // Réinitialiser les contrôleurs Stimulus dans le composant
+                    const element = container.getElement();
+                    window.application.controllers.forEach(controller => {
+                        if (element.contains(controller.element)) {
+                            controller.disconnect();
+                        }
+                    });
+                    window.application.start();
+                });
+            });
+            
+            layout.registerComponent('geocache-solver', function(container, state) {
+                container.getElement().innerHTML = '<div class="loading">Loading...</div>';
+                
+                // Charger le contenu du solver via HTMX
+                htmx.ajax('GET', `/geocaches/${state.geocacheId}/solver/panel`, {
+                    target: container.getElement(),
+                    swap: 'innerHTML'
+                }).then(() => {
+                    // Réinitialiser les contrôleurs Stimulus dans le composant
+                    const element = container.getElement();
+                    window.application.controllers.forEach(controller => {
+                        if (element.contains(controller.element)) {
+                            controller.disconnect();
+                        }
+                    });
+                    window.application.start();
+                });
+            });
+        };
+    </script>
 </body>
 </html>
+

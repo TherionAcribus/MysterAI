@@ -1,0 +1,24 @@
+{
+    "name": "html_comments_finder",
+    "version": "1.0.0",
+    "description": "Plugin pour rechercher tous les commentaires dans du code HTML",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": ["beautifulsoup4"],
+    "categories": ["Parser", "HTML", "StealthText"],
+    "brute_force": false,
+  
+    "input_types": {
+      "html": {
+        "type": "string",
+        "label": "Contenu HTML à analyser"
+      }
+    },
+    "output_types": {
+      "comments": {
+        "type": "array",
+        "label": "Liste de commentaires trouvés"
+      }
+    }
+  }

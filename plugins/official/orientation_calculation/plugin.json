@@ -1,0 +1,42 @@
+{
+    "name": "move_point_plugin",
+    "version": "1.6.0",
+    "description": "Plugin pour déplacer un point de coordonnée en fonction d'une distance et d'un azimut depuis le Nord.",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "categories": ["CoordinatesCalculations"],
+    "dependencies": ["pyproj"],
+    "input_types": {
+      "text": {
+          "type": "string",
+          "label": "Coordonnée",
+          "placeholder": "Entrez une coordonnée au format 'N dd° mm.mmm E dd° mm.mmm'"
+      },
+      "distance": {
+        "type": "float",
+        "label": "Distance",
+        "placeholder": "Entrez une distance en m, km ou miles"
+    },
+      "bearing_deg": {
+        "type": "float",
+        "label": "Angle",
+        "placeholder": "Entrez un angle en degrés"
+    },
+      "distance_unit": {
+          "type": "select",
+          "label": "Unité de distance",
+          "options": [
+              "m",
+              "km",
+              "miles"
+          ],
+          "default": "m"
+      }
+    },
+    "output_types": {
+      "new_lat": "float",
+      "new_lon": "float"
+    }
+  }
+  

@@ -1,0 +1,28 @@
+{
+    "name": "color_text_detector",
+    "version": "1.0.0",
+    "description": "Plugin pour détecter du texte caché (couleur identique au fond) dans un contenu HTML",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": ["beautifulsoup4", "requests"],
+    "categories": ["Parser", "HTML", "StealthText"],
+    "brute_force": false,
+  
+    "input_types": {
+      "html": {
+        "type": "string",
+        "label": "Contenu HTML à analyser"
+      }
+    },
+    "output_types": {
+      "matches": {
+        "type": "array",
+        "label": "Liste d'éléments HTML correspondant au texte 'caché'"
+      },
+      "details": {
+        "type": "object",
+        "label": "Infos supplémentaires (ex: nombre de matchs...)"
+      }
+    }
+  }

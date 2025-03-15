@@ -1,0 +1,366 @@
+<!-- Template pour le tableau des géocaches -->
+<div class="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
+    <!-- Formulaire d'ajout de géocache -->
+    <div class="flex-shrink-0 gap-4 items-end p-4">
+        <div class="flex justify-between w-full">
+            <form id="addGeocacheForm" class="flex gap-4 items-end">
+                <div>
+                    <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
+                    <input type="text" id="geocacheCode" name="code" required
+                           class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                           placeholder="GC12345">
+                    <input type="hidden" name="zone_id" value="{{ zone_id }}">
+                </div>
+                <button type="submit" 
+                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Ajouter</span>
+                    <div class="loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </form>
+            <button id="openMapButton" 
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2"
+                    data-zone-id="{{ zone_id }}">
+                <i class="fas fa-map-marked-alt"></i>
+                <span>Map</span>
+            </button>
+        </div>
+        <div id="spinner" class="spinner"></div>
+        <div id="message" class="mt-2"></div>
+    </div>
+
+    <!-- Conteneur du tableau -->
+    <div class="flex-1 min-h-0 overflow-hidden">
+        <div id="geocaches-table-{{ zone_id }}" class="w-full h-full overflow-auto"
+             data-zone-id="{{ zone_id }}"
+             data-api-url="{{ url_for('geocaches.get_geocaches', zone_id=zone_id) }}">
+            {% include 'geocaches_table_content.html' %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .spinner {
+        display: none;
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 10px auto;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Styles pour Tabulator */
+    .tabulator {
+        background-color: transparent !important;
+        border: none !important;
+        color: #e1e1e1 !important;
+        font-size: 14px !important;
+    }
+
+    .tabulator-header {
+        background-color: #1a1a1a !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+        font-weight: 600 !important;
+    }
+
+    .tabulator-header .tabulator-col {
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #2d2d2d !important;
+        padding: 8px !important;
+    }
+
+    .tabulator-header .tabulator-col-content {
+        padding: 8px !important;
+    }
+
+    .tabulator-col-title {
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row {
+        background-color: #1e1e1e !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row.tabulator-row-even {
+        background-color: #252525 !important;
+    }
+
+    .tabulator-row.tabulator-selectable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-row .tabulator-cell {
+        padding: 8px !important;
+        border-right: 1px solid #2d2d2d !important;
+    }
+
+    .tabulator-tableholder {
+        background-color: transparent !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+    }
+
+    /* Style pour les barres de défilement de Tabulator */
+    .tabulator-tableholder::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-track {
+        background: #1e1e1e;
+        border-radius: 5px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb {
+        background: #3c3c3c;
+        border-radius: 5px;
+        border: 2px solid #1e1e1e;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+        background: #4c4c4c;
+    }
+
+    /* Support Firefox */
+    .tabulator-tableholder {
+        scrollbar-width: thin;
+        scrollbar-color: #3c3c3c #1e1e1e;
+    }
+
+    /* Style pour les en-têtes de colonnes triables */
+    .tabulator-col.tabulator-sortable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="none"] .tabulator-col-content:after {
+        border-top: 4px solid #666 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="asc"] .tabulator-col-content:after {
+        border-bottom: 4px solid #e1e1e1 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="desc"] .tabulator-col-content:after {
+        border-top: 4px solid #e1e1e1 !important;
+    }
+
+    /* Style pour les cellules spécifiques */
+    .tabulator-row .tabulator-cell[tabulator-field="solved"] {
+        font-weight: 600 !important;
+    }
+
+    /* Style pour les boutons d'action */
+    .action-button {
+        @apply font-bold py-1 px-2 rounded mr-2;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .details-button {
+        @apply bg-blue-500 hover:bg-blue-700 text-white action-button;
+    }
+
+    .delete-button {
+        @apply bg-red-500 hover:bg-red-700 text-white action-button;
+    }
+</style>
+
+<script type="text/javascript">
+    // S'assurer que le script s'exécute dans l'iframe
+    (function() {
+        const form = document.getElementById('addGeocacheForm');
+        const loadingIndicator = form.querySelector('.loading-indicator');
+        const spinner = document.getElementById('spinner');
+        const messageDiv = document.getElementById('message');
+        const submitButton = form.querySelector('button[type="submit"]');
+        const openMapButton = document.getElementById('openMapButton');
+
+        // Fonction pour initialiser Tabulator
+        function initializeTabulator() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const tableElement = document.getElementById(tableId);
+            if (!tableElement) return;
+
+            const apiUrl = tableElement.dataset.apiUrl;
+            
+            // Détruire l'instance existante si elle existe
+            if (window[`tabulator_${tableId}`]) {
+                window[`tabulator_${tableId}`].destroy();
+            }
+
+            // Créer une nouvelle instance de Tabulator
+            window[`tabulator_${tableId}`] = new Tabulator(`#${tableId}`, {
+                ajaxURL: apiUrl,
+                layout: "fitDataFill",
+                height: "100%",
+                placeholder: "Aucune géocache trouvée",
+                columns: [
+                    { title: "GC Code", field: "gc_code", headerSort: true },
+                    { title: "Nom", field: "name", headerSort: true },
+                    { title: "Type", field: "cache_type", headerSort: true },
+                    { title: "Difficulté", field: "difficulty", headerSort: true },
+                    { title: "Terrain", field: "terrain", headerSort: true },
+                    { title: "Taille", field: "size", headerSort: true },
+                    { title: "Favoris", field: "favorites_count", headerSort: true },
+                    { title: "Logs", field: "logs_count", headerSort: true },
+                    { title: "Statut", field: "solved", headerSort: true,
+                        formatter: function(cell) {
+                            const value = cell.getValue();
+                            switch(value) {
+                                case 'solved':
+                                    return '<span class="text-green-500">✓ Résolue</span>';
+                                case 'not_solved':
+                                    return '<span class="text-red-500">✗ Non résolue</span>';
+                                case 'ongoing':
+                                    return '<span class="text-yellow-500">⟳ En cours</span>';
+                                default:
+                                    return '<span class="text-gray-500">-</span>';
+                            }
+                        }
+                    },
+                    { title: "Actions", field: "id", headerSort: false,
+                        formatter: function(cell) {
+                            const row = cell.getRow();
+                            const data = row.getData();
+                            const geocacheId = data.id;
+                            const gcCode = data.gc_code;
+                            const name = data.name;
+                            
+                            // Échapper les caractères spéciaux pour JavaScript
+                            const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
+                            const escapedName = name.replace(/['\\]/g, '\\$&');
+                            
+                            return `<button 
+                                class="details-button"
+                                onclick="window.parent.postMessage({ 
+                                    type: 'openGeocacheDetails', 
+                                    geocacheId: ${geocacheId},
+                                    gcCode: '${escapedGcCode}',
+                                    name: '${escapedName}'
+                                }, '*')"
+                            >
+                                Détails
+                            </button>
+                            <button 
+                                class="delete-button"
+                                onclick="window.deleteGeocache(${geocacheId}, '${escapedGcCode}')"
+                            >
+                                Supprimer
+                            </button>`;
+                        }
+                    }
+                ]
+            });
+        }
+
+        // Fonction pour recharger le tableau
+        async function reloadTable() {
+            // Recharger les données via Tabulator
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (table) {
+                await table.setData();
+            }
+        }
+
+        // Initialiser Tabulator au chargement
+        initializeTabulator();
+
+        // Gestionnaire d'événements pour la suppression
+        window.deleteGeocache = async function(geocacheId, gcCode) {
+            if (!confirm(`Êtes-vous sûr de vouloir supprimer la géocache ${gcCode} ?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/geocaches/${geocacheId}`, {
+                    method: 'DELETE',
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.textContent = data.message;
+                    messageDiv.className = 'mt-2 text-green-600';
+                    // Recharger le tableau
+                    await reloadTable();
+                } else {
+                    messageDiv.textContent = data.error || 'Une erreur est survenue lors de la suppression';
+                    messageDiv.className = 'mt-2 text-red-600';
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                messageDiv.textContent = 'Une erreur est survenue lors de la communication avec le serveur';
+                messageDiv.className = 'mt-2 text-red-600';
+            }
+        };
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            try {
+                // Afficher l'indicateur de chargement
+                loadingIndicator.classList.remove('hidden');
+                spinner.style.display = 'block';
+                messageDiv.textContent = '';
+                messageDiv.className = 'mt-2';
+                submitButton.disabled = true;
+                
+                // Préparer les données du formulaire
+                const formData = new FormData(form);
+                
+                // Envoyer la requête
+                const response = await fetch('/api/geocaches/add', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Afficher le message de succès
+                    messageDiv.textContent = 'Géocache ajoutée avec succès !';
+                    messageDiv.className = 'mt-2 text-green-600';
+                    
+                    // Réinitialiser le formulaire
+                    form.reset();
+
+                    // Recharger le tableau
+                    await reloadTable();
+
+                    // Ouvrir la page de détails de la nouvelle géocache
+                    const apiUrl = window.API_BASE_URL || '';
+                    const detailsUrl = `${apiUrl}/geocaches/${data.id}/details-panel`;
+                    window.parent.postMessage({
+                        type: 'openGeocacheDetails',
+                        geocacheId: data.id,
+                        containerId: window.currentContainerId,
+                        detailsUrl: detailsUrl
+                    }, '*');
+                } else {
+                    // Afficher le message d'erreur
+                    messageDiv.textContent = data.error || 'Une erreur est survenue';
+                    messageDiv.className = 'mt-2 text-red-600';
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                messageDiv.textContent = 'Une erreur est survenue lors de la communication avec le serveur';
+                messageDiv.className = 'mt-2 text-red-600';
+            } finally {
+                // Cacher l'indicateur de chargement
+                loadingIndicator.classList.add('hidden');
+                spinner.style.display = 'none';
+                submitButton.disabled = false;
+            }
+        });
+    })();
+</script>

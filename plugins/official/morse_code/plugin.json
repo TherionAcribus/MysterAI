@@ -1,0 +1,33 @@
+{
+  "name": "morse_code",
+  "version": "1.2.0",
+  "description": "Plugin pour chiffrer et déchiffrer le code Morse (A-Z, 0-9).",
+  "author": "MysterAI",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "categories": ["SymbolsDecryption"],
+  "dependencies": [],
+  "input_types": {
+      "text": {
+          "type": "string",
+          "label": "Texte à traiter",
+          "placeholder": "Entrez le texte en clair ou en Morse..."
+      },
+      "mode": {
+          "type": "select",
+          "label": "Mode",
+          "options": ["decode", "encode"],
+          "default": "decode"
+      }
+  },     
+  "output_types": {
+      "encoded_text": {
+          "type": "string",
+          "label": "Texte en Morse"
+      },
+      "decoded_text": {
+          "type": "string",
+          "label": "Texte décodé"
+      }
+  }
+}

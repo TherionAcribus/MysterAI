@@ -1,0 +1,527 @@
+<div class="w-full h-full bg-gray-900 overflow-auto p-4" 
+     hx-ext="include-vals" 
+     hx-headers='{"X-Layout-Component": "true"}'
+     x-init="console.log('Component initialized with geocache ID:', '{{ geocache.id }}')"
+     data-action="coordinatesFormLoaded@window->geocache-coordinates#formLoaded coordinatesUpdated@window->geocache-coordinates#coordinatesUpdated">
+    <div class="max-w-4xl mx-auto">
+        <!-- En-tête -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-100 mb-2">{{ geocache.name }}</h1>
+            <div class="flex items-center text-gray-400 space-x-4">
+                <span>{{ geocache.gc_code }}</span>
+                <span>•</span>
+                <span>{{ geocache.cache_type }}</span>
+                <span>•</span>
+                <span>Par {{ geocache.owner }}</span>
+            </div>
+        </div>
+
+        <!-- Informations principales -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Statistiques -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold text-gray-100 mb-4">Statistiques</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="text-gray-400">Difficulté</span>
+                        <div class="text-yellow-400">
+                            {% for _ in range(geocache.difficulty|int) %}★{% endfor %}
+                            {% for _ in range(5 - geocache.difficulty|int) %}☆{% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Terrain</span>
+                        <div class="text-green-400">
+                            {% for _ in range(geocache.terrain|int) %}★{% endfor %}
+                            {% for _ in range(5 - geocache.terrain|int) %}☆{% endfor %}
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Taille</span>
+                        <div class="text-blue-400">{{ geocache.size }}</div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400">Favoris</span>
+                        <div class="text-purple-400">{{ geocache.favorites_count }}</div>
+                    </div>
+                    <div class="col-span-2">
+                        <span class="text-gray-400">Statut</span>
+                        <select class="mt-1 bg-gray-700 text-white rounded px-2 py-1 w-full"
+                                data-action="change->geocache-coordinates#updateSolvedStatus"
+                                name="solved_status"
+                                data-previous-value="{{ geocache.solved }}">
+                            <option value="not_solved" {% if geocache.solved == 'not_solved' %}selected{% endif %}>
+                                Non résolu
+                            </option>
+                            <option value="in_progress" {% if geocache.solved == 'in_progress' %}selected{% endif %}>
+                                En cours
+                            </option>
+                            <option value="solved" {% if geocache.solved == 'solved' %}selected{% endif %}>
+                                Résolu
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coordonnées -->
+            <div class="bg-gray-800 rounded-lg p-4" id="geocache-coordinates">
+                <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
+                <div data-controller="geocache-coordinates" 
+                     data-geocache-coordinates-geocache-id-value="{{ geocache.id }}">
+                    <div id="geocache-coordinates-container" 
+                         data-geocache-coordinates-target="container">
+                        {% include 'partials/coordinates_display.html' %}
+                    </div>
+                    
+                    <!-- Boutons d'action pour les coordonnées -->
+                    <div class="flex justify-end mt-3">
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+                            data-action="click->geocache-coordinates#openAnalysis"
+                            data-geocache-id="{{ geocache.id }}"
+                            data-gc-code="{{ geocache.gc_code }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                            </svg>
+                            Analyser
+                        </button>
+                        <button
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
+                            data-action="click->geocache-coordinates#openSolver"
+                            data-geocache-id="{{ geocache.id }}"
+                            data-gc-code="{{ geocache.gc_code }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                            </svg>
+                            Solver
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="text-lg font-semibold text-gray-100 mb-4 flex justify-between items-center">
+                <span>Description</span>
+                <div class="flex">
+                    <button 
+                        id="analyze-geocache-button"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
+                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}'})"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.96-.421-2.632-1.102l-.547-.547z" />
+                        </svg>
+                        <span>Analyser</span>
+                    </button>
+                    <button 
+                        id="solver-geocache-button"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
+                        onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                        </svg>
+                        <span>Solver</span>
+                    </button>
+                    <button 
+                        id="ai-chat-geocache-button"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
+                        onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', '{{ geocache.name|replace("'", "\\'") }}')"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}"
+                        data-geocache-name="{{ geocache.name|replace("'", "\\'") }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        <span>Chat IA</span>
+                    </button>
+                </div>
+            </h2>
+            <div class="prose prose-invert max-w-none">
+                {{ geocache.description|safe }}
+            </div>
+        </div>
+
+        <!-- Waypoints -->
+        <div class="waypoints-section" data-controller="waypoint-form">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Waypoints</h3>
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline" 
+                    type="button"
+                    data-action="click->waypoint-form#toggleForm">
+              Ajouter un waypoint
+            </button>
+          </div>
+          
+          <!-- Formulaire d'ajout de waypoint (initialement caché) -->
+          <div class="waypoint-form-container bg-gray-700 p-4 rounded-lg mb-4 hidden" data-waypoint-form-target="form">
+            <h4 class="text-white text-md font-medium mb-3" data-waypoint-form-target="formTitle">Nouveau Waypoint</h4>
+            <form data-action="submit->waypoint-form#submitForm">
+              <input type="hidden" name="geocache_id" value="{{ geocache.id }}" data-waypoint-form-target="geocacheIdInput">
+              <input type="hidden" name="waypoint_id" value="" data-waypoint-form-target="waypointIdInput">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpPrefix">
+                    Préfixe
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpPrefix" name="prefix" type="text" placeholder="Préfixe" data-waypoint-form-target="prefixInput">
+                </div>
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLookup">
+                    Lookup
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLookup" name="lookup" type="text" placeholder="Lookup" data-waypoint-form-target="lookupInput">
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-bold mb-2" for="wpName">
+                  Nom
+                </label>
+                <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                       id="wpName" name="name" type="text" placeholder="Nom du waypoint" data-waypoint-form-target="nameInput">
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLatitude">
+                    Latitude (format GC)
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLatitude" name="gc_lat" type="text" 
+                         placeholder="N 48° 51.402"
+                         value="{{ geocache.gc_lat }}" data-waypoint-form-target="gcLatInput">
+                </div>
+                <div>
+                  <label class="block text-gray-300 text-sm font-bold mb-2" for="wpLongitude">
+                    Longitude (format GC)
+                  </label>
+                  <input class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                         id="wpLongitude" name="gc_lon" type="text" 
+                         placeholder="E 002° 21.048"
+                         value="{{ geocache.gc_lon }}" data-waypoint-form-target="gcLonInput">
+                </div>
+              </div>
+              
+              <!-- Section de projection de waypoint -->
+              <div class="bg-gray-800 p-3 rounded-lg mb-4 border border-gray-700" data-waypoint-form-target="projectionSection">
+                <h5 class="text-white text-sm font-medium mb-2">Projection du waypoint</h5>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label class="block text-gray-300 text-xs font-bold mb-1" for="wpDistance">
+                      Distance
+                    </label>
+                    <input class="bg-gray-700 text-white border border-gray-600 rounded w-full py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           id="wpDistance" type="number" step="0.1" min="0" 
+                           placeholder="100" value="100" data-waypoint-form-target="distanceInput">
+                  </div>
+                  <div>
+                    <label class="block text-gray-300 text-xs font-bold mb-1" for="wpDistanceUnit">
+                      Unité
+                    </label>
+                    <select class="bg-gray-700 text-white border border-gray-600 rounded w-full py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                            id="wpDistanceUnit" data-waypoint-form-target="distanceUnitInput">
+                      <option value="m">mètres</option>
+                      <option value="km">kilomètres</option>
+                      <option value="miles">miles</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-gray-300 text-xs font-bold mb-1" for="wpBearing">
+                      Angle (0° = Nord)
+                    </label>
+                    <input class="bg-gray-700 text-white border border-gray-600 rounded w-full py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           id="wpBearing" type="number" step="1" min="0" max="359" 
+                           placeholder="0" value="0" data-waypoint-form-target="bearingInput">
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="block text-gray-300 text-xs font-bold mb-1" for="wpProjectedCoords">
+                    Coordonnées projetées
+                  </label>
+                  <div class="flex items-center">
+                    <input class="bg-gray-700 text-white border border-gray-600 rounded w-full py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           id="wpProjectedCoords" type="text" readonly
+                           placeholder="Les coordonnées projetées apparaîtront ici" 
+                           data-waypoint-form-target="projectedCoordsInput">
+                    <!-- Le bouton "Appliquer" sera ajouté ici dynamiquement par JavaScript -->
+                  </div>
+                  <p class="text-xs text-gray-400 mt-1">Cliquez sur "Calculer" pour projeter les coordonnées, puis sur "Appliquer" pour les utiliser.</p>
+                </div>
+                <div class="mb-3">
+                  <div class="flex items-center">
+                    <input class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded" 
+                           type="checkbox" 
+                           id="wpAddProjectionToNotes" 
+                           data-waypoint-form-target="addToNotesCheckbox" 
+                           checked>
+                    <label class="text-gray-300 text-xs" for="wpAddProjectionToNotes">
+                      Ajouter les informations de projection dans les notes
+                    </label>
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline" 
+                          type="button"
+                          data-action="click->waypoint-form#calculateProjection">
+                    <i class="fas fa-calculator mr-1"></i> Calculer
+                  </button>
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-bold mb-2" for="wpNote">
+                  Note
+                </label>
+                <textarea class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                          id="wpNote" name="note" rows="3" placeholder="Notes sur le waypoint" data-waypoint-form-target="noteInput"></textarea>
+              </div>
+              
+              <div class="flex items-center justify-end">
+                <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded mr-2 focus:outline-none focus:shadow-outline" 
+                        type="button"
+                        data-action="click->waypoint-form#toggleForm">
+                  Annuler
+                </button>
+                <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                        type="submit"
+                        data-waypoint-form-target="submitButton">
+                  Ajouter le waypoint
+                </button>
+                <!-- Bouton pour créer un nouveau point, visible uniquement en mode édition -->
+                <button class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ml-2 hidden" 
+                        type="button"
+                        data-waypoint-form-target="createNewButton"
+                        data-action="click->waypoint-form#createNewFromCurrent">
+                  Créer un nouveau point
+                </button>
+              </div>
+              
+              <!-- Bouton pour transformer le waypoint en coordonnées corrigées -->
+              <div class="mt-4 pt-4 border-t border-gray-700">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-300">
+                    <i class="fas fa-map-marker-alt mr-1"></i> Transformer en coordonnées corrigées
+                    <p class="text-xs text-gray-400 mt-1">
+                      Utiliser ce waypoint comme coordonnées corrigées pour cette géocache.
+                    </p>
+                  </div>
+                  <button class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                          type="button"
+                          data-waypoint-form-target="useAsCorrectCoordsButton"
+                          data-action="click->waypoint-form#useAsCorrectCoordinates">
+                    <i class="fas fa-check-circle mr-1"></i> Utiliser comme coordonnées corrigées
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+          
+          <!-- Container pour la liste des waypoints -->
+          <div id="waypoints-list-container" data-waypoint-form-target="waypointsList">
+            {% include 'partials/waypoints_list.html' %}
+          </div>
+        </div>
+
+        <!-- Indices -->
+        {% if geocache.hints %}
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="text-lg font-semibold text-gray-100 mb-4">Indices</h2>
+            <div class="text-gray-300 whitespace-pre-wrap">{{ geocache.hints }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Galerie d'images -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6"
+             data-controller="geocache-gallery">
+            <h2 class="text-lg font-semibold text-gray-100 mb-4">Images</h2>
+            <div id="geocache-gallery-container" data-geocache-id="{{ geocache.id }}">
+                {% include 'partials/geocache_gallery.html' %}
+            </div>
+        </div>
+
+        <!-- Logs -->
+        {% if geocache.logs_count %}
+        <div class="bg-gray-800 rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-gray-100 mb-4">Logs</h2>
+            <div class="text-gray-300">{{ geocache.logs_count }} logs enregistrés</div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<style>
+    /* Style pour les barres de défilement */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #1e1e1e;
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #3c3c3c;
+        border-radius: 5px;
+        border: 2px solid #1e1e1e;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #4c4c4c;
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: #1e1e1e;
+    }
+
+    /* Support Firefox */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: #3c3c3c #1e1e1e;
+    }
+
+    .geocache-image {
+        cursor: pointer;
+    }
+
+    .geocache-image.selected {
+        outline: 2px solid #3b82f6;
+        outline-offset: -2px;
+    }
+
+    .context-menu {
+        position: fixed;
+        z-index: 10000;
+        background: #1f2937;
+        border: 1px solid #374151;
+        border-radius: 0.375rem;
+        padding: 0.5rem 0;
+        min-width: 160px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .context-menu-item {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        color: #e5e7eb;
+        transition: background-color 0.2s;
+        user-select: none;
+    }
+
+    .context-menu-item:hover {
+        background-color: #374151;
+    }
+
+    .context-menu-item i {
+        margin-right: 0.5rem;
+        width: 1rem;
+        text-align: center;
+    }
+</style>
+
+<script>
+    // Fonction pour ouvrir un onglet de chat IA avec les informations de la géocache
+    function openGeocacheAIChat(geocacheId, gcCode, geocacheName) {
+        // Récupérer la description de la géocache
+        const geocacheDescription = document.querySelector('.prose.prose-invert').innerText.trim();
+        
+        // Construire le message initial pour l'IA
+        const initialMessage = `Je travaille sur la géocache ${gcCode} - "${geocacheName}". Voici sa description:\n\n${geocacheDescription.substring(0, 1500)}\n\nPouvez-vous m'aider à analyser cette géocache et à trouver des indices potentiels?`;
+        
+        // Vérifier si le panneau de chat est visible
+        const chatPanel = document.getElementById('chat-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        
+        // Si le panneau de droite est fermé, l'ouvrir
+        if (rightPanel.classList.contains('collapsed')) {
+            // Trouver le bouton de chat dans la barre latérale droite
+            const chatButton = document.querySelector('.right-sidebar .sidebar-button[data-panel="chat"]');
+            if (chatButton) {
+                chatButton.click();
+            }
+        }
+        
+        if (chatPanel) {
+            // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
+            let chatId;
+            const chatInstances = chatPanel.querySelectorAll('.chat-instance');
+            
+            if (chatInstances.length === 0) {
+                // Aucun chat existant, créer un nouveau
+                chatId = chatPanel.addChat();
+            } else {
+                // Vérifier si un onglet est déjà ouvert pour cette géocache
+                let existingChatId = null;
+                chatInstances.forEach(instance => {
+                    const header = instance.querySelector('.chat-header h2');
+                    if (header && header.textContent.includes(gcCode)) {
+                        existingChatId = parseInt(instance.dataset.chatId);
+                    }
+                });
+                
+                if (existingChatId) {
+                    // Utiliser l'onglet existant
+                    chatId = existingChatId;
+                    chatPanel.switchToChat(chatId);
+                } else {
+                    // Créer un nouvel onglet
+                    chatId = chatPanel.addChat();
+                    
+                    // Renommer l'onglet avec le code GC
+                    const tabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
+                    if (tabLabel) {
+                        tabLabel.textContent = gcCode;
+                    }
+                    
+                    // Renommer le titre du chat
+                    const chatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
+                    if (chatHeader) {
+                        chatHeader.textContent = `CHAT IA - ${gcCode}`;
+                    }
+                    
+                    // Stocker l'ID de la géocache dans le chat pour référence future
+                    const chatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+                    if (chatInstance) {
+                        chatInstance.dataset.geocacheId = geocacheId;
+                    }
+                }
+            }
+            
+            // Envoyer le message initial
+            const activeChat = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            if (activeChat) {
+                const textarea = activeChat.querySelector('.chat-input');
+                if (textarea) {
+                    textarea.value = initialMessage;
+                    
+                    // Simuler l'envoi du message
+                    const sendButton = activeChat.querySelector('.chat-send-button');
+                    if (sendButton) {
+                        // Créer et déclencher un événement de clic
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        sendButton.dispatchEvent(clickEvent);
+                    }
+                }
+            }
+        } else {
+            console.error("Le panneau de chat n'a pas été trouvé.");
+        }
+    }
+</script>

@@ -1,0 +1,28 @@
+{
+    "name": "image_alt_text_extractor",
+    "version": "1.0.0",
+    "description": "Plugin pour extraire les textes 'alt' des balises <img>",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": ["beautifulsoup4"],
+    "categories": ["Parser", "HTML", "Accessibility"],
+    "brute_force": false,
+  
+    "input_types": {
+      "html": {
+        "type": "string",
+        "label": "Contenu HTML à analyser"
+      }
+    },
+    "output_types": {
+      "alt_texts": {
+        "type": "array",
+        "label": "Liste des textes 'alt' des images"
+      },
+      "missing_alt": {
+        "type": "array",
+        "label": "Liste des balises <img> sans attribut 'alt'"
+      }
+    }
+  }

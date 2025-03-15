@@ -1,0 +1,51 @@
+{% if alphabets %}
+    {% for alphabet in alphabets %}
+        <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 transition-colors"
+            data-alphabet-id="{{ alphabet.id }}">
+            <div class="cursor-pointer" onclick="openAlphabetTab('{{ alphabet.id }}', '{{ alphabet.name }}')">
+                <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
+                <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
+            </div>
+            
+            {% if show_examples %}
+            <div class="alphabet-example mt-3 p-2 bg-gray-800 rounded">
+                {% if alphabet.alphabetConfig.type == 'font' %}
+                    <div class="text-white">
+                        <style>
+                            @font-face {
+                                font-family: "{{ alphabet.id }}";
+                                src: url("/api/alphabets/{{ alphabet.id }}/font");
+                            }
+                            .font-{{ alphabet.id }} {
+                                font-family: "{{ alphabet.id }}";
+                                font-size: {{ font_size }}px;
+                            }
+                        </style>
+                        <span class="font-{{ alphabet.id }}">{{ display_text }}</span>
+                    </div>
+                {% elif alphabet.alphabetConfig.type == 'images' %}
+                    <div class="flex flex-wrap gap-1">
+                        {% for char in display_text[:10] %}
+                            {% if char|lower in "abcdefghijklmnopqrstuvwxyz0123456789" %}
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char|lower }}.{{ alphabet.alphabetConfig.imageFormat }}" 
+                                    alt="{{ char }}" 
+                                    style="width: {{ font_size|int * 1.5 }}px; height: {{ font_size|int * 1.5 }}px;"
+                                    class="object-contain">
+                            {% else %}
+                                <div style="width: {{ font_size|int * 1.5 }}px; height: {{ font_size|int * 1.5 }}px;" 
+                                    class="flex items-center justify-center bg-gray-700 rounded">
+                                    <span class="text-gray-400">{{ char }}</span>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="text-gray-400 text-center py-4">
+        Aucun alphabet disponible
+    </div>
+{% endif %}

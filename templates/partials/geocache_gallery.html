@@ -1,0 +1,17 @@
+<!-- Galerie d'images -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {% for image in geocache.images %}
+    <div class="relative aspect-square">
+        <img src="{{ image.url }}"
+             alt="{{ image.name or 'Image de la géocache' }}"
+             class="geocache-image w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 {% if not image.is_original %}border-2 border-purple-500{% endif %}"
+             data-geocache-gallery-target="image"
+             data-image-id="{{ image.id }}"
+             data-image-name="{{ image.name or '' }}"
+             data-is-original="{{ image.is_original|lower }}">
+        {% if not image.is_original %}
+        <div class="absolute top-0 right-0 bg-purple-600 text-white text-xs px-1 rounded-bl">Modifiée</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>

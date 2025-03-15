@@ -1,0 +1,23 @@
+<div id="notes-content" class="space-y-4 p-4">
+    {% if geocache_id %}
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-200">Notes pour {{ geocache_name }}</h3>
+            <button class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                    hx-get="/api/logs/note_form?geocacheId={{ geocache_id }}"
+                    hx-target="#notes-content"
+                    hx-swap="innerHTML">
+                Nouvelle note
+            </button>
+        </div>
+        
+        {% if notes %}
+            {% for note in notes %}
+                {% include 'note_item.html' %}
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-400">Aucune note pour cette géocache.</p>
+        {% endif %}
+    {% else %}
+        <p class="text-gray-400">Sélectionnez une géocache pour voir ses notes.</p>
+    {% endif %}
+</div>

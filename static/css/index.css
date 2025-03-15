@@ -1,0 +1,666 @@
+/* Custom styles for VSCode-like layout */
+.workspace-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    background-color: #1e1e1e;
+    position: relative; /* Ajout de position relative */
+}
+
+.sidebar {
+    width: 48px;
+    flex-shrink: 0;
+    z-index: 10;
+    background-color: #252526;
+    border-right: 1px solid #3c3c3c;
+}
+
+.sidebar.right-sidebar {
+    border-right: none;
+    border-left: 1px solid #3c3c3c;
+    order: 3;
+}
+
+.panel-container {
+    display: flex;
+    flex: 1;
+    position: relative;
+    background-color: #1e1e1e;
+    order: 2;
+    overflow: hidden;
+}
+
+.side-panel {
+    width: 250px;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform 0.15s ease-out;
+    z-index: 5;
+    background-color: #252526;
+    border-right: 1px solid #3c3c3c;
+    opacity: 0;
+}
+
+.side-panel.right-panel {
+    left: auto;
+    right: 0;
+    transform: translateX(100%);
+    border-right: none;
+    border-left: 1px solid #3c3c3c;
+    position: fixed;
+    top: 0;
+    bottom: 22px; /* Hauteur de la barre de statut */
+    width: 250px;
+    padding-right: 48px; /* Ajouter un padding pour éviter le chevauchement avec la barre latérale */
+    box-sizing: border-box; /* S'assurer que le padding est inclus dans la largeur */
+}
+
+.side-panel.visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.resizer {
+    position: absolute;
+    right: -5px;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    cursor: ew-resize;
+    z-index: 15;
+    pointer-events: none;
+}
+
+.right-panel .resizer {
+    right: auto;
+    left: -5px;
+}
+
+.side-panel.visible .resizer {
+    pointer-events: all;
+}
+
+.resizer:hover, .resizing {
+    background-color: #007fd4;
+    opacity: 0.4;
+}
+
+.main-content {
+    flex: 1;
+    margin-left: 0;
+    margin-right: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    transition: margin 0.15s ease-out;
+    overflow: hidden;
+}
+
+.main-content.shifted-left {
+    margin-left: 250px;
+}
+
+.main-content.shifted-right {
+    margin-right: 250px;
+}
+
+.golden-layout-container {
+    flex: 1;
+    min-height: 0;
+    transition: height 0.15s ease-out;
+}
+
+.bottom-panel-container {
+    display: flex;
+    flex-direction: column;
+    height: 35px;
+    min-height: 35px;
+    max-height: 800px;
+    background-color: #1e1e1e;
+    transition: height 0.3s ease;
+    overflow: hidden;
+    border-top: 1px solid #3c3c3c;
+    position: relative;
+}
+
+.bottom-panel-container.expanded {
+    height: 300px;
+}
+
+.bottom-panel-header {
+    flex-shrink: 0;
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #3c3c3c;
+    padding: 4px 0;
+    user-select: none;
+    z-index: 10;
+}
+
+.bottom-panel-tabs {
+    display: flex;
+    gap: 1rem;
+    padding: 0 1rem;
+}
+
+.bottom-panel-content {
+    flex: 1;
+    overflow: auto;
+    background-color: #1e1e1e;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.panel-content {
+    display: none;
+    padding: 1rem;
+    height: 100%;
+    color: #e1e1e1;
+    background-color: #1e1e1e;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.panel-content.active {
+    display: block !important;
+}
+
+.bottom-panel-tab {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    transition: color 0.2s;
+    position: relative;
+    outline: none;
+}
+
+.bottom-panel-tab:hover {
+    color: #c9d1d9;
+}
+
+.bottom-panel-tab.active {
+    color: #58a6ff;
+}
+
+.bottom-panel-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #58a6ff;
+}
+
+.bottom-panel-tab i {
+    margin-right: 0.5rem;
+}
+
+/* Style pour la poignée de redimensionnement du panneau inférieur */
+.bottom-panel-resizer {
+    width: 100%;
+    height: 4px;
+    cursor: ns-resize;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: transparent;
+    z-index: 20;
+}
+
+.bottom-panel-resizer:hover,
+.bottom-panel-resizer.resizing {
+    background: #58a6ff;
+}
+
+.bottom-panel-container {
+    display: flex;
+    flex-direction: column;
+    height: 35px;
+    min-height: 35px;
+    max-height: 800px;
+    background-color: #1e1e1e;
+    transition: height 0.3s ease;
+    overflow: hidden;
+    border-top: 1px solid #3c3c3c;
+    position: relative;
+}
+
+/* Désactiver les transitions pendant le redimensionnement */
+.resizing .bottom-panel-container,
+.resizing .golden-layout-container {
+    transition: none !important;
+}
+
+/* Styles pour le chat */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1rem;
+    color: #e2e8f0;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    padding-right: 0.5rem;
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chat-input {
+    flex: 1;
+    background-color: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0.5rem;
+    color: #fff;
+    resize: none;
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: #007fd4;
+}
+
+.chat-send-button {
+    background-color: #007fd4;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    color: white;
+    cursor: pointer;
+}
+
+.chat-send-button:hover {
+    background-color: #1a8ad4;
+}
+
+.status-bar {
+    height: 22px;
+    background-color: #252526;
+    border-top: 1px solid #3c3c3c;
+    color: #cccccc;
+    position: relative;
+    z-index: 5; /* Au-dessus du panneau */
+}
+
+/* Styles pour le panneau inférieur */
+.bottom-panel-resizer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -5px;
+    height: 10px;
+    cursor: ns-resize;
+    z-index: 15;
+}
+
+.bottom-panel-resizer:hover {
+    background-color: #007fd4;
+    opacity: 0.4;
+}
+
+/* Ajustement du panneau droit quand le panneau inférieur est ouvert */
+.side-panel.right-panel.with-bottom-panel {
+    bottom: 322px; /* 300px + 22px */
+}
+
+/* Style pour les panneaux de contenu */
+.side-panel-content {
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.panel-content {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: auto;
+}
+
+.panel-content.active {
+    display: block;
+}
+
+.panel-header {
+    position: sticky;
+    top: 0;
+    background-color: #252526;
+    z-index: 1;
+}
+
+.panel-body {
+    height: calc(100% - 3rem);
+    overflow: auto;
+}
+
+.bottom-panel-tab {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.bottom-panel-tab:hover {
+    color: #c9d1d9;
+}
+
+.bottom-panel-tab.active {
+    color: #58a6ff;
+    border-bottom: 2px solid #58a6ff;
+}
+
+.bottom-panel-tab i {
+    margin-right: 0.5rem;
+}
+
+/* Style pour les composants GoldenLayout */
+.lm_content {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Style pour le contenu des composants */
+.lm_content > div {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+}
+
+/* Style pour les iframes dans GoldenLayout */
+.lm_content iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* Assurer que le contenu des composants remplit l'espace disponible */
+.lm_item {
+    overflow: hidden !important;
+}
+
+/* Style pour la barre de défilement */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e1e1e;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3c3c3c;
+    border-radius: 5px;
+    border: 2px solid #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4c4c4c;
+}
+
+::-webkit-scrollbar-corner {
+    background: #1e1e1e;
+}
+
+/* Cacher les barres de défilement par défaut et les montrer au survol */
+.lm_content {
+    scrollbar-width: thin;
+    scrollbar-color: #3c3c3c #1e1e1e;
+}
+
+/* Support pour Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #3c3c3c #1e1e1e;
+}
+
+/* Styles de base pour GoldenLayout */
+.golden-layout-container {
+    flex: 1;
+    min-height: 0; /* Important pour que flex fonctionne correctement */
+    position: relative;
+}
+
+/* Conteneur principal de GoldenLayout */
+.lm_goldenlayout {
+    width: 100%;
+    height: 100%;
+    position: absolute !important;
+}
+
+/* Conteneur des éléments */
+.lm_item_container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+/* Contenu des composants */
+.lm_content {
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* Style pour les composants spécifiques */
+.lm_content > div {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    padding: 10px;
+}
+
+/* Style pour les iframes */
+.lm_content iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Styles pour la barre de défilement */
+.lm_content > div::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.lm_content > div::-webkit-scrollbar-track {
+    background: #1e1e1e;
+    border-radius: 6px;
+}
+
+.lm_content > div::-webkit-scrollbar-thumb {
+    background-color: #3c3c3c;
+    border-radius: 6px;
+    border: 3px solid #1e1e1e;
+}
+
+.lm_content > div::-webkit-scrollbar-thumb:hover {
+    background-color: #4c4c4c;
+}
+
+.lm_content > div::-webkit-scrollbar-corner {
+    background: #1e1e1e;
+}
+
+/* Support Firefox */
+.lm_content > div {
+    scrollbar-width: thin;
+    scrollbar-color: #3c3c3c #1e1e1e;
+}
+
+/* Styles spécifiques pour les tableaux */
+.tabulator {
+    height: 100% !important;
+    max-height: none !important;
+}
+
+.tabulator-tableholder {
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+}
+
+/* Ajout de styles pour le menu contextuel */
+.geocache-image {
+    cursor: pointer;
+}
+
+.geocache-image.selected {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+}
+
+.context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0;
+    min-width: 160px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: #e5e7eb;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.context-menu-item:hover {
+    background-color: #374151;
+}
+
+.context-menu-item i {
+    margin-right: 0.5rem;
+    width: 1rem;
+    text-align: center;
+}
+
+/* Styles pour les onglets de paramètres */
+.settings-tabs {
+    display: flex;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+}
+
+.settings-tab {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: #8b949e;
+    cursor: pointer;
+    transition: color 0.2s;
+    position: relative;
+    outline: none;
+}
+
+.settings-tab:hover {
+    color: #c9d1d9;
+}
+
+.settings-tab.active {
+    color: #58a6ff;
+}
+
+.settings-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #58a6ff;
+}
+
+.settings-section {
+    display: none;
+    padding: 1rem 0;
+}
+
+.settings-section.active {
+    display: block;
+}
+
+/* Styles pour les formulaires de paramètres */
+.form-input, .form-select, .form-range {
+    background-color: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    color: #e1e1e1;
+    width: 100%;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: #58a6ff;
+}
+
+.form-radio {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid #444;
+    border-radius: 50%;
+    background-color: #2d2d2d;
+    margin-right: 0.5rem;
+    position: relative;
+}
+
+.form-radio:checked {
+    border-color: #58a6ff;
+}
+
+.form-radio:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: #58a6ff;
+}
+
+/* Styles pour les messages d'erreur dans le chat */
+.chat-message.system.error .message-content {
+    background-color: #5a1d1d;
+    color: #ffa5a5;
+}

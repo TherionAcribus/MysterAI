@@ -1,0 +1,22 @@
+<!-- Template pour la liste des zones -->
+<div class="p-4">
+    {% if zones %}
+        <div class="space-y-4">
+            {% for zone in zones %}
+                <div class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-2">{{ zone.name }}</h3>
+                    {% if zone.description %}
+                        <p class="text-gray-300 mb-4">{{ zone.description }}</p>
+                    {% endif %}
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                            onclick="window.openGeocachesTab('{{ zone.id }}', '{{ zone.name | escape }}')">
+                        <i class="fas fa-table mr-2"></i>
+                        Voir les géocaches
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-gray-400">Aucune zone trouvée</p>
+    {% endif %}
+</div>

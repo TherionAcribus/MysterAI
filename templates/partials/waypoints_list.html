@@ -1,0 +1,52 @@
+{% if geocache.additional_waypoints %}
+<table class="min-w-full bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+  <thead class="bg-gray-700">
+    <tr>
+      <th class="px-4 py-2 text-left text-gray-300">Préfixe</th>
+      <th class="px-4 py-2 text-left text-gray-300">Lookup</th>
+      <th class="px-4 py-2 text-left text-gray-300">Nom</th>
+      <th class="px-4 py-2 text-left text-gray-300">Coordonnées</th>
+      <th class="px-4 py-2 text-left text-gray-300">Note</th>
+      <th class="px-4 py-2 text-center text-gray-300">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for wp in geocache.additional_waypoints %}
+    <tr class="border-t border-gray-700" data-waypoint-id="{{ wp.id }}">
+      <td class="px-4 py-2 text-gray-300">{{ wp.prefix }}</td>
+      <td class="px-4 py-2 text-gray-300">{{ wp.lookup }}</td>
+      <td class="px-4 py-2 text-gray-300">{{ wp.name }}</td>
+      <td class="px-4 py-2 text-gray-300">
+        {% if wp.gc_lat and wp.gc_lon %}
+          <div class="text-gray-300">{{ wp.gc_lat }} {{ wp.gc_lon }}</div>
+        {% endif %}
+        {% if wp.latitude and wp.longitude %}
+          <div class="text-gray-400 text-xs mt-1">{{ wp.latitude|round(6) }}, {{ wp.longitude|round(6) }}</div>
+        {% endif %}
+      </td>
+      <td class="px-4 py-2 text-gray-300">{{ wp.note }}</td>
+      <td class="px-4 py-2 text-center">
+        <div class="flex justify-center space-x-2">
+          <button 
+            class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs edit-waypoint-btn"
+            data-waypoint-id="{{ wp.id }}"
+            data-geocache-id="{{ geocache.id }}"
+            data-action="click->waypoint-form#editWaypoint">
+            <i class="fas fa-edit mr-1"></i> Modifier
+          </button>
+          <button 
+            class="bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs delete-waypoint-btn"
+            data-waypoint-id="{{ wp.id }}"
+            data-geocache-id="{{ geocache.id }}"
+            data-action="click->waypoint-form#deleteWaypoint">
+            <i class="fas fa-trash-alt mr-1"></i> Supprimer
+          </button>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-gray-500">Aucun waypoint supplémentaire n'a été ajouté.</p>
+{% endif %}
