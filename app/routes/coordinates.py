@@ -106,8 +106,8 @@ def _format_coordinate(coord_str: str, expected_deg_digits: int) -> str:
 def _detect_dmm_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
     print(f"[DEBUG] _detect_dmm_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
     dmm_regex = (
-        r'([NS])\s*(\d{1,2})°\s*(\d{1,2}(?:\.\d+)?)[\'"]?\s*'
-        r'([EW])\s*(\d{1,3})°\s*(\d{1,2}(?:\.\d+)?)[\'"]?'
+        r'([NS])\s*(\d{1,2})\s*[°º]\s*(\d{1,2}(?:\.\d+)?)[\'"]?\s*'
+        r'([EW])\s*(\d{1,3})\s*[°º]\s*(\d{1,2}(?:\.\d+)?)[\'"]?'
     )
     print(f"[DEBUG] _detect_dmm_coordinates: Regex utilisée: {dmm_regex}")
     match = re.search(dmm_regex, text)
@@ -373,6 +373,214 @@ def _detect_flexible_coordinates(text: str) -> Optional[Dict[str, Optional[str]]
     return None
 
 # ------------------------------------------------------------------------------
+# Détection du format NORD/EST avec chiffres séparés par des espaces
+# ------------------------------------------------------------------------------
+
+def _detect_nord_est_format(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format NORD/EST avec chiffres séparés par des espaces, par exemple :
+      - "NORD 48 32 296 EST 6 40 636"
+      - "Nord 48 32 296 Est 6 40 636"
+    
+    Ce format est spécifique aux coordonnées normalisées après décodage.
+    """
+    print(f"[DEBUG] _detect_nord_est_format: Analyse du texte: '{text}'")
+    
+    # Pattern pour détecter NORD/EST suivi de chiffres séparés par des espaces
+    nord_est_regex = r'(?:NORD|Nord|nord)\s+(\d{1,2})\s+(\d{1,2})\s+(\d{1,3})(?:\s+|\s*[/\n]\s*)(?:EST|Est|est)\s+(\d{1,3})\s+(\d{1,2})\s+(\d{1,3})'
+    
+    print(f"[DEBUG] _detect_nord_est_format: Regex utilisée: {nord_est_regex}")
+    
+    match = re.search(nord_est_regex, text, re.IGNORECASE)
+    if match:
+        print(f"[DEBUG] _detect_nord_est_format: Match trouvé! Groupes: {match.groups()}")
+        lat_deg, lat_min, lat_sec, lon_deg, lon_min, lon_sec = match.groups()
+        
+        # Formatage des coordonnées
+        ddm_lat = f"N {lat_deg}° {lat_min}.{lat_sec}'"
+        ddm_lon = f"E {lon_deg}° {lon_min}.{lon_sec}'"
+        
+        print(f"[DEBUG] _detect_nord_est_format: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+    
+    print("[DEBUG] _detect_nord_est_format: Aucun match trouvé")
+    return None
+
+# ------------------------------------------------------------------------------
+# Détection du format NORD/EST avec variations
+# ------------------------------------------------------------------------------
+
+def _detect_nord_est_variations(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format NORD/EST avec diverses variations possibles, par exemple :
+      - "NORD 48 32 296 EST 6 40 636"
+      - "NORD48 32 296EST6 40 636"
+      - "NORD48.32.296 EST6.40.636"
+    
+    Cette fonction est très flexible et tolérante aux variations de format.
+    """
+    print(f"[DEBUG] _detect_nord_est_variations: Analyse du texte: '{text}'")
+    
+    # Extraction des nombres après NORD et EST
+    nord_match = re.search(r'(?:NORD|Nord|nord)[^\d]*(\d{1,2})[^\d]*(\d{1,2})[^\d]*(\d{1,3})', text, re.IGNORECASE)
+    est_match = re.search(r'(?:EST|Est|est)[^\d]*(\d{1,3})[^\d]*(\d{1,2})[^\d]*(\d{1,3})', text, re.IGNORECASE)
+    
+    print(f"[DEBUG] _detect_nord_est_variations: Match NORD: {nord_match.groups() if nord_match else None}")
+    print(f"[DEBUG] _detect_nord_est_variations: Match EST: {est_match.groups() if est_match else None}")
+    
+    if nord_match and est_match:
+        lat_deg, lat_min, lat_sec = nord_match.groups()
+        lon_deg, lon_min, lon_sec = est_match.groups()
+        
+        # Formatage des coordonnées
+        ddm_lat = f"N {lat_deg}° {lat_min}.{lat_sec}'"
+        ddm_lon = f"E {lon_deg}° {lon_min}.{lon_sec}'"
+        
+        print(f"[DEBUG] _detect_nord_est_variations: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+    
+    print("[DEBUG] _detect_nord_est_variations: Aucun match trouvé")
+    return None
+
+# ------------------------------------------------------------------------------
+# Détection du format DMS (degrés, minutes, secondes)
+# ------------------------------------------------------------------------------
+
+def _detect_dms_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format DMS (degrés, minutes, secondes), par exemple :
+      - "N 48° 51' 24.12\" E 002° 17' 26.1\""
+    
+    Ce format est couramment utilisé dans le géocaching.
+    """
+    print(f"[DEBUG] _detect_dms_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
+    
+    # Pattern pour détecter le format DMS
+    dms_regex = (
+        r'([NS])\s*(\d{1,2})\s*[°º]\s*(\d{1,2})\s*[\']\s*(\d{1,2}(?:\.\d+)?)[\"\']*\s*'
+        r'([EW])\s*(\d{1,3})\s*[°º]\s*(\d{1,2})\s*[\']\s*(\d{1,2}(?:\.\d+)?)[\"\']*'
+    )
+    
+    print(f"[DEBUG] _detect_dms_coordinates: Regex utilisée: {dms_regex}")
+    
+    match = re.search(dms_regex, text)
+    if match:
+        print(f"[DEBUG] _detect_dms_coordinates: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_deg, lat_min, lat_sec, lon_dir, lon_deg, lon_min, lon_sec = match.groups()
+        
+        # Convertir DMS en DDM
+        lat_min_decimal = float(lat_min) + float(lat_sec) / 60
+        lon_min_decimal = float(lon_min) + float(lon_sec) / 60
+        
+        # Formatage des coordonnées
+        ddm_lat = f"{lat_dir} {lat_deg}° {lat_min_decimal:.3f}'"
+        ddm_lon = f"{lon_dir} {lon_deg}° {lon_min_decimal:.3f}'"
+        
+        print(f"[DEBUG] _detect_dms_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+    
+    print("[DEBUG] _detect_dms_coordinates: Aucun match trouvé")
+    return None
+
+# ------------------------------------------------------------------------------
+# Détection du format avec chiffres romains
+# ------------------------------------------------------------------------------
+
+def _detect_roman_numerals_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées avec des chiffres romains, par exemple :
+      - "NORD XLVIII XXXII CCXCVI EST VI XL DCXXXVI"
+      - "N XLVIII° XXXII.CCXCVI' E VI° XL.DCXXXVI'"
+    
+    Cette fonction convertit d'abord les chiffres romains en chiffres arabes.
+    """
+    print(f"[DEBUG] _detect_roman_numerals_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
+    
+    # Dictionnaire de conversion des chiffres romains
+    roman_to_arabic = {
+        'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000,
+        'IV': 4, 'IX': 9, 'XL': 40, 'XC': 90, 'CD': 400, 'CM': 900
+    }
+    
+    # Fonction pour convertir un nombre romain en nombre arabe
+    def roman_to_int(roman: str) -> int:
+        i, result = 0, 0
+        while i < len(roman):
+            # Vérifier les sous-chaînes de 2 caractères
+            if i + 1 < len(roman) and roman[i:i+2] in roman_to_arabic:
+                result += roman_to_arabic[roman[i:i+2]]
+                i += 2
+            else:
+                # Vérifier les caractères individuels
+                if roman[i] in roman_to_arabic:
+                    result += roman_to_arabic[roman[i]]
+                i += 1
+        return result
+    
+    # Rechercher les motifs de chiffres romains
+    roman_pattern = r'(NORD|Nord|nord|N)\s+((?:[IVXLCDM]+)\s+(?:[IVXLCDM]+)\s+(?:[IVXLCDM]+))\s+(EST|Est|est|E)\s+((?:[IVXLCDM]+)\s+(?:[IVXLCDM]+)\s+(?:[IVXLCDM]+))'
+    
+    print(f"[DEBUG] _detect_roman_numerals_coordinates: Pattern utilisé: {roman_pattern}")
+    
+    match = re.search(roman_pattern, text, re.IGNORECASE)
+    if match:
+        print(f"[DEBUG] _detect_roman_numerals_coordinates: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_romans, lon_dir, lon_romans = match.groups()
+        
+        # Extraire les chiffres romains individuels
+        lat_parts = lat_romans.split()
+        lon_parts = lon_romans.split()
+        
+        if len(lat_parts) >= 3 and len(lon_parts) >= 3:
+            try:
+                # Convertir les chiffres romains en chiffres arabes
+                lat_deg = roman_to_int(lat_parts[0])
+                lat_min = roman_to_int(lat_parts[1])
+                lat_sec = roman_to_int(lat_parts[2])
+                
+                lon_deg = roman_to_int(lon_parts[0])
+                lon_min = roman_to_int(lon_parts[1])
+                lon_sec = roman_to_int(lon_parts[2])
+                
+                print(f"[DEBUG] _detect_roman_numerals_coordinates: Conversion - lat: {lat_deg} {lat_min} {lat_sec}, lon: {lon_deg} {lon_min} {lon_sec}")
+                
+                # Formatage des coordonnées
+                ddm_lat = f"N {lat_deg}° {lat_min}.{lat_sec}'"
+                ddm_lon = f"E {lon_deg}° {lon_min}.{lon_sec}'"
+                
+                print(f"[DEBUG] _detect_roman_numerals_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+                
+                return {
+                    "exist": True,
+                    "ddm_lat": ddm_lat,
+                    "ddm_lon": ddm_lon,
+                    "ddm": f"{ddm_lat} {ddm_lon}"
+                }
+            except Exception as e:
+                print(f"[DEBUG] _detect_roman_numerals_coordinates: Erreur lors de la conversion: {e}")
+    
+    print("[DEBUG] _detect_roman_numerals_coordinates: Aucun match trouvé ou erreur de conversion")
+    return None
+
+# ------------------------------------------------------------------------------
 # Fonction principale de détection multi-format
 # ------------------------------------------------------------------------------
 
@@ -390,6 +598,10 @@ def detect_gps_coordinates(text: str) -> Dict[str, Optional[str]]:
     print(f"[DEBUG] detect_gps_coordinates: Extrait du texte: '{text[:100]}...' (tronqué)")
     
     detection_functions = [
+        _detect_roman_numerals_coordinates,  # Format avec chiffres romains
+        _detect_dms_coordinates,      # Format DMS (degrés, minutes, secondes)
+        _detect_nord_est_variations,  # Format NORD/EST avec variations
+        _detect_nord_est_format,      # Format NORD/EST avec chiffres séparés
         _detect_flexible_coordinates,   # Approche ultra-flexible
         _detect_simplified_coordinates,  # Approche simplifiée pour l'exemple exact
         _detect_specific_tabpoint_coordinates, # Format très spécifique pour l'exemple
