@@ -42,7 +42,7 @@ def create_app():
     # Initialisation de CORS avec les options appropriées
     CORS(app, resources={
         r"/*": {
-            "origins": ["http://localhost:8080", "http://localhost:3000"],  # Autoriser les deux ports
+            "origins": ["http://localhost:8080", "http://localhost:3000", "http://127.0.0.1:3000", "http://127.0.0.1:8080"],  # Autoriser les deux ports et leurs équivalents 127.0.0.1
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "HX-Request", "HX-Current-URL", "HX-Target", "HX-Trigger"],
             "supports_credentials": True

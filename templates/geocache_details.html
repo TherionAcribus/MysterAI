@@ -106,28 +106,42 @@
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <h2 class="text-lg font-semibold text-gray-100 mb-4 flex justify-between items-center">
                 <span>Description</span>
-                <button 
-                    id="analyze-geocache-button"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
-                    onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}'})"
-                    data-geocache-id="{{ geocache.id }}"
-                    data-gc-code="{{ geocache.gc_code }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.96-.421-2.632-1.102l-.547-.547z" />
-                    </svg>
-                    <span>Analyser</span>
-                </button>
-                <button 
-                    id="solver-geocache-button"
-                    class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                    onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
-                    data-geocache-id="{{ geocache.id }}"
-                    data-gc-code="{{ geocache.gc_code }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
-                    </svg>
-                    <span>Solver</span>
-                </button>
+                <div class="flex">
+                    <button 
+                        id="analyze-geocache-button"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
+                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}'})"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.96-.421-2.632-1.102l-.547-.547z" />
+                        </svg>
+                        <span>Analyser</span>
+                    </button>
+                    <button 
+                        id="solver-geocache-button"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
+                        onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                        </svg>
+                        <span>Solver</span>
+                    </button>
+                    <button 
+                        id="ai-chat-geocache-button"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
+                        onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', '{{ geocache.name|replace("'", "\\'") }}')"
+                        data-geocache-id="{{ geocache.id }}"
+                        data-gc-code="{{ geocache.gc_code }}"
+                        data-geocache-name="{{ geocache.name|replace("'", "\\'") }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        <span>Chat IA</span>
+                    </button>
+                </div>
             </h2>
             <div class="prose prose-invert max-w-none">
                 {{ geocache.description|safe }}
@@ -417,3 +431,97 @@
         text-align: center;
     }
 </style>
+
+<script>
+    // Fonction pour ouvrir un onglet de chat IA avec les informations de la géocache
+    function openGeocacheAIChat(geocacheId, gcCode, geocacheName) {
+        // Récupérer la description de la géocache
+        const geocacheDescription = document.querySelector('.prose.prose-invert').innerText.trim();
+        
+        // Construire le message initial pour l'IA
+        const initialMessage = `Je travaille sur la géocache ${gcCode} - "${geocacheName}". Voici sa description:\n\n${geocacheDescription.substring(0, 1500)}\n\nPouvez-vous m'aider à analyser cette géocache et à trouver des indices potentiels?`;
+        
+        // Vérifier si le panneau de chat est visible
+        const chatPanel = document.getElementById('chat-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        
+        // Si le panneau de droite est fermé, l'ouvrir
+        if (rightPanel.classList.contains('collapsed')) {
+            // Trouver le bouton de chat dans la barre latérale droite
+            const chatButton = document.querySelector('.right-sidebar .sidebar-button[data-panel="chat"]');
+            if (chatButton) {
+                chatButton.click();
+            }
+        }
+        
+        if (chatPanel) {
+            // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
+            let chatId;
+            const chatInstances = chatPanel.querySelectorAll('.chat-instance');
+            
+            if (chatInstances.length === 0) {
+                // Aucun chat existant, créer un nouveau
+                chatId = chatPanel.addChat();
+            } else {
+                // Vérifier si un onglet est déjà ouvert pour cette géocache
+                let existingChatId = null;
+                chatInstances.forEach(instance => {
+                    const header = instance.querySelector('.chat-header h2');
+                    if (header && header.textContent.includes(gcCode)) {
+                        existingChatId = parseInt(instance.dataset.chatId);
+                    }
+                });
+                
+                if (existingChatId) {
+                    // Utiliser l'onglet existant
+                    chatId = existingChatId;
+                    chatPanel.switchToChat(chatId);
+                } else {
+                    // Créer un nouvel onglet
+                    chatId = chatPanel.addChat();
+                    
+                    // Renommer l'onglet avec le code GC
+                    const tabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
+                    if (tabLabel) {
+                        tabLabel.textContent = gcCode;
+                    }
+                    
+                    // Renommer le titre du chat
+                    const chatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
+                    if (chatHeader) {
+                        chatHeader.textContent = `CHAT IA - ${gcCode}`;
+                    }
+                    
+                    // Stocker l'ID de la géocache dans le chat pour référence future
+                    const chatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+                    if (chatInstance) {
+                        chatInstance.dataset.geocacheId = geocacheId;
+                    }
+                }
+            }
+            
+            // Envoyer le message initial
+            const activeChat = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            if (activeChat) {
+                const textarea = activeChat.querySelector('.chat-input');
+                if (textarea) {
+                    textarea.value = initialMessage;
+                    
+                    // Simuler l'envoi du message
+                    const sendButton = activeChat.querySelector('.chat-send-button');
+                    if (sendButton) {
+                        // Créer et déclencher un événement de clic
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        });
+                        sendButton.dispatchEvent(clickEvent);
+                    }
+                }
+            }
+        } else {
+            console.error("Le panneau de chat n'a pas été trouvé.");
+        }
+    }
+</script>

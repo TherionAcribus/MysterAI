@@ -36,6 +36,10 @@
             
             // Écouter les changements de taille de la fenêtre
             window.addEventListener('resize', this.adjustTabsPosition.bind(this));
+            
+            // Exposer les méthodes publiques pour l'accès externe
+            this.element.addChat = this.addChat.bind(this);
+            this.element.switchToChat = this.switchToChat.bind(this);
         }
         
         /**
