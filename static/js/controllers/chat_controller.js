@@ -37,6 +37,9 @@
             // Écouter les changements de taille de la fenêtre
             window.addEventListener('resize', this.adjustTabsPosition.bind(this));
             
+            // Écouter les changements de modèle d'IA
+            window.addEventListener('aiModelChanged', this.handleAIModelChanged.bind(this));
+            
             // Exposer les méthodes publiques pour l'accès externe
             this.element.addChat = this.addChat.bind(this);
             this.element.switchToChat = this.switchToChat.bind(this);
@@ -257,6 +260,13 @@
             messagesContainer.appendChild(typingElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
+            // Récupérer le modèle d'IA actif (s'il est affiché dans la status bar)
+            let activeModel = null;
+            const modelSelector = document.getElementById('ai-model-selector');
+            if (modelSelector) {
+                activeModel = modelSelector.value;
+            }
+            
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -264,10 +274,16 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    messages: this.conversations[chatId]
+                    messages: this.conversations[chatId],
+                    model_id: activeModel // Envoyer l'ID du modèle actif
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Supprimer l'indicateur de frappe
                 typingElement.remove();
@@ -275,7 +291,15 @@
                 // Ajouter la réponse de l'IA
                 const aiMessageElement = document.createElement('div');
                 aiMessageElement.className = 'chat-message system';
+                
+                // Ajouter l'info du modèle utilisé si disponible
+                let modelInfo = '';
+                if (data.model_used) {
+                    modelInfo = `<div class="message-model-info">Modèle: ${data.model_used}</div>`;
+                }
+                
                 aiMessageElement.innerHTML = `
+                    ${modelInfo}
                     <div class="message-content">${this.escapeHtml(data.response)}</div>
                 `;
                 messagesContainer.appendChild(aiMessageElement);
@@ -283,7 +307,8 @@
                 // Ajouter la réponse à la conversation
                 this.conversations[chatId].push({
                     role: "assistant",
-                    content: data.response
+                    content: data.response,
+                    model: data.model_used // Stocker le modèle utilisé
                 });
                 
                 // Faire défiler vers le bas
@@ -305,6 +330,36 @@
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
                 console.error('Erreur lors de l\'appel à l\'API:', error);
+            });
+        }
+        
+        /**
+         * Gère le changement de modèle d'IA
+         * @param {CustomEvent} event - L'événement contenant les détails du modèle
+         */
+        handleAIModelChanged(event) {
+            const modelId = event.detail.modelId;
+            const modelName = event.detail.modelName;
+            
+            // Ajouter un message système dans tous les chats actifs
+            this.chatListTarget.querySelectorAll('.chat-instance').forEach(chatInstance => {
+                const chatId = parseInt(chatInstance.dataset.chatId);
+                const messagesContainer = chatInstance.querySelector('.chat-messages');
+                
+                if (messagesContainer) {
+                    // Créer le message de notification
+                    const notificationElement = document.createElement('div');
+                    notificationElement.className = 'chat-message system model-change';
+                    notificationElement.innerHTML = `
+                        <div class="message-content">
+                            <i class="fas fa-exchange-alt"></i> Modèle d'IA changé pour: <strong>${modelName}</strong>
+                        </div>
+                    `;
+                    messagesContainer.appendChild(notificationElement);
+                    
+                    // Faire défiler vers le bas
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
             });
         }
         

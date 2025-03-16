@@ -293,15 +293,58 @@
 }
 
 .status-bar {
-    height: 22px;
-    background-color: #252526;
-    border-top: 1px solid #3c3c3c;
-    color: #cccccc;
-    position: relative;
-    z-index: 5; /* Au-dessus du panneau */
+    background-color: #1a1a1a;
+    border-top: 1px solid #333;
+    height: 24px;
+    color: #ccc;
 }
 
-/* Styles pour le panneau inférieur */
+.status-bar select {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 0.75rem;
+}
+
+/* Styles pour les notifications */
+.notification {
+    position: fixed;
+    bottom: 30px;
+    right: 20px;
+    padding: 10px 15px;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 9999;
+    max-width: 300px;
+}
+
+.notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.notification.success {
+    background-color: #4caf50;
+    border-left: 4px solid #2e7d32;
+}
+
+.notification.error {
+    background-color: #f44336;
+    border-left: 4px solid #c62828;
+}
+
+/* Styles pour le sélecteur d'IA dans la status bar */
+#ai-model-selector {
+    min-width: 120px;
+}
+
+/* Style pour le panneau inférieur */
 .bottom-panel-resizer {
     position: absolute;
     left: 0;

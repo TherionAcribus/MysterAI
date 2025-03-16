@@ -36,16 +36,62 @@ def test_ollama_connection():
 
 @ai_bp.route('/chat', methods=['POST'])
 def chat():
-    """Envoie un message à l'IA et retourne la réponse"""
-    data = request.json
-    messages = data.get('messages', [])
-    system_prompt = data.get('system_prompt')
-    
-    response = ai_service.chat(messages, system_prompt)
-    
-    return jsonify({
-        'response': response
-    })
+    """
+    Endpoint pour le chat avec l'IA
+    """
+    try:
+        data = request.json
+        messages = data.get('messages', [])
+        model_id = data.get('model_id')  # Récupérer l'ID du modèle spécifié
+        
+        if not messages:
+            return jsonify({
+                'success': False,
+                'error': 'Aucun message fourni'
+            }), 400
+        
+        # Si un modèle spécifique est demandé, l'utiliser temporairement
+        settings = ai_service.get_settings()
+        original_mode = settings.get('mode')
+        original_model = None
+        model_used = None
+        
+        if model_id:
+            # Déterminer si le modèle est en ligne ou local
+            if settings.get('online_models') and model_id in settings['online_models']:
+                original_model = settings.get('online_model')
+                settings['mode'] = 'online'
+                settings['online_model'] = model_id
+                model_used = settings['online_models'][model_id].get('name', model_id)
+            elif settings.get('local_models') and model_id in settings['local_models']:
+                original_model = settings.get('local_model')
+                settings['mode'] = 'local'
+                settings['local_model'] = model_id
+                model_used = settings['local_models'][model_id].get('name', model_id)
+        
+        # Obtenir la réponse de l'IA
+        response = ai_service.chat(messages, settings)
+        
+        # Restaurer les paramètres originaux si nécessaire
+        if model_id and original_mode:
+            settings['mode'] = original_mode
+            if original_model:
+                if original_mode == 'online':
+                    settings['online_model'] = original_model
+                else:
+                    settings['local_model'] = original_model
+        
+        return jsonify({
+            'success': True,
+            'response': response,
+            'model_used': model_used  # Renvoyer le nom du modèle utilisé
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de l'appel au chat IA: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @ai_bp.route('/settings_panel', methods=['GET'])
 def settings_panel():
@@ -182,6 +228,50 @@ def settings_panel():
                     </button>
                     <span class="ml-2 text-sm" data-ai-settings-target="connectionStatus"></span>
                 </div>
+                
+                <!-- Modèles locaux disponibles -->
+                <div class="mb-4">
+                    <h4 class="text-sm font-medium mb-2">Modèles locaux disponibles</h4>
+                    <div class="bg-gray-800 p-3 rounded">
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- Llama 3 -->
+                            <div class="flex items-center">
+                                <input type="checkbox" id="enable-llama3" class="mr-2 form-checkbox"
+                                       data-ai-settings-target="localModelEnabled"
+                                       data-model-id="llama3"
+                                       {"checked" if settings.get('local_models', {}).get('llama3', {}).get('enabled', False) else ""}>
+                                <label for="enable-llama3">Llama 3</label>
+                            </div>
+                            
+                            <!-- Mistral -->
+                            <div class="flex items-center">
+                                <input type="checkbox" id="enable-mistral" class="mr-2 form-checkbox"
+                                       data-ai-settings-target="localModelEnabled"
+                                       data-model-id="mistral"
+                                       {"checked" if settings.get('local_models', {}).get('mistral', {}).get('enabled', False) else ""}>
+                                <label for="enable-mistral">Mistral</label>
+                            </div>
+                            
+                            <!-- DeepSeek Coder -->
+                            <div class="flex items-center">
+                                <input type="checkbox" id="enable-deepseek-coder" class="mr-2 form-checkbox"
+                                       data-ai-settings-target="localModelEnabled"
+                                       data-model-id="deepseek-coder"
+                                       {"checked" if settings.get('local_models', {}).get('deepseek-coder', {}).get('enabled', False) else ""}>
+                                <label for="enable-deepseek-coder">DeepSeek Coder</label>
+                            </div>
+                            
+                            <!-- Phi-3 -->
+                            <div class="flex items-center">
+                                <input type="checkbox" id="enable-phi3" class="mr-2 form-checkbox"
+                                       data-ai-settings-target="localModelEnabled"
+                                       data-model-id="phi3"
+                                       {"checked" if settings.get('local_models', {}).get('phi3', {}).get('enabled', False) else ""}>
+                                <label for="enable-phi3">Phi-3</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Paramètres communs -->
@@ -238,3 +328,145 @@ def settings_panel():
             <p>{str(e)}</p>
         </div>
         """ 
+
+@ai_bp.route('/models', methods=['GET'])
+def get_ai_models():
+    """
+    Récupère la liste des modèles d'IA disponibles
+    """
+    try:
+        # Récupérer les paramètres actuels
+        settings = ai_service.get_settings()
+        
+        # Construire la liste des modèles
+        models = []
+        
+        # Modèles en ligne (OpenAI, etc.) - uniquement si une clé API est configurée
+        if settings.get('online_models') and settings.get('api_key'):
+            for model_id, model_info in settings['online_models'].items():
+                # Vérifier si le modèle correspond au fournisseur actuel
+                provider = settings.get('provider', 'openai')
+                
+                # Filtrer selon le fournisseur (à adapter selon votre structure)
+                if (provider == 'openai' and model_id.startswith('gpt')) or \
+                   (provider == 'anthropic' and model_id.startswith('claude')) or \
+                   (provider == 'google' and model_id.startswith('gemini')):
+                    models.append({
+                        'id': model_id,
+                        'name': model_info.get('name', model_id),
+                        'type': 'online',
+                        'is_active': settings.get('mode') == 'online' and settings.get('online_model') == model_id
+                    })
+        
+        # Modèles locaux (Ollama, etc.) - uniquement ceux marqués comme enabled
+        if settings.get('local_models'):
+            for model_id, model_info in settings['local_models'].items():
+                if model_info.get('enabled', False):
+                    models.append({
+                        'id': model_id,
+                        'name': model_info.get('name', model_id),
+                        'type': 'local',
+                        'is_active': settings.get('mode') == 'local' and settings.get('local_model') == model_id
+                    })
+        
+        # Si aucun modèle n'est disponible, ajouter un modèle par défaut
+        if not models:
+            models.append({
+                'id': 'default',
+                'name': 'Modèle par défaut (non configuré)',
+                'type': 'online',
+                'is_active': True
+            })
+        
+        # Trier les modèles par nom
+        models.sort(key=lambda x: x['name'])
+        
+        return jsonify({
+            'success': True,
+            'models': models,
+            'current_mode': settings.get('mode', 'online')
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des modèles d'IA: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@ai_bp.route('/set_active_model', methods=['POST'])
+def set_active_model():
+    """
+    Définit le modèle d'IA actif
+    """
+    try:
+        data = request.json
+        model_id = data.get('model_id')
+        
+        if not model_id:
+            return jsonify({
+                'success': False,
+                'error': 'ID de modèle non spécifié'
+            }), 400
+        
+        # Récupérer les paramètres actuels
+        settings = ai_service.get_settings()
+        
+        # Déterminer si le modèle est en ligne ou local
+        model_type = None
+        model_name = model_id
+        
+        # Vérifier dans les modèles en ligne
+        if settings.get('online_models') and model_id in settings['online_models']:
+            model_type = 'online'
+            model_name = settings['online_models'][model_id].get('name', model_id)
+        
+        # Vérifier dans les modèles locaux
+        elif settings.get('local_models') and model_id in settings['local_models']:
+            model_type = 'local'
+            model_name = settings['local_models'][model_id].get('name', model_id)
+        
+        if not model_type:
+            return jsonify({
+                'success': False,
+                'error': 'Modèle non trouvé'
+            }), 404
+        
+        # Mettre à jour les paramètres
+        settings['mode'] = model_type
+        
+        # Créer un dictionnaire de paramètres pour la sauvegarde
+        save_settings = {
+            'ai_mode': model_type,  # Utiliser ai_mode au lieu de mode pour la compatibilité
+            'temperature': settings.get('temperature', 0.7),
+            'max_context': settings.get('max_context', 10)
+        }
+        
+        if model_type == 'online':
+            settings['online_model'] = model_id
+            save_settings['ai_provider'] = settings.get('provider', 'openai')
+            save_settings['ai_model'] = model_id  # Utiliser ai_model au lieu de online_model
+        else:
+            settings['local_model'] = model_id
+            save_settings['local_model'] = model_id
+        
+        # Sauvegarder les paramètres
+        result = ai_service.save_settings(save_settings)
+        
+        if not result.get('success', False):
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Erreur lors de la sauvegarde des paramètres')
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'model_id': model_id,
+            'model_name': model_name,
+            'model_type': model_type
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la définition du modèle d'IA actif: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 

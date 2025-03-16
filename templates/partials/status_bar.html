@@ -1,0 +1,18 @@
+<!-- Status Bar -->
+<div class="status-bar flex items-center px-2 text-sm" data-controller="status-bar">
+    <div class="flex-1">Ready</div>
+    <div class="flex items-center space-x-4">
+        <!-- Sélecteur d'IA -->
+        <div class="flex items-center">
+            <span class="mr-2">IA:</span>
+            <select id="ai-model-selector" class="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600"
+                    data-action="change->status-bar#changeAIModel"
+                    data-status-bar-target="aiModelSelector">
+                <option value="loading">Chargement...</option>
+            </select>
+        </div>
+        <span>UTF-8</span>
+        <span>JavaScript</span>
+        <span>Ln 1, Col 1</span>
+    </div>
+</div> 

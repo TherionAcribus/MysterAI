@@ -55,6 +55,14 @@ Le panel IA s'intègre désormais avec les détails des géocaches, permettant a
 - Initialiser automatiquement le chat avec les informations de la géocache (code, nom, description)
 - Poser des questions spécifiques à l'IA concernant l'analyse de la géocache
 
+### 5. Changement de modèle d'IA en temps réel
+
+Le panel IA permet désormais de changer de modèle d'IA en temps réel pendant une conversation :
+- Sélection du modèle via la barre de statut
+- Notification dans le chat lors du changement de modèle
+- Affichage du modèle utilisé pour chaque réponse
+- Conservation du contexte de la conversation lors du changement de modèle
+
 ## Implémentation technique
 
 ### Contrôleur Stimulus
@@ -143,6 +151,28 @@ L'intégration avec les géocaches est gérée par une fonction JavaScript dédi
         <!-- Les instances de chat sont ajoutées ici dynamiquement -->
     </div>
     <input type="hidden" data-chat-target="activeChat">
+</div>
+```
+
+### Barre de statut avec sélecteur de modèle d'IA
+
+```html
+<div class="status-bar flex items-center px-2 text-sm" data-controller="status-bar">
+    <div class="flex-1">Ready</div>
+    <div class="flex items-center space-x-4">
+        <!-- Sélecteur d'IA -->
+        <div class="flex items-center">
+            <span class="mr-2">IA:</span>
+            <select id="ai-model-selector" class="bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600"
+                    data-action="change->status-bar#changeAIModel"
+                    data-status-bar-target="aiModelSelector">
+                <option value="loading">Chargement...</option>
+            </select>
+        </div>
+        <span>UTF-8</span>
+        <span>JavaScript</span>
+        <span>Ln 1, Col 1</span>
+    </div>
 </div>
 ```
 
@@ -270,6 +300,26 @@ sequenceDiagram
     Function->>DOM: Envoie le message initial
 ```
 
+### 5. Changement de modèle d'IA
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant StatusBar
+    participant StatusBarController
+    participant API
+    participant ChatController
+    participant DOM
+
+    User->>StatusBar: Sélectionne un nouveau modèle
+    StatusBar->>StatusBarController: changeAIModel()
+    StatusBarController->>API: POST /api/ai/set_active_model
+    API->>StatusBarController: Retourne confirmation
+    StatusBarController->>DOM: Déclenche l'événement aiModelChanged
+    DOM->>ChatController: handleAIModelChanged()
+    ChatController->>DOM: Ajoute un message de notification
+```
+
 ## Configuration du backend
 
 ### Routes API
@@ -281,6 +331,8 @@ Le backend expose une API pour interagir avec les modèles d'IA.
 **Routes principales** :
 - `/api/ai/chat` : Endpoint pour envoyer des messages et recevoir des réponses
 - `/api/ai/settings_panel` : Endpoint pour charger le panneau de configuration de l'IA
+- `/api/ai/models` : Endpoint pour récupérer la liste des modèles d'IA disponibles
+- `/api/ai/set_active_model` : Endpoint pour définir le modèle d'IA actif
 
 ### Configuration CORS
 

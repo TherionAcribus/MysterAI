@@ -319,4 +319,33 @@
 
 .sidebar.right-sidebar {
     z-index: 20; /* S'assurer que la barre latérale est au-dessus du panel */
+}
+
+/* Styles pour les messages de changement de modèle */
+.chat-message.model-change {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    margin: 8px 0;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    color: #a3bffa;
+}
+
+.chat-message.model-change .message-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chat-message.model-change i {
+    color: #3b82f6;
+}
+
+/* Styles pour l'info du modèle utilisé */
+.message-model-info {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-bottom: 4px;
+    text-align: right;
+    font-style: italic;
 } 
