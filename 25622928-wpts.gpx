@@ -1,0 +1,1447 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gpx xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" version="1.0" xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd http://www.groundspeak.com/cache/1/0/1 http://www.groundspeak.com/cache/1/0/1/cache.xsd" creator="Groundspeak, Inc. All Rights Reserved. http://www.groundspeak.com" xmlns="http://www.topografix.com/GPX/1/0">
+  <name>Waypoints for Cache Listings Generated from Geocaching.com</name>
+  <desc>This is a list of supporting waypoints for caches generated from Geocaching.com</desc>
+  <author>Various users from Geocaching.com</author>
+  <email>contact@geocaching.com</email>
+  <url>https://www.geocaching.com</url>
+  <urlname>Geocaching - High Tech Treasure Hunting</urlname>
+  <time>2025-03-17T10:11:51.1003571Z</time>
+  <keywords>cache, geocache, waypoints</keywords>
+  <bounds minlat="49.711633" minlon="5.86735" maxlat="49.810133" maxlon="6.029683" />
+  <wpt lat="49.75665" lon="5.943533">
+    <time>2023-12-24T06:13:35</time>
+    <name>FNAHM30</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ba8de3c8-9eda-4038-bc67-f7f52561aa21</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.757533" lon="5.945717">
+    <time>2023-12-26T11:49:26</time>
+    <name>FNAHP39</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=bb00fa04-22d0-476e-8e23-73d571ca8f6e</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.758467" lon="5.948417">
+    <time>2023-12-29T08:21:22</time>
+    <name>FNAHT2H</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e82fcc6b-b6b7-44b5-aed9-8187b13339b4</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.758683" lon="5.949183">
+    <time>2019-08-28T05:27:31</time>
+    <name>PA83RRE</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b6997eb2-89ee-4b8c-a10c-65d9346201a7</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.762517" lon="5.948667">
+    <time>2024-05-03T07:56:56</time>
+    <name>01AP97Q</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=d2a65782-c1fc-4b99-8725-3d3b96761ffb</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.74945" lon="5.929883">
+    <time>2024-07-01T07:43:08</time>
+    <name>01AHM33</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=cf7bc9cf-5aa5-48e5-acd6-4641a14615d8</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.765667" lon="5.9511">
+    <time>2023-12-24T06:11:38</time>
+    <name>FNAHM2R</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=0f927978-dca6-44b8-8863-41be6cc27f66</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.766117" lon="5.953317">
+    <time>2023-12-29T08:19:47</time>
+    <name>FNAHT2F</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ec1e1482-199d-45be-87d3-940ac73b2626</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.771883" lon="5.983283">
+    <time>2022-11-02T10:57:52</time>
+    <name>P0A1NPH</name>
+    <desc>Parkplatz</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=4722191b-bd1f-45c9-bb90-fa4a54da354a</url>
+    <urlname>Parkplatz</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773583" lon="5.926633">
+    <time>2014-12-10T00:26:07</time>
+    <name>P15HN95</name>
+    <desc>Chemin de l' Attert</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=7ba1f638-0ca4-4146-b7cc-1c1fbf7ebe13</url>
+    <urlname>Chemin de l' Attert</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>You can park your car next to the glass container, and walk to the cache.</cmt>
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T01:08:47</time>
+    <name>P0777T2</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b62f3077-4b1e-4528-a9cd-fcf6ca1a9cc1</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T01:08:47</time>
+    <name>P1777T2</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=39ba0f50-9d0e-495f-857b-d1a625da2b78</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.766283" lon="5.956917">
+    <time>2017-06-16T01:43:21</time>
+    <name>S1777T2</name>
+    <desc>Wasserbüffel / buffles d'eau</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=5c5ed28a-bde0-4c31-b489-f43a74b686ec</url>
+    <urlname>Wasserbüffel / buffles d'eau</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt>Wasserbüffel (Frühjahr bis Herbst)
+buffles d'eau (printemps - automne)</cmt>
+  </wpt>
+  <wpt lat="49.7541" lon="5.911883">
+    <time>2021-09-06T04:17:01</time>
+    <name>P09G1FF</name>
+    <desc>49 45.246 005 54.713</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=f57137a8-b16a-4013-a478-885ede15e8c2</url>
+    <urlname>49 45.246 005 54.713</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Grouss Parkplatz / Grand parking</cmt>
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T01:16:25</time>
+    <name>P0777T8</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=5ad665af-65e9-4edf-965f-99b15c248cfe</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T01:16:25</time>
+    <name>P1777T8</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=13e6cc38-6a18-429f-a1cc-97bdd77828e2</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.800117" lon="5.9676">
+    <time>2024-01-17T23:43:35</time>
+    <name>FNAJM1P</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=82a54389-4817-4c47-8492-87864db0351b</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-12T01:29:49</time>
+    <name>P0774R4</name>
+    <desc>Parkplatz 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8cf442a6-0059-4624-944c-c96a1610c30a</url>
+    <urlname>Parkplatz 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-12T01:29:49</time>
+    <name>P1774R4</name>
+    <desc>Parkplatz 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=a1ee2e95-8bf1-4aa4-b605-1c42b5a521ab</url>
+    <urlname>Parkplatz 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.76925" lon="5.99335">
+    <time>2024-01-09T10:12:47</time>
+    <name>01AJ7CH</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1e416d26-9607-4a8e-af6a-113011827c95</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T00:07:10</time>
+    <name>P0777QQ</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=62f0ec20-aa79-4f9d-ab18-de0d656d1ac9</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T00:07:10</time>
+    <name>P1777QQ</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=0d949c99-e721-4c0a-9b86-ac914f012fda</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T01:00:56</time>
+    <name>P0777RT</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=f68150a3-3d34-41b0-8d2c-da4eed6897a6</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T01:00:56</time>
+    <name>P1777RT</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=9f6f28d5-6f94-44e4-a8d8-f72d8f6430b1</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.77095" lon="5.999833">
+    <time>2024-01-10T07:49:48</time>
+    <name>FNAJ81P</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=aaaaf862-b76c-4a1b-98c9-a78955417b13</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768767" lon="5.995933">
+    <time>2024-01-07T05:50:48</time>
+    <name>FNAJ4YB</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=162aa1f9-01c7-48d7-852f-ef30380dec85</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T00:23:14</time>
+    <name>P0777R1</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e2b189ad-1645-4531-98ae-02cce339a827</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T00:23:14</time>
+    <name>P1777R1</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=86a25afe-af76-40fb-ba3c-22427456501b</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.769833" lon="5.997917">
+    <time>2024-01-10T07:47:01</time>
+    <name>FNAJ81K</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=04128199-7c75-4bcc-a61f-42fdb3f4e43f</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7637" lon="5.975733">
+    <time>2024-01-09T10:05:00</time>
+    <name>01AJ7C1</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=5ee3e238-cb64-4b32-aa30-d0b2e0036ab6</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7617" lon="5.975483">
+    <time>2024-01-09T10:03:12</time>
+    <name>01AJ7BZ</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=d0b22d7d-18cd-49f2-9747-769e9502d8de</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.765067" lon="5.980033">
+    <time>2024-01-09T10:06:47</time>
+    <name>01AJ7CA</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=69ea3a44-5fd4-48a6-be35-87c51b6bcb2b</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7697" lon="6.0076">
+    <time>2024-01-10T07:52:51</time>
+    <name>FNAJ81V</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e855b5b9-ed3e-460c-88f8-564d16ecb927</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7593" lon="5.9759">
+    <time>2024-01-08T21:54:13</time>
+    <name>FNAJ6Y8</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=0cac8f54-bbf5-4bee-99ec-804654114b40</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.766483" lon="5.980883">
+    <time>2024-01-09T10:09:33</time>
+    <name>01AJ7CE</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=17848631-4112-4eb5-89e3-5d7522b20a8a</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.76925" lon="6.004917">
+    <time>2024-01-10T07:51:15</time>
+    <name>FNAJ81Q</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=349f3249-0b08-4c28-8af8-972f61a66a97</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773967" lon="5.953817">
+    <time>2017-06-13T00:53:00</time>
+    <name>P0777RJ</name>
+    <desc>Parking 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=2e4d9cdb-dd0c-4ac1-a043-10a48e3c4147</url>
+    <urlname>Parking 1</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.773717" lon="5.954183">
+    <time>2017-06-13T00:53:00</time>
+    <name>P1777RJ</name>
+    <desc>Parking 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=dba1058e-8607-4667-a4f6-699525e15a0f</url>
+    <urlname>Parking 2</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.75545" lon="5.976933">
+    <time>2024-01-08T21:48:44</time>
+    <name>01AJ6Y2</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b99a1358-4e76-43b0-81fe-9fb6fbbce4a3</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.80065" lon="5.9597">
+    <time>2024-01-17T23:46:02</time>
+    <name>FNAJM1Q</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=f26ad32e-d52d-4ef3-8adb-45666f28d22a</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.77115" lon="6.008733">
+    <time>2024-01-10T07:54:13</time>
+    <name>FNAJ81R</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=87313ce1-b841-483d-8ebb-e38281a3e13c</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.753133" lon="5.97805">
+    <time>2024-01-08T08:54:22</time>
+    <name>01AJ6DH</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=91177d52-5b81-4cce-a881-ffd4e0d059a2</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7725" lon="5.898">
+    <time>2015-02-23T06:49:05</time>
+    <name>P15NA6D</name>
+    <desc>Parking (Cactus)</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=cfeef67e-8c06-4c29-9089-e585211df380</url>
+    <urlname>Parking (Cactus)</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.780733" lon="5.90945">
+    <time>2011-11-17T12:53:06</time>
+    <name>S037X95</name>
+    <desc>PARKING</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=2b03dc3f-c059-4ee9-9045-426e3d942fe7</url>
+    <urlname>PARKING</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.780417" lon="5.9102">
+    <time>2011-11-17T12:55:15</time>
+    <name>S137X95</name>
+    <desc>WP1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=429d3c80-363c-4d6d-a9da-eb6ad52971b9</url>
+    <urlname>WP1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Look around and answer the questions. (Search radius : +/- 40 meters)</cmt>
+  </wpt>
+  <wpt lat="49.77265" lon="6.00995">
+    <time>2024-01-10T07:55:25</time>
+    <name>FNAJ81X</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=0d519666-8232-4e05-bfc4-9c0a59414848</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7748" lon="6.011">
+    <time>2024-01-10T07:56:49</time>
+    <name>FNAJ81Y</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=877e4460-2f0d-4b1e-ad08-693d85b0cfb6</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.769" lon="5.977174">
+    <time>2025-03-07T03:52:50</time>
+    <name>P0B42RQ</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=057c89a4-6341-4d91-bfe7-ed95e5039ad0</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7676" lon="5.979217">
+    <time>2010-05-13T11:59:42</time>
+    <name>S028F1W</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ccf86b32-0276-40c5-97c0-f72d5f165e43</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768267" lon="5.9789">
+    <time>2010-05-13T12:51:00</time>
+    <name>S228F1W</name>
+    <desc>WP2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=4e3b7fcd-8984-472e-97ff-ceab028be15e</url>
+    <urlname>WP2</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7683" lon="5.979583">
+    <time>2010-05-13T12:03:55</time>
+    <name>S128F1W</name>
+    <desc>WP1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=44dce54e-6f2a-4154-bb1e-b80846eccf95</url>
+    <urlname>WP1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768467" lon="5.97955">
+    <time>2010-05-13T12:06:27</time>
+    <name>S328F1W</name>
+    <desc>WP3</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=0b7810aa-0e92-4fa2-a615-2d939cf2a24d</url>
+    <urlname>WP3</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7689" lon="5.9801">
+    <time>2010-05-13T12:08:49</time>
+    <name>S428F1W</name>
+    <desc>WP4</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8138fea4-a65e-4930-b9a6-ddb7ebac41ec</url>
+    <urlname>WP4</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768583" lon="5.9801">
+    <time>2010-05-13T12:10:25</time>
+    <name>S528F1W</name>
+    <desc>WP5</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=f89f0f16-b6a7-4e72-9899-7b418d845260</url>
+    <urlname>WP5</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768533" lon="5.9809">
+    <time>2010-05-13T12:23:30</time>
+    <name>S628F1W</name>
+    <desc>WP6</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8aee98ec-92d3-4839-bb76-254ddd4c16c1</url>
+    <urlname>WP6</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.76815" lon="5.9805">
+    <time>2010-05-13T12:24:39</time>
+    <name>S728F1W</name>
+    <desc>WP7</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=7c7547a0-d04b-40a6-8ebd-995292135be7</url>
+    <urlname>WP7</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.751383" lon="5.977283">
+    <time>2024-01-07T10:07:14</time>
+    <name>FNAJ5BP</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=a9fa2416-32da-4650-a9a8-8fc84c10842b</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.797683" lon="5.983067">
+    <time>2024-01-17T22:12:38</time>
+    <name>FNAJM0M</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=3199466f-935c-46e0-a622-7c7ff0a047aa</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.777233" lon="6.014233">
+    <time>2024-01-10T07:57:52</time>
+    <name>FNAJ820</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1fc347e3-a203-4755-84f1-1aaab0b7f7f5</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.766483" lon="5.89965">
+    <time>2020-05-12T12:01:47</time>
+    <name>01890PA</name>
+    <desc>Virtuelle Station</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=7b3d09d3-2e31-4a60-898b-f10ec37cdbb4</url>
+    <urlname>Virtuelle Station</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Den Kropemann as geplennert fir eng Zeit an as elo op deser Plaatz ze fannen.</cmt>
+  </wpt>
+  <wpt lat="49.800617" lon="5.971117">
+    <time>2024-01-17T23:18:36</time>
+    <name>FNAJM1F</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=4b7fbf56-18a4-4726-8c9c-c488d33697c9</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.767917" lon="5.9802">
+    <time>2019-06-25T01:20:28</time>
+    <name>018926C</name>
+    <desc>P1 (auch Rollstuhl)</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=be3875df-023b-4a22-9d22-b93b60e1649a</url>
+    <urlname>P1 (auch Rollstuhl)</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768733" lon="5.9808">
+    <time>2019-06-25T01:20:28</time>
+    <name>028926C</name>
+    <desc>P2 (+- 10 Plätze)</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=37af4eab-b096-46c9-b9a3-c94e7b02ed29</url>
+    <urlname>P2 (+- 10 Plätze)</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768517" lon="5.9808">
+    <time>2019-06-25T01:20:28</time>
+    <name>038926C</name>
+    <desc>Frage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=52f22317-296b-428a-bd00-f4d9cc2066d2</url>
+    <urlname>Frage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768317" lon="5.97885">
+    <time>2019-06-25T01:20:28</time>
+    <name>048926C</name>
+    <desc>Frage 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=67061ff9-347f-45ba-ada5-0e7c99f97daa</url>
+    <urlname>Frage 2</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768517" lon="5.980883">
+    <time>2019-06-25T01:48:55</time>
+    <name>058926C</name>
+    <desc>Frage 3</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1b7bc335-2e06-435b-aeb3-a2d7614af734</url>
+    <urlname>Frage 3</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.797717" lon="5.99125">
+    <time>2024-01-17T21:44:04</time>
+    <name>FNAJM0B</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=751e0e23-f204-401e-8e3a-ff974fdc81e5</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.776367" lon="6.016617">
+    <time>2024-01-10T08:00:13</time>
+    <name>FNAJ82T</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=cb9aac2a-4101-49b3-9c9c-a4605149b38e</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.746833" lon="5.974333">
+    <time>2024-01-15T07:51:24</time>
+    <name>01AJ81M</name>
+    <desc>Parking camping car friendly (&lt;3,5t), cars (50+)</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=45cfc32b-abc8-477c-9e55-064a4acc562e</url>
+    <urlname>Parking camping car friendly (&lt;3,5t), cars (50+)</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>P&amp;R Schwebach</cmt>
+  </wpt>
+  <wpt lat="49.768833" lon="5.977733">
+    <time>2024-01-18T02:06:10</time>
+    <name>02AJ81M</name>
+    <desc>Parking: camping cars +/-5m, cars (10+)</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=72f59a5e-0ec1-498f-a885-1f09042d859f</url>
+    <urlname>Parking: camping cars +/-5m, cars (10+)</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Useldange</cmt>
+  </wpt>
+  <wpt lat="49.763617" lon="5.976067">
+    <time>2024-03-01T09:31:56</time>
+    <name>03AJ81M</name>
+    <desc>Parking for 5 cars or 3 camping cars</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=7d38201c-df40-4164-a4da-f6a8f8bbe4d8</url>
+    <urlname>Parking for 5 cars or 3 camping cars</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Useldange</cmt>
+  </wpt>
+  <wpt lat="49.780583" lon="6.024467">
+    <time>2024-03-04T09:16:31</time>
+    <name>04AJ81M</name>
+    <desc>Parking for 4 cars or 1-2 camping cars</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=5a29d459-ccb0-4dcb-8d01-728df137ca88</url>
+    <urlname>Parking for 4 cars or 1-2 camping cars</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Boevange-Attert</cmt>
+  </wpt>
+  <wpt lat="49.80105" lon="5.956983">
+    <time>2024-04-02T14:26:30</time>
+    <name>08AJ81M</name>
+    <desc>Parking for some cars</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=f17260f2-b207-4e18-8d53-0b289e6241f4</url>
+    <urlname>Parking for some cars</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Reimberg</cmt>
+  </wpt>
+  <wpt lat="49.759167" lon="5.950633">
+    <time>2024-04-22T04:54:41</time>
+    <name>09AJ81M</name>
+    <desc>Parking for some cars</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=83c1b603-acb4-46bb-8d2a-85ee96fa6ed4</url>
+    <urlname>Parking for some cars</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.749067" lon="5.975433">
+    <time>2024-01-10T07:41:17</time>
+    <name>FNAJ81M</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=64cf19b7-3147-4dab-8b99-efe92e25e633</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.768717" lon="5.980633">
+    <time>2024-03-09T15:22:14</time>
+    <name>05AJ81M</name>
+    <desc>Bike repair station 🛠</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=3bdbb330-f8ce-4eda-95d2-901e391bf658</url>
+    <urlname>Bike repair station 🛠</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt>Useldange (Tourit Info Wëlle Westen)</cmt>
+  </wpt>
+  <wpt lat="49.777183" lon="6.014217">
+    <time>2024-03-09T15:25:10</time>
+    <name>06AJ81M</name>
+    <desc>Bike repair station 🛠</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=88bfddd8-7a9a-4d5f-a390-8782f6dc6f01</url>
+    <urlname>Bike repair station 🛠</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt>Boevange-Attert</cmt>
+  </wpt>
+  <wpt lat="49.747167" lon="5.974167">
+    <time>2024-03-11T09:05:57</time>
+    <name>07AJ81M</name>
+    <desc>Toilet €0.50 🚽</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=2e61e0ca-c550-439b-b7b6-ea2d26c81f1d</url>
+    <urlname>Toilet €0.50 🚽</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt>P&amp;R Schwebach</cmt>
+  </wpt>
+  <wpt lat="49.801" lon="5.957183">
+    <time>2024-06-23T16:12:42</time>
+    <name>10AJ81M</name>
+    <desc>Drinking water 💧</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=093db759-3a2c-43ec-a30f-39c521e1ef5e</url>
+    <urlname>Drinking water 💧</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.801017" lon="5.957083">
+    <time>2024-06-23T16:12:42</time>
+    <name>11AJ81M</name>
+    <desc>Toilet 🚽</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e14ca16f-83fd-4586-bb9f-03fca046bfa1</url>
+    <urlname>Toilet 🚽</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.80095" lon="5.956817">
+    <time>2024-10-27T06:02:36</time>
+    <name>12AJ81M</name>
+    <desc>Solar-Ravi 🥤</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=4d41963a-f328-46b4-86a7-3fab55e42648</url>
+    <urlname>Solar-Ravi 🥤</urlname>
+    <sym>Reference Point</sym>
+    <type>Waypoint|Reference Point</type>
+    <cmt>Help yourself, pay &amp; enjoy your break!  👉 Season-related</cmt>
+  </wpt>
+  <wpt lat="49.798383" lon="5.97315">
+    <time>2024-01-17T23:31:23</time>
+    <name>FNAJM1J</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=89e5bf1e-25e1-4acb-ac4f-bd2762e63638</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.786317" lon="6.012317">
+    <time>2024-01-16T13:32:10</time>
+    <name>FNAJEQR</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c0db4692-12df-47bd-b4a5-52ae7bf3764a</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.786533" lon="6.010067">
+    <time>2024-01-17T02:39:14</time>
+    <name>FNAJF2Q</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e72a3925-0214-4ba8-a131-86a037565cbf</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.787233" lon="6.007633">
+    <time>2024-01-17T12:26:25</time>
+    <name>FNAJKRX</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8e2ed07a-71d7-4077-83a5-a1274a8c9a1a</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.787983" lon="6.011717">
+    <time>2024-01-17T12:46:42</time>
+    <name>FNAJKT9</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1b9055a4-b309-4733-ae57-b478dd07fea7</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.79735" lon="5.974967">
+    <time>2024-01-17T22:51:11</time>
+    <name>FNAJM10</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8968b424-19b5-4a7a-8a26-b26c1e43b9fa</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.789583" lon="6.010967">
+    <time>2024-01-17T12:59:31</time>
+    <name>FNAJKTT</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=6c26b5c6-7d5c-4a4e-9ac6-4d15d1cb71f9</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.790883" lon="6.00995">
+    <time>2024-01-17T20:38:08</time>
+    <name>FNAJKZM</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ebd22c31-c790-47f2-abd8-167d6bfc2282</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.7925" lon="6.01065">
+    <time>2024-01-17T21:34:49</time>
+    <name>FNAJKZZ</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=45d43018-ed22-4d8c-a866-52f9e163f1df</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.797183" lon="6.009267">
+    <time>2024-01-17T21:36:32</time>
+    <name>FNAJM00</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8bd45577-33d8-4844-ad00-06896542d56b</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.798233" lon="5.979833">
+    <time>2024-01-17T22:48:59</time>
+    <name>FNAJM0X</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=706c0904-6dc9-450c-a162-eab2ff9ba5b7</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.798283" lon="6.0069">
+    <time>2024-01-17T21:38:10</time>
+    <name>FNAJM01</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=486389a7-aa18-4fe1-8e94-e6f7f18835ad</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.724396" lon="5.916588">
+    <time>2023-10-16T10:17:06</time>
+    <name>P0AFDB7</name>
+    <desc>Hinter der Bushaltestelle</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=96e5d06a-4b09-46d5-b5d3-a706b3ee857a</url>
+    <urlname>Hinter der Bushaltestelle</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.796533" lon="6.00585">
+    <time>2024-01-17T21:39:53</time>
+    <name>FNAJM03</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=909ac4f0-1b58-4307-bede-9f014db16132</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.797067" lon="5.985183">
+    <time>2024-01-17T21:52:22</time>
+    <name>FNAJM0H</name>
+    <desc>Final Location</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=87aaf366-14ff-4822-9261-3309e4590b27</url>
+    <urlname>Final Location</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.795183" lon="6.00315">
+    <time>2024-01-17T21:41:05</time>
+    <name>FNAJM04</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=a1f13acd-13fa-497b-8407-eb78059667c5</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.798217" lon="5.987817">
+    <time>2024-01-17T21:45:33</time>
+    <name>FNAJM08</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=23ec4027-ab99-4b8e-af9d-b535d0db3c95</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.79495" lon="5.998833">
+    <time>2024-01-17T21:42:38</time>
+    <name>FNAJM06</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c8986ab9-b6bd-4ee1-a26c-dee720f27c76</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.757783" lon="5.87435">
+    <time>2022-06-12T05:03:50</time>
+    <name>019VZQC</name>
+    <desc>1.Start vum kaalen Abenteuer (A=) </desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b9781df6-e846-40e0-9494-676cec9f53a1</url>
+    <urlname>1.Start vum kaalen Abenteuer (A=) </urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wat kenn der op desem Scheld gesin?
+                                                                           A. Perd/Hond   B.Moto/Perd  C.Moto/Velo
+Which illustrations are on this sign?
+A. horse/dog  B. motocycle/horse    C.motocycle/bike
+Was ist auf diesem Schild zu sehen?
+A.Pferd/Hund  B.Motorad/Pferd  C.Motorad/Fahrrad                                        
+                                                                        A=4  B=1  C=5</cmt>
+  </wpt>
+  <wpt lat="49.72485" lon="5.899117">
+    <time>2015-08-09T04:44:16</time>
+    <name>1P4QTNW</name>
+    <desc>FLMP Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=cd84bf63-b500-4085-9e7b-cc06e61e09e4</url>
+    <urlname>FLMP Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.724267" lon="5.899117">
+    <time>2015-08-09T04:46:15</time>
+    <name>AA4QTNW</name>
+    <desc>A</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=6178d0b4-d196-44e5-904d-46d07e72b8a6</url>
+    <urlname>A</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+A =</cmt>
+  </wpt>
+  <wpt lat="49.722383" lon="5.889033">
+    <time>2015-08-09T04:48:09</time>
+    <name>BB4QTNW</name>
+    <desc>B</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=13b94ee3-5e3b-464c-a092-eb7f3fb1a6fb</url>
+    <urlname>B</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+B =</cmt>
+  </wpt>
+  <wpt lat="49.719767" lon="5.881833">
+    <time>2015-08-09T04:48:35</time>
+    <name>CC4QTNW</name>
+    <desc>C</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=bf0df0b3-01c0-4660-84ce-116fdb37c448</url>
+    <urlname>C</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+C =</cmt>
+  </wpt>
+  <wpt lat="49.721017" lon="5.888567">
+    <time>2015-08-09T04:48:57</time>
+    <name>DD4QTNW</name>
+    <desc>D</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=21595d29-1c48-465e-b747-8b9cbc7a53ab</url>
+    <urlname>D</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+D =</cmt>
+  </wpt>
+  <wpt lat="49.72215" lon="5.896867">
+    <time>2015-08-09T04:49:22</time>
+    <name>EE4QTNW</name>
+    <desc>E</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=a6fcef8e-8899-4619-85e5-facfdd84b25b</url>
+    <urlname>E</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+E =</cmt>
+  </wpt>
+  <wpt lat="49.721217" lon="5.903667">
+    <time>2015-08-09T04:49:51</time>
+    <name>FF4QTNW</name>
+    <desc>F</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c1d90bbd-441b-47a7-a35b-1ee67ea24f05</url>
+    <urlname>F</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+F = 5</cmt>
+  </wpt>
+  <wpt lat="49.716833" lon="5.905417">
+    <time>2015-08-09T04:50:18</time>
+    <name>GG4QTNW</name>
+    <desc>G</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b2439de2-2c66-40c8-9f77-55ac3767b5df</url>
+    <urlname>G</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+G =</cmt>
+  </wpt>
+  <wpt lat="49.720783" lon="5.905533">
+    <time>2015-08-09T04:51:09</time>
+    <name>HH4QTNW</name>
+    <desc>H</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e851b053-0986-49e5-80ee-9cefe4196331</url>
+    <urlname>H</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+H =</cmt>
+  </wpt>
+  <wpt lat="49.7232" lon="5.90165">
+    <time>2015-08-09T04:51:44</time>
+    <name>II4QTNW</name>
+    <desc>I</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=b76109b5-ad10-4aea-803e-436bfc52144e</url>
+    <urlname>I</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Suche das Bild das zu diesem Punkt passt
+
+I =</cmt>
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:53:38</time>
+    <name>PA494TG</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=3cca2b6e-2318-4688-8f86-5fd4176753c3</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:49:38</time>
+    <name>PA494RW</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=d2ad6fdc-eaa2-4528-8bcc-54d0ba1a463c</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:44:41</time>
+    <name>PA494RE</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=34df0eda-3c96-49bc-b6ae-317bfde37b00</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.8014" lon="5.954967">
+    <time>2023-07-25T06:51:34</time>
+    <name>01ABTR0</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8aa9acba-8e8a-48f0-a984-d26ad24554fb</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:41:52</time>
+    <name>PA494R3</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=fef11827-f345-439f-a271-94505359b21e</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.8021" lon="5.950983">
+    <time>2023-07-25T06:49:28</time>
+    <name>01ABTQZ</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1d8929a4-384f-4cdb-b739-3e1c2c71007e</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture!   </cmt>
+  </wpt>
+  <wpt lat="49.80105" lon="5.957">
+    <time>2023-07-24T04:26:55</time>
+    <name>02ABTQA</name>
+    <desc>Virtual stage</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=257ebc20-7d55-4bca-a259-ee4772df62c1</url>
+    <urlname>Virtual stage</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.801283" lon="5.957367">
+    <time>2023-07-24T03:14:34</time>
+    <name>01ABTQA</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ea3cb2af-1aa2-41dd-9a18-3883ba437d0d</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>ABCD ; FINAL: N 49° 48.0BD E 5° 57.(2xD+C-1)DB</cmt>
+  </wpt>
+  <wpt lat="49.7998" lon="5.965517">
+    <time>2023-07-24T04:43:04</time>
+    <name>01ABTQD</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c0506e49-0671-4a4b-8bae-4ec348f9a0b7</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Bustavenunzuel vum 1. Wued = A, 2. Wued = B, 3. Wued = C, 4. Wued = D
+
+Bustabenanzahl vom 1. Wort = A, 2. = B, 3. = C, 4. = D
+
+Number of letters 1st word =A, 2nd = B, 3rd = C, 4th = D 
+
+FINAL: N 49° 48.(A:2-2)(B-5)C E 5° 57.B(D:2)A</cmt>
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:38:49</time>
+    <name>PA494QJ</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=3e602ea3-d095-4410-a4f4-57ba3ec65c55</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.72475" lon="5.89925">
+    <time>2017-11-26T02:32:11</time>
+    <name>PA7FAV6</name>
+    <desc>Parking Area</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=aeeb9442-9a45-48df-9ba8-87838420948e</url>
+    <urlname>Parking Area</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.8013" lon="5.961583">
+    <time>2023-07-24T04:31:32</time>
+    <name>01ABTQB</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=7cf6ad93-0828-4d87-8cea-57951c7f01fb</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>A B C D E  ; FINAL: N 49° 47.((2xA)-D)((2xA)-D)(A+B) E 5° 57.(A+E)EC</cmt>
+  </wpt>
+  <wpt lat="49.77145" lon="6.00455">
+    <time>2024-03-11T11:44:39</time>
+    <name>02AHM36</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c1d8bcdc-92b3-46cd-aef9-3d0513b8d03c</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.771417" lon="6.004383">
+    <time>2024-06-30T03:25:02</time>
+    <name>01AHM36</name>
+    <desc>Final</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ad0ad097-392e-4ab3-8f98-603d035708da</url>
+    <urlname>Final</urlname>
+    <sym>Final Location</sym>
+    <type>Waypoint|Final Location</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.732167" lon="5.982167">
+    <time>2013-04-05T12:31:37</time>
+    <name>PA494JW</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=d191d63e-b273-499c-abc3-09208d47ba02</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.804367" lon="5.951683">
+    <time>2023-07-25T06:48:25</time>
+    <name>01ABTQY</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=e53ffe82-28e6-4c7a-a146-77170641544b</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture!  N 49° 48.??? E 5° 57.???</cmt>
+  </wpt>
+  <wpt lat="49.801" lon="5.957217">
+    <time>2022-05-08T04:44:01</time>
+    <name>P09TEZP</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c1ff9007-8651-4b24-941d-9fa0d7ce02bb</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.77155" lon="6.004583">
+    <time>2024-03-11T11:34:43</time>
+    <name>01AHM35</name>
+    <desc>Virtual stage</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=389fae25-b355-4374-a535-046837a50e38</url>
+    <urlname>Virtual stage</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.802683" lon="5.9656">
+    <time>2023-07-24T05:44:48</time>
+    <name>01ABTQE</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=04676b78-f5a5-4b19-b928-c7eb57986e06</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture! = A</cmt>
+  </wpt>
+  <wpt lat="49.803633" lon="5.96555">
+    <time>2023-07-24T05:44:48</time>
+    <name>02ABTQE</name>
+    <desc>Stage 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=25f0c6e0-c461-4ed1-9933-58c197b08a6d</url>
+    <urlname>Stage 2</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>B C D ; FINAL: N 49° 48.(B+C)D(2xC) E 5° 57.(A+C)(B+C+D)(3xC+3)</cmt>
+  </wpt>
+  <wpt lat="49.805717" lon="5.95375">
+    <time>2023-07-25T06:46:40</time>
+    <name>01ABTQX</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=612bf5a2-c65f-4b81-8e41-d092a8ab2dfb</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture! N 49° 48.??? E 5° 57.???</cmt>
+  </wpt>
+  <wpt lat="49.807883" lon="5.953767">
+    <time>2023-07-25T06:43:22</time>
+    <name>01ABTQW</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=1de946d7-eed7-4baf-881d-86d466af5efe</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>A B C D</cmt>
+  </wpt>
+  <wpt lat="49.7159" lon="5.978117">
+    <time>2008-11-06T14:25:20</time>
+    <name>001HXN0</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=ea0f678c-7d12-4bb6-becd-b282612c96f3</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Parking for 3 cars.</cmt>
+  </wpt>
+  <wpt lat="49.711633" lon="5.9781">
+    <time>2008-11-06T14:33:07</time>
+    <name>021HXN0</name>
+    <desc>WP1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=3f700738-fbdb-429f-8e99-108c6c2b1d0e</url>
+    <urlname>WP1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>How many horizontal wooden boards can you count on this fence ? Result minus 2 = A ! - A = ?</cmt>
+  </wpt>
+  <wpt lat="49.715483" lon="5.97325">
+    <time>2008-11-06T14:30:02</time>
+    <name>011HXN0</name>
+    <desc>Turn left</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c65db682-831e-42f6-84bd-0ce327007511</url>
+    <urlname>Turn left</urlname>
+    <sym>Trailhead</sym>
+    <type>Waypoint|Trailhead</type>
+    <cmt>Turn left and follow the blue sign (number 2) to WP1.</cmt>
+  </wpt>
+  <wpt lat="49.805533" lon="5.966533">
+    <time>2023-07-24T06:07:52</time>
+    <name>01ABTQF</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=49535d1a-5498-48cb-9963-5ff16fe6e082</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture!
+
+ </cmt>
+  </wpt>
+  <wpt lat="49.799683" lon="6.029683">
+    <time>2019-01-15T03:40:26</time>
+    <name>01800MR</name>
+    <desc>Parking EASY "Camping-car friendly"</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8f30d442-d9a5-4b64-a2d6-18c8ecdcb135</url>
+    <urlname>Parking EASY "Camping-car friendly"</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt />
+  </wpt>
+  <wpt lat="49.731283" lon="5.86735">
+    <time>2018-11-12T11:53:03</time>
+    <name>P0808T9</name>
+    <desc>Parking</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=af140e0c-8a09-4f2d-a317-ff4a2b578147</url>
+    <urlname>Parking</urlname>
+    <sym>Parking Area</sym>
+    <type>Waypoint|Parking Area</type>
+    <cmt>Space for one or 2 cachemobiles</cmt>
+  </wpt>
+  <wpt lat="49.810133" lon="5.9532">
+    <time>2023-07-25T06:15:32</time>
+    <name>01ABTQV</name>
+    <desc>Stage 1</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=8040c969-8fca-4ccc-8772-484ba01148a4</url>
+    <urlname>Stage 1</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture! 
+FINAL: N 49° 48.-N-</cmt>
+  </wpt>
+  <wpt lat="49.80915" lon="5.953867">
+    <time>2023-07-25T06:15:32</time>
+    <name>02ABTQV</name>
+    <desc>Stage 2</desc>
+    <url>http://www.geocaching.com/seek/wpt.aspx?WID=c36838d0-3cdd-4a2f-b9b5-6d7c49089179</url>
+    <urlname>Stage 2</urlname>
+    <sym>Virtual Stage</sym>
+    <type>Waypoint|Virtual Stage</type>
+    <cmt>Wéi eng Foto ass déi richteg? Welches Foto passt? Match the picture! 
+FINAL: E 5° 57.-E-</cmt>
+  </wpt>
+</gpx>

@@ -3,22 +3,31 @@
     <!-- Formulaire d'ajout de géocache -->
     <div class="flex-shrink-0 gap-4 items-end p-4">
         <div class="flex justify-between w-full">
-            <form id="addGeocacheForm" class="flex gap-4 items-end">
-                <div>
-                    <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
-                    <input type="text" id="geocacheCode" name="code" required
-                           class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                           placeholder="GC12345">
-                    <input type="hidden" name="zone_id" value="{{ zone_id }}">
-                </div>
-                <button type="submit" 
-                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
-                    <span>Ajouter</span>
-                    <div class="loading-indicator hidden ml-2">
-                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+            <div class="flex gap-4">
+                <form id="addGeocacheForm" class="flex gap-4 items-end">
+                    <div>
+                        <label for="geocacheCode" class="block text-sm font-medium text-gray-300">Code GC</label>
+                        <input type="text" id="geocacheCode" name="code" required
+                               class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                               placeholder="GC12345">
+                        <input type="hidden" name="zone_id" value="{{ zone_id }}">
                     </div>
+                    <button type="submit" 
+                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                        <span>Ajouter</span>
+                        <div class="loading-indicator hidden ml-2">
+                            <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        </div>
+                    </button>
+                </form>
+                
+                <!-- Bouton d'importation GPX -->
+                <button id="importGpxButton" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2">
+                    <i class="fas fa-file-import"></i>
+                    <span>Importer GPX</span>
                 </button>
-            </form>
+            </div>
             <button id="openMapButton" 
                     class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2"
                     data-zone-id="{{ zone_id }}">
@@ -28,6 +37,44 @@
         </div>
         <div id="spinner" class="spinner"></div>
         <div id="message" class="mt-2"></div>
+    </div>
+
+    <!-- Modal d'importation GPX -->
+    <div id="importGpxModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Importer un fichier GPX</h3>
+                <button id="closeImportModal" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="importGpxForm" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <label for="gpxFile" class="block text-sm font-medium text-gray-300 mb-2">Fichier GPX (Pocket Query)</label>
+                    <input type="file" id="gpxFile" name="gpxFile" accept=".gpx" required
+                           class="block w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-500 file:text-white hover:file:bg-blue-600">
+                    <input type="hidden" name="zone_id" value="{{ zone_id }}">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" id="cancelImport" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        Annuler
+                    </button>
+                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                        <span>Importer</span>
+                        <div class="import-loading-indicator hidden ml-2">
+                            <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        </div>
+                    </button>
+                </div>
+            </form>
+            <div id="importProgress" class="mt-4 hidden">
+                <div class="text-sm text-gray-300 mb-1">Progression: <span id="importProgressText">0%</span></div>
+                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                    <div id="importProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            <div id="importMessage" class="mt-4 text-sm"></div>
+        </div>
     </div>
 
     <!-- Conteneur du tableau -->
@@ -184,6 +231,18 @@
         const messageDiv = document.getElementById('message');
         const submitButton = form.querySelector('button[type="submit"]');
         const openMapButton = document.getElementById('openMapButton');
+        
+        // Éléments pour l'importation GPX
+        const importGpxButton = document.getElementById('importGpxButton');
+        const importGpxModal = document.getElementById('importGpxModal');
+        const closeImportModal = document.getElementById('closeImportModal');
+        const cancelImport = document.getElementById('cancelImport');
+        const importGpxForm = document.getElementById('importGpxForm');
+        const importLoadingIndicator = importGpxForm.querySelector('.import-loading-indicator');
+        const importProgress = document.getElementById('importProgress');
+        const importProgressBar = document.getElementById('importProgressBar');
+        const importProgressText = document.getElementById('importProgressText');
+        const importMessage = document.getElementById('importMessage');
 
         // Fonction pour initialiser Tabulator
         function initializeTabulator() {
@@ -360,6 +419,109 @@
                 loadingIndicator.classList.add('hidden');
                 spinner.style.display = 'none';
                 submitButton.disabled = false;
+            }
+        });
+        
+        // Gestionnaires d'événements pour le modal d'importation GPX
+        importGpxButton.addEventListener('click', function() {
+            importGpxModal.classList.remove('hidden');
+            importMessage.textContent = '';
+            importMessage.className = '';
+            importProgress.classList.add('hidden');
+            importProgressBar.style.width = '0%';
+            importProgressText.textContent = '0%';
+        });
+        
+        closeImportModal.addEventListener('click', function() {
+            importGpxModal.classList.add('hidden');
+        });
+        
+        cancelImport.addEventListener('click', function() {
+            importGpxModal.classList.add('hidden');
+        });
+        
+        importGpxForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            try {
+                // Afficher l'indicateur de chargement
+                importLoadingIndicator.classList.remove('hidden');
+                importProgress.classList.remove('hidden');
+                importMessage.textContent = '';
+                importMessage.className = '';
+                
+                // Préparer les données du formulaire
+                const formData = new FormData(importGpxForm);
+                
+                // Envoyer la requête
+                const response = await fetch('/api/geocaches/import-gpx', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Gérer la réponse en streaming pour la progression
+                const reader = response.body.getReader();
+                let receivedLength = 0;
+                let chunks = [];
+                
+                while(true) {
+                    const {done, value} = await reader.read();
+                    
+                    if (done) {
+                        break;
+                    }
+                    
+                    chunks.push(value);
+                    receivedLength += value.length;
+                    
+                    // Essayer de parser les données reçues jusqu'à présent
+                    try {
+                        const chunksAll = new Uint8Array(receivedLength);
+                        let position = 0;
+                        for(let chunk of chunks) {
+                            chunksAll.set(chunk, position);
+                            position += chunk.length;
+                        }
+                        
+                        const result = new TextDecoder("utf-8").decode(chunksAll);
+                        const lines = result.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    const data = JSON.parse(line);
+                                    if (data.progress !== undefined) {
+                                        importProgressBar.style.width = `${data.progress}%`;
+                                        importProgressText.textContent = `${data.progress}%`;
+                                    }
+                                    if (data.message) {
+                                        importMessage.textContent = data.message;
+                                        importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
+                                    }
+                                } catch (e) {
+                                    console.error('Erreur de parsing JSON:', e, line);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Erreur de traitement des chunks:', e);
+                    }
+                }
+                
+                // Recharger le tableau une fois l'importation terminée
+                await reloadTable();
+                
+                // Afficher le message final
+                importMessage.textContent = 'Importation terminée avec succès !';
+                importMessage.className = 'text-green-500';
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
+                importMessage.className = 'text-red-500';
+            } finally {
+                // Cacher l'indicateur de chargement
+                importLoadingIndicator.classList.add('hidden');
             }
         });
     })();

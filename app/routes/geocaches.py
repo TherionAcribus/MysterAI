@@ -16,6 +16,9 @@ import base64
 import time
 from flask import make_response, send_from_directory
 import math
+import xml.etree.ElementTree as ET
+import re
+from flask import Response, stream_with_context
 
 logger = setup_logger()
 
@@ -1109,4 +1112,300 @@ def project_waypoint():
         
     except Exception as e:
         current_app.logger.error(f"Erreur lors de la projection du waypoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@geocaches_bp.route('/api/geocaches/import-gpx', methods=['POST'])
+def import_gpx():
+    """Importe des géocaches depuis un fichier GPX (Pocket Query)."""
+    try:
+        # Vérifier si un fichier a été envoyé
+        if 'gpxFile' not in request.files:
+            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+            
+        gpx_file = request.files['gpxFile']
+        
+        # Vérifier si le fichier est vide
+        if gpx_file.filename == '':
+            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+            
+        # Vérifier l'extension du fichier
+        if not gpx_file.filename.endswith('.gpx'):
+            return jsonify({'error': 'Le fichier doit être au format GPX'}), 400
+            
+        # Récupérer l'ID de la zone
+        zone_id = request.form.get('zone_id')
+        if not zone_id:
+            return jsonify({'error': 'ID de zone manquant'}), 400
+            
+        # Vérifier que la zone existe
+        zone = Zone.query.get(zone_id)
+        if not zone:
+            return jsonify({'error': f'Zone avec ID {zone_id} introuvable'}), 404
+            
+        # Utiliser stream_with_context pour envoyer des mises à jour de progression
+        def generate():
+            try:
+                # Parser le fichier GPX
+                tree = ET.parse(gpx_file)
+                root = tree.getroot()
+                
+                # Définir les namespaces
+                ns = {
+                    'default': 'http://www.topografix.com/GPX/1/0',
+                    'groundspeak': 'http://www.groundspeak.com/cache/1/0/1'
+                }
+                
+                # Compter le nombre total de waypoints
+                waypoints = root.findall('default:wpt', ns)
+                total_waypoints = len(waypoints)
+                
+                if total_waypoints == 0:
+                    yield json.dumps({'error': True, 'message': 'Aucune géocache trouvée dans le fichier GPX'}) + '\n'
+                    return
+                    
+                yield json.dumps({'message': f'Traitement de {total_waypoints} waypoints...'}) + '\n'
+                
+                # Compteurs pour les statistiques
+                added_count = 0
+                skipped_count = 0
+                error_count = 0
+                waypoints_added = 0
+                
+                # Dictionnaire pour stocker les waypoints additionnels par code GC
+                additional_waypoints = {}
+                
+                # Premier passage: identifier les géocaches principales et les waypoints additionnels
+                for waypoint in waypoints:
+                    try:
+                        # Extraire le code du waypoint
+                        name_elem = waypoint.find('default:name', ns)
+                        if name_elem is None or not name_elem.text:
+                            continue
+                            
+                        waypoint_code = name_elem.text.strip()
+                        
+                        # Vérifier si c'est un waypoint additionnel
+                        # Format typique: GC12345-1, GC12345-PARKING, etc.
+                        if re.match(r'GC[A-Z0-9]+-\w+', waypoint_code):
+                            # Extraire le code GC principal
+                            gc_code = waypoint_code.split('-')[0]
+                            
+                            # Stocker le waypoint additionnel
+                            if gc_code not in additional_waypoints:
+                                additional_waypoints[gc_code] = []
+                                
+                            additional_waypoints[gc_code].append(waypoint)
+                    except Exception as e:
+                        current_app.logger.error(f"Erreur lors de l'analyse des waypoints: {str(e)}")
+                
+                # Deuxième passage: traiter les géocaches principales
+                for index, waypoint in enumerate(waypoints):
+                    try:
+                        # Calculer et envoyer la progression
+                        progress = int((index / total_waypoints) * 100)
+                        yield json.dumps({'progress': progress}) + '\n'
+                        
+                        # Extraire les données de base du waypoint
+                        lat = float(waypoint.attrib.get('lat', 0))
+                        lon = float(waypoint.attrib.get('lon', 0))
+                        
+                        # Extraire le code GC
+                        name_elem = waypoint.find('default:name', ns)
+                        if name_elem is None or not name_elem.text:
+                            continue
+                            
+                        gc_code = name_elem.text.strip()
+                        
+                        # Ignorer les waypoints additionnels dans ce passage
+                        if not gc_code.startswith('GC') or re.match(r'GC[A-Z0-9]+-\w+', gc_code):
+                            continue
+                            
+                        # Vérifier si la géocache existe déjà
+                        existing = Geocache.query.filter_by(gc_code=gc_code).first()
+                        if existing:
+                            skipped_count += 1
+                            yield json.dumps({'message': f'Géocache {gc_code} déjà existante, ignorée'}) + '\n'
+                            continue
+                            
+                        # Extraire les données de la cache
+                        cache_data = waypoint.find('groundspeak:cache', ns)
+                        if cache_data is None:
+                            continue
+                            
+                        # Nom de la cache
+                        cache_name = cache_data.find('groundspeak:name', ns)
+                        name = cache_name.text if cache_name is not None else ""
+                        
+                        # Propriétaire
+                        owner = cache_data.find('groundspeak:owner', ns)
+                        owner_name = owner.text if owner is not None else ""
+                        
+                        # Type de cache
+                        cache_type = cache_data.find('groundspeak:type', ns)
+                        type_name = cache_type.text if cache_type is not None else ""
+                        
+                        # Difficulté et terrain
+                        difficulty = cache_data.find('groundspeak:difficulty', ns)
+                        difficulty_value = float(difficulty.text) if difficulty is not None else 1.0
+                        
+                        terrain = cache_data.find('groundspeak:terrain', ns)
+                        terrain_value = float(terrain.text) if terrain is not None else 1.0
+                        
+                        # Taille
+                        container = cache_data.find('groundspeak:container', ns)
+                        size = container.text if container is not None else ""
+                        
+                        # Indices
+                        hints_elem = cache_data.find('groundspeak:encoded_hints', ns)
+                        hints = hints_elem.text if hints_elem is not None else ""
+                        
+                        # Description
+                        long_desc = cache_data.find('groundspeak:long_description', ns)
+                        description = long_desc.text if long_desc is not None and long_desc.text else ""
+                        
+                        # Attributs HTML de la description
+                        is_html = False
+                        if long_desc is not None and 'html' in long_desc.attrib:
+                            is_html = long_desc.attrib['html'].lower() == 'true'
+                        
+                        # Si la description n'est pas en HTML, la convertir en HTML basique
+                        if not is_html and description:
+                            description = f"<p>{description.replace('\n', '<br>')}</p>"
+                        
+                        # Date de création
+                        time_elem = waypoint.find('default:time', ns)
+                        hidden_date = None
+                        if time_elem is not None and time_elem.text:
+                            try:
+                                # Format ISO: 2024-04-19T00:00:00
+                                hidden_date = datetime.fromisoformat(time_elem.text.replace('Z', '+00:00'))
+                            except ValueError:
+                                pass
+                        
+                        # Logs et favoris
+                        logs_count = 0
+                        favorites_count = 0
+                        
+                        logs_elem = cache_data.find('groundspeak:logs', ns)
+                        if logs_elem is not None:
+                            logs = logs_elem.findall('groundspeak:log', ns)
+                            logs_count = len(logs)
+                            
+                            # Compter les favoris (logs de type "Favorite")
+                            for log in logs:
+                                log_type = log.find('groundspeak:type', ns)
+                                if log_type is not None and log_type.text == 'Found it':
+                                    # Vérifier si le log contient un favori
+                                    if 'favorite_points' in log.attrib and int(log.attrib['favorite_points']) > 0:
+                                        favorites_count += 1
+                        
+                        # Convertir les coordonnées en format GC
+                        lat_deg = int(lat)
+                        lat_min = abs(lat - lat_deg) * 60
+                        lon_deg = int(lon)
+                        lon_min = abs(lon - lon_deg) * 60
+                        
+                        gc_lat = f"N {abs(lat_deg)}° {lat_min:.3f}" if lat >= 0 else f"S {abs(lat_deg)}° {lat_min:.3f}"
+                        gc_lon = f"E {abs(lon_deg)}° {lon_min:.3f}" if lon >= 0 else f"W {abs(lon_deg)}° {lon_min:.3f}"
+                        
+                        # Créer la nouvelle géocache
+                        geocache = Geocache(
+                            gc_code=gc_code,
+                            name=name,
+                            owner=owner_name,
+                            cache_type=type_name,
+                            description=description,
+                            difficulty=difficulty_value,
+                            terrain=terrain_value,
+                            size=size,
+                            hints=hints,
+                            favorites_count=favorites_count,
+                            logs_count=logs_count,
+                            hidden_date=hidden_date,
+                            zone_id=zone_id
+                        )
+                        
+                        # Définir la position
+                        geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                        
+                        # Ajouter la géocache à la base de données
+                        db.session.add(geocache)
+                        db.session.commit()
+                        
+                        # Traiter les waypoints additionnels pour cette géocache
+                        if gc_code in additional_waypoints:
+                            for wp in additional_waypoints[gc_code]:
+                                try:
+                                    wp_lat = float(wp.attrib.get('lat', 0))
+                                    wp_lon = float(wp.attrib.get('lon', 0))
+                                    
+                                    # Extraire le code et le nom du waypoint
+                                    wp_code = wp.find('default:name', ns).text
+                                    wp_desc = wp.find('default:desc', ns)
+                                    wp_name = wp_desc.text if wp_desc is not None else wp_code
+                                    
+                                    # Extraire le préfixe (partie après le tiret)
+                                    prefix = wp_code.split('-')[1] if '-' in wp_code else ""
+                                    
+                                    # Extraire la note (commentaire)
+                                    wp_cmt = wp.find('default:cmt', ns)
+                                    note = wp_cmt.text if wp_cmt is not None else ""
+                                    
+                                    # Convertir les coordonnées en format GC
+                                    wp_lat_deg = int(wp_lat)
+                                    wp_lat_min = abs(wp_lat - wp_lat_deg) * 60
+                                    wp_lon_deg = int(wp_lon)
+                                    wp_lon_min = abs(wp_lon - wp_lon_deg) * 60
+                                    
+                                    wp_gc_lat = f"N {abs(wp_lat_deg)}° {wp_lat_min:.3f}" if wp_lat >= 0 else f"S {abs(wp_lat_deg)}° {wp_lat_min:.3f}"
+                                    wp_gc_lon = f"E {abs(wp_lon_deg)}° {wp_lon_min:.3f}" if wp_lon >= 0 else f"W {abs(wp_lon_deg)}° {wp_lon_min:.3f}"
+                                    
+                                    # Créer le waypoint additionnel
+                                    waypoint = AdditionalWaypoint(
+                                        geocache_id=geocache.id,
+                                        name=wp_name,
+                                        prefix=prefix,
+                                        lookup=wp_code,
+                                        note=note
+                                    )
+                                    
+                                    # Définir la position
+                                    waypoint.set_location(wp_lat, wp_lon, gc_lat=wp_gc_lat, gc_lon=wp_gc_lon)
+                                    
+                                    # Ajouter le waypoint à la base de données
+                                    db.session.add(waypoint)
+                                    waypoints_added += 1
+                                    
+                                except Exception as e:
+                                    current_app.logger.error(f"Erreur lors du traitement du waypoint additionnel: {str(e)}")
+                            
+                            # Commit après avoir ajouté tous les waypoints
+                            db.session.commit()
+                        
+                        added_count += 1
+                        yield json.dumps({'message': f'Géocache {gc_code} ajoutée avec succès'}) + '\n'
+                        
+                    except Exception as e:
+                        current_app.logger.error(f"Erreur lors du traitement de la géocache {index}: {str(e)}")
+                        error_count += 1
+                        # Annuler la transaction en cours
+                        db.session.rollback()
+                
+                # Envoyer un résumé final
+                yield json.dumps({
+                    'progress': 100,
+                    'message': f'Importation terminée: {added_count} géocaches ajoutées, {waypoints_added} waypoints additionnels, {skipped_count} ignorées, {error_count} erreurs'
+                }) + '\n'
+                
+            except Exception as e:
+                current_app.logger.error(f"Erreur lors de l'importation du fichier GPX: {str(e)}")
+                yield json.dumps({'error': True, 'message': f'Erreur: {str(e)}'}) + '\n'
+        
+        # Retourner la réponse en streaming
+        return Response(stream_with_context(generate()), 
+                       content_type='application/json')
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de l'importation du fichier GPX: {str(e)}")
         return jsonify({'error': str(e)}), 500
