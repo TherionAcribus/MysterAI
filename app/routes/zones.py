@@ -52,9 +52,10 @@ def add_zone():
         db.session.add(new_zone)
         db.session.commit()
         
-        # Si la requête est HTMX, renvoyer un message de succès
+        # Si la requête est HTMX, renvoyer directement la liste des zones
         if request.headers.get('HX-Request'):
-            return render_template('zone_form_success.html', zone=new_zone, is_new=True)
+            zones = Zone.query.all()
+            return render_template('zones_list.html', zones=zones)
             
         return redirect(url_for('zones.zones_page'))
     except Exception as e:
@@ -153,9 +154,10 @@ def update_zone(zone_id):
         zone.description = request.form.get('description', '')
         db.session.commit()
         
-        # Si la requête est HTMX, renvoyer un message de succès
+        # Si la requête est HTMX, renvoyer directement la liste des zones
         if request.headers.get('HX-Request'):
-            return render_template('zone_form_success.html', zone=zone, is_new=False)
+            zones = Zone.query.all()
+            return render_template('zones_list.html', zones=zones)
             
         return redirect(url_for('zones.zones_page'))
     except Exception as e:
