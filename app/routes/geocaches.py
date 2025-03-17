@@ -646,7 +646,7 @@ def get_geocache_details_panel(geocache_id):
         db.joinedload(Geocache.additional_waypoints),
         db.joinedload(Geocache.attributes),
         db.joinedload(Geocache.checkers),
-        db.joinedload(Geocache.zone),
+        db.joinedload(Geocache.zones),
         db.joinedload(Geocache.images)
     ).get_or_404(geocache_id)
     return render_template('geocache_details.html', geocache=geocache)
