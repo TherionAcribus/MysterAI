@@ -348,4 +348,60 @@
     margin-bottom: 4px;
     text-align: right;
     font-style: italic;
+}
+
+/* Badges pour les messages */
+.message-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.model-badge {
+    background-color: #4b5563;
+    color: #e2e8f0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.langgraph-badge {
+    background-color: #7c3aed;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tool-badge {
+    background-color: #059669;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Styles pour les blocs de code */
+.code-block {
+    background-color: #1a1a1a;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    overflow-x: auto;
+    font-family: monospace;
+    white-space: pre;
+    color: #e2e8f0;
+    border: 1px solid #4b5563;
+}
+
+code {
+    background-color: rgba(75, 85, 99, 0.3);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
 } 

@@ -9,7 +9,6 @@ from loguru import logger
 
 # Importer votre modèle SQLAlchemy et votre session DB
 from app.models.plugin_model import Plugin
-from app.routes.coordinates import detect_gps_coordinates
 from app import db  # Utiliser l'instance de db de l'application
 
 
@@ -398,6 +397,7 @@ class PluginManager:
         
         if enable_gps and decoded_text:
             print(f"[DEBUG] execute_plugin: Lancement de la détection GPS sur le texte décodé")
+            # Importer ici pour éviter l'importation circulaire
             from app.routes.coordinates import detect_gps_coordinates
             gps_coordinates = detect_gps_coordinates(decoded_text)
             print(f"[DEBUG] execute_plugin: Résultat de la détection GPS: {gps_coordinates}")

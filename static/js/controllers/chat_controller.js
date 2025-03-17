@@ -253,83 +253,132 @@
             typingElement.innerHTML = `
                 <div class="message-content">
                     <div class="typing-indicator">
-                        <span></span><span></span><span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
                     </div>
                 </div>
             `;
             messagesContainer.appendChild(typingElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
-            // Récupérer le modèle d'IA actif (s'il est affiché dans la status bar)
-            let activeModel = null;
-            const modelSelector = document.getElementById('ai-model-selector');
-            if (modelSelector) {
-                activeModel = modelSelector.value;
-            }
+            // Récupérer le modèle actif
+            const activeModel = document.getElementById('ai-model-selector')?.value || null;
             
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     messages: this.conversations[chatId],
-                    model_id: activeModel // Envoyer l'ID du modèle actif
+                    model_id: activeModel,
+                    use_tools: true  // Activer l'utilisation des outils
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erreur HTTP: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 // Supprimer l'indicateur de frappe
-                typingElement.remove();
-                
-                // Ajouter la réponse de l'IA
-                const aiMessageElement = document.createElement('div');
-                aiMessageElement.className = 'chat-message system';
-                
-                // Ajouter l'info du modèle utilisé si disponible
-                let modelInfo = '';
-                if (data.model_used) {
-                    modelInfo = `<div class="message-model-info">Modèle: ${data.model_used}</div>`;
+                const typingIndicator = messagesContainer.querySelector('.typing');
+                if (typingIndicator) {
+                    typingIndicator.remove();
                 }
                 
-                aiMessageElement.innerHTML = `
-                    ${modelInfo}
-                    <div class="message-content">${this.escapeHtml(data.response)}</div>
-                `;
-                messagesContainer.appendChild(aiMessageElement);
-                
-                // Ajouter la réponse à la conversation
-                this.conversations[chatId].push({
-                    role: "assistant",
-                    content: data.response,
-                    model: data.model_used // Stocker le modèle utilisé
-                });
+                if (data.success) {
+                    // Ajouter la réponse à l'interface
+                    const responseElement = document.createElement('div');
+                    responseElement.className = 'chat-message system';
+                    
+                    // Formater la réponse avec Markdown si nécessaire
+                    let formattedResponse = this.escapeHtml(data.response);
+                    
+                    // Remplacer les blocs de code
+                    formattedResponse = formattedResponse.replace(/```(\w*)([\s\S]*?)```/g, (match, language, code) => {
+                        return `<pre class="code-block ${language}"><code>${this.escapeHtml(code.trim())}</code></pre>`;
+                    });
+                    
+                    // Remplacer les lignes de code inline
+                    formattedResponse = formattedResponse.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    
+                    // Remplacer les sauts de ligne
+                    formattedResponse = formattedResponse.replace(/\n/g, '<br>');
+                    
+                    // Ajouter le badge du modèle si disponible
+                    let modelBadge = '';
+                    if (data.model_used) {
+                        modelBadge = `<div class="model-badge">${data.model_used}</div>`;
+                    }
+                    
+                    // Ajouter le badge LangGraph si utilisé
+                    let langGraphBadge = '';
+                    if (data.used_langgraph) {
+                        langGraphBadge = `<div class="langgraph-badge">LangGraph</div>`;
+                    }
+                    
+                    responseElement.innerHTML = `
+                        <div class="message-content">
+                            ${formattedResponse}
+                        </div>
+                        <div class="message-badges">
+                            ${modelBadge}
+                            ${langGraphBadge}
+                        </div>
+                    `;
+                    
+                    messagesContainer.appendChild(responseElement);
+                    
+                    // Ajouter la réponse à la conversation
+                    this.conversations[chatId].push({
+                        role: "assistant",
+                        content: data.response
+                    });
+                    
+                    // Vérifier s'il y a des appels d'outils dans la réponse
+                    if (data.response.includes("Je vais utiliser un outil") || 
+                        data.response.includes("J'utilise l'outil") ||
+                        data.response.includes("Résultat de ")) {
+                        
+                        // Ajouter un badge d'outil
+                        const toolBadge = document.createElement('div');
+                        toolBadge.className = 'tool-badge';
+                        toolBadge.textContent = 'Outil utilisé';
+                        responseElement.querySelector('.message-badges').appendChild(toolBadge);
+                    }
+                } else {
+                    // Afficher l'erreur
+                    const errorElement = document.createElement('div');
+                    errorElement.className = 'chat-message error';
+                    errorElement.innerHTML = `
+                        <div class="message-content">
+                            Erreur: ${data.error || 'Une erreur est survenue lors de la communication avec l\'IA.'}
+                        </div>
+                    `;
+                    messagesContainer.appendChild(errorElement);
+                }
                 
                 // Faire défiler vers le bas
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             })
             .catch(error => {
                 // Supprimer l'indicateur de frappe
-                typingElement.remove();
+                const typingIndicator = messagesContainer.querySelector('.typing');
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                }
                 
                 // Afficher l'erreur
-                const errorMessageElement = document.createElement('div');
-                errorMessageElement.className = 'chat-message system error';
-                errorMessageElement.innerHTML = `
-                    <div class="message-content">Erreur: ${this.escapeHtml(error.message)}</div>
+                const errorElement = document.createElement('div');
+                errorElement.className = 'chat-message error';
+                errorElement.innerHTML = `
+                    <div class="message-content">
+                        Erreur de connexion: ${error.message}
+                    </div>
                 `;
-                messagesContainer.appendChild(errorMessageElement);
+                messagesContainer.appendChild(errorElement);
                 
                 // Faire défiler vers le bas
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                
-                console.error('Erreur lors de l\'appel à l\'API:', error);
             });
         }
         

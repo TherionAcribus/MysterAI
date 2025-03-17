@@ -19,6 +19,7 @@ class AIService:
         self.api_key = ''
         self.model_name = 'gpt-3.5-turbo'
         self.ollama_url = 'http://localhost:11434'
+        self.use_langgraph = True  # Par défaut, utiliser LangGraph
         
         # Les paramètres seront chargés lors de la première utilisation
         self._initialized = False
@@ -31,6 +32,7 @@ class AIService:
                 self.mode = AppConfig.get_value('ai_mode', 'online')
                 self.temperature = float(AppConfig.get_value('temperature', 0.7))
                 self.max_context = int(AppConfig.get_value('max_context', 10))
+                self.use_langgraph = AppConfig.get_value('use_langgraph', 'true').lower() == 'true'
                 
                 # Charger les modèles locaux activés
                 local_models_enabled_json = AppConfig.get_value('local_models_enabled', '{}')
@@ -59,7 +61,7 @@ class AIService:
                 self._initialized = True
                 
                 # Log pour confirmer l'initialisation
-                print(f"=== DEBUG: Service AI initialisé - Mode: {self.mode}, Modèle: {self.model_name} ===")
+                print(f"=== DEBUG: Service AI initialisé - Mode: {self.mode}, Modèle: {self.model_name}, LangGraph: {self.use_langgraph} ===")
             except Exception as e:
                 # Si nous sommes toujours en dehors du contexte de l'application,
                 # nous utiliserons les valeurs par défaut
@@ -92,50 +94,39 @@ class AIService:
                 base_url=self.ollama_url
             )
     
-    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
+    def chat(self, messages, settings=None):
         """
-        Envoie une conversation au modèle d'IA et retourne la réponse
+        Envoie une conversation au modèle d'IA et retourne la réponse.
+        Cette méthode sert de point d'entrée unique et délègue aux implémentations
+        spécifiques (LangGraph ou LangChain) selon la configuration.
         
         Args:
             messages: Liste de messages au format {"role": "user"|"assistant", "content": "..."}
-            system_prompt: Message système optionnel
+            settings: Paramètres optionnels pour l'appel
             
         Returns:
-            La réponse du modèle d'IA
+            str: Réponse de l'IA
         """
-        try:
-            self._ensure_initialized()
+        if settings is None:
+            settings = self.get_settings()
+        
+        # Déterminer si on utilise LangGraph ou LangChain
+        use_langgraph = settings.get('use_langgraph', self.use_langgraph)
+        
+        if use_langgraph:
+            # Utiliser LangGraph (avec support des outils/plugins)
+            # Importer ici pour éviter l'importation circulaire
+            from app.services.langgraph_service import langgraph_service
+            system_prompt = settings.get('system_prompt', '')
+            return langgraph_service.chat(messages, system_prompt)
+        else:
+            # Utiliser LangChain (implémentation simple sans outils)
+            mode = settings.get('mode', 'online')
             
-            # Limiter le nombre de messages au contexte maximum
-            if len(messages) > self.max_context:
-                messages = messages[-self.max_context:]
-            
-            # Convertir les messages au format LangChain
-            langchain_messages = []
-            
-            # Ajouter le message système s'il est fourni
-            if system_prompt:
-                langchain_messages.append(SystemMessage(content=system_prompt))
-            
-            # Ajouter les messages de la conversation
-            for msg in messages:
-                if msg["role"] == "user":
-                    langchain_messages.append(HumanMessage(content=msg["content"]))
-                elif msg["role"] == "assistant":
-                    langchain_messages.append(AIMessage(content=msg["content"]))
-            
-            # Obtenir le modèle de chat
-            chat_model = self.get_chat_model()
-            
-            # Envoyer la requête au modèle
-            response = chat_model.invoke(langchain_messages)
-            
-            # Retourner le contenu de la réponse
-            return response.content
-            
-        except Exception as e:
-            print(f"Erreur lors de l'appel au modèle d'IA: {str(e)}")
-            return f"Erreur: {str(e)}"
+            if mode == 'online':
+                return self.chat_online(messages, settings)
+            else:
+                return self.chat_local(messages, settings)
     
     def test_ollama_connection(self, url: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -204,8 +195,27 @@ class AIService:
             AppConfig.set_value('temperature', settings.get('temperature', 0.7))
             AppConfig.set_value('max_context', settings.get('max_context', 10))
             
+            # Enregistrer le paramètre use_langgraph
+            if 'use_langgraph' in settings:
+                use_langgraph = settings.get('use_langgraph', True)
+                AppConfig.set_value('use_langgraph', str(use_langgraph).lower())
+                self.use_langgraph = use_langgraph
+                print(f"=== DEBUG: Paramètre use_langgraph sauvegardé: {use_langgraph} ===")
+            
             # Log pour le débogage
             print(f"=== DEBUG: Sauvegarde des paramètres - Mode: {mode} ===")
+            
+            # Enregistrer les modèles locaux activés (quel que soit le mode)
+            if settings.get('local_models_enabled'):
+                # Convertir en JSON pour le stockage
+                local_models_enabled_json = json.dumps(settings.get('local_models_enabled'))
+                AppConfig.set_value('local_models_enabled', local_models_enabled_json)
+                
+                # Log pour le débogage
+                print(f"=== DEBUG: Modèles locaux activés sauvegardés: {settings.get('local_models_enabled')} ===")
+                
+                # Mettre à jour les modèles locaux activés dans l'instance
+                self.local_models_enabled = settings.get('local_models_enabled')
             
             # Enregistrer les paramètres spécifiques au mode
             if mode == 'online':
@@ -235,15 +245,6 @@ class AIService:
                 AppConfig.set_value('ollama_url', ollama_url)
                 AppConfig.set_value('local_model', local_model)
                 
-                # Enregistrer les modèles locaux activés
-                if settings.get('local_models_enabled'):
-                    # Convertir en JSON pour le stockage
-                    local_models_enabled_json = json.dumps(settings.get('local_models_enabled'))
-                    AppConfig.set_value('local_models_enabled', local_models_enabled_json)
-                    
-                    # Log pour le débogage
-                    print(f"=== DEBUG: Modèles locaux activés sauvegardés: {settings.get('local_models_enabled')} ===")
-                
                 # Log pour le débogage
                 print(f"=== DEBUG: Paramètres locaux sauvegardés - URL: {ollama_url}, Model: {local_model} ===")
             
@@ -260,10 +261,6 @@ class AIService:
             else:
                 self.ollama_url = settings.get('ollama_url', 'http://localhost:11434')
                 self.model_name = settings.get('local_model', 'deepseek-coder:latest')
-            
-            # Mettre à jour les modèles locaux activés dans l'instance
-            if settings.get('local_models_enabled'):
-                self.local_models_enabled = settings.get('local_models_enabled')
             
             self._initialized = True
             
@@ -320,7 +317,8 @@ class AIService:
             'temperature': self.temperature,
             'max_context': self.max_context,
             'online_models': default_online_models,
-            'local_models': default_local_models
+            'local_models': default_local_models,
+            'use_langgraph': self.use_langgraph
         }
         
         # Paramètres spécifiques au mode
@@ -339,27 +337,6 @@ class AIService:
             })
         
         return settings
-
-    def chat(self, messages, settings=None):
-        """
-        Envoie un message à l'IA et retourne la réponse
-        
-        Args:
-            messages (list): Liste des messages précédents
-            settings (dict, optional): Paramètres spécifiques pour cette requête
-        
-        Returns:
-            str: Réponse de l'IA
-        """
-        if settings is None:
-            settings = self.get_settings()
-        
-        mode = settings.get('mode', 'online')
-        
-        if mode == 'online':
-            return self.chat_online(messages, settings)
-        else:
-            return self.chat_local(messages, settings)
 
     def chat_online(self, messages, settings):
         """

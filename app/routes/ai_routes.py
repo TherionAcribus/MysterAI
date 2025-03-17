@@ -38,11 +38,19 @@ def test_ollama_connection():
 def chat():
     """
     Endpoint pour le chat avec l'IA
+    
+    Cette route gère les requêtes de chat et peut utiliser deux implémentations différentes :
+    1. LangGraph - Implémentation avancée avec support des outils/plugins
+    2. LangChain - Implémentation simple sans outils
+    
+    Le choix entre les deux est déterminé par les paramètres 'use_langgraph' et 'use_tools'.
     """
     try:
         data = request.json
         messages = data.get('messages', [])
         model_id = data.get('model_id')  # Récupérer l'ID du modèle spécifié
+        system_prompt = data.get('system_prompt')  # Récupérer le prompt système personnalisé
+        use_tools = data.get('use_tools', True)  # Activer/désactiver l'utilisation des outils
         
         if not messages:
             return jsonify({
@@ -69,8 +77,21 @@ def chat():
                 settings['local_model'] = model_id
                 model_used = settings['local_models'][model_id].get('name', model_id)
         
+        # Vérifier si on doit utiliser LangGraph
+        use_langgraph = settings.get('use_langgraph', True)
+        
         # Obtenir la réponse de l'IA
-        response = ai_service.chat(messages, settings)
+        if use_langgraph and use_tools:
+            # Utiliser LangGraph avec les outils de plugin
+            # Cette implémentation permet d'utiliser les plugins comme outils
+            # pour résoudre des énigmes de géocaching
+            # Importer ici pour éviter l'importation circulaire
+            from app.services.langgraph_service import langgraph_service
+            response = langgraph_service.chat(messages, system_prompt)
+        else:
+            # Utiliser le service AI standard (LangChain)
+            # Cette implémentation est plus simple et n'utilise pas les outils
+            response = ai_service.chat(messages, settings)
         
         # Restaurer les paramètres originaux si nécessaire
         if model_id and original_mode:
@@ -84,7 +105,8 @@ def chat():
         return jsonify({
             'success': True,
             'response': response,
-            'model_used': model_used  # Renvoyer le nom du modèle utilisé
+            'model_used': model_used,  # Renvoyer le nom du modèle utilisé
+            'used_langgraph': use_langgraph and use_tools  # Indiquer si LangGraph a été utilisé
         })
     except Exception as e:
         logger.error(f"Erreur lors de l'appel au chat IA: {str(e)}")
@@ -137,6 +159,26 @@ def settings_panel():
                         <span class="ml-2">Local (Ollama)</span>
                     </label>
                 </div>
+            </div>
+            
+            <!-- Sélection du framework (LangChain/LangGraph) -->
+            <div class="mb-6">
+                <h3 class="text-md font-medium mb-2">Framework IA</h3>
+                <div class="flex items-center space-x-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="use_langgraph" value="true" class="form-radio" 
+                               data-ai-settings-target="frameworkRadio"
+                               {"checked" if settings.get('use_langgraph', True) else ""}>
+                        <span class="ml-2">LangGraph (Avancé)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="use_langgraph" value="false" class="form-radio" 
+                               data-ai-settings-target="frameworkRadio"
+                               {"checked" if not settings.get('use_langgraph', True) else ""}>
+                        <span class="ml-2">LangChain (Simple)</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">LangGraph offre des fonctionnalités avancées comme les agents et les outils.</p>
             </div>
             
             <!-- Paramètres pour le mode en ligne -->

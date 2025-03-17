@@ -7,7 +7,8 @@
             "modeRadio", "provider", "apiKey", "onlineModel", 
             "ollamaUrl", "localModel", "connectionStatus", 
             "temperature", "temperatureValue", "maxContext",
-            "onlineSettings", "localSettings", "localModelEnabled"
+            "onlineSettings", "localSettings", "localModelEnabled",
+            "frameworkRadio"
         ];
         
         connect() {
@@ -108,12 +109,14 @@
             const mode = this.modeRadioTargets.find(radio => radio.checked).value;
             const temperature = parseFloat(this.temperatureTarget.value);
             const maxContext = parseInt(this.maxContextTarget.value);
+            const useLangGraph = this.frameworkRadioTargets.find(radio => radio.checked).value === 'true';
             
             // Créer l'objet de paramètres
             const settings = {
                 ai_mode: mode,
                 temperature: temperature,
-                max_context: maxContext
+                max_context: maxContext,
+                use_langgraph: useLangGraph
             };
             
             // Ajouter les paramètres spécifiques au mode
@@ -162,6 +165,7 @@
         resetDefaults() {
             // Réinitialiser les valeurs par défaut
             this.modeRadioTargets.find(radio => radio.value === 'online').checked = true;
+            this.frameworkRadioTargets.find(radio => radio.value === 'true').checked = true;
             this.providerTarget.value = 'openai';
             this.onlineModelTarget.value = 'gpt-3.5-turbo';
             this.ollamaUrlTarget.value = 'http://localhost:11434';
