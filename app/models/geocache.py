@@ -60,7 +60,13 @@ class Zone(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    geocaches = db.relationship('Geocache', back_populates='zone')
+    geocaches = db.relationship('Geocache', secondary='geocache_zone', back_populates='zones')
+
+class GeocacheZone(db.Model):
+    __table_args__ = {'extend_existing': True}
+    geocache_id = db.Column(db.Integer, db.ForeignKey('geocache.id'), primary_key=True)
+    zone_id = db.Column(db.Integer, db.ForeignKey('zone.id'), primary_key=True)
+    added_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 class AdditionalWaypoint(db.Model):
     __table_args__ = {'extend_existing': True}
@@ -119,6 +125,7 @@ class Attribute(db.Model):
 
 class GeocacheAttribute(db.Model):
     __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
     geocache_id = db.Column(db.Integer, db.ForeignKey('geocache.id'), primary_key=True)
     attribute_id = db.Column(db.Integer, db.ForeignKey('attribute.id'), primary_key=True)
     is_on = db.Column(db.Boolean, default=True)
@@ -188,7 +195,7 @@ class GeocacheImage(db.Model):
 class Geocache(db.Model):
     __table_args__ = {'extend_existing': True}
     id = db.Column(db.Integer, primary_key=True)
-    gc_code = db.Column(db.String(10), unique=True, nullable=False)
+    gc_code = db.Column(db.String(10), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     owner = db.Column(db.String(100))
     cache_type = db.Column(db.String(50))
@@ -209,7 +216,6 @@ class Geocache(db.Model):
     logs_count = db.Column(db.Integer, default=0)
     hidden_date = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    zone_id = db.Column(db.Integer, db.ForeignKey('zone.id'), nullable=False)
     solved = db.Column(db.String(20), default='not_solved')  # "not_solved", "solved", "ongoing"
     solved_date = db.Column(db.DateTime)
     found = db.Column(db.Boolean, default=False)
@@ -218,7 +224,7 @@ class Geocache(db.Model):
     gc_personnal_note = db.Column(db.Text)
 
 
-    zone = db.relationship('Zone', back_populates='geocaches')
+    zones = db.relationship('Zone', secondary='geocache_zone', back_populates='geocaches')
     additional_waypoints = db.relationship('AdditionalWaypoint', back_populates='geocache', cascade='all, delete-orphan')
     attributes = db.relationship('Attribute', secondary='geocache_attribute', back_populates='geocaches')
     checkers = db.relationship('Checker', back_populates='geocache', cascade='all, delete-orphan')
@@ -327,6 +333,16 @@ class Geocache(db.Model):
         text = '\n'.join(line.strip() for line in text.splitlines() if line.strip())
         
         return text
+
+    @property
+    def zone(self):
+        """Retourne la première zone associée à la géocache (pour compatibilité)"""
+        return self.zones[0] if self.zones else None
+        
+    @property
+    def zone_id(self):
+        """Retourne l'ID de la première zone associée à la géocache (pour compatibilité)"""
+        return self.zones[0].id if self.zones else None
 
     @staticmethod
     def get_image_by_id(image_id):
