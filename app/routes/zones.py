@@ -71,15 +71,17 @@ def delete_zone(zone_id):
         
         # Vérifier si la zone contient des géocaches
         if zone.geocaches and len(zone.geocaches) > 0:
-            # Si la zone a des géocaches, on supprime juste l'association
-            # mais on ne supprime pas les géocaches elles-mêmes
-            for geocache in zone.geocaches:
-                # Si la géocache n'est associée qu'à cette zone, on la garde quand même
-                # car elle pourrait être réutilisée plus tard
-                pass
-            
-            # Vider la liste des géocaches associées à cette zone
-            zone.geocaches = []
+            # Pour chaque géocache associée à cette zone
+            for geocache in list(zone.geocaches):  # Utiliser une copie de la liste pour éviter les problèmes de modification pendant l'itération
+                # Vérifier si la géocache appartient uniquement à cette zone
+                if len(geocache.zones) == 1 and geocache.zones[0] == zone:
+                    # Si la géocache n'appartient qu'à cette zone, la supprimer
+                    current_app.logger.info(f"Suppression de la géocache {geocache.id} qui n'appartient qu'à la zone {zone_id}")
+                    db.session.delete(geocache)
+                else:
+                    # Si la géocache appartient à d'autres zones, supprimer seulement la référence à cette zone
+                    current_app.logger.info(f"Suppression de la référence à la zone {zone_id} pour la géocache {geocache.id}")
+                    geocache.zones.remove(zone)
             
             # Enregistrer les modifications
             db.session.commit()

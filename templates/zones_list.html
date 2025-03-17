@@ -35,9 +35,8 @@
                         <p class="text-gray-300 mb-4">{{ zone.description }}</p>
                     {% endif %}
                     
-                    <button hx-get="/geocaches?zone_id={{ zone.id }}"
-                            hx-target="#geocaches-panel-content"
-                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                    <button onclick="openGeocachesTab('{{ zone.id }}', '{{ zone.name | escape }}')"
+                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors inline-flex items-center">
                         <i class="fas fa-table mr-2"></i>
                         Voir les géocaches
                     </button>
@@ -224,4 +223,49 @@
             }, 100);
         }
     });
+    
+    // Fonction pour ouvrir un nouvel onglet avec le tableau des géocaches d'une zone
+    function openGeocachesTab(zoneId, zoneName) {
+        console.log("Ouverture d'un nouvel onglet pour la zone", zoneId, zoneName);
+        
+        // Vérifier si nous sommes dans un iframe (dans GoldenLayout)
+        if (window.parent && window.parent.mainLayout) {
+            // Utiliser GoldenLayout pour ouvrir un nouvel onglet
+            try {
+                window.parent.mainLayout.root.contentItems[0].addChild({
+                    type: 'component',
+                    componentName: 'geocaches-table',
+                    title: 'Géocaches: ' + zoneName,
+                    componentState: {
+                        zoneId: zoneId,
+                        zoneName: zoneName
+                    }
+                });
+            } catch (error) {
+                console.error("Erreur lors de l'ajout du composant:", error);
+                // Fallback: rediriger vers la page du tableau
+                window.location.href = '/geocaches/table/' + zoneId;
+            }
+        } else if (window.mainLayout) {
+            // Si nous sommes dans la fenêtre principale
+            try {
+                window.mainLayout.root.contentItems[0].addChild({
+                    type: 'component',
+                    componentName: 'geocaches-table',
+                    title: 'Géocaches: ' + zoneName,
+                    componentState: {
+                        zoneId: zoneId,
+                        zoneName: zoneName
+                    }
+                });
+            } catch (error) {
+                console.error("Erreur lors de l'ajout du composant:", error);
+                // Fallback: rediriger vers la page du tableau
+                window.location.href = '/geocaches/table/' + zoneId;
+            }
+        } else {
+            // Fallback: rediriger vers la page du tableau
+            window.location.href = '/geocaches/table/' + zoneId;
+        }
+    }
 </script>

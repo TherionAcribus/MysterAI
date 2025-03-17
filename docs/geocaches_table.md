@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Le tableau des géocaches est un composant interactif qui affiche la liste des géocaches pour une zone donnée. Il est implémenté en utilisant la bibliothèque [Tabulator](http://tabulator.info/) et s'intègre avec GoldenLayout pour la gestion des onglets.
+Le tableau des géocaches est un composant interactif qui affiche la liste des géocaches pour une zone donnée. Il est implémenté en utilisant la bibliothèque [Tabulator](http://tabulator.info/) et s'intègre avec GoldenLayout pour la gestion des onglets. Ce composant est accessible depuis le panneau des zones via le bouton "Voir les géocaches".
 
 ## Fonctionnalités
 
@@ -13,6 +13,7 @@ Le tableau des géocaches est un composant interactif qui affiche la liste des g
 - Indicateurs visuels pour l'état des géocaches (résolue, non résolue, en cours)
 - Formulaire d'ajout de géocache intégré
 - Rechargement automatique du tableau après ajout ou suppression
+- Intégration avec le panneau des zones via GoldenLayout
 
 ## Structure technique
 
@@ -44,9 +45,35 @@ Le tableau des géocaches est un composant interactif qui affiche la liste des g
 ### Intégration avec GoldenLayout
 
 Le tableau est chargé dans un composant GoldenLayout qui :
-1. Charge le template via une requête fetch
-2. Exécute les scripts d'initialisation
-3. Gère le redimensionnement automatique du tableau
+1. Est enregistré dans `layout_initialize.js` sous le nom `geocaches-table`
+2. Est ouvert depuis le panneau des zones via la fonction `openGeocachesTab`
+3. Reçoit l'ID et le nom de la zone comme paramètres d'état
+4. Charge le template via une requête fetch
+5. Exécute les scripts d'initialisation
+6. Gère le redimensionnement automatique du tableau
+
+```javascript
+// Exemple d'ouverture du tableau depuis le panneau des zones
+function openGeocachesTab(zoneId, zoneName) {
+    if (window.parent && window.parent.mainLayout) {
+        try {
+            window.parent.mainLayout.root.contentItems[0].addChild({
+                type: 'component',
+                componentName: 'geocaches-table',
+                title: 'Géocaches: ' + zoneName,
+                componentState: {
+                    zoneId: zoneId,
+                    zoneName: zoneName
+                }
+            });
+        } catch (error) {
+            window.location.href = '/geocaches/table/' + zoneId;
+        }
+    } else {
+        window.location.href = '/geocaches/table/' + zoneId;
+    }
+}
+```
 
 ### Gestion du redimensionnement
 
@@ -105,9 +132,38 @@ Les états sont affichés avec des couleurs distinctives :
 3. Affichage du message de succès/erreur
 4. Rechargement du tableau via Tabulator
 
+## Communication inter-composants
+
 La communication entre le tableau et la fenêtre principale se fait via le système de messagerie `postMessage` :
 1. Les boutons d'action envoient des messages avec les informations nécessaires
 2. La fenêtre principale intercepte ces messages et :
    - Charge le contenu HTML approprié
    - Crée un nouvel onglet si nécessaire
    - Affiche le contenu dans l'onglet
+
+## Intégration avec le panneau des zones
+
+Le tableau des géocaches est étroitement intégré avec le panneau des zones :
+1. Chaque zone dans le panneau des zones a un bouton "Voir les géocaches"
+2. Ce bouton appelle la fonction `openGeocachesTab` avec l'ID et le nom de la zone
+3. La fonction ouvre un nouvel onglet dans GoldenLayout avec le tableau des géocaches
+4. Le tableau charge automatiquement les géocaches de la zone spécifiée
+5. Si GoldenLayout n'est pas disponible, une redirection vers la page du tableau est effectuée
+
+## Bonnes pratiques
+
+1. **Gestion des erreurs**
+   - Fallback vers une URL directe si GoldenLayout n'est pas disponible
+   - Messages d'erreur clairs pour les opérations CRUD
+   - Validation des données côté client et serveur
+
+2. **Performance**
+   - Chargement asynchrone des données
+   - Rechargement partiel du tableau après modifications
+   - Utilisation de l'API Tabulator pour les mises à jour
+
+3. **UX**
+   - Indicateurs visuels pour les états des géocaches
+   - Confirmation avant suppression
+   - Feedback immédiat après les actions
+   - Intégration fluide avec GoldenLayout
