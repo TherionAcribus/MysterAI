@@ -24,6 +24,11 @@ function initializeLayout() {
         let mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
         window.mainLayout = mainLayout;
 
+        // Déclencher un événement pour indiquer que GoldenLayout est initialisé
+        document.dispatchEvent(new CustomEvent('goldenLayoutInitialized', {
+            detail: { layout: mainLayout }
+        }));
+
         // Écouteurs d'événements pour le gestionnaire d'état
         mainLayout.on('itemCreated', function(item) {
             console.log('=== Layout: Item créé ===', {

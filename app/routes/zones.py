@@ -32,11 +32,7 @@ def get_zone(zone_id):
     """Get a specific zone."""
     try:
         zone = Zone.query.get_or_404(zone_id)
-        return jsonify({
-            'id': zone.id,
-            'name': zone.name,
-            'description': zone.description
-        })
+        return jsonify(zone.to_dict())
     except Exception as e:
         current_app.logger.error(f"Error fetching zone {zone_id}: {str(e)}")
         return jsonify({'error': f'Failed to fetch zone {zone_id}'}), 500
@@ -55,21 +51,59 @@ def add_zone():
         )
         db.session.add(new_zone)
         db.session.commit()
+        
+        # Si la requête est HTMX, renvoyer un message de succès
+        if request.headers.get('HX-Request'):
+            return render_template('zone_form_success.html', zone=new_zone, is_new=True)
+            
+        return redirect(url_for('zones.zones_page'))
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f"Error adding zone: {str(e)}")
         return str(e), 400
-    return redirect(url_for('zones.zones_page'))
 
 @zones_bp.route('/zones/<int:zone_id>/delete', methods=['POST'])
 def delete_zone(zone_id):
+    """Supprime une zone existante."""
     try:
         zone = Zone.query.get_or_404(zone_id)
+        
+        # Vérifier si la zone contient des géocaches
+        if zone.geocaches and len(zone.geocaches) > 0:
+            # Si la zone a des géocaches, on supprime juste l'association
+            # mais on ne supprime pas les géocaches elles-mêmes
+            for geocache in zone.geocaches:
+                # Si la géocache n'est associée qu'à cette zone, on la garde quand même
+                # car elle pourrait être réutilisée plus tard
+                pass
+            
+            # Vider la liste des géocaches associées à cette zone
+            zone.geocaches = []
+            
+            # Enregistrer les modifications
+            db.session.commit()
+        
+        # Supprimer la zone
         db.session.delete(zone)
         db.session.commit()
+        
+        # Si la requête est HTMX, renvoyer la liste des zones
+        if request.headers.get('HX-Request'):
+            zones = Zone.query.all()
+            return render_template('zones_list.html', zones=zones)
+            
+        # Rediriger vers la page d'accueil au lieu de l'API des zones
+        return redirect(url_for('main.index'))
     except Exception as e:
         db.session.rollback()
+        current_app.logger.error(f"Error deleting zone {zone_id}: {str(e)}")
         return str(e), 400
-    return redirect(url_for('zones.zones_page'))
+
+@zones_bp.route('/zones/<int:zone_id>/delete', methods=['GET'])
+def delete_zone_get(zone_id):
+    """Gère les requêtes GET sur l'URL de suppression d'une zone."""
+    # Rediriger vers la page d'accueil
+    return redirect(url_for('main.index'))
 
 @zones_bp.route('/api/active-zone', methods=['GET'])
 def get_active_zone():
@@ -78,11 +112,7 @@ def get_active_zone():
     if active_zone_id:
         zone = Zone.query.get(active_zone_id)
         if zone:
-            return jsonify({
-                'id': zone.id,
-                'name': zone.name,
-                'description': zone.description
-            })
+            return jsonify(zone.to_dict())
     return jsonify(None)
 
 @zones_bp.route('/api/active-zone', methods=['POST'])
@@ -93,14 +123,42 @@ def set_active_zone():
         if zone_id:
             zone = Zone.query.get_or_404(zone_id)
             current_app.config['ACTIVE_ZONE_ID'] = zone.id
-            return jsonify({
-                'id': zone.id,
-                'name': zone.name,
-                'description': zone.description
-            })
+            return jsonify(zone.to_dict())
         else:
             current_app.config['ACTIVE_ZONE_ID'] = None
             return jsonify(None)
     except Exception as e:
         current_app.logger.error(f"Error setting active zone: {str(e)}")
         return jsonify({'error': 'Failed to set active zone'}), 500
+
+@zones_bp.route('/zones/new', methods=['GET'])
+def new_zone_form():
+    """Affiche le formulaire d'ajout d'une nouvelle zone."""
+    form_action = url_for('zones.add_zone')
+    return render_template('zone_form.html', form_action=form_action)
+
+@zones_bp.route('/zones/<int:zone_id>/edit', methods=['GET'])
+def edit_zone_form(zone_id):
+    """Affiche le formulaire de modification d'une zone existante."""
+    zone = Zone.query.get_or_404(zone_id)
+    form_action = url_for('zones.update_zone', zone_id=zone.id)
+    return render_template('zone_form.html', zone=zone, form_action=form_action)
+
+@zones_bp.route('/zones/<int:zone_id>/update', methods=['POST'])
+def update_zone(zone_id):
+    """Met à jour une zone existante."""
+    try:
+        zone = Zone.query.get_or_404(zone_id)
+        zone.name = request.form['name']
+        zone.description = request.form.get('description', '')
+        db.session.commit()
+        
+        # Si la requête est HTMX, renvoyer un message de succès
+        if request.headers.get('HX-Request'):
+            return render_template('zone_form_success.html', zone=zone, is_new=False)
+            
+        return redirect(url_for('zones.zones_page'))
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating zone {zone_id}: {str(e)}")
+        return str(e), 400

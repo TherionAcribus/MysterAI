@@ -1,0 +1,55 @@
+<!-- Formulaire d'ajout/modification de zone -->
+<div class="p-4 max-w-lg mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold text-blue-400">
+            {% if zone %}
+                Modifier la zone
+            {% else %}
+                Nouvelle zone
+            {% endif %}
+        </h2>
+        <button hx-get="/api/zones"
+                hx-target="#geocaches-panel-content"
+                class="text-gray-400 hover:text-white">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <form hx-post="{{ form_action }}" 
+          hx-target="#geocaches-panel-content"
+          class="space-y-4">
+        <!-- Champ Nom -->
+        <div>
+            <label for="name" class="block text-sm font-medium text-gray-300 mb-1">Nom de la zone *</label>
+            <input type="text" id="name" name="name" 
+                   value="{{ zone.name if zone else '' }}" 
+                   class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   required>
+        </div>
+        
+        <!-- Champ Description -->
+        <div>
+            <label for="description" class="block text-sm font-medium text-gray-300 mb-1">Description</label>
+            <textarea id="description" name="description" rows="4"
+                      class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500">{{ zone.description if zone else '' }}</textarea>
+        </div>
+        
+        <!-- Boutons d'action -->
+        <div class="flex justify-end space-x-3 pt-4">
+            <button type="button"
+                    hx-get="/api/zones"
+                    hx-target="#geocaches-panel-content"
+                    class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors">
+                Annuler
+            </button>
+            <button type="submit" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                {% if zone %}
+                    Mettre à jour
+                {% else %}
+                    Créer
+                {% endif %}
+            </button>
+        </div>
+    </form>
+</div> 

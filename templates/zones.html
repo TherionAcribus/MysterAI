@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Zones{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-blue-500">Gestion des Zones</h1>
+        <a href="{{ url_for('zones.new_zone_form') }}" 
+           class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+            <i class="fas fa-plus mr-2"></i>Ajouter une zone
+        </a>
+    </div>
+    
+    {% if zones %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for zone in zones %}
+                <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+                    <h2 class="text-xl font-semibold text-blue-400 mb-2">{{ zone.name }}</h2>
+                    
+                    {% if zone.description %}
+                        <p class="text-gray-300 mb-4">{{ zone.description }}</p>
+                    {% else %}
+                        <p class="text-gray-500 italic mb-4">Aucune description</p>
+                    {% endif %}
+                    
+                    <div class="flex justify-between items-center mt-4">
+                        <span class="text-sm text-gray-400">
+                            Créée le {{ zone.created_at.strftime('%d/%m/%Y') }}
+                        </span>
+                        
+                        <div class="flex space-x-2">
+                            <a href="{{ url_for('zones.edit_zone_form', zone_id=zone.id) }}" 
+                               class="text-yellow-500 hover:text-yellow-400 transition-colors">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            
+                            <button onclick="confirmDelete({{ zone.id }}, '{{ zone.name | escape }}')"
+                                    class="text-red-500 hover:text-red-400 transition-colors">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            
+                            <a href="{{ url_for('geocaches.geocaches_page', zone_id=zone.id) }}" 
+                               class="text-blue-500 hover:text-blue-400 transition-colors">
+                                <i class="fas fa-table"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-gray-800 rounded-lg p-8 text-center">
+            <p class="text-gray-400 mb-4">Aucune zone n'a été créée pour le moment.</p>
+            <a href="{{ url_for('zones.new_zone_form') }}" 
+               class="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i>Créer votre première zone
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal de confirmation de suppression -->
+<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-800 rounded-lg p-6 max-w-md mx-auto">
+        <h3 class="text-xl font-bold text-red-500 mb-4">Confirmer la suppression</h3>
+        <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer la zone <span id="zoneName" class="font-semibold"></span> ? Cette action est irréversible.</p>
+        
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeDeleteModal()" 
+                    class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors">
+                Annuler
+            </button>
+            <form id="deleteForm" method="POST" class="inline">
+                <button type="submit" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                    Supprimer
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(zoneId, zoneName) {
+        document.getElementById('zoneName').textContent = zoneName;
+        document.getElementById('deleteForm').action = "{{ url_for('zones.delete_zone', zone_id=0) }}".replace('0', zoneId);
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+    
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+    }
+    
+    // Fermer le modal si on clique en dehors
+    document.getElementById('deleteModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeDeleteModal();
+        }
+    });
+</script>
+{% endblock %} 

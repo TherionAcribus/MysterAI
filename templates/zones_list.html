@@ -1,15 +1,43 @@
 <!-- Template pour la liste des zones -->
 <div class="p-4">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold text-blue-400">Zones</h2>
+        <button hx-get="/zones/new" 
+                hx-target="#geocaches-panel-content"
+                class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 transition-colors flex items-center">
+            <i class="fas fa-plus mr-1"></i>Ajouter
+        </button>
+    </div>
+
     {% if zones %}
         <div class="space-y-4">
             {% for zone in zones %}
                 <div class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-2">{{ zone.name }}</h3>
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-lg font-semibold text-blue-400">{{ zone.name }}</h3>
+                        <div class="flex space-x-2">
+                            <button hx-get="/zones/{{ zone.id }}/edit"
+                                    hx-target="#geocaches-panel-content"
+                                    class="text-yellow-500 hover:text-yellow-400 transition-colors" 
+                                    title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button data-zone-id="{{ zone.id }}" 
+                                    data-zone-name="{{ zone.name | escape }}"
+                                    class="delete-zone-btn text-red-500 hover:text-red-400 transition-colors" 
+                                    title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
                     {% if zone.description %}
                         <p class="text-gray-300 mb-4">{{ zone.description }}</p>
                     {% endif %}
-                    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                            onclick="window.openGeocachesTab('{{ zone.id }}', '{{ zone.name | escape }}')">
+                    
+                    <button hx-get="/geocaches?zone_id={{ zone.id }}"
+                            hx-target="#geocaches-panel-content"
+                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
                         <i class="fas fa-table mr-2"></i>
                         Voir les géocaches
                     </button>
@@ -17,6 +45,183 @@
             {% endfor %}
         </div>
     {% else %}
-        <p class="text-gray-400">Aucune zone trouvée</p>
+        <div class="text-center py-8">
+            <p class="text-gray-400 mb-4">Aucune zone trouvée</p>
+            <button hx-get="/zones/new"
+                    hx-target="#geocaches-panel-content"
+                    class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i>Créer votre première zone
+            </button>
+        </div>
     {% endif %}
 </div>
+
+<!-- Modal de confirmation de suppression -->
+<div id="deleteZoneModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-gray-800 rounded-lg p-6 max-w-md mx-auto">
+        <h3 class="text-xl font-bold text-red-500 mb-4">Confirmer la suppression</h3>
+        <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer la zone <span id="zoneNameToDelete" class="font-semibold"></span> ? Cette action est irréversible.</p>
+        
+        <div class="flex justify-end space-x-3">
+            <button id="cancelDeleteButton" 
+                    class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors">
+                Annuler
+            </button>
+            <button id="deleteZoneButton"
+                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                Supprimer
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fonction pour initialiser les gestionnaires d'événements
+    function initZoneEvents() {
+        console.log("Initialisation des gestionnaires d'événements pour les zones");
+        
+        // Déplacer le modal dans le conteneur global
+        const modalContainer = document.getElementById('modals-container');
+        const deleteModal = document.getElementById('deleteZoneModal');
+        
+        if (modalContainer && deleteModal) {
+            // Vérifier si le modal est déjà dans le conteneur
+            if (!modalContainer.contains(deleteModal)) {
+                // Déplacer le modal dans le conteneur global
+                modalContainer.appendChild(deleteModal);
+            }
+        }
+        
+        // Ajouter des gestionnaires d'événements pour les boutons de suppression
+        document.querySelectorAll('.delete-zone-btn').forEach(function(button) {
+            // Supprimer les anciens gestionnaires d'événements en clonant le bouton
+            const newButton = button.cloneNode(true);
+            if (button.parentNode) {
+                button.parentNode.replaceChild(newButton, button);
+            }
+            
+            // Ajouter un nouveau gestionnaire d'événements
+            newButton.addEventListener('click', function() {
+                const zoneId = this.getAttribute('data-zone-id');
+                const zoneName = this.getAttribute('data-zone-name');
+                confirmDeleteZone(zoneId, zoneName);
+            });
+        });
+        
+        // Réinitialiser le bouton d'annulation du modal
+        const cancelButton = document.querySelector('#deleteZoneModal button:first-of-type');
+        if (cancelButton) {
+            const newCancelButton = cancelButton.cloneNode(true);
+            if (cancelButton.parentNode) {
+                cancelButton.parentNode.replaceChild(newCancelButton, cancelButton);
+            }
+            newCancelButton.addEventListener('click', closeDeleteZoneModal);
+        }
+        
+        // Configurer le modal pour fermer si on clique en dehors
+        if (deleteModal) {
+            deleteModal.onclick = function(e) {
+                if (e.target === this) {
+                    closeDeleteZoneModal();
+                }
+            };
+        }
+    }
+    
+    // Fonction pour confirmer la suppression d'une zone
+    function confirmDeleteZone(zoneId, zoneName) {
+        console.log("Confirmation de suppression pour la zone", zoneId, zoneName);
+        
+        const zoneNameElement = document.getElementById('zoneNameToDelete');
+        if (zoneNameElement) {
+            zoneNameElement.textContent = zoneName;
+        }
+        
+        const deleteButton = document.getElementById('deleteZoneButton');
+        if (deleteButton) {
+            const deleteUrl = "{{ url_for('zones.delete_zone', zone_id=0) }}".replace('0', zoneId);
+            
+            // Supprimer les anciens gestionnaires d'événements
+            const newButton = deleteButton.cloneNode(true);
+            if (deleteButton.parentNode) {
+                deleteButton.parentNode.replaceChild(newButton, deleteButton);
+            }
+            
+            // Ajouter un nouveau gestionnaire d'événements
+            newButton.addEventListener('click', function() {
+                console.log("Envoi de la requête de suppression à", deleteUrl);
+                
+                // Créer une requête AJAX manuelle
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', deleteUrl);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.setRequestHeader('HX-Request', 'true');
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        console.log("Suppression réussie, mise à jour du contenu");
+                        
+                        // Fermer le modal avant de mettre à jour le contenu
+                        closeDeleteZoneModal();
+                        
+                        // Mettre à jour le contenu
+                        document.getElementById('geocaches-panel-content').innerHTML = xhr.responseText;
+                        
+                        // Réinitialiser les gestionnaires d'événements après la mise à jour du contenu
+                        setTimeout(function() {
+                            console.log("Réinitialisation des gestionnaires d'événements après suppression");
+                            initZoneEvents();
+                            
+                            // Réactiver les boutons HTMX
+                            htmx.process(document.getElementById('geocaches-panel-content'));
+                        }, 100);
+                    } else {
+                        console.error('Erreur lors de la suppression de la zone:', xhr.status);
+                        closeDeleteZoneModal();
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    console.error('Erreur réseau lors de la suppression de la zone');
+                    closeDeleteZoneModal();
+                };
+                
+                xhr.send();
+            });
+        }
+        
+        // Afficher le modal
+        const deleteModal = document.getElementById('deleteZoneModal');
+        if (deleteModal) {
+            deleteModal.classList.remove('hidden');
+        }
+    }
+    
+    // Fonction pour fermer le modal de suppression
+    function closeDeleteZoneModal() {
+        console.log("Fermeture du modal de suppression");
+        const deleteModal = document.getElementById('deleteZoneModal');
+        if (deleteModal) {
+            deleteModal.classList.add('hidden');
+        }
+    }
+    
+    // Initialiser les gestionnaires d'événements au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOMContentLoaded - Initialisation des gestionnaires d'événements");
+        initZoneEvents();
+    });
+    
+    // Réinitialiser les gestionnaires d'événements après chaque mise à jour HTMX
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'geocaches-panel-content') {
+            console.log("htmx:afterSwap - Réinitialisation des gestionnaires d'événements");
+            setTimeout(function() {
+                initZoneEvents();
+                
+                // Réactiver les boutons HTMX
+                htmx.process(document.getElementById('geocaches-panel-content'));
+            }, 100);
+        }
+    });
+</script>

@@ -61,6 +61,16 @@ class Zone(db.Model):
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     geocaches = db.relationship('Geocache', secondary='geocache_zone', back_populates='zones')
+    
+    def to_dict(self):
+        """Convertit l'objet Zone en dictionnaire pour la sérialisation JSON."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'geocaches_count': len(self.geocaches) if self.geocaches else 0
+        }
 
 class GeocacheZone(db.Model):
     __table_args__ = {'extend_existing': True}

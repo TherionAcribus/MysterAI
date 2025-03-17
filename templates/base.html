@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MysteryAI{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Styles personnalisés -->
+    <style>
+        body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+    </style>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+    <!-- Barre de navigation -->
+    <nav class="bg-gray-900 text-white shadow-md">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center">
+                    <a href="{{ url_for('main.index') }}" class="text-xl font-bold text-blue-400">
+                        <i class="fas fa-map-marked-alt mr-2"></i>MysteryAI
+                    </a>
+                    
+                    <div class="ml-10 hidden md:flex space-x-6">
+                        <a href="{{ url_for('zones.zones_page') }}" class="hover:text-blue-400 transition-colors">
+                            <i class="fas fa-map mr-1"></i>Zones
+                        </a>
+                        <a href="{{ url_for('geocaches.geocaches_page') }}" class="hover:text-blue-400 transition-colors">
+                            <i class="fas fa-search-location mr-1"></i>Géocaches
+                        </a>
+                        <!-- Autres liens de navigation -->
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Boutons d'action ou menu utilisateur -->
+                    <a href="#" class="hover:text-blue-400 transition-colors">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Contenu principal -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Pied de page -->
+    <footer class="bg-gray-900 text-gray-400 py-6 mt-12">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <p>&copy; 2024 MysteryAI. Tous droits réservés.</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="hover:text-blue-400 transition-colors">
+                        <i class="fas fa-question-circle mr-1"></i>Aide
+                    </a>
+                    <a href="#" class="hover:text-blue-400 transition-colors">
+                        <i class="fas fa-info-circle mr-1"></i>À propos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Scripts JavaScript -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>
