@@ -1,6 +1,18 @@
 // Alphabet Viewer Controller
 (() => {
-    const application = Stimulus.Application.start()
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
+    // Utiliser l'application Stimulus déjà initialisée dans index.html
+    const application = window.application || window.StimulusApp;
+    
+    if (!application) {
+        console.error("L'application Stimulus n'est pas disponible");
+        return;
+    }
     
     application.register("alphabet-viewer", class extends Stimulus.Controller {
         static targets = ["enteredSymbols", "decodedText", "availableSymbol"]

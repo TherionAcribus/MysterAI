@@ -1,5 +1,11 @@
 // Map Controller
 (() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class MapController extends Stimulus.Controller {
         static targets = ["container", "popup", "popupContent"]
         static values = {

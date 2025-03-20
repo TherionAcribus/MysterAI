@@ -2,7 +2,13 @@
  * Contrôleur Stimulus pour la barre de statut
  * Gère notamment le sélecteur de modèle d'IA
  */
-(function() {
+(() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class StatusBarController extends Stimulus.Controller {
         static targets = ["aiModelSelector"];
         

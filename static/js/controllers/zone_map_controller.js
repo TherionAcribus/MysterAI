@@ -1,6 +1,12 @@
 // Zone Map Controller
+console.log("=== DEBUG: Preparing Zone Map Controller ===");
+
 (() => {
-    console.log('=== DEBUG: Preparing Zone Map Controller ===');
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
     
     class ZoneMapController extends Stimulus.Controller {
         static targets = ["container"]

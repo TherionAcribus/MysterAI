@@ -1,7 +1,13 @@
 /**
  * Contrôleur Stimulus pour les paramètres IA
  */
-(function() {
+(() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class AISettingsController extends Stimulus.Controller {
         static targets = [
             "modeRadio", "provider", "apiKey", "onlineModel", 
@@ -13,8 +19,30 @@
         
         connect() {
             console.log('=== DEBUG: AISettingsController connecté ===');
-            this.updateVisibility();
-            this.updateProviderVisibility();
+            
+            // Écouter l'événement htmx:afterSwap pour initialiser après le chargement HTMX
+            this.element.addEventListener('htmx:afterSwap', this.initialize.bind(this));
+            
+            // Si le contenu est déjà chargé (si ce n'est pas un chargement HTMX),
+            // initialiser directement
+            if (this.hasModeRadioTargets) {
+                this.initialize();
+            }
+        }
+        
+        initialize() {
+            console.log('=== DEBUG: AISettingsController initializing ===', {
+                hasModeRadioTargets: this.hasModeRadioTargets,
+                hasOnlineSettingsTarget: this.hasOnlineSettingsTarget,
+                hasLocalSettingsTarget: this.hasLocalSettingsTarget
+            });
+            
+            if (this.hasModeRadioTargets && this.hasOnlineSettingsTarget && this.hasLocalSettingsTarget) {
+                this.updateVisibility();
+                if (this.hasProviderTarget && this.hasOnlineModelTarget) {
+                    this.updateProviderVisibility();
+                }
+            }
         }
         
         changeMode() {
@@ -22,7 +50,21 @@
         }
         
         updateVisibility() {
-            const mode = this.modeRadioTargets.find(radio => radio.checked).value;
+            // Vérifier que les cibles existent
+            if (!this.hasModeRadioTargets || !this.hasOnlineSettingsTarget || !this.hasLocalSettingsTarget) {
+                console.warn('=== WARN: Targets for updateVisibility not available yet ===');
+                return;
+            }
+            
+            // Trouver le radio bouton coché, ou prendre le premier par défaut
+            const checkedRadio = this.modeRadioTargets.find(radio => radio.checked);
+            if (!checkedRadio) {
+                console.warn('=== WARN: No checked radio button found ===');
+                return;
+            }
+            
+            const mode = checkedRadio.value;
+            console.log('=== DEBUG: Changing mode to ===', mode);
             
             if (mode === 'online') {
                 this.onlineSettingsTarget.style.display = 'block';
@@ -38,6 +80,12 @@
         }
         
         updateProviderVisibility() {
+            // Vérifier que les cibles existent
+            if (!this.hasProviderTarget || !this.hasOnlineModelTarget) {
+                console.warn('=== WARN: Targets for updateProviderVisibility not available yet ===');
+                return;
+            }
+            
             const provider = this.providerTarget.value;
             
             // Masquer tous les groupes d'options

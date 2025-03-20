@@ -1,5 +1,11 @@
-// Controller for displaying/hiding alphabet examples
-(function() {
+// Alphabet Display Controller
+(() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class AlphabetDisplayController extends Stimulus.Controller {
         static targets = ["showSelector", "exampleControl", "textSelector", "sizeSelector", "customTextControls", "customText"];
     

@@ -1,16 +1,31 @@
 /**
  * Contrôleur Stimulus pour gérer les onglets de paramètres
  */
-(function() {
+(() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class SettingsController extends Stimulus.Controller {
         static targets = ["tab", "section"];
         
         connect() {
             console.log('=== DEBUG: SettingsController connecté ===');
-            this.initTabs();
+            
+            // Initier les onglets seulement si le contenu est chargé
+            if (document.querySelectorAll('.settings-tab').length > 0) {
+                this.initTabs();
+            } else {
+                // Sinon attendre le chargement HTMX
+                this.element.addEventListener('htmx:afterSwap', this.initTabs.bind(this));
+            }
         }
         
         initTabs() {
+            console.log('=== DEBUG: Initializing settings tabs ===');
+            
             // Ajouter les écouteurs d'événements aux onglets
             document.querySelectorAll('.settings-tab').forEach(tab => {
                 tab.addEventListener('click', () => {

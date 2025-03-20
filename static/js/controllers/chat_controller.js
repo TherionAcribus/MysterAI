@@ -1,7 +1,13 @@
 /**
  * Contrôleur Stimulus pour gérer les chats IA multiples
  */
-(function() {
+(() => {
+    // S'assurer que Stimulus est disponible globalement
+    if (!window.Stimulus) {
+        console.error("Stimulus n'est pas disponible globalement");
+        return;
+    }
+    
     class ChatController extends Stimulus.Controller {
         static targets = ["container", "tabs", "chatList", "addButton", "activeChat"];
         static values = {
