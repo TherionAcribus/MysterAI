@@ -824,7 +824,7 @@
             }
             
             const { 
-                deleteSelectedButton, closeDeleteMultipleModal, cancelDeleteMultiple, 
+                deleteSelectedButton, closeDeleteMultipleModal: closeDeleteModalBtn, cancelDeleteMultiple, 
                 confirmDeleteMultiple, deleteMultipleModal, importGpxButton,
                 importGpxModal, closeImportModal, cancelImport, importGpxForm 
             } = elements;
@@ -834,12 +834,16 @@
                 deleteSelectedButton.addEventListener('click', openDeleteMultipleModal);
             }
             
-            if (closeDeleteMultipleModal) {
-                closeDeleteMultipleModal.addEventListener('click', closeDeleteMultipleModal);
+            if (closeDeleteModalBtn) {
+                closeDeleteModalBtn.addEventListener('click', function() {
+                    closeDeleteMultipleModal();
+                });
             }
             
             if (cancelDeleteMultiple) {
-                cancelDeleteMultiple.addEventListener('click', closeDeleteMultipleModal);
+                cancelDeleteMultiple.addEventListener('click', function() {
+                    closeDeleteMultipleModal();
+                });
             }
             
             if (confirmDeleteMultiple) {
