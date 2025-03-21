@@ -39,6 +39,78 @@
         <div id="message" class="mt-2"></div>
     </div>
 
+    <!-- Filtre pour le tableau des géocaches -->
+    <div class="px-4 pb-4">
+        <div class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[300px]">
+                <label for="tableFilter" class="block text-sm font-medium text-gray-300 mb-1">Filtrer les géocaches</label>
+                <div class="relative">
+                    <input type="text" id="tableFilter" placeholder="Rechercher par nom, code, type, ..."
+                           class="block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm pl-10">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <button id="clearFilter" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label for="statusFilter" class="block text-sm font-medium text-gray-300 mb-1">Statut</label>
+                <select id="statusFilter" class="rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="">Tous les statuts</option>
+                    <option value="solved">Résolues</option>
+                    <option value="not_solved">Non résolues</option>
+                    <option value="ongoing">En cours</option>
+                </select>
+            </div>
+            <div>
+                <label for="typeFilter" class="block text-sm font-medium text-gray-300 mb-1">Type</label>
+                <select id="typeFilter" class="rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                    <option value="">Tous les types</option>
+                    <!-- Options seront remplies dynamiquement via JavaScript -->
+                </select>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-end">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex space-x-3">
+                    <div id="selected-count-container-{{ zone_id }}" class="hidden">
+                        <span class="bg-indigo-600 text-white px-2 py-1 rounded" id="selected-count-{{ zone_id }}">0</span>
+                        <span class="text-gray-300">géocaches sélectionnées</span>
+                    </div>
+                </div>
+                <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
+                    <i class="fas fa-trash mr-1"></i> Supprimer les géocaches affichées
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation de suppression multiple -->
+    <div id="deleteMultipleModal-{{ zone_id }}" class="delete-multiple-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-red-500">Confirmer la suppression</h3>
+                <button class="close-delete-multiple-modal text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer <span class="geocaches-count-to-delete font-semibold">0</span> géocaches actuellement affichées ? Cette action est irréversible.</p>
+            <div class="flex justify-end gap-2">
+                <button class="cancel-delete-multiple bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Annuler
+                </button>
+                <button class="confirm-delete-multiple bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Supprimer</span>
+                    <div class="delete-loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal d'importation GPX -->
     <div id="importGpxModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
@@ -235,6 +307,55 @@
 <script type="text/javascript">
     // S'assurer que le script s'exécute dans l'iframe
     (function() {
+        console.log("Initialisation du tableau des géocaches pour la zone {{ zone_id }}");
+        
+        // Déplacer les modales vers le conteneur global des modales
+        function moveModalsToGlobalContainer() {
+            const modalContainer = window.parent.document.getElementById('modals-container');
+            if (modalContainer) {
+                // Modale de suppression multiple
+                const deleteMultipleModal = document.getElementById('deleteMultipleModal-{{ zone_id }}');
+                if (deleteMultipleModal) {
+                    // Vérifier si la modale existe déjà dans le conteneur global
+                    const existingModal = modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }}');
+                    if (existingModal) {
+                        // Si elle existe, la supprimer pour éviter les doublons
+                        existingModal.remove();
+                    }
+                    
+                    // Cloner la modale et l'ajouter au conteneur global
+                    const clonedModal = deleteMultipleModal.cloneNode(true);
+                    modalContainer.appendChild(clonedModal);
+                    
+                    // Supprimer la modale originale
+                    deleteMultipleModal.remove();
+                }
+                
+                // Modale d'importation GPX (si elle existe)
+                const importGpxModal = document.getElementById('importGpxModal');
+                if (importGpxModal) {
+                    // Vérifier si la modale existe déjà dans le conteneur global
+                    const existingImportModal = modalContainer.querySelector('#importGpxModal-{{ zone_id }}');
+                    if (existingImportModal) {
+                        existingImportModal.remove();
+                    }
+                    
+                    // Renommer la modale pour éviter les conflits
+                    importGpxModal.id = 'importGpxModal-{{ zone_id }}';
+                    
+                    // Cloner et ajouter au conteneur global
+                    const clonedImportModal = importGpxModal.cloneNode(true);
+                    modalContainer.appendChild(clonedImportModal);
+                    
+                    // Supprimer la modale originale
+                    importGpxModal.remove();
+                }
+            }
+        }
+        
+        // Appeler cette fonction pour déplacer les modales dès que possible
+        setTimeout(moveModalsToGlobalContainer, 0);
+        
         const form = document.getElementById('addGeocacheForm');
         const loadingIndicator = form.querySelector('.loading-indicator');
         const spinner = document.getElementById('spinner');
@@ -242,17 +363,44 @@
         const submitButton = form.querySelector('button[type="submit"]');
         const openMapButton = document.getElementById('openMapButton');
         
-        // Éléments pour l'importation GPX
-        const importGpxButton = document.getElementById('importGpxButton');
-        const importGpxModal = document.getElementById('importGpxModal');
-        const closeImportModal = document.getElementById('closeImportModal');
-        const cancelImport = document.getElementById('cancelImport');
-        const importGpxForm = document.getElementById('importGpxForm');
-        const importLoadingIndicator = importGpxForm.querySelector('.import-loading-indicator');
-        const importProgress = document.getElementById('importProgress');
-        const importProgressBar = document.getElementById('importProgressBar');
-        const importProgressText = document.getElementById('importProgressText');
-        const importMessage = document.getElementById('importMessage');
+        // Éléments de filtrage du tableau
+        const tableFilter = document.getElementById('tableFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        const typeFilter = document.getElementById('typeFilter');
+        const clearFilterButton = document.getElementById('clearFilter');
+        
+        // Variable pour stocker les géocaches sélectionnées
+        let selectedGeocaches = [];
+        
+        // Fonction pour obtenir les références aux éléments des modales dans le conteneur global
+        function getModalElements() {
+            const modalContainer = window.parent.document.getElementById('modals-container');
+            if (!modalContainer) return null;
+            
+            return {
+                // Éléments pour la suppression multiple
+                deleteSelectedButton: document.getElementById('delete-selected-btn-{{ zone_id }}'),
+                selectedCountElement: document.getElementById('selected-count-container-{{ zone_id }}'),
+                deleteMultipleModal: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }}'),
+                geocachesCountToDelete: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .geocaches-count-to-delete'),
+                closeDeleteMultipleModal: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .close-delete-multiple-modal'),
+                cancelDeleteMultiple: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .cancel-delete-multiple'),
+                confirmDeleteMultiple: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .confirm-delete-multiple'),
+                deleteLoadingIndicator: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .delete-loading-indicator'),
+                
+                // Éléments pour l'importation GPX
+                importGpxButton: document.getElementById('importGpxButton'),
+                importGpxModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }}'),
+                closeImportModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #closeImportModal'),
+                cancelImport: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #cancelImport'),
+                importGpxForm: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #importGpxForm'),
+                importLoadingIndicator: modalContainer.querySelector('#importGpxModal-{{ zone_id }} .import-loading-indicator'),
+                importProgress: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #importProgress'),
+                importProgressBar: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #importProgressBar'),
+                importProgressText: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #importProgressText'),
+                importMessage: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #importMessage')
+            };
+        }
 
         // Fonction pour initialiser Tabulator
         function initializeTabulator() {
@@ -273,6 +421,25 @@
                 layout: "fitDataFill",
                 height: "100%",
                 placeholder: "Aucune géocache trouvée",
+                selectable: true, // Activer la sélection de lignes
+                selectableRangeMode: "click", // Permettre la sélection par Shift+Click
+                // Nous ne voulons pas de pagination par défaut pour avoir toutes les données disponibles
+                pagination: false,
+                // S'assurer que Tabulator ne limite pas les résultats
+                maxHeight: "100%", // Utiliser toute la hauteur disponible
+                virtualDom: true, // Activer le DOM virtuel pour de meilleures performances
+                layoutColumnsOnNewData: false, // Ne pas recalculer la disposition à chaque mise à jour
+                // Garantir que toutes les données sont chargées
+                ajaxConfig: {
+                    method: "GET",
+                },
+                // Stocker toutes les données pour nos opérations personnalisées
+                ajaxResponse: function(url, params, response) {
+                    // Stocker les données complètes dans une variable accessible
+                    window[`allGeocachesData_${tableId}`] = response;
+                    console.log(`Chargement de ${response.length} géocaches dans le tableau.`);
+                    return response;
+                },
                 columns: [
                     { title: "GC Code", field: "gc_code", headerSort: true },
                     { title: "Nom", field: "name", headerSort: true },
@@ -328,8 +495,201 @@
                             </button>`;
                         }
                     }
-                ]
+                ],
+                initialComplete: function() {
+                    // Remplir dynamiquement le filtre de type avec les valeurs uniques de la colonne
+                    const table = window[`tabulator_${tableId}`];
+                    const allData = table.getData();
+                    console.log(`Tableau initialisé avec ${allData.length} géocaches au total.`);
+                    
+                    const uniqueTypes = [...new Set(allData.map(row => row.cache_type))].filter(Boolean).sort();
+                    
+                    // Vider d'abord les options existantes sauf la première
+                    while(typeFilter.options.length > 1) {
+                        typeFilter.remove(1);
+                    }
+                    
+                    // Ajouter les types uniques comme options
+                    uniqueTypes.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        typeFilter.appendChild(option);
+                    });
+                },
+                rowSelectionChanged: function(data, rows) {
+                    // Mettre à jour les géocaches sélectionnées
+                    selectedGeocaches = data;
+                    
+                    // Mettre à jour le compteur et le bouton de suppression
+                    updateSelectionCount();
+                }
             });
+            
+            return window[`tabulator_${tableId}`];
+        }
+
+        // Fonction pour mettre à jour le compteur de sélection et l'état du bouton de suppression
+        function updateSelectionCount() {
+            const count = selectedGeocaches.length;
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { selectedCountElement, deleteSelectedButton } = elements;
+            
+            if (count > 0 && selectedCountElement) {
+                selectedCountElement.textContent = count;
+                selectedCountElement.classList.remove('hidden');
+            } else if (selectedCountElement) {
+                selectedCountElement.classList.add('hidden');
+            }
+        }
+
+        // Fonction pour ouvrir le modal de confirmation de suppression multiple
+        function openDeleteMultipleModal() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { deleteMultipleModal, geocachesCountToDelete } = elements;
+            
+            // Obtenir toutes les géocaches actuellement visibles dans le tableau
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            
+            if (!table) return;
+            
+            // Vérifier si des filtres sont actifs
+            const textFilter = tableFilter.value.toLowerCase();
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            let geocachesToDelete;
+            
+            // Utiliser notre propre logique de filtrage pour toutes les données, que des filtres soient actifs ou non
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            if (!textFilter && !statusValue && !typeValue) {
+                // Si aucun filtre n'est actif, utiliser toutes les données
+                geocachesToDelete = allData;
+            } else {
+                // Appliquer manuellement le filtre sur toutes les données
+                geocachesToDelete = allData.filter(function(data) {
+                    let textMatch = true;
+                    let statusMatch = true;
+                    let typeMatch = true;
+                    
+                    // Filtre textuel
+                    if (textFilter) {
+                        textMatch = (
+                            (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                            (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                            (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                        );
+                    }
+                    
+                    // Filtre de statut
+                    if (statusValue) {
+                        statusMatch = data.solved === statusValue;
+                    }
+                    
+                    // Filtre de type
+                    if (typeValue) {
+                        typeMatch = data.cache_type === typeValue;
+                    }
+                    
+                    return textMatch && statusMatch && typeMatch;
+                });
+            }
+            
+            // Vérifier s'il y a des géocaches visibles
+            if (!geocachesToDelete || geocachesToDelete.length === 0) {
+                alert("Aucune géocache n'est actuellement affichée. Veuillez ajuster vos filtres.");
+                return;
+            }
+            
+            // Stocker les géocaches pour la suppression
+            selectedGeocaches = geocachesToDelete;
+            
+            console.log(`Suppression de ${selectedGeocaches.length} géocaches sur un total de ${window[`allGeocachesData_${tableId}`]?.length || table.getData().length}.`);
+            
+            if (geocachesCountToDelete) {
+                geocachesCountToDelete.textContent = selectedGeocaches.length;
+            }
+            
+            if (deleteMultipleModal) {
+                deleteMultipleModal.classList.remove('hidden');
+            }
+        }
+
+        // Fonction pour fermer le modal de confirmation de suppression multiple
+        function closeDeleteMultipleModal() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { deleteMultipleModal } = elements;
+            
+            if (deleteMultipleModal) {
+                deleteMultipleModal.classList.add('hidden');
+            }
+        }
+
+        // Fonction pour supprimer les géocaches sélectionnées
+        async function deleteSelectedGeocaches() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { deleteLoadingIndicator } = elements;
+            
+            // Afficher l'indicateur de chargement
+            if (deleteLoadingIndicator) {
+                deleteLoadingIndicator.classList.remove('hidden');
+            }
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            // Copier la liste des géocaches à supprimer
+            const geocachesToDelete = [...selectedGeocaches];
+            
+            // Supprimer chaque géocache
+            for (const geocache of geocachesToDelete) {
+                try {
+                    const response = await fetch(`/api/geocaches/${geocache.id}`, {
+                        method: 'DELETE',
+                    });
+                    
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                } catch (error) {
+                    console.error('Erreur:', error);
+                    errorCount++;
+                }
+            }
+            
+            // Mettre à jour le message
+            if (successCount > 0) {
+                messageDiv.textContent = `${successCount} géocache(s) supprimée(s) avec succès.`;
+                messageDiv.className = 'mt-2 text-green-600';
+            }
+            
+            if (errorCount > 0) {
+                messageDiv.textContent += ` ${errorCount} géocache(s) n'ont pas pu être supprimées.`;
+                messageDiv.className = 'mt-2 text-orange-600';
+            }
+            
+            // Recharger le tableau
+            await reloadTable();
+            
+            // Fermer le modal
+            closeDeleteMultipleModal();
+            
+            // Cacher l'indicateur de chargement
+            if (deleteLoadingIndicator) {
+                deleteLoadingIndicator.classList.add('hidden');
+            }
         }
 
         // Fonction pour recharger le tableau
@@ -343,7 +703,195 @@
         }
 
         // Initialiser Tabulator au chargement
-        initializeTabulator();
+        const table = initializeTabulator();
+
+        // Fonction pour filtrer le tableau
+        function filterTable() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (!table) return;
+            
+            // Obtenir les valeurs des filtres
+            const textFilter = tableFilter.value.toLowerCase();
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            console.log(`Filtrage: texte="${textFilter}", statut="${statusValue}", type="${typeValue}"`);
+            
+            // Si aucun filtre actif, supprimer tous les filtres existants
+            if (!textFilter && !statusValue && !typeValue) {
+                console.log("Aucun filtre actif, affichage de toutes les données");
+                table.clearFilter();
+                
+                // Vérifier le nombre réel de lignes affichées
+                setTimeout(() => {
+                    const visibleRows = table.getRows("visible");
+                    console.log(`Après suppression des filtres: ${visibleRows.length} géocaches visibles`);
+                }, 50);
+                
+                return;
+            }
+            
+            // Appliquer le filtre - utiliser une fonction identique à celle de openDeleteMultipleModal
+            // pour garantir la cohérence entre ce que l'utilisateur voit et ce qui sera supprimé
+            table.setFilter(function(data) {
+                let textMatch = true;
+                let statusMatch = true;
+                let typeMatch = true;
+                
+                // Filtre textuel
+                if (textFilter) {
+                    textMatch = (
+                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                    );
+                }
+                
+                // Filtre de statut
+                if (statusValue) {
+                    statusMatch = data.solved === statusValue;
+                }
+                
+                // Filtre de type
+                if (typeValue) {
+                    typeMatch = data.cache_type === typeValue;
+                }
+                
+                return textMatch && statusMatch && typeMatch;
+            });
+            
+            // Vérifier le nombre réel de lignes affichées après filtrage
+            setTimeout(() => {
+                const visibleRows = table.getRows("visible");
+                console.log(`Après filtrage: ${visibleRows.length} géocaches visibles`);
+                
+                // Filtrer manuellement pour vérification
+                const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+                const manuallyFiltered = allData.filter(data => {
+                    let textMatch = true;
+                    let statusMatch = true;
+                    let typeMatch = true;
+                    
+                    if (textFilter) {
+                        textMatch = (
+                            (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                            (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                            (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                        );
+                    }
+                    
+                    if (statusValue) {
+                        statusMatch = data.solved === statusValue;
+                    }
+                    
+                    if (typeValue) {
+                        typeMatch = data.cache_type === typeValue;
+                    }
+                    
+                    return textMatch && statusMatch && typeMatch;
+                });
+                
+                console.log(`Résultat du filtrage manuel: ${manuallyFiltered.length} géocaches correspondantes`);
+                
+                // Si différence, forcer l'actualisation
+                if (manuallyFiltered.length !== visibleRows.length) {
+                    console.log("Différence détectée entre filtrage Tabulator et manuel, forçage de l'actualisation");
+                    setTimeout(() => table.refreshFilter(), 10);
+                }
+            }, 100);
+        }
+
+        // Gestionnaires d'événements pour les filtres
+        tableFilter.addEventListener('input', filterTable);
+        statusFilter.addEventListener('change', filterTable);
+        typeFilter.addEventListener('change', filterTable);
+        
+        // Gestionnaire pour effacer le filtre de texte
+        clearFilterButton.addEventListener('click', function() {
+            tableFilter.value = '';
+            filterTable();
+        });
+        
+        // Fonction pour initialiser les gestionnaires d'événements après le déplacement des modales
+        function initializeEventListeners() {
+            console.log("Initialisation des gestionnaires d'événements pour les modales");
+            
+            const elements = getModalElements();
+            if (!elements) {
+                console.warn("Impossible d'obtenir les éléments des modales");
+                return;
+            }
+            
+            const { 
+                deleteSelectedButton, closeDeleteMultipleModal, cancelDeleteMultiple, 
+                confirmDeleteMultiple, deleteMultipleModal, importGpxButton,
+                importGpxModal, closeImportModal, cancelImport, importGpxForm 
+            } = elements;
+            
+            // Gestionnaires d'événements pour la suppression multiple
+            if (deleteSelectedButton) {
+                deleteSelectedButton.addEventListener('click', openDeleteMultipleModal);
+            }
+            
+            if (closeDeleteMultipleModal) {
+                closeDeleteMultipleModal.addEventListener('click', closeDeleteMultipleModal);
+            }
+            
+            if (cancelDeleteMultiple) {
+                cancelDeleteMultiple.addEventListener('click', closeDeleteMultipleModal);
+            }
+            
+            if (confirmDeleteMultiple) {
+                confirmDeleteMultiple.addEventListener('click', deleteSelectedGeocaches);
+            }
+            
+            // Configurer le modal pour fermer si on clique en dehors
+            if (deleteMultipleModal) {
+                deleteMultipleModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeDeleteMultipleModal();
+                    }
+                });
+            }
+            
+            // Gestionnaires d'événements pour l'importation GPX
+            if (importGpxButton && importGpxModal) {
+                importGpxButton.addEventListener('click', function() {
+                    importGpxModal.classList.remove('hidden');
+                    if (elements.importMessage) {
+                        elements.importMessage.textContent = '';
+                        elements.importMessage.className = '';
+                    }
+                    if (elements.importProgress) {
+                        elements.importProgress.classList.add('hidden');
+                    }
+                    if (elements.importProgressBar) {
+                        elements.importProgressBar.style.width = '0%';
+                    }
+                    if (elements.importProgressText) {
+                        elements.importProgressText.textContent = '0%';
+                    }
+                });
+            }
+            
+            if (closeImportModal && importGpxModal) {
+                closeImportModal.addEventListener('click', function() {
+                    importGpxModal.classList.add('hidden');
+                });
+            }
+            
+            if (cancelImport && importGpxModal) {
+                cancelImport.addEventListener('click', function() {
+                    importGpxModal.classList.add('hidden');
+                });
+            }
+            
+            // Autres gestionnaires d'événements pour l'importation GPX à ajouter si nécessaire
+        }
+        
+        // Attendre un peu pour s'assurer que les modales ont été déplacées
+        setTimeout(initializeEventListeners, 100);
 
         // Gestionnaire d'événements pour la suppression
         window.deleteGeocache = async function(geocacheId, gcCode) {
@@ -373,6 +921,7 @@
             }
         };
 
+        // Gestionnaire d'événements pour l'ajout de géocaches
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
 
@@ -432,107 +981,100 @@
             }
         });
         
-        // Gestionnaires d'événements pour le modal d'importation GPX
-        importGpxButton.addEventListener('click', function() {
-            importGpxModal.classList.remove('hidden');
-            importMessage.textContent = '';
-            importMessage.className = '';
-            importProgress.classList.add('hidden');
-            importProgressBar.style.width = '0%';
-            importProgressText.textContent = '0%';
-        });
-        
-        closeImportModal.addEventListener('click', function() {
-            importGpxModal.classList.add('hidden');
-        });
-        
-        cancelImport.addEventListener('click', function() {
-            importGpxModal.classList.add('hidden');
-        });
-        
-        importGpxForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
+        // Ajouter le gestionnaire pour le formulaire d'importation GPX
+        setTimeout(function() {
+            const elements = getModalElements();
+            if (!elements || !elements.importGpxForm) return;
             
-            try {
-                // Afficher l'indicateur de chargement
-                importLoadingIndicator.classList.remove('hidden');
-                importProgress.classList.remove('hidden');
-                importMessage.textContent = '';
-                importMessage.className = '';
+            const { 
+                importGpxForm, importLoadingIndicator, importProgress,
+                importMessage, importProgressBar, importProgressText 
+            } = elements;
+            
+            importGpxForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
                 
-                // Préparer les données du formulaire
-                const formData = new FormData(importGpxForm);
-                
-                // Envoyer la requête
-                const response = await fetch('/api/geocaches/import-gpx', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                // Gérer la réponse en streaming pour la progression
-                const reader = response.body.getReader();
-                let receivedLength = 0;
-                let chunks = [];
-                
-                while(true) {
-                    const {done, value} = await reader.read();
+                try {
+                    // Afficher l'indicateur de chargement
+                    importLoadingIndicator.classList.remove('hidden');
+                    importProgress.classList.remove('hidden');
+                    importMessage.textContent = '';
+                    importMessage.className = '';
                     
-                    if (done) {
-                        break;
-                    }
+                    // Préparer les données du formulaire
+                    const formData = new FormData(importGpxForm);
                     
-                    chunks.push(value);
-                    receivedLength += value.length;
+                    // Envoyer la requête
+                    const response = await fetch('/api/geocaches/import-gpx', {
+                        method: 'POST',
+                        body: formData
+                    });
                     
-                    // Essayer de parser les données reçues jusqu'à présent
-                    try {
-                        const chunksAll = new Uint8Array(receivedLength);
-                        let position = 0;
-                        for(let chunk of chunks) {
-                            chunksAll.set(chunk, position);
-                            position += chunk.length;
+                    // Gérer la réponse en streaming pour la progression
+                    const reader = response.body.getReader();
+                    let receivedLength = 0;
+                    let chunks = [];
+                    
+                    while(true) {
+                        const {done, value} = await reader.read();
+                        
+                        if (done) {
+                            break;
                         }
                         
-                        const result = new TextDecoder("utf-8").decode(chunksAll);
-                        const lines = result.split('\n');
+                        chunks.push(value);
+                        receivedLength += value.length;
                         
-                        for (const line of lines) {
-                            if (line.trim()) {
-                                try {
-                                    const data = JSON.parse(line);
-                                    if (data.progress !== undefined) {
-                                        importProgressBar.style.width = `${data.progress}%`;
-                                        importProgressText.textContent = `${data.progress}%`;
+                        // Essayer de parser les données reçues jusqu'à présent
+                        try {
+                            const chunksAll = new Uint8Array(receivedLength);
+                            let position = 0;
+                            for(let chunk of chunks) {
+                                chunksAll.set(chunk, position);
+                                position += chunk.length;
+                            }
+                            
+                            const result = new TextDecoder("utf-8").decode(chunksAll);
+                            const lines = result.split('\n');
+                            
+                            for (const line of lines) {
+                                if (line.trim()) {
+                                    try {
+                                        const data = JSON.parse(line);
+                                        if (data.progress !== undefined) {
+                                            importProgressBar.style.width = `${data.progress}%`;
+                                            importProgressText.textContent = `${data.progress}%`;
+                                        }
+                                        if (data.message) {
+                                            importMessage.textContent = data.message;
+                                            importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
+                                        }
+                                    } catch (e) {
+                                        console.error('Erreur de parsing JSON:', e, line);
                                     }
-                                    if (data.message) {
-                                        importMessage.textContent = data.message;
-                                        importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
-                                    }
-                                } catch (e) {
-                                    console.error('Erreur de parsing JSON:', e, line);
                                 }
                             }
+                        } catch (e) {
+                            console.error('Erreur de traitement des chunks:', e);
                         }
-                    } catch (e) {
-                        console.error('Erreur de traitement des chunks:', e);
                     }
+                    
+                    // Recharger le tableau une fois l'importation terminée
+                    await reloadTable();
+                    
+                    // Afficher le message final
+                    importMessage.textContent = 'Importation terminée avec succès !';
+                    importMessage.className = 'text-green-500';
+                    
+                } catch (error) {
+                    console.error('Erreur:', error);
+                    importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
+                    importMessage.className = 'text-red-500';
+                } finally {
+                    // Cacher l'indicateur de chargement
+                    importLoadingIndicator.classList.add('hidden');
                 }
-                
-                // Recharger le tableau une fois l'importation terminée
-                await reloadTable();
-                
-                // Afficher le message final
-                importMessage.textContent = 'Importation terminée avec succès !';
-                importMessage.className = 'text-green-500';
-                
-            } catch (error) {
-                console.error('Erreur:', error);
-                importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
-                importMessage.className = 'text-red-500';
-            } finally {
-                // Cacher l'indicateur de chargement
-                importLoadingIndicator.classList.add('hidden');
-            }
-        });
+            });
+        }, 200);
     })();
 </script>
