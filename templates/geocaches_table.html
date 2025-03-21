@@ -1,4 +1,37 @@
 <!-- Template pour le tableau des géocaches -->
+<!--
+DOCUMENTATION DU SYSTÈME DE FILTRAGE DES GÉOCACHES
+
+Ce système permet de filtrer les géocaches affichées dans le tableau selon différents critères.
+
+1. FILTRES SIMPLES
+   - Recherche rapide : filtre sur le nom, code GC ou type de cache
+   - Statut : filtre sur l'état de résolution (résolue, non résolue, en cours)
+   - Type : filtre sur le type de cache (Traditional, Mystery, etc.)
+
+2. FILTRES AVANCÉS
+   Les filtres avancés permettent des critères plus précis avec différents opérateurs :
+   - Difficulté/Terrain : valeurs de 1 à 5 (par 0.5)
+   - Type : types disponibles dans la base de données
+   - Statut : résolue, non résolue, en cours
+   - Taille : Micro, Small, Regular, Large, Other
+   - Favoris/Logs : nombre de favoris ou logs
+
+3. OPÉRATEURS DISPONIBLES
+   - Égal à / Différent de : comparaison exacte
+   - Supérieur/Inférieur à : pour les valeurs numériques
+   - Parmi : sélection multiple
+
+4. PARTICULARITÉS TECHNIQUES
+   - Les comparaisons sont insensibles à la casse pour certains champs (ex: taille)
+   - Les valeurs des champs (types, tailles) sont détectées automatiquement depuis les données
+   - Le système utilise le même algorithme pour le filtrage à l'écran et pour la sélection des géocaches à supprimer
+
+5. SUPPRESSION MULTIPLE
+   - Le bouton "Supprimer les géocaches filtrées" permet de supprimer toutes les géocaches correspondant aux filtres actuels
+   - La confirmation indique clairement le nombre de géocaches qui seront supprimées
+-->
+
 <div class="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
     <!-- Formulaire d'ajout de géocache -->
     <div class="flex-shrink-0 gap-4 items-end p-4">
@@ -43,7 +76,7 @@
     <div class="px-4 pb-4">
         <div class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[300px]">
-                <label for="tableFilter" class="block text-sm font-medium text-gray-300 mb-1">Filtrer les géocaches</label>
+                <label for="tableFilter" class="block text-sm font-medium text-gray-300 mb-1">Recherche rapide</label>
                 <div class="relative">
                     <input type="text" id="tableFilter" placeholder="Rechercher par nom, code, type, ..."
                            class="block w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm pl-10">
@@ -55,6 +88,7 @@
                     </button>
                 </div>
             </div>
+            <!-- Anciens filtres simples (on les garde pour la compatibilité) -->
             <div>
                 <label for="statusFilter" class="block text-sm font-medium text-gray-300 mb-1">Statut</label>
                 <select id="statusFilter" class="rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -72,6 +106,65 @@
                 </select>
             </div>
         </div>
+
+        <!-- Système de filtres avancés -->
+        <div class="mt-4">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-sm font-medium text-gray-300">Filtres avancés</h3>
+                <div class="flex gap-2">
+                    <button id="clear-all-filters-btn" class="bg-gray-600 hover:bg-gray-700 text-white text-sm py-1 px-2 rounded inline-flex items-center gap-1 hidden">
+                        <i class="fas fa-trash-alt"></i> Supprimer tous les filtres
+                    </button>
+                    <button id="add-filter-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-2 rounded inline-flex items-center gap-1">
+                        <i class="fas fa-plus"></i> Ajouter un filtre
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Liste des filtres actifs -->
+            <div id="active-filters" class="flex flex-wrap gap-2 mb-3">
+                <!-- Les filtres actifs seront ajoutés ici dynamiquement -->
+            </div>
+            
+            <!-- Formulaire d'ajout de filtre (invisible par défaut) -->
+            <div id="filter-form" class="bg-gray-800 p-3 rounded-md mb-3 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
+                    <div>
+                        <label for="filter-field" class="block text-xs font-medium text-gray-300 mb-1">Champ</label>
+                        <select id="filter-field" class="w-full text-sm rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="difficulty">Difficulté</option>
+                            <option value="terrain">Terrain</option>
+                            <option value="cache_type">Type</option>
+                            <option value="solved">Statut</option>
+                            <option value="size">Taille</option>
+                            <option value="favorites_count">Favoris</option>
+                            <option value="logs_count">Logs</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filter-operator" class="block text-xs font-medium text-gray-300 mb-1">Condition</label>
+                        <select id="filter-operator" class="w-full text-sm rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <!-- Options dynamiques selon le champ -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filter-value" class="block text-xs font-medium text-gray-300 mb-1">Valeur</label>
+                        <select id="filter-value" class="w-full text-sm rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <!-- Options dynamiques selon le champ -->
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button id="apply-filter-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm py-1 px-3 rounded mr-2">
+                            Appliquer
+                        </button>
+                        <button id="cancel-filter-btn" class="bg-gray-600 hover:bg-gray-700 text-white text-sm py-1 px-3 rounded">
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="mt-4 flex justify-end">
             <div class="flex justify-between items-center mb-4">
                 <div class="flex space-x-3">
@@ -81,7 +174,7 @@
                     </div>
                 </div>
                 <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
-                    <i class="fas fa-trash mr-1"></i> Supprimer les géocaches affichées
+                    <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
                 </button>
             </div>
         </div>
@@ -96,7 +189,7 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer <span class="geocaches-count-to-delete font-semibold">0</span> géocaches actuellement affichées ? Cette action est irréversible.</p>
+            <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer <span class="geocaches-count-to-delete font-semibold">0</span> géocaches correspondant aux filtres actuels ? Cette action est irréversible et affectera toutes les géocaches filtrées, même celles qui ne sont pas visibles à l'écran.</p>
             <div class="flex justify-end gap-2">
                 <button class="cancel-delete-multiple bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Annuler
@@ -369,8 +462,69 @@
         const typeFilter = document.getElementById('typeFilter');
         const clearFilterButton = document.getElementById('clearFilter');
         
+        // Éléments pour les filtres avancés
+        const addFilterBtn = document.getElementById('add-filter-btn');
+        const filterForm = document.getElementById('filter-form');
+        const filterField = document.getElementById('filter-field');
+        const filterOperator = document.getElementById('filter-operator');
+        const filterValue = document.getElementById('filter-value');
+        const applyFilterBtn = document.getElementById('apply-filter-btn');
+        const cancelFilterBtn = document.getElementById('cancel-filter-btn');
+        const activeFilters = document.getElementById('active-filters');
+        const clearAllFiltersBtn = document.getElementById('clear-all-filters-btn');
+        
         // Variable pour stocker les géocaches sélectionnées
         let selectedGeocaches = [];
+        
+        // Variable pour stocker les filtres actifs
+        let activeFiltersList = [];
+        
+        // Définitions des opérateurs par type de champ
+        const operatorsByFieldType = {
+            numeric: [
+                { value: "eq", label: "Égal à" },
+                { value: "neq", label: "Différent de" },
+                { value: "gt", label: "Supérieur à" },
+                { value: "gte", label: "Supérieur ou égal à" },
+                { value: "lt", label: "Inférieur à" },
+                { value: "lte", label: "Inférieur ou égal à" }
+            ],
+            categorical: [
+                { value: "eq", label: "Égal à" },
+                { value: "neq", label: "Différent de" },
+                { value: "in", label: "Parmi" }
+            ]
+        };
+        
+        // Définition des champs et leurs types
+        const fieldDefinitions = {
+            difficulty: { type: "numeric", label: "Difficulté", values: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] },
+            terrain: { type: "numeric", label: "Terrain", values: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] },
+            cache_type: { type: "categorical", label: "Type", values: [] }, // Valeurs remplies dynamiquement
+            solved: { 
+                type: "categorical", 
+                label: "Statut", 
+                values: [
+                    { value: "solved", label: "Résolue" },
+                    { value: "not_solved", label: "Non résolue" },
+                    { value: "ongoing", label: "En cours" }
+                ] 
+            },
+            size: { 
+                type: "categorical", 
+                label: "Taille", 
+                values: [
+                    { value: "Micro", label: "Micro" },
+                    { value: "Small", label: "Petite" },
+                    { value: "Regular", label: "Normale" },
+                    { value: "Large", label: "Grande" },
+                    { value: "Other", label: "Autre" }
+                ],
+                caseSensitive: false // Indiquer que ce champ doit être comparé sans tenir compte de la casse
+            },
+            favorites_count: { type: "numeric", label: "Favoris", values: [] }, // Valeurs générées dynamiquement
+            logs_count: { type: "numeric", label: "Logs", values: [] } // Valeurs générées dynamiquement
+        };
         
         // Fonction pour obtenir les références aux éléments des modales dans le conteneur global
         function getModalElements() {
@@ -516,6 +670,27 @@
                         option.textContent = type;
                         typeFilter.appendChild(option);
                     });
+                    
+                    // Remplir également les valeurs pour le filtre avancé de type
+                    fieldDefinitions.cache_type.values = uniqueTypes.map(type => ({ value: type, label: type }));
+                    
+                    // Collecter les tailles uniques pour le filtre de taille
+                    const uniqueSizes = [...new Set(allData.map(row => row.size))].filter(Boolean);
+                    if (uniqueSizes.length > 0) {
+                        // Remplacer les valeurs prédéfinies par les valeurs réelles trouvées dans les données
+                        fieldDefinitions.size.values = uniqueSizes.map(size => ({ value: size, label: size }));
+                        console.log("Tailles uniques trouvées:", uniqueSizes);
+                    }
+                    
+                    // Déterminer les plages pour les favoris et logs
+                    if (allData.length > 0) {
+                        const maxFavorites = Math.max(...allData.map(row => row.favorites_count || 0));
+                        const maxLogs = Math.max(...allData.map(row => row.logs_count || 0));
+                        
+                        // Générer des valeurs sensibles pour ces champs
+                        fieldDefinitions.favorites_count.values = [0, 5, 10, 25, 50, 100, 200, 500, 1000].filter(v => v <= maxFavorites * 1.2);
+                        fieldDefinitions.logs_count.values = [0, 10, 25, 50, 100, 250, 500, 1000, 2000].filter(v => v <= maxLogs * 1.2);
+                    }
                 },
                 rowSelectionChanged: function(data, rows) {
                     // Mettre à jour les géocaches sélectionnées
@@ -545,6 +720,382 @@
             }
         }
 
+        // Fonction pour mettre à jour les opérateurs disponibles en fonction du champ sélectionné
+        function updateOperators() {
+            const fieldName = filterField.value;
+            const fieldType = fieldDefinitions[fieldName].type;
+            
+            // Vider les options existantes
+            filterOperator.innerHTML = '';
+            
+            // Ajouter les nouvelles options
+            operatorsByFieldType[fieldType].forEach(op => {
+                const option = document.createElement('option');
+                option.value = op.value;
+                option.textContent = op.label;
+                filterOperator.appendChild(option);
+            });
+            
+            // Mettre à jour les valeurs
+            updateValues();
+        }
+        
+        // Fonction pour mettre à jour les valeurs disponibles en fonction du champ et de l'opérateur sélectionnés
+        function updateValues() {
+            const fieldName = filterField.value;
+            const operatorValue = filterOperator.value;
+            const fieldDef = fieldDefinitions[fieldName];
+            
+            // Vider les options existantes
+            filterValue.innerHTML = '';
+            
+            // Si l'opérateur est "in", afficher une interface de sélection multiple
+            if (operatorValue === "in") {
+                // Pour l'instant, nous utilisons un select simple avec des instructions
+                const instruction = document.createElement('option');
+                instruction.value = "";
+                instruction.textContent = "Sélectionnez plusieurs valeurs (Ctrl+clic)";
+                instruction.disabled = true;
+                instruction.selected = true;
+                filterValue.appendChild(instruction);
+                
+                // Rendre le select multiple
+                filterValue.setAttribute('multiple', 'multiple');
+                filterValue.setAttribute('size', '4');
+            } else {
+                // Rendre le select simple
+                filterValue.removeAttribute('multiple');
+                filterValue.removeAttribute('size');
+            }
+            
+            // Ajouter les valeurs
+            if (fieldDef.values.length > 0) {
+                // Si les valeurs sont prédéfinies
+                fieldDef.values.forEach(val => {
+                    const option = document.createElement('option');
+                    if (typeof val === 'object') {
+                        option.value = val.value;
+                        option.textContent = val.label;
+                    } else {
+                        option.value = val;
+                        option.textContent = val;
+                    }
+                    filterValue.appendChild(option);
+                });
+            } else {
+                // Si les valeurs doivent être générées dynamiquement
+                if (fieldName === 'favorites_count' || fieldName === 'logs_count') {
+                    // Pour les compteurs, générer des valeurs de 0 à 100 par incréments de 5
+                    for (let i = 0; i <= 100; i += 5) {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = i;
+                        filterValue.appendChild(option);
+                    }
+                }
+                // Pour cache_type, les valeurs sont déjà générées lors de l'initialisation du tableau
+            }
+        }
+        
+        // Fonction pour supprimer tous les filtres actifs
+        function clearAllFilters() {
+            // Vider la liste des filtres actifs
+            activeFiltersList = [];
+            
+            // Supprimer tous les éléments visuels
+            activeFilters.innerHTML = '';
+            
+            // Masquer le bouton de suppression totale
+            clearAllFiltersBtn.classList.add('hidden');
+            
+            // Appliquer les filtres (ou plutôt, les supprimer tous)
+            applyFilters();
+        }
+        
+        // Fonction pour ajouter un filtre actif
+        function addActiveFilter() {
+            const fieldName = filterField.value;
+            const operatorValue = filterOperator.value;
+            const fieldDef = fieldDefinitions[fieldName];
+            let filterValueDisplay;
+            let filterValueData;
+            
+            // Récupérer la valeur sélectionnée
+            if (operatorValue === "in" && filterValue.multiple) {
+                // Pour la sélection multiple
+                const selectedOptions = Array.from(filterValue.selectedOptions);
+                if (selectedOptions.length === 0) return; // Ne rien faire si aucune option n'est sélectionnée
+                
+                filterValueData = selectedOptions.map(opt => opt.value);
+                
+                // Créer une représentation visuelle des valeurs sélectionnées
+                filterValueDisplay = selectedOptions.map(opt => opt.textContent).join(", ");
+            } else {
+                // Pour la sélection simple
+                filterValueData = filterValue.value;
+                filterValueDisplay = filterValue.options[filterValue.selectedIndex].textContent;
+            }
+            
+            // S'assurer que la valeur est du bon type
+            if (fieldDef.type === "numeric" && !Array.isArray(filterValueData)) {
+                // Convertir explicitement en nombre
+                filterValueData = filterValueData.toString();
+            }
+            
+            // Trouver le label de l'opérateur
+            const operatorObj = operatorsByFieldType[fieldDef.type].find(op => op.value === operatorValue);
+            const operatorLabel = operatorObj ? operatorObj.label : operatorValue;
+            
+            // Créer un objet filtre
+            const filter = {
+                id: Date.now(), // Identifiant unique
+                field: fieldName,
+                operator: operatorValue,
+                value: filterValueData,
+                displayText: `${fieldDef.label} ${operatorLabel} ${filterValueDisplay}`
+            };
+            
+            console.log("Nouveau filtre créé:", filter);
+            
+            // Ajouter à la liste des filtres actifs
+            activeFiltersList.push(filter);
+            
+            // Créer l'élément visuel du filtre
+            const filterElement = document.createElement('div');
+            filterElement.className = 'inline-flex items-center bg-blue-600 text-white text-xs rounded-full px-3 py-1';
+            filterElement.dataset.filterId = filter.id;
+            filterElement.innerHTML = `
+                <span class="mr-1">${filter.displayText}</span>
+                <button class="remove-filter text-white hover:text-red-200" data-filter-id="${filter.id}">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            // Ajouter l'élément à la liste des filtres actifs
+            activeFilters.appendChild(filterElement);
+            
+            // Cacher le formulaire d'ajout de filtre
+            filterForm.classList.add('hidden');
+            
+            // Afficher le bouton de suppression totale s'il y a au moins un filtre
+            clearAllFiltersBtn.classList.remove('hidden');
+            
+            // Appliquer les filtres
+            applyFilters();
+        }
+        
+        // Fonction pour supprimer un filtre actif
+        function removeFilter(filterId) {
+            // Supprimer de la liste des filtres actifs
+            activeFiltersList = activeFiltersList.filter(f => f.id.toString() !== filterId.toString());
+            
+            // Supprimer l'élément visuel
+            const filterElement = activeFilters.querySelector(`[data-filter-id="${filterId}"]`);
+            if (filterElement) {
+                filterElement.remove();
+            }
+            
+            // Masquer le bouton de suppression totale s'il n'y a plus de filtres
+            if (activeFiltersList.length === 0) {
+                clearAllFiltersBtn.classList.add('hidden');
+            }
+            
+            // Appliquer les filtres mis à jour
+            applyFilters();
+        }
+        
+        // Fonction pour appliquer tous les filtres actifs
+        function applyFilters() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (!table) return;
+            
+            // Obtenir les valeurs des filtres simples (recherche, statut, type)
+            const textFilter = tableFilter.value.toLowerCase();
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            // Si aucun filtre actif et aucun filtre simple, supprimer tous les filtres
+            if (activeFiltersList.length === 0 && !textFilter && !statusValue && !typeValue) {
+                console.log("Aucun filtre actif, affichage de toutes les données");
+                table.clearFilter();
+                
+                // Vérifier le nombre réel de lignes affichées
+                setTimeout(() => {
+                    const visibleRows = table.getRows("visible");
+                    console.log(`Après suppression des filtres: ${visibleRows.length} géocaches visibles`);
+                }, 50);
+                
+                return;
+            }
+            
+            // Obtenir toutes les données pour des logs de diagnostic
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            // Appliquer tous les filtres
+            table.setFilter(function(data) {
+                let matchesAllFilters = true;
+                
+                // Vérifier les filtres simples
+                // Filtre textuel
+                if (textFilter) {
+                    const textMatch = (
+                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                    );
+                    if (!textMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de statut
+                if (statusValue && matchesAllFilters) {
+                    const statusMatch = data.solved === statusValue;
+                    if (!statusMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de type
+                if (typeValue && matchesAllFilters) {
+                    const typeMatch = data.cache_type === typeValue;
+                    if (!typeMatch) matchesAllFilters = false;
+                }
+                
+                // Vérifier les filtres avancés
+                for (const filter of activeFiltersList) {
+                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
+                    
+                    const fieldValue = data[filter.field];
+                    const filterValue = filter.value;
+                    const fieldDef = fieldDefinitions[filter.field];
+                    
+                    // Log pour débogage
+                    console.log(`Comparaison pour ${filter.field}: valeur dans données = "${fieldValue}" (${typeof fieldValue}), valeur de filtre = "${filterValue}" (${typeof filterValue})`);
+                    
+                    // Vérifier si la valeur existe
+                    if (fieldValue === undefined || fieldValue === null) {
+                        matchesAllFilters = false;
+                        continue;
+                    }
+                    
+                    // Convertir les valeurs en nombres pour les champs numériques
+                    let dataValue = fieldValue;
+                    let comparisonValue = filterValue;
+                    
+                    if (fieldDef?.type === "numeric") {
+                        dataValue = parseFloat(dataValue);
+                        comparisonValue = parseFloat(comparisonValue);
+                        
+                        // Vérifier si la conversion a réussi
+                        if (isNaN(dataValue) || isNaN(comparisonValue)) {
+                            console.warn(`Conversion en nombre échouée pour ${filter.field}: ${dataValue} ou ${comparisonValue}`);
+                            matchesAllFilters = false;
+                            continue;
+                        }
+                    }
+                    
+                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    if (fieldDef?.caseSensitive === false) {
+                        dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
+                        comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
+                    }
+                    
+                    // Appliquer l'opérateur approprié
+                    switch (filter.operator) {
+                        case "eq":
+                            matchesAllFilters = dataValue === comparisonValue;
+                            break;
+                        case "neq":
+                            matchesAllFilters = dataValue !== comparisonValue;
+                            break;
+                        case "gt":
+                            matchesAllFilters = dataValue > comparisonValue;
+                            break;
+                        case "gte":
+                            matchesAllFilters = dataValue >= comparisonValue;
+                            break;
+                        case "lt":
+                            matchesAllFilters = dataValue < comparisonValue;
+                            break;
+                        case "lte":
+                            matchesAllFilters = dataValue <= comparisonValue;
+                            break;
+                        case "in":
+                            // Pour les opérateurs "in" (parmi)
+                            if (Array.isArray(comparisonValue)) {
+                                if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
+                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
+                                    matchesAllFilters = lowerCaseValues.includes(dataValue);
+                                } else {
+                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    const stringComparisonValues = comparisonValue.map(v => v.toString());
+                                    matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
+                                }
+                            } else {
+                                matchesAllFilters = dataValue.toString() === comparisonValue.toString();
+                            }
+                            break;
+                        default:
+                            console.warn(`Opérateur non reconnu: ${filter.operator}`);
+                            matchesAllFilters = true;
+                    }
+                    
+                    // Log pour débogage
+                    console.log(`Résultat de comparaison: ${matchesAllFilters} (opérateur: ${filter.operator})`);
+                }
+                
+                return matchesAllFilters;
+            });
+            
+            // Vérification et diagnostic après filtrage
+            setTimeout(() => {
+                const visibleRows = table.getRows("visible");
+                console.log(`Après filtrage avancé: ${visibleRows.length} géocaches visibles`);
+                
+                // Log des filtres actifs pour diagnostic
+                console.log("Filtres actifs:", activeFiltersList);
+                
+                // Vérification manuelle pour le débogage
+                if (visibleRows.length === 0 && activeFiltersList.length > 0) {
+                    console.log("Aucun résultat trouvé. Vérification manuelle des correspondances...");
+                    
+                    // Vérifier manuellement combien d'éléments correspondent aux critères
+                    const matches = allData.filter(item => {
+                        for (const filter of activeFiltersList) {
+                            const fieldValue = item[filter.field];
+                            if (fieldValue === undefined || fieldValue === null) return false;
+                            
+                            // Convertir pour les comparaisons numériques
+                            let dataValue = fieldValue;
+                            let comparisonValue = filter.value;
+                            const fieldDef = fieldDefinitions[filter.field];
+                            
+                            if (fieldDef?.type === "numeric") {
+                                dataValue = parseFloat(dataValue);
+                                comparisonValue = parseFloat(comparisonValue);
+                            }
+                            
+                            // Pour les champs insensibles à la casse
+                            if (fieldDef?.caseSensitive === false) {
+                                dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
+                                comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
+                            }
+                            
+                            // Pour les filtres d'égalité, qui sont les plus courants
+                            if (filter.operator === "eq" && dataValue != comparisonValue) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    });
+                    
+                    console.log(`Vérification manuelle: ${matches.length} correspondances trouvées.`);
+                    if (matches.length > 0) {
+                        console.log("Exemples de correspondances:", matches.slice(0, 3));
+                    }
+                }
+            }, 100);
+        }
+
         // Fonction pour ouvrir le modal de confirmation de suppression multiple
         function openDeleteMultipleModal() {
             const elements = getModalElements();
@@ -552,65 +1103,136 @@
             
             const { deleteMultipleModal, geocachesCountToDelete } = elements;
             
-            // Obtenir toutes les géocaches actuellement visibles dans le tableau
+            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             
             if (!table) return;
             
-            // Vérifier si des filtres sont actifs
+            // Récupérer toutes les données
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            // Obtenir les valeurs des filtres simples (recherche, statut, type)
             const textFilter = tableFilter.value.toLowerCase();
             const statusValue = statusFilter.value;
             const typeValue = typeFilter.value;
             
-            let geocachesToDelete;
-            
-            // Utiliser notre propre logique de filtrage pour toutes les données, que des filtres soient actifs ou non
-            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
-            
-            if (!textFilter && !statusValue && !typeValue) {
-                // Si aucun filtre n'est actif, utiliser toutes les données
-                geocachesToDelete = allData;
-            } else {
-                // Appliquer manuellement le filtre sur toutes les données
-                geocachesToDelete = allData.filter(function(data) {
-                    let textMatch = true;
-                    let statusMatch = true;
-                    let typeMatch = true;
+            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
+            const geocachesToDelete = allData.filter(data => {
+                let matchesAllFilters = true;
+                
+                // Vérifier les filtres simples
+                // Filtre textuel
+                if (textFilter) {
+                    const textMatch = (
+                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                    );
+                    if (!textMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de statut
+                if (statusValue && matchesAllFilters) {
+                    const statusMatch = data.solved === statusValue;
+                    if (!statusMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de type
+                if (typeValue && matchesAllFilters) {
+                    const typeMatch = data.cache_type === typeValue;
+                    if (!typeMatch) matchesAllFilters = false;
+                }
+                
+                // Vérifier les filtres avancés
+                for (const filter of activeFiltersList) {
+                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
                     
-                    // Filtre textuel
-                    if (textFilter) {
-                        textMatch = (
-                            (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
-                            (data.name && data.name.toLowerCase().includes(textFilter)) ||
-                            (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
-                        );
+                    const fieldValue = data[filter.field];
+                    const filterValue = filter.value;
+                    const fieldDef = fieldDefinitions[filter.field];
+                    
+                    // Vérifier si la valeur existe
+                    if (fieldValue === undefined || fieldValue === null) {
+                        matchesAllFilters = false;
+                        continue;
                     }
                     
-                    // Filtre de statut
-                    if (statusValue) {
-                        statusMatch = data.solved === statusValue;
+                    // Convertir les valeurs en nombres pour les champs numériques
+                    let dataValue = fieldValue;
+                    let comparisonValue = filterValue;
+                    
+                    if (fieldDef?.type === "numeric") {
+                        dataValue = parseFloat(dataValue);
+                        comparisonValue = parseFloat(comparisonValue);
+                        
+                        // Vérifier si la conversion a réussi
+                        if (isNaN(dataValue) || isNaN(comparisonValue)) {
+                            matchesAllFilters = false;
+                            continue;
+                        }
                     }
                     
-                    // Filtre de type
-                    if (typeValue) {
-                        typeMatch = data.cache_type === typeValue;
+                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    if (fieldDef?.caseSensitive === false) {
+                        dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
+                        comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
                     }
                     
-                    return textMatch && statusMatch && typeMatch;
-                });
-            }
+                    // Appliquer l'opérateur approprié
+                    switch (filter.operator) {
+                        case "eq":
+                            matchesAllFilters = dataValue === comparisonValue;
+                            break;
+                        case "neq":
+                            matchesAllFilters = dataValue !== comparisonValue;
+                            break;
+                        case "gt":
+                            matchesAllFilters = dataValue > comparisonValue;
+                            break;
+                        case "gte":
+                            matchesAllFilters = dataValue >= comparisonValue;
+                            break;
+                        case "lt":
+                            matchesAllFilters = dataValue < comparisonValue;
+                            break;
+                        case "lte":
+                            matchesAllFilters = dataValue <= comparisonValue;
+                            break;
+                        case "in":
+                            // Pour les opérateurs "in" (parmi)
+                            if (Array.isArray(comparisonValue)) {
+                                if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
+                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
+                                    matchesAllFilters = lowerCaseValues.includes(dataValue);
+                                } else {
+                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    const stringComparisonValues = comparisonValue.map(v => v.toString());
+                                    matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
+                                }
+                            } else {
+                                matchesAllFilters = dataValue.toString() === comparisonValue.toString();
+                            }
+                            break;
+                        default:
+                            matchesAllFilters = true;
+                    }
+                }
+                
+                return matchesAllFilters;
+            });
             
-            // Vérifier s'il y a des géocaches visibles
+            console.log(`Sélection manuelle de ${geocachesToDelete.length} géocaches filtrées sur un total de ${allData.length}.`);
+            
+            // Vérifier s'il y a des géocaches correspondant aux filtres
             if (!geocachesToDelete || geocachesToDelete.length === 0) {
-                alert("Aucune géocache n'est actuellement affichée. Veuillez ajuster vos filtres.");
+                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
                 return;
             }
             
             // Stocker les géocaches pour la suppression
             selectedGeocaches = geocachesToDelete;
-            
-            console.log(`Suppression de ${selectedGeocaches.length} géocaches sur un total de ${window[`allGeocachesData_${tableId}`]?.length || table.getData().length}.`);
             
             if (geocachesCountToDelete) {
                 geocachesCountToDelete.textContent = selectedGeocaches.length;
@@ -705,104 +1327,13 @@
         // Initialiser Tabulator au chargement
         const table = initializeTabulator();
 
-        // Fonction pour filtrer le tableau
+        // Fonction pour filtrer le tableau avec le filtre simple
         function filterTable() {
-            const tableId = `geocaches-table-{{ zone_id }}`;
-            const table = window[`tabulator_${tableId}`];
-            if (!table) return;
-            
-            // Obtenir les valeurs des filtres
-            const textFilter = tableFilter.value.toLowerCase();
-            const statusValue = statusFilter.value;
-            const typeValue = typeFilter.value;
-            
-            console.log(`Filtrage: texte="${textFilter}", statut="${statusValue}", type="${typeValue}"`);
-            
-            // Si aucun filtre actif, supprimer tous les filtres existants
-            if (!textFilter && !statusValue && !typeValue) {
-                console.log("Aucun filtre actif, affichage de toutes les données");
-                table.clearFilter();
-                
-                // Vérifier le nombre réel de lignes affichées
-                setTimeout(() => {
-                    const visibleRows = table.getRows("visible");
-                    console.log(`Après suppression des filtres: ${visibleRows.length} géocaches visibles`);
-                }, 50);
-                
-                return;
-            }
-            
-            // Appliquer le filtre - utiliser une fonction identique à celle de openDeleteMultipleModal
-            // pour garantir la cohérence entre ce que l'utilisateur voit et ce qui sera supprimé
-            table.setFilter(function(data) {
-                let textMatch = true;
-                let statusMatch = true;
-                let typeMatch = true;
-                
-                // Filtre textuel
-                if (textFilter) {
-                    textMatch = (
-                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
-                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
-                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
-                    );
-                }
-                
-                // Filtre de statut
-                if (statusValue) {
-                    statusMatch = data.solved === statusValue;
-                }
-                
-                // Filtre de type
-                if (typeValue) {
-                    typeMatch = data.cache_type === typeValue;
-                }
-                
-                return textMatch && statusMatch && typeMatch;
-            });
-            
-            // Vérifier le nombre réel de lignes affichées après filtrage
-            setTimeout(() => {
-                const visibleRows = table.getRows("visible");
-                console.log(`Après filtrage: ${visibleRows.length} géocaches visibles`);
-                
-                // Filtrer manuellement pour vérification
-                const allData = window[`allGeocachesData_${tableId}`] || table.getData();
-                const manuallyFiltered = allData.filter(data => {
-                    let textMatch = true;
-                    let statusMatch = true;
-                    let typeMatch = true;
-                    
-                    if (textFilter) {
-                        textMatch = (
-                            (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
-                            (data.name && data.name.toLowerCase().includes(textFilter)) ||
-                            (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
-                        );
-                    }
-                    
-                    if (statusValue) {
-                        statusMatch = data.solved === statusValue;
-                    }
-                    
-                    if (typeValue) {
-                        typeMatch = data.cache_type === typeValue;
-                    }
-                    
-                    return textMatch && statusMatch && typeMatch;
-                });
-                
-                console.log(`Résultat du filtrage manuel: ${manuallyFiltered.length} géocaches correspondantes`);
-                
-                // Si différence, forcer l'actualisation
-                if (manuallyFiltered.length !== visibleRows.length) {
-                    console.log("Différence détectée entre filtrage Tabulator et manuel, forçage de l'actualisation");
-                    setTimeout(() => table.refreshFilter(), 10);
-                }
-            }, 100);
+            // Appliquer tous les filtres (simples + avancés)
+            applyFilters();
         }
 
-        // Gestionnaires d'événements pour les filtres
+        // Gestionnaires d'événements pour les filtres simples
         tableFilter.addEventListener('input', filterTable);
         statusFilter.addEventListener('change', filterTable);
         typeFilter.addEventListener('change', filterTable);
@@ -811,6 +1342,35 @@
         clearFilterButton.addEventListener('click', function() {
             tableFilter.value = '';
             filterTable();
+        });
+        
+        // Gestionnaires d'événements pour les filtres avancés
+        addFilterBtn.addEventListener('click', function() {
+            filterForm.classList.remove('hidden');
+            
+            // Initialiser le formulaire
+            updateOperators();
+        });
+        
+        cancelFilterBtn.addEventListener('click', function() {
+            filterForm.classList.add('hidden');
+        });
+        
+        applyFilterBtn.addEventListener('click', addActiveFilter);
+        
+        // Gestionnaire pour le changement de champ
+        filterField.addEventListener('change', updateOperators);
+        
+        // Gestionnaire pour le changement d'opérateur
+        filterOperator.addEventListener('change', updateValues);
+        
+        // Gestionnaire pour les boutons de suppression de filtre (délégation d'événements)
+        activeFilters.addEventListener('click', function(e) {
+            const removeButton = e.target.closest('.remove-filter');
+            if (removeButton) {
+                const filterId = removeButton.dataset.filterId;
+                removeFilter(filterId);
+            }
         });
         
         // Fonction pour initialiser les gestionnaires d'événements après le déplacement des modales
@@ -1080,5 +1640,8 @@
                 }
             });
         }, 200);
+
+        // Gestionnaire pour le bouton de suppression de tous les filtres
+        clearAllFiltersBtn.addEventListener('click', clearAllFilters);
     })();
 </script>

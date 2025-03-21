@@ -1,110 +1,63 @@
-# MysteryAI - Assistant Intelligent pour Géocaches
+# MysteryAI - Gestionnaire de Géocaches
 
-## Description
-
-MysteryAI est une application de bureau moderne conçue pour aider à la résolution de géocaches mystères. Elle combine une interface utilisateur intuitive avec des outils puissants d'analyse et de résolution.
+Application web pour gérer les géocaches, particulièrement adaptée aux Mystery Caches (géocaches nécessitant la résolution d'énigmes).
 
 ## Fonctionnalités Principales
 
-- **Gestion des Géocaches**
-  - Import depuis Geocaching.com
-  - Organisation par zones
-  - Waypoints additionnels
-  - Notes et annotations
+### Gestion des Géocaches
+- **Ajout de géocaches** par code GC
+- **Importation par fichier GPX** (PocketQuery)
+- **Visualisation des géocaches** dans un tableau interactif
+- **Filtrage avancé** selon de multiples critères
+- **Suppression individuelle ou multiple** des géocaches
 
-- **Système de Notes**
-  - Types de notes personnalisables
-  - Interface moderne avec HTMX
-  - Organisation claire des informations
-  - Édition et suppression faciles
+### Filtrage des Géocaches
+Le système de filtrage permet de trouver facilement les géocaches correspondant à des critères spécifiques:
 
-- **Gestion des Images**
-  - Éditeur d'image intégré
-  - Historique des modifications
-  - Organisation par géocache
+1. **Filtres Simples**
+   - Recherche rapide (nom, code GC, type)
+   - Filtres par statut et type
 
-- **Plugins**
-  - Outils de résolution
-  - Analyseurs de texte
-  - Convertisseurs de coordonnées
+2. **Filtres Avancés**
+   - Filtres par difficulté/terrain (1-5)
+   - Filtres par taille (Micro, Small, Regular, Large, Other)
+   - Filtres par nombre de favoris ou logs
+   - Opérateurs multiples (égal, supérieur à, parmi, etc.)
 
-## Installation
+3. **Caractéristiques Techniques**
+   - Comparaisons insensibles à la casse pour certains champs
+   - Détection automatique des valeurs disponibles
+   - Interface utilisateur intuitive pour la création et gestion des filtres
 
-### Prérequis
+### Suppression Multiple
+- Suppression de toutes les géocaches correspondant aux filtres actuellement appliqués
+- Confirmation avec indication claire du nombre de géocaches affectées
 
-- Python 3.8+
-- Node.js 14+
-- SQLite 3
+### Visualisation Cartographique
+- Affichage des géocaches sur une carte interactive
+- Navigation facilitée entre les différentes géocaches
 
-### Installation des Dépendances
+## Améliorations Récentes
 
-```bash
-# Backend
-pip install -r requirements.txt
+### Version 1.3.0
+- Correction de la suppression multiple pour ne cibler que les géocaches filtrées
+- Amélioration du système de filtrage pour supporter l'insensibilité à la casse
+- Correction du filtre par taille pour reconnaître correctement toutes les valeurs
+- Détection automatique des valeurs de taille présentes dans les données
 
-# Frontend
-npm install
-```
+## Instructions d'Installation
 
-### Configuration
+1. Cloner le dépôt
+2. Installer les dépendances: `pip install -r requirements.txt`
+3. Configurer la base de données
+4. Lancer l'application: `python app.py`
 
-1. Copier `.env.example` vers `.env`
-2. Configurer les variables d'environnement
-3. Initialiser la base de données :
-   ```bash
-   flask db upgrade
-   ```
+## Développement
 
-## Utilisation
+### Structure du Code
+- Frontend: HTML/CSS/JavaScript avec Tailwind CSS et Tabulator
+- Backend: Flask avec SQLAlchemy
+- Base de données: SQLite (par défaut)
 
-### Démarrage
-
-```bash
-# Mode développement
-npm run dev
-
-# Mode production
-npm run start
-```
-
-### Interface
-
-1. **Géocaches**
-   - Liste à gauche
-   - Détails au centre
-   - Notes en bas
-
-2. **Notes**
-   - Cliquer sur "+" pour ajouter
-   - Types : personnelle, système, indice, spoiler
-   - Édition en temps réel
-
-3. **Images**
-   - Glisser-déposer pour importer
-   - Double-clic pour éditer
-   - Menu contextuel pour les options
-
-## Documentation
-
-Documentation détaillée disponible dans le dossier `docs/` :
-
-- [Architecture](docs/architecture.md)
-- [Notes](docs/notes.md)
-- [Images](docs/images.md)
-- [Plugins](docs/plugins.md)
-
-## Contribution
-
-1. Fork le projet
-2. Créer une branche (`git checkout -b feature/AmazingFeature`)
-3. Commit les changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrir une Pull Request
-
-## Licence
-
-Distribué sous la licence MIT. Voir `LICENSE` pour plus d'informations.
-
-## Contact
-
-Créé par [Votre Nom] - [votre.email@example.com]
+### Contribution
+Les contributions sont les bienvenues! N'hésitez pas à soumettre des pull requests ou à ouvrir des issues pour tout problème rencontré.
