@@ -181,6 +181,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <button id="copy-to-zone-btn-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-copy mr-1"></i> Copier vers une zone
                     </button>
+                    <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
+                        <i class="fas fa-share mr-1"></i> Déplacer vers une zone
+                    </button>
                     <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
                     </button>
@@ -1963,8 +1966,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         }
 
         // Fonction pour ouvrir la modale de copie vers une zone
-        function openCopyToZoneModal() {
-            console.log("Ouverture de la modale de copie vers une zone");
+        function openCopyToZoneModal(action = 'copy') {
+            console.log(`Ouverture de la modale pour ${action === 'copy' ? 'copier' : 'déplacer'} les géocaches`);
             
             // Vérifier si la modale est dans le conteneur global
             const modalContainer = window.parent.document.getElementById('modals-container');
@@ -1987,34 +1990,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     
                     // Récupérer la référence de la modale dans le conteneur global
                     copyToZoneModal = modalContainer.querySelector('#copyToZoneModal-{{ zone_id }}');
-                    
-                    // Réinitialiser les gestionnaires d'événements après le déplacement
-                    const closeButton = copyToZoneModal.querySelector('.close-copy-to-zone-modal');
-                    if (closeButton) {
-                        closeButton.addEventListener('click', closeCopyToZoneModal);
-                    }
-                    
-                    const cancelButton = copyToZoneModal.querySelector('.cancel-copy-to-zone');
-                    if (cancelButton) {
-                        cancelButton.addEventListener('click', closeCopyToZoneModal);
-                    }
-                    
-                    const confirmButton = copyToZoneModal.querySelector('.confirm-copy-to-zone');
-                    if (confirmButton) {
-                        confirmButton.addEventListener('click', copyToSelectedZone);
-                    }
-                    
-                    // Gestionnaire pour fermer en cliquant en dehors
-                    copyToZoneModal.addEventListener('click', function(e) {
-                        if (e.target === this) {
-                            closeCopyToZoneModal();
-                        }
-                    });
-                    
-                    console.log("Modale déplacée et gestionnaires d'événements initialisés");
-                } else {
-                    console.error("Modale non trouvée ni localement ni globalement");
-                    return;
                 }
             }
 
@@ -2024,7 +1999,59 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 return;
             }
 
-            const { geocachesCountToCopy, targetZoneSelect } = elements;
+            // Mettre à jour les textes selon l'action
+            const modalTitle = copyToZoneModal.querySelector('h3');
+            const modalText = copyToZoneModal.querySelector('p');
+            const confirmButton = copyToZoneModal.querySelector('.confirm-copy-to-zone');
+            const closeButton = copyToZoneModal.querySelector('.close-copy-to-zone-modal');
+            const cancelButton = copyToZoneModal.querySelector('.cancel-copy-to-zone');
+            
+            // Réinitialiser les gestionnaires d'événements
+            if (closeButton) {
+                closeButton.onclick = closeCopyToZoneModal;
+            }
+            
+            if (cancelButton) {
+                cancelButton.onclick = closeCopyToZoneModal;
+            }
+            
+            if (confirmButton) {
+                confirmButton.onclick = () => {
+                    if (action === 'move') {
+                        moveToSelectedZone();
+                    } else {
+                        copyToSelectedZone();
+                    }
+                };
+            }
+            
+            // Gestionnaire pour fermer en cliquant en dehors
+            copyToZoneModal.onclick = function(e) {
+                if (e.target === this) {
+                    closeCopyToZoneModal();
+                }
+            };
+            
+            if (modalTitle) {
+                modalTitle.textContent = action === 'copy' ? 'Copier vers une zone' : 'Déplacer vers une zone';
+                modalTitle.className = action === 'copy' ? 'text-xl font-bold text-green-500' : 'text-xl font-bold text-yellow-500';
+            }
+            
+            if (modalText) {
+                modalText.textContent = `Sélectionnez la zone où ${action === 'copy' ? 'copier' : 'déplacer'} `;
+                const countSpan = modalText.querySelector('.geocaches-count-to-copy') || document.createElement('span');
+                countSpan.className = 'geocaches-count-to-copy font-semibold';
+                modalText.appendChild(countSpan);
+                modalText.appendChild(document.createTextNode(' géocaches :'));
+            }
+            
+            if (confirmButton) {
+                const buttonSpan = confirmButton.querySelector('span');
+                if (buttonSpan) {
+                    buttonSpan.textContent = action === 'copy' ? 'Copier' : 'Déplacer';
+                }
+                confirmButton.className = `confirm-copy-to-zone ${action === 'copy' ? 'bg-green-500 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-700'} text-white font-bold py-2 px-4 rounded inline-flex items-center`;
+            }
 
             // Obtenir les géocaches filtrées comme pour la suppression
             const tableId = `geocaches-table-{{ zone_id }}`;
@@ -2044,10 +2071,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
             // Stocker les géocaches pour la copie
             selectedGeocaches = geocachesToCopy;
-            console.log(`${selectedGeocaches.length} géocaches sélectionnées pour la copie`);
+            console.log(`${selectedGeocaches.length} géocaches sélectionnées pour ${action === 'copy' ? 'la copie' : 'le déplacement'}`);
 
-            if (geocachesCountToCopy) {
-                geocachesCountToCopy.textContent = selectedGeocaches.length;
+            if (elements.geocachesCountToCopy) {
+                elements.geocachesCountToCopy.textContent = selectedGeocaches.length;
             }
 
             // Recharger la liste des zones
@@ -2061,6 +2088,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 console.error("Impossible d'ouvrir la modale : référence non trouvée");
             }
         }
+
+        // Ajouter les gestionnaires d'événements pour les boutons
+        document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('copy'));
+        document.querySelector('#move-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('move'));
 
         // Attendre que le DOM soit complètement chargé
         document.addEventListener('DOMContentLoaded', function() {
@@ -2259,6 +2290,110 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
                 return matchesAllFilters;
             });
+        }
+
+        // Fonctions utilitaires pour afficher les messages
+        function showError(message) {
+            messageDiv.textContent = message;
+            messageDiv.className = 'mt-2 text-red-600';
+        }
+
+        function showSuccess(message) {
+            messageDiv.textContent = message;
+            messageDiv.className = 'mt-2 text-green-600';
+        }
+
+        // Fonction pour obtenir les IDs des géocaches filtrées
+        function getFilteredGeocacheIds() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (!table) return [];
+
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            const filteredGeocaches = getFilteredGeocaches(allData);
+            return filteredGeocaches.map(g => g.id);
+        }
+
+        // Fonction pour rafraîchir le tableau des géocaches
+        async function refreshGeocachesTable() {
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            if (table) {
+                await table.setData();
+            }
+        }
+
+        async function moveToSelectedZone() {
+            const elements = getModalElements();
+            if (!elements) {
+                showError('Erreur: éléments de la modale non trouvés');
+                return;
+            }
+
+            try {
+                const selectedZoneId = elements.targetZoneSelect.value;
+                if (!selectedZoneId) {
+                    showError('Veuillez sélectionner une zone cible');
+                    return;
+                }
+
+                // Afficher l'indicateur de chargement
+                if (elements.copyLoadingIndicator) {
+                    elements.copyLoadingIndicator.classList.remove('hidden');
+                }
+
+                // Récupérer les IDs des géocaches filtrées
+                const geocacheIds = getFilteredGeocacheIds();
+                if (geocacheIds.length === 0) {
+                    showError('Aucune géocache à déplacer');
+                    return;
+                }
+
+                // Copier d'abord les géocaches vers la nouvelle zone
+                const copyResponse = await fetch('/api/geocaches/copy-to-zone', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        geocache_ids: geocacheIds,
+                        target_zone_id: selectedZoneId
+                    })
+                });
+
+                if (!copyResponse.ok) {
+                    throw new Error('Erreur lors de la copie des géocaches vers la nouvelle zone');
+                }
+
+                // Supprimer ensuite les géocaches de la zone actuelle
+                const deleteResponse = await fetch(`/api/zones/{{ zone_id }}/geocaches`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        geocache_ids: geocacheIds
+                    })
+                });
+
+                if (!deleteResponse.ok) {
+                    throw new Error('Erreur lors de la suppression des géocaches de la zone actuelle');
+                }
+
+                // Fermer la modale et rafraîchir le tableau
+                closeCopyToZoneModal();
+                await refreshGeocachesTable();
+                showSuccess('Les géocaches ont été déplacées avec succès');
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError('Erreur: ' + error.message);
+            } finally {
+                // Cacher l'indicateur de chargement
+                if (elements.copyLoadingIndicator) {
+                    elements.copyLoadingIndicator.classList.add('hidden');
+                }
+            }
         }
     })();
 </script>

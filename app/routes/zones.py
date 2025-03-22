@@ -200,3 +200,34 @@ def copy_geocaches_to_zone():
         db.session.rollback()
         current_app.logger.error(f"Error copying geocaches to zone: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@zones_bp.route('/api/zones/<int:zone_id>/geocaches', methods=['DELETE'])
+def remove_geocaches_from_zone(zone_id):
+    """Supprime des géocaches d'une zone spécifique."""
+    try:
+        data = request.get_json()
+        if not data or 'geocache_ids' not in data:
+            return jsonify({'error': 'Liste des IDs de géocaches manquante'}), 400
+
+        geocache_ids = data['geocache_ids']
+        zone = Zone.query.get_or_404(zone_id)
+
+        # Récupérer toutes les géocaches à supprimer de la zone
+        geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+
+        # Supprimer chaque géocache de la zone
+        for geocache in geocaches:
+            if zone in geocache.zones:
+                geocache.zones.remove(zone)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'{len(geocaches)} géocache(s) supprimée(s) de la zone {zone.name}',
+            'removed_count': len(geocaches)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error removing geocaches from zone: {str(e)}")
+        return jsonify({'error': str(e)}), 500
