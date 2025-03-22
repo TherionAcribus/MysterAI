@@ -29,6 +29,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
 5. SUPPRESSION MULTIPLE
    - Le bouton "Supprimer les géocaches filtrées" permet de supprimer toutes les géocaches correspondant aux filtres actuels
+   - Le bouton "Conserver uniquement les filtrées" permet de supprimer toutes les géocaches ne correspondant PAS aux filtres actuels
    - La confirmation indique clairement le nombre de géocaches qui seront supprimées
 -->
 
@@ -173,9 +174,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         <span class="text-gray-300">géocaches sélectionnées</span>
                     </div>
                 </div>
-                <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
-                    <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
-                </button>
+                <div class="flex gap-3">
+                    <button id="keep-filtered-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded">
+                        <i class="fas fa-filter mr-1"></i> Conserver uniquement les filtrées
+                    </button>
+                    <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
+                        <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -541,8 +547,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 cancelDeleteMultiple: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .cancel-delete-multiple'),
                 confirmDeleteMultiple: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .confirm-delete-multiple'),
                 deleteLoadingIndicator: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .delete-loading-indicator'),
-                
-                // Éléments pour l'importation GPX
+        
+        // Éléments pour l'importation GPX
                 importGpxButton: document.getElementById('importGpxButton'),
                 importGpxModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }}'),
                 closeImportModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #closeImportModal'),
@@ -1101,7 +1107,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             const elements = getModalElements();
             if (!elements) return;
             
-            const { deleteMultipleModal, geocachesCountToDelete } = elements;
+            const { deleteMultipleModal, geocachesCountToDelete, deleteConfirmText } = elements;
             
             // Obtenir toutes les géocaches qui correspondent aux filtres actuels
             const tableId = `geocaches-table-{{ zone_id }}`;
@@ -1236,6 +1242,164 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             
             if (geocachesCountToDelete) {
                 geocachesCountToDelete.textContent = selectedGeocaches.length;
+            }
+            
+            if (deleteConfirmText) {
+                deleteConfirmText.textContent = `Êtes-vous sûr de vouloir supprimer ${selectedGeocaches.length} géocaches filtrées ?`;
+            }
+            
+            if (deleteMultipleModal) {
+                deleteMultipleModal.classList.remove('hidden');
+            }
+        }
+
+        // Fonction pour ouvrir le modal de confirmation de suppression inverse (garder les filtrées, supprimer les autres)
+        function openKeepFilteredModal() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { deleteMultipleModal, geocachesCountToDelete, deleteConfirmText } = elements;
+            
+            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            
+            if (!table) return;
+            
+            // Récupérer toutes les données
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            // Obtenir les valeurs des filtres simples (recherche, statut, type)
+            const textFilter = tableFilter.value.toLowerCase();
+            const statusValue = statusFilter.value;
+            const typeValue = typeFilter.value;
+            
+            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
+            const geocachesToKeep = allData.filter(data => {
+                let matchesAllFilters = true;
+                
+                // Vérifier les filtres simples
+                // Filtre textuel
+                if (textFilter) {
+                    const textMatch = (
+                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
+                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
+                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
+                    );
+                    if (!textMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de statut
+                if (statusValue && matchesAllFilters) {
+                    const statusMatch = data.solved === statusValue;
+                    if (!statusMatch) matchesAllFilters = false;
+                }
+                
+                // Filtre de type
+                if (typeValue && matchesAllFilters) {
+                    const typeMatch = data.cache_type === typeValue;
+                    if (!typeMatch) matchesAllFilters = false;
+                }
+                
+                // Vérifier les filtres avancés
+                for (const filter of activeFiltersList) {
+                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
+                    
+                    const fieldValue = data[filter.field];
+                    const filterValue = filter.value;
+                    const fieldDef = fieldDefinitions[filter.field];
+                    
+                    // Vérifier si la valeur existe
+                    if (fieldValue === undefined || fieldValue === null) {
+                        matchesAllFilters = false;
+                        continue;
+                    }
+                    
+                    // Convertir les valeurs en nombres pour les champs numériques
+                    let dataValue = fieldValue;
+                    let comparisonValue = filterValue;
+                    
+                    if (fieldDef?.type === "numeric") {
+                        dataValue = parseFloat(dataValue);
+                        comparisonValue = parseFloat(comparisonValue);
+                        
+                        // Vérifier si la conversion a réussi
+                        if (isNaN(dataValue) || isNaN(comparisonValue)) {
+                            matchesAllFilters = false;
+                            continue;
+                        }
+                    }
+                    
+                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    if (fieldDef?.caseSensitive === false) {
+                        dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
+                        comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
+                    }
+                    
+                    // Appliquer l'opérateur approprié
+                    switch (filter.operator) {
+                        case "eq":
+                            matchesAllFilters = dataValue === comparisonValue;
+                            break;
+                        case "neq":
+                            matchesAllFilters = dataValue !== comparisonValue;
+                            break;
+                        case "gt":
+                            matchesAllFilters = dataValue > comparisonValue;
+                            break;
+                        case "gte":
+                            matchesAllFilters = dataValue >= comparisonValue;
+                            break;
+                        case "lt":
+                            matchesAllFilters = dataValue < comparisonValue;
+                            break;
+                        case "lte":
+                            matchesAllFilters = dataValue <= comparisonValue;
+                            break;
+                        case "in":
+                            // Pour les opérateurs "in" (parmi)
+                            if (Array.isArray(comparisonValue)) {
+                                if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
+                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
+                                    matchesAllFilters = lowerCaseValues.includes(dataValue);
+                                } else {
+                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    const stringComparisonValues = comparisonValue.map(v => v.toString());
+                                    matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
+                                }
+                            } else {
+                                matchesAllFilters = dataValue.toString() === comparisonValue.toString();
+                            }
+                            break;
+                        default:
+                            matchesAllFilters = true;
+                    }
+                }
+                
+                return matchesAllFilters;
+            });
+            
+            // Stocker la liste des géocaches à conserver
+            const geocachesToDelete = allData.filter(item => !geocachesToKeep.some(keep => keep.id === item.id));
+            
+            console.log(`Sélection inverse: ${geocachesToDelete.length} géocaches à supprimer sur un total de ${allData.length}. ${geocachesToKeep.length} seront conservées.`);
+            
+            // Vérifier s'il y a des géocaches à supprimer
+            if (!geocachesToDelete || geocachesToDelete.length === 0) {
+                alert("Aucune géocache à supprimer. Toutes les géocaches correspondent aux filtres actuels.");
+                return;
+            }
+            
+            // Stocker les géocaches pour la suppression
+            selectedGeocaches = geocachesToDelete;
+            
+            if (geocachesCountToDelete) {
+                geocachesCountToDelete.textContent = selectedGeocaches.length;
+            }
+            
+            if (deleteConfirmText) {
+                deleteConfirmText.textContent = `Êtes-vous sûr de vouloir supprimer ${selectedGeocaches.length} géocaches ? Cette action conservera uniquement les géocaches filtrées (${geocachesToKeep.length} géocaches).`;
             }
             
             if (deleteMultipleModal) {
@@ -1554,94 +1718,122 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 importGpxForm, importLoadingIndicator, importProgress,
                 importMessage, importProgressBar, importProgressText 
             } = elements;
+        
+        importGpxForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
             
-            importGpxForm.addEventListener('submit', async function(event) {
-                event.preventDefault();
+            try {
+                // Afficher l'indicateur de chargement
+                importLoadingIndicator.classList.remove('hidden');
+                importProgress.classList.remove('hidden');
+                importMessage.textContent = '';
+                importMessage.className = '';
                 
-                try {
-                    // Afficher l'indicateur de chargement
-                    importLoadingIndicator.classList.remove('hidden');
-                    importProgress.classList.remove('hidden');
-                    importMessage.textContent = '';
-                    importMessage.className = '';
+                // Préparer les données du formulaire
+                const formData = new FormData(importGpxForm);
+                
+                // Envoyer la requête
+                const response = await fetch('/api/geocaches/import-gpx', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Gérer la réponse en streaming pour la progression
+                const reader = response.body.getReader();
+                let receivedLength = 0;
+                let chunks = [];
+                
+                while(true) {
+                    const {done, value} = await reader.read();
                     
-                    // Préparer les données du formulaire
-                    const formData = new FormData(importGpxForm);
-                    
-                    // Envoyer la requête
-                    const response = await fetch('/api/geocaches/import-gpx', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    // Gérer la réponse en streaming pour la progression
-                    const reader = response.body.getReader();
-                    let receivedLength = 0;
-                    let chunks = [];
-                    
-                    while(true) {
-                        const {done, value} = await reader.read();
-                        
-                        if (done) {
-                            break;
-                        }
-                        
-                        chunks.push(value);
-                        receivedLength += value.length;
-                        
-                        // Essayer de parser les données reçues jusqu'à présent
-                        try {
-                            const chunksAll = new Uint8Array(receivedLength);
-                            let position = 0;
-                            for(let chunk of chunks) {
-                                chunksAll.set(chunk, position);
-                                position += chunk.length;
-                            }
-                            
-                            const result = new TextDecoder("utf-8").decode(chunksAll);
-                            const lines = result.split('\n');
-                            
-                            for (const line of lines) {
-                                if (line.trim()) {
-                                    try {
-                                        const data = JSON.parse(line);
-                                        if (data.progress !== undefined) {
-                                            importProgressBar.style.width = `${data.progress}%`;
-                                            importProgressText.textContent = `${data.progress}%`;
-                                        }
-                                        if (data.message) {
-                                            importMessage.textContent = data.message;
-                                            importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
-                                        }
-                                    } catch (e) {
-                                        console.error('Erreur de parsing JSON:', e, line);
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Erreur de traitement des chunks:', e);
-                        }
+                    if (done) {
+                        break;
                     }
                     
-                    // Recharger le tableau une fois l'importation terminée
-                    await reloadTable();
+                    chunks.push(value);
+                    receivedLength += value.length;
                     
-                    // Afficher le message final
-                    importMessage.textContent = 'Importation terminée avec succès !';
-                    importMessage.className = 'text-green-500';
-                    
-                } catch (error) {
-                    console.error('Erreur:', error);
-                    importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
-                    importMessage.className = 'text-red-500';
-                } finally {
-                    // Cacher l'indicateur de chargement
-                    importLoadingIndicator.classList.add('hidden');
+                    // Essayer de parser les données reçues jusqu'à présent
+                    try {
+                        const chunksAll = new Uint8Array(receivedLength);
+                        let position = 0;
+                        for(let chunk of chunks) {
+                            chunksAll.set(chunk, position);
+                            position += chunk.length;
+                        }
+                        
+                        const result = new TextDecoder("utf-8").decode(chunksAll);
+                        const lines = result.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    const data = JSON.parse(line);
+                                    if (data.progress !== undefined) {
+                                        importProgressBar.style.width = `${data.progress}%`;
+                                        importProgressText.textContent = `${data.progress}%`;
+                                    }
+                                    if (data.message) {
+                                        importMessage.textContent = data.message;
+                                        importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
+                                    }
+                                } catch (e) {
+                                    console.error('Erreur de parsing JSON:', e, line);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Erreur de traitement des chunks:', e);
+                    }
                 }
-            });
+                
+                // Recharger le tableau une fois l'importation terminée
+                await reloadTable();
+                
+                // Afficher le message final
+                importMessage.textContent = 'Importation terminée avec succès !';
+                importMessage.className = 'text-green-500';
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
+                importMessage.className = 'text-red-500';
+            } finally {
+                // Cacher l'indicateur de chargement
+                importLoadingIndicator.classList.add('hidden');
+            }
+        });
         }, 200);
 
         // Gestionnaire pour le bouton de suppression de tous les filtres
         clearAllFiltersBtn.addEventListener('click', clearAllFilters);
+
+        // Fonction pour afficher le formulaire de filtre
+        function showFilterForm() {
+            filterForm.classList.remove('hidden');
+            updateOperators();
+        }
+
+        // Fonction pour masquer le formulaire de filtre
+        function hideFilterForm() {
+            filterForm.classList.add('hidden');
+        }
+
+        // Fonction pour ajouter un filtre
+        function addFilter() {
+            addActiveFilter();
+            hideFilterForm();
+        }
+
+        // Initialiser les écouteurs d'événements pour les filtres et les boutons d'action
+        addFilterBtn.addEventListener('click', showFilterForm);
+        applyFilterBtn.addEventListener('click', addFilter);
+        cancelFilterBtn.addEventListener('click', hideFilterForm);
+        clearAllFiltersBtn.addEventListener('click', clearAllFilters);
+        tableFilter.addEventListener('input', filterTable);
+        statusFilter.addEventListener('change', filterTable);
+        typeFilter.addEventListener('change', filterTable);
+        document.querySelector('#delete-selected-btn-{{ zone_id }}').addEventListener('click', openDeleteMultipleModal);
+        document.querySelector('#keep-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
     })();
 </script>

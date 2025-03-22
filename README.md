@@ -31,6 +31,7 @@ Le système de filtrage permet de trouver facilement les géocaches correspondan
 
 ### Suppression Multiple
 - Suppression de toutes les géocaches correspondant aux filtres actuellement appliqués
+- Conservation des géocaches filtrées uniquement (suppression de toutes les autres)
 - Confirmation avec indication claire du nombre de géocaches affectées
 
 ### Visualisation Cartographique
@@ -44,6 +45,10 @@ Le système de filtrage permet de trouver facilement les géocaches correspondan
 - Amélioration du système de filtrage pour supporter l'insensibilité à la casse
 - Correction du filtre par taille pour reconnaître correctement toutes les valeurs
 - Détection automatique des valeurs de taille présentes dans les données
+
+### Version 1.4.0
+- Ajout d'une fonction pour conserver uniquement les géocaches correspondant aux filtres appliqués
+- Amélioration des messages de confirmation pour clarifier l'action à entreprendre
 
 ## Instructions d'Installation
 
