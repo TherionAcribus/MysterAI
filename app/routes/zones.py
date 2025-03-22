@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for
-from app.models.geocache import Zone
+from app.models.geocache import Zone, Geocache
 from app.database import db
 from flask import current_app
 
@@ -166,3 +166,37 @@ def update_zone(zone_id):
         db.session.rollback()
         current_app.logger.error(f"Error updating zone {zone_id}: {str(e)}")
         return str(e), 400
+
+@zones_bp.route('/api/geocaches/copy-to-zone', methods=['POST'])
+def copy_geocaches_to_zone():
+    """Copie des géocaches vers une zone spécifique."""
+    try:
+        data = request.get_json()
+        if not data or 'geocache_ids' not in data or 'target_zone_id' not in data:
+            return jsonify({'error': 'Données manquantes'}), 400
+
+        geocache_ids = data['geocache_ids']
+        target_zone_id = data['target_zone_id']
+
+        # Vérifier que la zone cible existe
+        target_zone = Zone.query.get_or_404(target_zone_id)
+
+        # Récupérer toutes les géocaches à copier
+        geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+
+        # Ajouter chaque géocache à la zone cible si elle n'y est pas déjà
+        for geocache in geocaches:
+            if target_zone not in geocache.zones:
+                geocache.zones.append(target_zone)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'{len(geocaches)} géocache(s) copiée(s) avec succès vers la zone {target_zone.name}',
+            'copied_count': len(geocaches)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error copying geocaches to zone: {str(e)}")
+        return jsonify({'error': str(e)}), 500
