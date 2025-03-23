@@ -110,7 +110,7 @@
                     <button 
                         id="analyze-geocache-button"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
-                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}'})"
+                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}', gcCode: '{{ geocache.gc_code }}'})"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

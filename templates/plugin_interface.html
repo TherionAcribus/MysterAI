@@ -135,38 +135,46 @@
 <script>
     function executePlugin() {
         const geocacheId = '{{ plugin.params.get('geocacheId', 'default') }}';
-        const form = document.getElementById('plugin-form-' + geocacheId);
-        const formData = new FormData(form);
         const data = {};
-        
-        // Convertir FormData en objet
-        for (let [key, value] of formData.entries()) {
-            data[key] = value;
-        }
-        
-        // Pour le mode, récupérer la valeur du select s'il existe
-        const modeSelect = document.getElementById('mode');
-        if (modeSelect) {
-            data.mode = modeSelect.value;
-        }
-        
-        // Vérifier l'option brute_force s'il est présent
-        const bruteForceCheckbox = document.getElementById('brute_force');
-        if (bruteForceCheckbox) {
-            data.brute_force = bruteForceCheckbox.checked;
+
+        // Si on a un formulaire, récupérer ses données
+        const form = document.getElementById('plugin-form-' + geocacheId);
+        if (form) {
+            const formData = new FormData(form);
+            // Convertir FormData en objet
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            // Pour le mode, récupérer la valeur du select s'il existe
+            const modeSelect = document.getElementById('mode');
+            if (modeSelect) {
+                data.mode = modeSelect.value;
+            }
+            
+            // Vérifier l'option brute_force s'il est présent
+            const bruteForceCheckbox = document.getElementById('brute_force');
+            if (bruteForceCheckbox) {
+                data.brute_force = bruteForceCheckbox.checked;
+            }
+        } else {
+            // Si pas de formulaire, utiliser les paramètres passés au plugin
+            data.geocache_id = geocacheId;
         }
         
         // Montrer le chargement
         const output = document.getElementById('plugin-output-' + geocacheId);
-        output.classList.remove('hidden');
-        output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
+        if (output) {
+            output.classList.remove('hidden');
+            output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
+        }
         
         // Exécuter le plugin
         fetch(`/api/plugins/{{ plugin.name }}/execute`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json' // Demande explicitement du JSON
+                'Accept': 'application/json'
             },
             body: JSON.stringify(data)
         })

@@ -606,13 +606,26 @@ window.openPluginTab = function(pluginName, title, params = {}) {
             // Si l'onglet existe, le mettre en focus
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
-            // Sinon, créer un nouvel onglet
-            window.mainLayout.root.contentItems[0].addChild({
-                type: 'component',
-                componentName: 'plugin',
-                title: title || pluginName,
-                componentState: componentState
-            });
+            // Pour le plugin analysis_web_page avec un geocacheId, utiliser le composant GeocacheAnalysis
+            if (pluginName === 'analysis_web_page' && params.geocacheId) {
+                window.mainLayout.root.contentItems[0].addChild({
+                    type: 'component',
+                    componentName: 'GeocacheAnalysis',
+                    title: title || pluginName,
+                    componentState: {
+                        geocacheId: params.geocacheId,
+                        gcCode: params.gcCode
+                    }
+                });
+            } else {
+                // Sinon, créer un nouvel onglet de plugin standard
+                window.mainLayout.root.contentItems[0].addChild({
+                    type: 'component',
+                    componentName: 'plugin',
+                    title: title || pluginName,
+                    componentState: componentState
+                });
+            }
         }
     } catch (error) {
         console.error('Erreur lors de l\'ouverture du plugin:', error);
