@@ -5,6 +5,7 @@ from .plugins import plugins_bp
 from .alphabets import alphabets_bp
 from .logs import logs_bp
 from app.routes.ai_routes import ai_bp
+from .settings import settings_bp
 
 blueprints = [
     main,
@@ -13,6 +14,7 @@ blueprints = [
     plugins_bp,
     alphabets_bp,
     logs_bp,
-    ai_bp
+    ai_bp,
+    settings_bp
 ]
 
