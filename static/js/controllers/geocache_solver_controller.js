@@ -193,7 +193,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     <div class="mb-4">
                         <input 
                             type="text" 
-                            placeholder="Rechercher un plugin..." 
+                            placeholder="Rechercher un plugin...2" 
                             class="w-full px-3 py-2 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             data-action="input->geocache-solver#filterPlugins">
                     </div>
@@ -710,7 +710,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 <div class="mb-4">
                     <input 
                         type="text" 
-                        placeholder="Rechercher un plugin..." 
+                        placeholder="Rechercher un plugin...1" 
                         class="w-full px-3 py-2 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                         data-action="input->geocache-solver#filterPlugins">
                 </div>

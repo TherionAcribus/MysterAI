@@ -1,4 +1,4 @@
-﻿<!-- Template pour le tableau des géocaches -->
+<!-- Template pour le tableau des géocaches -->
 <!--
 DOCUMENTATION DU SYSTÈME DE FILTRAGE DES GÉOCACHES
 
@@ -1912,7 +1912,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         document.querySelector('#delete-selected-btn-{{ zone_id }}').addEventListener('click', openDeleteMultipleModal);
         document.querySelector('#keep-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
         document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', openCopyToZoneModal);
-        document.querySelector('#solve-filtered-btn-{{ zone_id }}').addEventListener('click', openMultiSolver);
 
         // Gestionnaires pour la modale de copie vers une zone
         const elements = getModalElements();
@@ -2399,165 +2398,44 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
             }
         }
-
-        // Fonction pour ouvrir le multi-solver avec les géocaches filtrées
-        function openMultiSolver() {
-            console.log("Ouverture du multi-solver pour les géocaches filtrées");
-            
-            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
-            const tableId = `geocaches-table-{{ zone_id }}`;
-            const table = window[`tabulator_${tableId}`];
-            
-            if (!table) return;
-            
-            // Récupérer toutes les données
-            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
-            
-            // Obtenir les valeurs des filtres simples (recherche, statut, type)
-            const textFilter = tableFilter.value.toLowerCase();
-            const statusValue = statusFilter.value;
-            const typeValue = typeFilter.value;
-            
-            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
-            const filteredGeocaches = allData.filter(data => {
-                let matchesAllFilters = true;
-                
-                // Vérifier les filtres simples
-                // Filtre textuel
-                if (textFilter) {
-                    const textMatch = (
-                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
-                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
-                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
-                    );
-                    if (!textMatch) matchesAllFilters = false;
-                }
-                
-                // Filtre de statut
-                if (statusValue && matchesAllFilters) {
-                    const statusMatch = data.solved === statusValue;
-                    if (!statusMatch) matchesAllFilters = false;
-                }
-                
-                // Filtre de type
-                if (typeValue && matchesAllFilters) {
-                    const typeMatch = data.cache_type === typeValue;
-                    if (!typeMatch) matchesAllFilters = false;
-                }
-                
-                // Vérifier les filtres avancés
-                for (const filter of activeFiltersList) {
-                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
-                    
-                    const fieldValue = data[filter.field];
-                    const filterValue = filter.value;
-                    const fieldDef = fieldDefinitions[filter.field];
-                    
-                    // Vérifier si la valeur existe
-                    if (fieldValue === undefined || fieldValue === null) {
-                        matchesAllFilters = false;
-                        continue;
-                    }
-                    
-                    // Convertir les valeurs en nombres pour les champs numériques
-                    let dataValue = fieldValue;
-                    let comparisonValue = filterValue;
-                    
-                    if (fieldDef?.type === "numeric") {
-                        dataValue = parseFloat(dataValue);
-                        comparisonValue = parseFloat(comparisonValue);
-                        
-                        // Vérifier si la conversion a réussi
-                        if (isNaN(dataValue) || isNaN(comparisonValue)) {
-                            matchesAllFilters = false;
-                            continue;
-                        }
-                    }
-                    
-                    // Pour les champs insensibles à la casse, convertir en minuscules
-                    if (fieldDef?.caseSensitive === false) {
-                        dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
-                        comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
-                    }
-                    
-                    // Appliquer l'opérateur approprié
-                    switch (filter.operator) {
-                        case "eq":
-                            matchesAllFilters = dataValue === comparisonValue;
-                            break;
-                        case "neq":
-                            matchesAllFilters = dataValue !== comparisonValue;
-                            break;
-                        case "gt":
-                            matchesAllFilters = dataValue > comparisonValue;
-                            break;
-                        case "gte":
-                            matchesAllFilters = dataValue >= comparisonValue;
-                            break;
-                        case "lt":
-                            matchesAllFilters = dataValue < comparisonValue;
-                            break;
-                        case "lte":
-                            matchesAllFilters = dataValue <= comparisonValue;
-                            break;
-                        case "in":
-                            // Pour les opérateurs "in" (parmi)
-                            if (Array.isArray(comparisonValue)) {
-                                if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
-                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
-                                    const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
-                                    matchesAllFilters = lowerCaseValues.includes(dataValue);
-                                } else {
-                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
-                                    const stringComparisonValues = comparisonValue.map(v => v.toString());
-                                    matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
-                                }
-                            } else {
-                                matchesAllFilters = dataValue.toString() === comparisonValue.toString();
-                            }
-                            break;
-                        default:
-                            matchesAllFilters = true;
-                    }
-                }
-                
-                return matchesAllFilters;
-            });
-            
-            console.log(`Filtrage manuel: ${filteredGeocaches.length} géocaches filtrées sur un total de ${allData.length}.`);
-            
-            // Vérifier s'il y a des géocaches correspondant aux filtres
-            if (!filteredGeocaches || filteredGeocaches.length === 0) {
-                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
-                return;
-            }
-            
-            // Préparer les données des géocaches pour le multi-solver
-            const geocachesData = filteredGeocaches.map(g => ({
-                id: g.id,
-                gc_code: g.gc_code,
-                name: g.name
-            }));
-            
-            console.log("Données des géocaches pour le multi-solver:", geocachesData);
-            
-            // Encoder les données des géocaches pour les passer via l'URL
-            const encodedGeocachesData = encodeURIComponent(JSON.stringify(geocachesData));
-            
-            // Ouvrir un nouvel onglet avec le multi-solver
-            window.parent.postMessage({
-                type: 'openMultiSolver',
-                geocaches: geocachesData,
-                component: {
-                    type: 'component',
-                    componentName: 'multi-solver',
-                    title: `Multi-Solver (${geocachesData.length} géocaches)`,
-                    componentState: {
-                        url: `/multi-solver`,
-                        geocaches: geocachesData // Passer les géocaches directement dans le componentState
-                    }
-                }
-            }, '*');
-        }
     })();
-</script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... existing code ...
+
+            // Ajout du gestionnaire pour le bouton "Résoudre les caches filtrées"
+            const solveFilteredBtn = document.getElementById('solve-filtered-btn-{{ zone_id }}');
+            if (solveFilteredBtn) {
+                solveFilteredBtn.addEventListener('click', function() {
+                    console.log('Ouverture du multi-solver pour les géocaches filtrées');
+                    
+                    // Récupérer les IDs des géocaches filtrées
+                    const filteredIds = getFilteredGeocacheIds();
+                    
+                    if (!filteredIds || filteredIds.length === 0) {
+                        alert('Aucune géocache ne correspond aux filtres actuels');
+                        return;
+                    }
+                    
+                    // Ouvrir une nouvelle tab avec le multi-solver
+                    if (window.mainLayout) {
+                        // Stocker temporairement les IDs des géocaches dans une variable globale
+                        window.layoutGeoacheIdsParam = filteredIds;
+                        
+                        // Créer un nouvel onglet avec le multi-solver
+                        window.mainLayout.root.contentItems[0].addChild({
+                            type: 'component',
+                            componentName: 'multi-geocache-solver',
+                            title: `Multi-Solver (${filteredIds.length})`,
+                            componentState: { 
+                                geocacheIds: filteredIds
+                            }
+                        });
+                    } else {
+                        console.error("GoldenLayout n'est pas initialisé");
+                        alert("Erreur: Impossible d'ouvrir le multi-solver");
+                    }
+                });
+            }
+        });

@@ -858,8 +858,8 @@ def get_standalone_solver_panel():
     """Renvoie le panneau HTML du solver sans géocache associée."""
     try:
         return render_template('geocache_solver.html',
-                             geocache_id=None,
-                             gc_code=None)
+                               geocache_id=None,
+                               gc_code=None)
     except Exception as e:
         logger.error(f"Error getting standalone solver panel: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -1816,3 +1816,20 @@ def process_additional_waypoints(geocache, waypoints, ns):
         current_app.logger.error(f"Erreur lors du traitement des waypoints additionnels: {str(e)}")
         db.session.rollback()
         raise
+
+@geocaches_bp.route('/geocaches/solver/panel', methods=['GET'])
+def geocache_solver_panel():
+    """
+    Affiche le panneau du solver pour une géocache spécifiée par son ID
+    """
+    geocache_id = request.args.get('geocache_id')
+    gc_code = request.args.get('gc_code')
+    
+    return render_template('geocache_solver.html', geocache_id=geocache_id, gc_code=gc_code)
+
+@geocaches_bp.route('/multi-solver', methods=['GET'])
+def multi_solver_panel():
+    """
+    Affiche le panneau du multi-solver pour plusieurs géocaches
+    """
+    return render_template('multi_solver.html')

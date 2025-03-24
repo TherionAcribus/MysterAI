@@ -1,40 +1,40 @@
-﻿<!-- Template pour le tableau des géocaches -->
+﻿<!-- Template pour le tableau des gÃ©ocaches -->
 <!--
-DOCUMENTATION DU SYSTÈME DE FILTRAGE DES GÉOCACHES
+DOCUMENTATION DU SYSTÃˆME DE FILTRAGE DES GÃ‰OCACHES
 
-Ce système permet de filtrer les géocaches affichées dans le tableau selon différents critères.
+Ce systÃ¨me permet de filtrer les gÃ©ocaches affichÃ©es dans le tableau selon diffÃ©rents critÃ¨res.
 
 1. FILTRES SIMPLES
    - Recherche rapide : filtre sur le nom, code GC ou type de cache
-   - Statut : filtre sur l'état de résolution (résolue, non résolue, en cours)
+   - Statut : filtre sur l'Ã©tat de rÃ©solution (rÃ©solue, non rÃ©solue, en cours)
    - Type : filtre sur le type de cache (Traditional, Mystery, etc.)
 
-2. FILTRES AVANCÉS
-   Les filtres avancés permettent des critères plus précis avec différents opérateurs :
-   - Difficulté/Terrain : valeurs de 1 à 5 (par 0.5)
-   - Type : types disponibles dans la base de données
-   - Statut : résolue, non résolue, en cours
+2. FILTRES AVANCÃ‰S
+   Les filtres avancÃ©s permettent des critÃ¨res plus prÃ©cis avec diffÃ©rents opÃ©rateurs :
+   - DifficultÃ©/Terrain : valeurs de 1 Ã  5 (par 0.5)
+   - Type : types disponibles dans la base de donnÃ©es
+   - Statut : rÃ©solue, non rÃ©solue, en cours
    - Taille : Micro, Small, Regular, Large, Other
    - Favoris/Logs : nombre de favoris ou logs
 
-3. OPÉRATEURS DISPONIBLES
-   - Égal à / Différent de : comparaison exacte
-   - Supérieur/Inférieur à : pour les valeurs numériques
-   - Parmi : sélection multiple
+3. OPÃ‰RATEURS DISPONIBLES
+   - Ã‰gal Ã  / DiffÃ©rent de : comparaison exacte
+   - SupÃ©rieur/InfÃ©rieur Ã  : pour les valeurs numÃ©riques
+   - Parmi : sÃ©lection multiple
 
-4. PARTICULARITÉS TECHNIQUES
-   - Les comparaisons sont insensibles à la casse pour certains champs (ex: taille)
-   - Les valeurs des champs (types, tailles) sont détectées automatiquement depuis les données
-   - Le système utilise le même algorithme pour le filtrage à l'écran et pour la sélection des géocaches à supprimer
+4. PARTICULARITÃ‰S TECHNIQUES
+   - Les comparaisons sont insensibles Ã  la casse pour certains champs (ex: taille)
+   - Les valeurs des champs (types, tailles) sont dÃ©tectÃ©es automatiquement depuis les donnÃ©es
+   - Le systÃ¨me utilise le mÃªme algorithme pour le filtrage Ã  l'Ã©cran et pour la sÃ©lection des gÃ©ocaches Ã  supprimer
 
 5. SUPPRESSION MULTIPLE
-   - Le bouton "Supprimer les géocaches filtrées" permet de supprimer toutes les géocaches correspondant aux filtres actuels
-   - Le bouton "Conserver uniquement les filtrées" permet de supprimer toutes les géocaches ne correspondant PAS aux filtres actuels
-   - La confirmation indique clairement le nombre de géocaches qui seront supprimées
+   - Le bouton "Supprimer les gÃ©ocaches filtrÃ©es" permet de supprimer toutes les gÃ©ocaches correspondant aux filtres actuels
+   - Le bouton "Conserver uniquement les filtrÃ©es" permet de supprimer toutes les gÃ©ocaches ne correspondant PAS aux filtres actuels
+   - La confirmation indique clairement le nombre de gÃ©ocaches qui seront supprimÃ©es
 -->
 
 <div class="w-full h-full bg-gray-900 flex flex-col overflow-hidden">
-    <!-- Formulaire d'ajout de géocache -->
+    <!-- Formulaire d'ajout de gÃ©ocache -->
     <div class="flex-shrink-0 gap-4 items-end p-4">
         <div class="flex justify-between w-full">
             <div class="flex gap-4">
@@ -73,7 +73,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         <div id="message" class="mt-2"></div>
     </div>
 
-    <!-- Filtre pour le tableau des géocaches -->
+    <!-- Filtre pour le tableau des gÃ©ocaches -->
     <div class="px-4 pb-4">
         <div class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[300px]">
@@ -89,13 +89,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     </button>
                 </div>
             </div>
-            <!-- Anciens filtres simples (on les garde pour la compatibilité) -->
+            <!-- Anciens filtres simples (on les garde pour la compatibilitÃ©) -->
             <div>
                 <label for="statusFilter" class="block text-sm font-medium text-gray-300 mb-1">Statut</label>
                 <select id="statusFilter" class="rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                     <option value="">Tous les statuts</option>
-                    <option value="solved">Résolues</option>
-                    <option value="not_solved">Non résolues</option>
+                    <option value="solved">RÃ©solues</option>
+                    <option value="not_solved">Non rÃ©solues</option>
                     <option value="ongoing">En cours</option>
                 </select>
             </div>
@@ -108,10 +108,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             </div>
         </div>
 
-        <!-- Système de filtres avancés -->
+        <!-- SystÃ¨me de filtres avancÃ©s -->
         <div class="mt-4">
             <div class="flex justify-between items-center mb-2">
-                <h3 class="text-sm font-medium text-gray-300">Filtres avancés</h3>
+                <h3 class="text-sm font-medium text-gray-300">Filtres avancÃ©s</h3>
                 <div class="flex gap-2">
                     <button id="clear-all-filters-btn" class="bg-gray-600 hover:bg-gray-700 text-white text-sm py-1 px-2 rounded inline-flex items-center gap-1 hidden">
                         <i class="fas fa-trash-alt"></i> Supprimer tous les filtres
@@ -124,16 +124,16 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             
             <!-- Liste des filtres actifs -->
             <div id="active-filters" class="flex flex-wrap gap-2 mb-3">
-                <!-- Les filtres actifs seront ajoutés ici dynamiquement -->
+                <!-- Les filtres actifs seront ajoutÃ©s ici dynamiquement -->
             </div>
             
-            <!-- Formulaire d'ajout de filtre (invisible par défaut) -->
+            <!-- Formulaire d'ajout de filtre (invisible par dÃ©faut) -->
             <div id="filter-form" class="bg-gray-800 p-3 rounded-md mb-3 hidden">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
                     <div>
                         <label for="filter-field" class="block text-xs font-medium text-gray-300 mb-1">Champ</label>
                         <select id="filter-field" class="w-full text-sm rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="difficulty">Difficulté</option>
+                            <option value="difficulty">DifficultÃ©</option>
                             <option value="terrain">Terrain</option>
                             <option value="cache_type">Type</option>
                             <option value="solved">Statut</option>
@@ -171,24 +171,24 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 <div class="flex space-x-3">
                     <div id="selected-count-container-{{ zone_id }}" class="hidden">
                         <span class="bg-indigo-600 text-white px-2 py-1 rounded" id="selected-count-{{ zone_id }}">0</span>
-                        <span class="text-gray-300">géocaches sélectionnées</span>
+                        <span class="text-gray-300">gÃ©ocaches sÃ©lectionnÃ©es</span>
                     </div>
                 </div>
                 <div class="flex gap-3">
                     <button id="keep-filtered-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-filter mr-1"></i> Conserver uniquement les filtrées
+                        <i class="fas fa-filter mr-1"></i> Conserver uniquement les filtrÃ©es
                     </button>
                     <button id="copy-to-zone-btn-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-copy mr-1"></i> Copier vers une zone
                     </button>
                     <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-share mr-1"></i> Déplacer vers une zone
+                        <i class="fas fa-share mr-1"></i> DÃ©placer vers une zone
                     </button>
                     <button id="solve-filtered-btn-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-puzzle-piece mr-1"></i> Résoudre les caches filtrées
+                        <i class="fas fa-puzzle-piece mr-1"></i> RÃ©soudre les caches filtrÃ©es
                     </button>
                     <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
+                        <i class="fas fa-trash mr-1"></i> Supprimer les gÃ©ocaches filtrÃ©es
                     </button>
                 </div>
             </div>
@@ -204,7 +204,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir supprimer <span class="geocaches-count-to-delete font-semibold">0</span> géocaches correspondant aux filtres actuels ? Cette action est irréversible et affectera toutes les géocaches filtrées, même celles qui ne sont pas visibles à l'écran.</p>
+            <p class="text-gray-300 mb-6">ÃŠtes-vous sÃ»r de vouloir supprimer <span class="geocaches-count-to-delete font-semibold">0</span> gÃ©ocaches correspondant aux filtres actuels ? Cette action est irrÃ©versible et affectera toutes les gÃ©ocaches filtrÃ©es, mÃªme celles qui ne sont pas visibles Ã  l'Ã©cran.</p>
             <div class="flex justify-end gap-2">
                 <button class="cancel-delete-multiple bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Annuler
@@ -223,7 +223,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
     <div id="importGpxModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-white">Importer des géocaches</h3>
+                <h3 class="text-xl font-bold text-white">Importer des gÃ©ocaches</h3>
                 <button id="closeImportModal" class="text-gray-400 hover:text-white">
                     <i class="fas fa-times"></i>
                 </button>
@@ -233,17 +233,17 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <label for="gpxFile" class="block text-sm font-medium text-gray-300 mb-2">Fichier GPX ou ZIP</label>
                     <input type="file" id="gpxFile" name="gpxFile" accept=".gpx,.zip" required
                            class="block w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-500 file:text-white hover:file:bg-blue-600">
-                    <p class="text-xs text-gray-400 mt-1">Formats acceptés: .gpx (Pocket Query) ou .zip contenant des fichiers GPX</p>
+                    <p class="text-xs text-gray-400 mt-1">Formats acceptÃ©s: .gpx (Pocket Query) ou .zip contenant des fichiers GPX</p>
                     <input type="hidden" name="zone_id" value="{{ zone_id }}">
                 </div>
                 <div class="mb-4">
                     <div class="flex items-center">
                         <input type="checkbox" id="updateExisting" name="updateExisting" class="h-4 w-4 text-blue-600 rounded border-gray-600 bg-gray-700 focus:ring-blue-500">
                         <label for="updateExisting" class="ml-2 block text-sm text-gray-300">
-                            Mettre à jour les waypoints des géocaches existantes
+                            Mettre Ã  jour les waypoints des gÃ©ocaches existantes
                         </label>
                     </div>
-                    <p class="text-xs text-gray-400 mt-1">Si coché, les waypoints additionnels seront ajoutés aux géocaches déjà existantes</p>
+                    <p class="text-xs text-gray-400 mt-1">Si cochÃ©, les waypoints additionnels seront ajoutÃ©s aux gÃ©ocaches dÃ©jÃ  existantes</p>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" id="cancelImport" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
@@ -267,7 +267,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         </div>
     </div>
 
-    <!-- Modal de sélection de zone -->
+    <!-- Modal de sÃ©lection de zone -->
     <div id="copyToZoneModal-{{ zone_id }}" class="copy-to-zone-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
             <div class="flex justify-between items-center mb-4">
@@ -276,7 +276,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <p class="text-gray-300 mb-4">Sélectionnez la zone où copier <span class="geocaches-count-to-copy font-semibold">0</span> géocaches :</p>
+            <p class="text-gray-300 mb-4">SÃ©lectionnez la zone oÃ¹ copier <span class="geocaches-count-to-copy font-semibold">0</span> gÃ©ocaches :</p>
             
             <div class="mb-4">
                 <select id="target-zone-select-{{ zone_id }}" class="w-full rounded-md border-gray-600 bg-gray-700 text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500">
@@ -379,7 +379,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         overflow-x: auto !important;
     }
 
-    /* Style pour les barres de défilement de Tabulator */
+    /* Style pour les barres de dÃ©filement de Tabulator */
     .tabulator-tableholder::-webkit-scrollbar {
         width: 10px;
         height: 10px;
@@ -406,7 +406,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         scrollbar-color: #3c3c3c #1e1e1e;
     }
 
-    /* Style pour les en-têtes de colonnes triables */
+    /* Style pour les en-tÃªtes de colonnes triables */
     .tabulator-col.tabulator-sortable:hover {
         background-color: #2d2d2d !important;
     }
@@ -423,7 +423,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         border-top: 4px solid #e1e1e1 !important;
     }
 
-    /* Style pour les cellules spécifiques */
+    /* Style pour les cellules spÃ©cifiques */
     .tabulator-row .tabulator-cell[tabulator-field="solved"] {
         font-weight: 600 !important;
     }
@@ -444,21 +444,21 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 </style>
 
 <script type="text/javascript">
-    // S'assurer que le script s'exécute dans l'iframe
+    // S'assurer que le script s'exÃ©cute dans l'iframe
     (function() {
-        console.log("Initialisation du tableau des géocaches pour la zone {{ zone_id }}");
+        console.log("Initialisation du tableau des gÃ©ocaches pour la zone {{ zone_id }}");
         
-        // Déplacer les modales vers le conteneur global des modales
+        // DÃ©placer les modales vers le conteneur global des modales
         function moveModalsToGlobalContainer() {
             const modalContainer = window.parent.document.getElementById('modals-container');
             if (modalContainer) {
                 // Modale de suppression multiple
                 const deleteMultipleModal = document.getElementById('deleteMultipleModal-{{ zone_id }}');
                 if (deleteMultipleModal) {
-                    // Vérifier si la modale existe déjà dans le conteneur global
+                    // VÃ©rifier si la modale existe dÃ©jÃ  dans le conteneur global
                     const existingModal = modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }}');
                     if (existingModal) {
-                        // Si elle existe, la supprimer pour éviter les doublons
+                        // Si elle existe, la supprimer pour Ã©viter les doublons
                         existingModal.remove();
                     }
                     
@@ -473,13 +473,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 // Modale d'importation GPX (si elle existe)
                 const importGpxModal = document.getElementById('importGpxModal');
                 if (importGpxModal) {
-                    // Vérifier si la modale existe déjà dans le conteneur global
+                    // VÃ©rifier si la modale existe dÃ©jÃ  dans le conteneur global
                     const existingImportModal = modalContainer.querySelector('#importGpxModal-{{ zone_id }}');
                     if (existingImportModal) {
                         existingImportModal.remove();
                     }
                     
-                    // Renommer la modale pour éviter les conflits
+                    // Renommer la modale pour Ã©viter les conflits
                     importGpxModal.id = 'importGpxModal-{{ zone_id }}';
                     
                     // Cloner et ajouter au conteneur global
@@ -492,7 +492,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         }
         
-        // Appeler cette fonction pour déplacer les modales dès que possible
+        // Appeler cette fonction pour dÃ©placer les modales dÃ¨s que possible
         setTimeout(moveModalsToGlobalContainer, 0);
         
         const form = document.getElementById('addGeocacheForm');
@@ -502,13 +502,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         const submitButton = form.querySelector('button[type="submit"]');
         const openMapButton = document.getElementById('openMapButton');
         
-        // Éléments de filtrage du tableau
+        // Ã‰lÃ©ments de filtrage du tableau
         const tableFilter = document.getElementById('tableFilter');
         const statusFilter = document.getElementById('statusFilter');
         const typeFilter = document.getElementById('typeFilter');
         const clearFilterButton = document.getElementById('clearFilter');
         
-        // Éléments pour les filtres avancés
+        // Ã‰lÃ©ments pour les filtres avancÃ©s
         const addFilterBtn = document.getElementById('add-filter-btn');
         const filterForm = document.getElementById('filter-form');
         const filterField = document.getElementById('filter-field');
@@ -519,40 +519,40 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         const activeFilters = document.getElementById('active-filters');
         const clearAllFiltersBtn = document.getElementById('clear-all-filters-btn');
         
-        // Variable pour stocker les géocaches sélectionnées
+        // Variable pour stocker les gÃ©ocaches sÃ©lectionnÃ©es
         let selectedGeocaches = [];
         
         // Variable pour stocker les filtres actifs
         let activeFiltersList = [];
         
-        // Définitions des opérateurs par type de champ
+        // DÃ©finitions des opÃ©rateurs par type de champ
         const operatorsByFieldType = {
             numeric: [
-                { value: "eq", label: "Égal à" },
-                { value: "neq", label: "Différent de" },
-                { value: "gt", label: "Supérieur à" },
-                { value: "gte", label: "Supérieur ou égal à" },
-                { value: "lt", label: "Inférieur à" },
-                { value: "lte", label: "Inférieur ou égal à" }
+                { value: "eq", label: "Ã‰gal Ã " },
+                { value: "neq", label: "DiffÃ©rent de" },
+                { value: "gt", label: "SupÃ©rieur Ã " },
+                { value: "gte", label: "SupÃ©rieur ou Ã©gal Ã " },
+                { value: "lt", label: "InfÃ©rieur Ã " },
+                { value: "lte", label: "InfÃ©rieur ou Ã©gal Ã " }
             ],
             categorical: [
-                { value: "eq", label: "Égal à" },
-                { value: "neq", label: "Différent de" },
+                { value: "eq", label: "Ã‰gal Ã " },
+                { value: "neq", label: "DiffÃ©rent de" },
                 { value: "in", label: "Parmi" }
             ]
         };
         
-        // Définition des champs et leurs types
+        // DÃ©finition des champs et leurs types
         const fieldDefinitions = {
-            difficulty: { type: "numeric", label: "Difficulté", values: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] },
+            difficulty: { type: "numeric", label: "DifficultÃ©", values: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] },
             terrain: { type: "numeric", label: "Terrain", values: [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] },
             cache_type: { type: "categorical", label: "Type", values: [] }, // Valeurs remplies dynamiquement
             solved: { 
                 type: "categorical", 
                 label: "Statut", 
                 values: [
-                    { value: "solved", label: "Résolue" },
-                    { value: "not_solved", label: "Non résolue" },
+                    { value: "solved", label: "RÃ©solue" },
+                    { value: "not_solved", label: "Non rÃ©solue" },
                     { value: "ongoing", label: "En cours" }
                 ] 
             },
@@ -566,19 +566,19 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     { value: "Large", label: "Grande" },
                     { value: "Other", label: "Autre" }
                 ],
-                caseSensitive: false // Indiquer que ce champ doit être comparé sans tenir compte de la casse
+                caseSensitive: false // Indiquer que ce champ doit Ãªtre comparÃ© sans tenir compte de la casse
             },
-            favorites_count: { type: "numeric", label: "Favoris", values: [] }, // Valeurs générées dynamiquement
-            logs_count: { type: "numeric", label: "Logs", values: [] } // Valeurs générées dynamiquement
+            favorites_count: { type: "numeric", label: "Favoris", values: [] }, // Valeurs gÃ©nÃ©rÃ©es dynamiquement
+            logs_count: { type: "numeric", label: "Logs", values: [] } // Valeurs gÃ©nÃ©rÃ©es dynamiquement
         };
         
-        // Fonction pour obtenir les références aux éléments des modales dans le conteneur global
+        // Fonction pour obtenir les rÃ©fÃ©rences aux Ã©lÃ©ments des modales dans le conteneur global
         function getModalElements() {
             const modalContainer = window.parent.document.getElementById('modals-container');
             if (!modalContainer) return null;
             
             return {
-                // Éléments pour la suppression multiple
+                // Ã‰lÃ©ments pour la suppression multiple
                 deleteSelectedButton: document.getElementById('delete-selected-btn-{{ zone_id }}'),
                 selectedCountElement: document.getElementById('selected-count-container-{{ zone_id }}'),
                 deleteMultipleModal: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }}'),
@@ -588,7 +588,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 confirmDeleteMultiple: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .confirm-delete-multiple'),
                 deleteLoadingIndicator: modalContainer.querySelector('#deleteMultipleModal-{{ zone_id }} .delete-loading-indicator'),
         
-        // Éléments pour l'importation GPX
+        // Ã‰lÃ©ments pour l'importation GPX
                 importGpxButton: document.getElementById('importGpxButton'),
                 importGpxModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }}'),
                 closeImportModal: modalContainer.querySelector('#importGpxModal-{{ zone_id }} #closeImportModal'),
@@ -616,41 +616,41 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
             const apiUrl = tableElement.dataset.apiUrl;
             
-            // Détruire l'instance existante si elle existe
+            // DÃ©truire l'instance existante si elle existe
             if (window[`tabulator_${tableId}`]) {
                 window[`tabulator_${tableId}`].destroy();
             }
 
-            // Créer une nouvelle instance de Tabulator
+            // CrÃ©er une nouvelle instance de Tabulator
             window[`tabulator_${tableId}`] = new Tabulator(`#${tableId}`, {
                 ajaxURL: apiUrl,
                 layout: "fitDataFill",
                 height: "100%",
-                placeholder: "Aucune géocache trouvée",
-                selectable: true, // Activer la sélection de lignes
-                selectableRangeMode: "click", // Permettre la sélection par Shift+Click
-                // Nous ne voulons pas de pagination par défaut pour avoir toutes les données disponibles
+                placeholder: "Aucune gÃ©ocache trouvÃ©e",
+                selectable: true, // Activer la sÃ©lection de lignes
+                selectableRangeMode: "click", // Permettre la sÃ©lection par Shift+Click
+                // Nous ne voulons pas de pagination par dÃ©faut pour avoir toutes les donnÃ©es disponibles
                 pagination: false,
-                // S'assurer que Tabulator ne limite pas les résultats
+                // S'assurer que Tabulator ne limite pas les rÃ©sultats
                 maxHeight: "100%", // Utiliser toute la hauteur disponible
                 virtualDom: true, // Activer le DOM virtuel pour de meilleures performances
-                layoutColumnsOnNewData: false, // Ne pas recalculer la disposition à chaque mise à jour
-                // Garantir que toutes les données sont chargées
+                layoutColumnsOnNewData: false, // Ne pas recalculer la disposition Ã  chaque mise Ã  jour
+                // Garantir que toutes les donnÃ©es sont chargÃ©es
                 ajaxConfig: {
                     method: "GET",
                 },
-                // Stocker toutes les données pour nos opérations personnalisées
+                // Stocker toutes les donnÃ©es pour nos opÃ©rations personnalisÃ©es
                 ajaxResponse: function(url, params, response) {
-                    // Stocker les données complètes dans une variable accessible
+                    // Stocker les donnÃ©es complÃ¨tes dans une variable accessible
                     window[`allGeocachesData_${tableId}`] = response;
-                    console.log(`Chargement de ${response.length} géocaches dans le tableau.`);
+                    console.log(`Chargement de ${response.length} gÃ©ocaches dans le tableau.`);
                     return response;
                 },
                 columns: [
                     { title: "GC Code", field: "gc_code", headerSort: true },
                     { title: "Nom", field: "name", headerSort: true },
                     { title: "Type", field: "cache_type", headerSort: true },
-                    { title: "Difficulté", field: "difficulty", headerSort: true },
+                    { title: "DifficultÃ©", field: "difficulty", headerSort: true },
                     { title: "Terrain", field: "terrain", headerSort: true },
                     { title: "Taille", field: "size", headerSort: true },
                     { title: "Favoris", field: "favorites_count", headerSort: true },
@@ -660,11 +660,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             const value = cell.getValue();
                             switch(value) {
                                 case 'solved':
-                                    return '<span class="text-green-500">✓ Résolue</span>';
+                                    return '<span class="text-green-500">âœ“ RÃ©solue</span>';
                                 case 'not_solved':
-                                    return '<span class="text-red-500">✗ Non résolue</span>';
+                                    return '<span class="text-red-500">âœ— Non rÃ©solue</span>';
                                 case 'ongoing':
-                                    return '<span class="text-yellow-500">⟳ En cours</span>';
+                                    return '<span class="text-yellow-500">âŸ³ En cours</span>';
                                 default:
                                     return '<span class="text-gray-500">-</span>';
                             }
@@ -678,7 +678,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             const gcCode = data.gc_code;
                             const name = data.name;
                             
-                            // Échapper les caractères spéciaux pour JavaScript
+                            // Ã‰chapper les caractÃ¨res spÃ©ciaux pour JavaScript
                             const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
                             const escapedName = name.replace(/['\\]/g, '\\$&');
                             
@@ -691,7 +691,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                     name: '${escapedName}'
                                 }, '*')"
                             >
-                                Détails
+                                DÃ©tails
                             </button>
                             <button 
                                 class="delete-button"
@@ -706,11 +706,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     // Remplir dynamiquement le filtre de type avec les valeurs uniques de la colonne
                     const table = window[`tabulator_${tableId}`];
                     const allData = table.getData();
-                    console.log(`Tableau initialisé avec ${allData.length} géocaches au total.`);
+                    console.log(`Tableau initialisÃ© avec ${allData.length} gÃ©ocaches au total.`);
                     
                     const uniqueTypes = [...new Set(allData.map(row => row.cache_type))].filter(Boolean).sort();
                     
-                    // Vider d'abord les options existantes sauf la première
+                    // Vider d'abord les options existantes sauf la premiÃ¨re
                     while(typeFilter.options.length > 1) {
                         typeFilter.remove(1);
                     }
@@ -723,32 +723,32 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         typeFilter.appendChild(option);
                     });
                     
-                    // Remplir également les valeurs pour le filtre avancé de type
+                    // Remplir Ã©galement les valeurs pour le filtre avancÃ© de type
                     fieldDefinitions.cache_type.values = uniqueTypes.map(type => ({ value: type, label: type }));
                     
                     // Collecter les tailles uniques pour le filtre de taille
                     const uniqueSizes = [...new Set(allData.map(row => row.size))].filter(Boolean);
                     if (uniqueSizes.length > 0) {
-                        // Remplacer les valeurs prédéfinies par les valeurs réelles trouvées dans les données
+                        // Remplacer les valeurs prÃ©dÃ©finies par les valeurs rÃ©elles trouvÃ©es dans les donnÃ©es
                         fieldDefinitions.size.values = uniqueSizes.map(size => ({ value: size, label: size }));
-                        console.log("Tailles uniques trouvées:", uniqueSizes);
+                        console.log("Tailles uniques trouvÃ©es:", uniqueSizes);
                     }
                     
-                    // Déterminer les plages pour les favoris et logs
+                    // DÃ©terminer les plages pour les favoris et logs
                     if (allData.length > 0) {
                         const maxFavorites = Math.max(...allData.map(row => row.favorites_count || 0));
                         const maxLogs = Math.max(...allData.map(row => row.logs_count || 0));
                         
-                        // Générer des valeurs sensibles pour ces champs
+                        // GÃ©nÃ©rer des valeurs sensibles pour ces champs
                         fieldDefinitions.favorites_count.values = [0, 5, 10, 25, 50, 100, 200, 500, 1000].filter(v => v <= maxFavorites * 1.2);
                         fieldDefinitions.logs_count.values = [0, 10, 25, 50, 100, 250, 500, 1000, 2000].filter(v => v <= maxLogs * 1.2);
                     }
                 },
                 rowSelectionChanged: function(data, rows) {
-                    // Mettre à jour les géocaches sélectionnées
+                    // Mettre Ã  jour les gÃ©ocaches sÃ©lectionnÃ©es
                     selectedGeocaches = data;
                     
-                    // Mettre à jour le compteur et le bouton de suppression
+                    // Mettre Ã  jour le compteur et le bouton de suppression
                     updateSelectionCount();
                 }
             });
@@ -756,7 +756,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             return window[`tabulator_${tableId}`];
         }
 
-        // Fonction pour mettre à jour le compteur de sélection et l'état du bouton de suppression
+        // Fonction pour mettre Ã  jour le compteur de sÃ©lection et l'Ã©tat du bouton de suppression
         function updateSelectionCount() {
             const count = selectedGeocaches.length;
             const elements = getModalElements();
@@ -772,7 +772,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         }
 
-        // Fonction pour mettre à jour les opérateurs disponibles en fonction du champ sélectionné
+        // Fonction pour mettre Ã  jour les opÃ©rateurs disponibles en fonction du champ sÃ©lectionnÃ©
         function updateOperators() {
             const fieldName = filterField.value;
             const fieldType = fieldDefinitions[fieldName].type;
@@ -788,11 +788,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 filterOperator.appendChild(option);
             });
             
-            // Mettre à jour les valeurs
+            // Mettre Ã  jour les valeurs
             updateValues();
         }
         
-        // Fonction pour mettre à jour les valeurs disponibles en fonction du champ et de l'opérateur sélectionnés
+        // Fonction pour mettre Ã  jour les valeurs disponibles en fonction du champ et de l'opÃ©rateur sÃ©lectionnÃ©s
         function updateValues() {
             const fieldName = filterField.value;
             const operatorValue = filterOperator.value;
@@ -801,12 +801,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             // Vider les options existantes
             filterValue.innerHTML = '';
             
-            // Si l'opérateur est "in", afficher une interface de sélection multiple
+            // Si l'opÃ©rateur est "in", afficher une interface de sÃ©lection multiple
             if (operatorValue === "in") {
                 // Pour l'instant, nous utilisons un select simple avec des instructions
                 const instruction = document.createElement('option');
                 instruction.value = "";
-                instruction.textContent = "Sélectionnez plusieurs valeurs (Ctrl+clic)";
+                instruction.textContent = "SÃ©lectionnez plusieurs valeurs (Ctrl+clic)";
                 instruction.disabled = true;
                 instruction.selected = true;
                 filterValue.appendChild(instruction);
@@ -822,7 +822,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             
             // Ajouter les valeurs
             if (fieldDef.values.length > 0) {
-                // Si les valeurs sont prédéfinies
+                // Si les valeurs sont prÃ©dÃ©finies
                 fieldDef.values.forEach(val => {
                     const option = document.createElement('option');
                     if (typeof val === 'object') {
@@ -835,9 +835,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     filterValue.appendChild(option);
                 });
             } else {
-                // Si les valeurs doivent être générées dynamiquement
+                // Si les valeurs doivent Ãªtre gÃ©nÃ©rÃ©es dynamiquement
                 if (fieldName === 'favorites_count' || fieldName === 'logs_count') {
-                    // Pour les compteurs, générer des valeurs de 0 à 100 par incréments de 5
+                    // Pour les compteurs, gÃ©nÃ©rer des valeurs de 0 Ã  100 par incrÃ©ments de 5
                     for (let i = 0; i <= 100; i += 5) {
                         const option = document.createElement('option');
                         option.value = i;
@@ -845,7 +845,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         filterValue.appendChild(option);
                     }
                 }
-                // Pour cache_type, les valeurs sont déjà générées lors de l'initialisation du tableau
+                // Pour cache_type, les valeurs sont dÃ©jÃ  gÃ©nÃ©rÃ©es lors de l'initialisation du tableau
             }
         }
         
@@ -854,13 +854,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             // Vider la liste des filtres actifs
             activeFiltersList = [];
             
-            // Supprimer tous les éléments visuels
+            // Supprimer tous les Ã©lÃ©ments visuels
             activeFilters.innerHTML = '';
             
             // Masquer le bouton de suppression totale
             clearAllFiltersBtn.classList.add('hidden');
             
-            // Appliquer les filtres (ou plutôt, les supprimer tous)
+            // Appliquer les filtres (ou plutÃ´t, les supprimer tous)
             applyFilters();
         }
         
@@ -872,18 +872,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             let filterValueDisplay;
             let filterValueData;
             
-            // Récupérer la valeur sélectionnée
+            // RÃ©cupÃ©rer la valeur sÃ©lectionnÃ©e
             if (operatorValue === "in" && filterValue.multiple) {
-                // Pour la sélection multiple
+                // Pour la sÃ©lection multiple
                 const selectedOptions = Array.from(filterValue.selectedOptions);
-                if (selectedOptions.length === 0) return; // Ne rien faire si aucune option n'est sélectionnée
+                if (selectedOptions.length === 0) return; // Ne rien faire si aucune option n'est sÃ©lectionnÃ©e
                 
                 filterValueData = selectedOptions.map(opt => opt.value);
                 
-                // Créer une représentation visuelle des valeurs sélectionnées
+                // CrÃ©er une reprÃ©sentation visuelle des valeurs sÃ©lectionnÃ©es
                 filterValueDisplay = selectedOptions.map(opt => opt.textContent).join(", ");
             } else {
-                // Pour la sélection simple
+                // Pour la sÃ©lection simple
                 filterValueData = filterValue.value;
                 filterValueDisplay = filterValue.options[filterValue.selectedIndex].textContent;
             }
@@ -894,11 +894,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 filterValueData = filterValueData.toString();
             }
             
-            // Trouver le label de l'opérateur
+            // Trouver le label de l'opÃ©rateur
             const operatorObj = operatorsByFieldType[fieldDef.type].find(op => op.value === operatorValue);
             const operatorLabel = operatorObj ? operatorObj.label : operatorValue;
             
-            // Créer un objet filtre
+            // CrÃ©er un objet filtre
             const filter = {
                 id: Date.now(), // Identifiant unique
                 field: fieldName,
@@ -907,12 +907,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 displayText: `${fieldDef.label} ${operatorLabel} ${filterValueDisplay}`
             };
             
-            console.log("Nouveau filtre créé:", filter);
+            console.log("Nouveau filtre crÃ©Ã©:", filter);
             
-            // Ajouter à la liste des filtres actifs
+            // Ajouter Ã  la liste des filtres actifs
             activeFiltersList.push(filter);
             
-            // Créer l'élément visuel du filtre
+            // CrÃ©er l'Ã©lÃ©ment visuel du filtre
             const filterElement = document.createElement('div');
             filterElement.className = 'inline-flex items-center bg-blue-600 text-white text-xs rounded-full px-3 py-1';
             filterElement.dataset.filterId = filter.id;
@@ -923,7 +923,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 </button>
             `;
             
-            // Ajouter l'élément à la liste des filtres actifs
+            // Ajouter l'Ã©lÃ©ment Ã  la liste des filtres actifs
             activeFilters.appendChild(filterElement);
             
             // Cacher le formulaire d'ajout de filtre
@@ -941,7 +941,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             // Supprimer de la liste des filtres actifs
             activeFiltersList = activeFiltersList.filter(f => f.id.toString() !== filterId.toString());
             
-            // Supprimer l'élément visuel
+            // Supprimer l'Ã©lÃ©ment visuel
             const filterElement = activeFilters.querySelector(`[data-filter-id="${filterId}"]`);
             if (filterElement) {
                 filterElement.remove();
@@ -952,7 +952,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 clearAllFiltersBtn.classList.add('hidden');
             }
             
-            // Appliquer les filtres mis à jour
+            // Appliquer les filtres mis Ã  jour
             applyFilters();
         }
         
@@ -969,26 +969,26 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             
             // Si aucun filtre actif et aucun filtre simple, supprimer tous les filtres
             if (activeFiltersList.length === 0 && !textFilter && !statusValue && !typeValue) {
-                console.log("Aucun filtre actif, affichage de toutes les données");
+                console.log("Aucun filtre actif, affichage de toutes les donnÃ©es");
                 table.clearFilter();
                 
-                // Vérifier le nombre réel de lignes affichées
+                // VÃ©rifier le nombre rÃ©el de lignes affichÃ©es
                 setTimeout(() => {
                     const visibleRows = table.getRows("visible");
-                    console.log(`Après suppression des filtres: ${visibleRows.length} géocaches visibles`);
+                    console.log(`AprÃ¨s suppression des filtres: ${visibleRows.length} gÃ©ocaches visibles`);
                 }, 50);
                 
                 return;
             }
             
-            // Obtenir toutes les données pour des logs de diagnostic
+            // Obtenir toutes les donnÃ©es pour des logs de diagnostic
             const allData = window[`allGeocachesData_${tableId}`] || table.getData();
             
             // Appliquer tous les filtres
             table.setFilter(function(data) {
                 let matchesAllFilters = true;
                 
-                // Vérifier les filtres simples
+                // VÃ©rifier les filtres simples
                 // Filtre textuel
                 if (textFilter) {
                     const textMatch = (
@@ -1011,24 +1011,24 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     if (!typeMatch) matchesAllFilters = false;
                 }
                 
-                // Vérifier les filtres avancés
+                // VÃ©rifier les filtres avancÃ©s
                 for (const filter of activeFiltersList) {
-                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
+                    if (!matchesAllFilters) break; // Sortir si dÃ©jÃ  non correspondant
                     
                     const fieldValue = data[filter.field];
                     const filterValue = filter.value;
                     const fieldDef = fieldDefinitions[filter.field];
                     
-                    // Log pour débogage
-                    console.log(`Comparaison pour ${filter.field}: valeur dans données = "${fieldValue}" (${typeof fieldValue}), valeur de filtre = "${filterValue}" (${typeof filterValue})`);
+                    // Log pour dÃ©bogage
+                    console.log(`Comparaison pour ${filter.field}: valeur dans donnÃ©es = "${fieldValue}" (${typeof fieldValue}), valeur de filtre = "${filterValue}" (${typeof filterValue})`);
                     
-                    // Vérifier si la valeur existe
+                    // VÃ©rifier si la valeur existe
                     if (fieldValue === undefined || fieldValue === null) {
                         matchesAllFilters = false;
                         continue;
                     }
                     
-                    // Convertir les valeurs en nombres pour les champs numériques
+                    // Convertir les valeurs en nombres pour les champs numÃ©riques
                     let dataValue = fieldValue;
                     let comparisonValue = filterValue;
                     
@@ -1036,21 +1036,21 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         dataValue = parseFloat(dataValue);
                         comparisonValue = parseFloat(comparisonValue);
                         
-                        // Vérifier si la conversion a réussi
+                        // VÃ©rifier si la conversion a rÃ©ussi
                         if (isNaN(dataValue) || isNaN(comparisonValue)) {
-                            console.warn(`Conversion en nombre échouée pour ${filter.field}: ${dataValue} ou ${comparisonValue}`);
+                            console.warn(`Conversion en nombre Ã©chouÃ©e pour ${filter.field}: ${dataValue} ou ${comparisonValue}`);
                             matchesAllFilters = false;
                             continue;
                         }
                     }
                     
-                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    // Pour les champs insensibles Ã  la casse, convertir en minuscules
                     if (fieldDef?.caseSensitive === false) {
                         dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
                         comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
                     }
                     
-                    // Appliquer l'opérateur approprié
+                    // Appliquer l'opÃ©rateur appropriÃ©
                     switch (filter.operator) {
                         case "eq":
                             matchesAllFilters = dataValue === comparisonValue;
@@ -1071,14 +1071,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             matchesAllFilters = dataValue <= comparisonValue;
                             break;
                         case "in":
-                            // Pour les opérateurs "in" (parmi)
+                            // Pour les opÃ©rateurs "in" (parmi)
                             if (Array.isArray(comparisonValue)) {
                                 if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
-                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    // Cas insensible Ã  la casse, convertir toutes les valeurs en minuscules
                                     const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
                                     matchesAllFilters = lowerCaseValues.includes(dataValue);
                                 } else {
-                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    // Cas normal, convertir en strings pour la comparaison si nÃ©cessaire
                                     const stringComparisonValues = comparisonValue.map(v => v.toString());
                                     matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
                                 }
@@ -1087,36 +1087,36 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             }
                             break;
                         default:
-                            console.warn(`Opérateur non reconnu: ${filter.operator}`);
+                            console.warn(`OpÃ©rateur non reconnu: ${filter.operator}`);
                             matchesAllFilters = true;
                     }
                     
-                    // Log pour débogage
-                    console.log(`Résultat de comparaison: ${matchesAllFilters} (opérateur: ${filter.operator})`);
+                    // Log pour dÃ©bogage
+                    console.log(`RÃ©sultat de comparaison: ${matchesAllFilters} (opÃ©rateur: ${filter.operator})`);
                 }
                 
                 return matchesAllFilters;
             });
             
-            // Vérification et diagnostic après filtrage
+            // VÃ©rification et diagnostic aprÃ¨s filtrage
             setTimeout(() => {
                 const visibleRows = table.getRows("visible");
-                console.log(`Après filtrage avancé: ${visibleRows.length} géocaches visibles`);
+                console.log(`AprÃ¨s filtrage avancÃ©: ${visibleRows.length} gÃ©ocaches visibles`);
                 
                 // Log des filtres actifs pour diagnostic
                 console.log("Filtres actifs:", activeFiltersList);
                 
-                // Vérification manuelle pour le débogage
+                // VÃ©rification manuelle pour le dÃ©bogage
                 if (visibleRows.length === 0 && activeFiltersList.length > 0) {
-                    console.log("Aucun résultat trouvé. Vérification manuelle des correspondances...");
+                    console.log("Aucun rÃ©sultat trouvÃ©. VÃ©rification manuelle des correspondances...");
                     
-                    // Vérifier manuellement combien d'éléments correspondent aux critères
+                    // VÃ©rifier manuellement combien d'Ã©lÃ©ments correspondent aux critÃ¨res
                     const matches = allData.filter(item => {
                         for (const filter of activeFiltersList) {
                             const fieldValue = item[filter.field];
                             if (fieldValue === undefined || fieldValue === null) return false;
                             
-                            // Convertir pour les comparaisons numériques
+                            // Convertir pour les comparaisons numÃ©riques
                             let dataValue = fieldValue;
                             let comparisonValue = filter.value;
                             const fieldDef = fieldDefinitions[filter.field];
@@ -1126,13 +1126,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                 comparisonValue = parseFloat(comparisonValue);
                             }
                             
-                            // Pour les champs insensibles à la casse
+                            // Pour les champs insensibles Ã  la casse
                             if (fieldDef?.caseSensitive === false) {
                                 dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
                                 comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
                             }
                             
-                            // Pour les filtres d'égalité, qui sont les plus courants
+                            // Pour les filtres d'Ã©galitÃ©, qui sont les plus courants
                             if (filter.operator === "eq" && dataValue != comparisonValue) {
                                 return false;
                             }
@@ -1140,7 +1140,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         return true;
                     });
                     
-                    console.log(`Vérification manuelle: ${matches.length} correspondances trouvées.`);
+                    console.log(`VÃ©rification manuelle: ${matches.length} correspondances trouvÃ©es.`);
                     if (matches.length > 0) {
                         console.log("Exemples de correspondances:", matches.slice(0, 3));
                     }
@@ -1155,13 +1155,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             
             const { deleteMultipleModal, geocachesCountToDelete, deleteConfirmText } = elements;
             
-            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
+            // Obtenir toutes les gÃ©ocaches qui correspondent aux filtres actuels
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             
             if (!table) return;
             
-            // Récupérer toutes les données
+            // RÃ©cupÃ©rer toutes les donnÃ©es
             const allData = window[`allGeocachesData_${tableId}`] || table.getData();
             
             // Obtenir les valeurs des filtres simples (recherche, statut, type)
@@ -1169,11 +1169,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             const statusValue = statusFilter.value;
             const typeValue = typeFilter.value;
             
-            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
+            // Filtrer manuellement les donnÃ©es selon les mÃªmes critÃ¨res que applyFilters()
             const geocachesToDelete = allData.filter(data => {
                 let matchesAllFilters = true;
                 
-                // Vérifier les filtres simples
+                // VÃ©rifier les filtres simples
                 // Filtre textuel
                 if (textFilter) {
                     const textMatch = (
@@ -1196,21 +1196,21 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     if (!typeMatch) matchesAllFilters = false;
                 }
                 
-                // Vérifier les filtres avancés
+                // VÃ©rifier les filtres avancÃ©s
                 for (const filter of activeFiltersList) {
-                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
+                    if (!matchesAllFilters) break; // Sortir si dÃ©jÃ  non correspondant
                     
                     const fieldValue = data[filter.field];
                     const filterValue = filter.value;
                     const fieldDef = fieldDefinitions[filter.field];
                     
-                    // Vérifier si la valeur existe
+                    // VÃ©rifier si la valeur existe
                     if (fieldValue === undefined || fieldValue === null) {
                         matchesAllFilters = false;
                         continue;
                     }
                     
-                    // Convertir les valeurs en nombres pour les champs numériques
+                    // Convertir les valeurs en nombres pour les champs numÃ©riques
                     let dataValue = fieldValue;
                     let comparisonValue = filterValue;
                     
@@ -1218,20 +1218,20 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         dataValue = parseFloat(dataValue);
                         comparisonValue = parseFloat(comparisonValue);
                         
-                        // Vérifier si la conversion a réussi
+                        // VÃ©rifier si la conversion a rÃ©ussi
                         if (isNaN(dataValue) || isNaN(comparisonValue)) {
                             matchesAllFilters = false;
                             continue;
                         }
                     }
                     
-                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    // Pour les champs insensibles Ã  la casse, convertir en minuscules
                     if (fieldDef?.caseSensitive === false) {
                         dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
                         comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
                     }
                     
-                    // Appliquer l'opérateur approprié
+                    // Appliquer l'opÃ©rateur appropriÃ©
                     switch (filter.operator) {
                         case "eq":
                             matchesAllFilters = dataValue === comparisonValue;
@@ -1252,14 +1252,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             matchesAllFilters = dataValue <= comparisonValue;
                             break;
                         case "in":
-                            // Pour les opérateurs "in" (parmi)
+                            // Pour les opÃ©rateurs "in" (parmi)
                             if (Array.isArray(comparisonValue)) {
                                 if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
-                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    // Cas insensible Ã  la casse, convertir toutes les valeurs en minuscules
                                     const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
                                     matchesAllFilters = lowerCaseValues.includes(dataValue);
                                 } else {
-                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    // Cas normal, convertir en strings pour la comparaison si nÃ©cessaire
                                     const stringComparisonValues = comparisonValue.map(v => v.toString());
                                     matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
                                 }
@@ -1275,15 +1275,15 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 return matchesAllFilters;
             });
             
-            console.log(`Sélection manuelle de ${geocachesToDelete.length} géocaches filtrées sur un total de ${allData.length}.`);
+            console.log(`SÃ©lection manuelle de ${geocachesToDelete.length} gÃ©ocaches filtrÃ©es sur un total de ${allData.length}.`);
             
-            // Vérifier s'il y a des géocaches correspondant aux filtres
+            // VÃ©rifier s'il y a des gÃ©ocaches correspondant aux filtres
             if (!geocachesToDelete || geocachesToDelete.length === 0) {
-                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
+                alert("Aucune gÃ©ocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
                 return;
             }
             
-            // Stocker les géocaches pour la suppression
+            // Stocker les gÃ©ocaches pour la suppression
             selectedGeocaches = geocachesToDelete;
             
             if (geocachesCountToDelete) {
@@ -1291,7 +1291,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
             
             if (deleteConfirmText) {
-                deleteConfirmText.textContent = `Êtes-vous sûr de vouloir supprimer ${selectedGeocaches.length} géocaches filtrées ?`;
+                deleteConfirmText.textContent = `ÃŠtes-vous sÃ»r de vouloir supprimer ${selectedGeocaches.length} gÃ©ocaches filtrÃ©es ?`;
             }
             
             if (deleteMultipleModal) {
@@ -1299,20 +1299,20 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         }
 
-        // Fonction pour ouvrir le modal de confirmation de suppression inverse (garder les filtrées, supprimer les autres)
+        // Fonction pour ouvrir le modal de confirmation de suppression inverse (garder les filtrÃ©es, supprimer les autres)
         function openKeepFilteredModal() {
             const elements = getModalElements();
             if (!elements) return;
             
             const { deleteMultipleModal, geocachesCountToDelete, deleteConfirmText } = elements;
             
-            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
+            // Obtenir toutes les gÃ©ocaches qui correspondent aux filtres actuels
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             
             if (!table) return;
             
-            // Récupérer toutes les données
+            // RÃ©cupÃ©rer toutes les donnÃ©es
             const allData = window[`allGeocachesData_${tableId}`] || table.getData();
             
             // Obtenir les valeurs des filtres simples (recherche, statut, type)
@@ -1320,11 +1320,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             const statusValue = statusFilter.value;
             const typeValue = typeFilter.value;
             
-            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
+            // Filtrer manuellement les donnÃ©es selon les mÃªmes critÃ¨res que applyFilters()
             const geocachesToKeep = allData.filter(data => {
                 let matchesAllFilters = true;
                 
-                // Vérifier les filtres simples
+                // VÃ©rifier les filtres simples
                 // Filtre textuel
                 if (textFilter) {
                     const textMatch = (
@@ -1347,21 +1347,21 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     if (!typeMatch) matchesAllFilters = false;
                 }
                 
-                // Vérifier les filtres avancés
+                // VÃ©rifier les filtres avancÃ©s
                 for (const filter of activeFiltersList) {
-                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
+                    if (!matchesAllFilters) break; // Sortir si dÃ©jÃ  non correspondant
                     
                     const fieldValue = data[filter.field];
                     const filterValue = filter.value;
                     const fieldDef = fieldDefinitions[filter.field];
                     
-                    // Vérifier si la valeur existe
+                    // VÃ©rifier si la valeur existe
                     if (fieldValue === undefined || fieldValue === null) {
                         matchesAllFilters = false;
                         continue;
                     }
                     
-                    // Convertir les valeurs en nombres pour les champs numériques
+                    // Convertir les valeurs en nombres pour les champs numÃ©riques
                     let dataValue = fieldValue;
                     let comparisonValue = filterValue;
                     
@@ -1369,20 +1369,20 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         dataValue = parseFloat(dataValue);
                         comparisonValue = parseFloat(comparisonValue);
                         
-                        // Vérifier si la conversion a réussi
+                        // VÃ©rifier si la conversion a rÃ©ussi
                         if (isNaN(dataValue) || isNaN(comparisonValue)) {
                             matchesAllFilters = false;
                             continue;
                         }
                     }
                     
-                    // Pour les champs insensibles à la casse, convertir en minuscules
+                    // Pour les champs insensibles Ã  la casse, convertir en minuscules
                     if (fieldDef?.caseSensitive === false) {
                         dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
                         comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
                     }
                     
-                    // Appliquer l'opérateur approprié
+                    // Appliquer l'opÃ©rateur appropriÃ©
                     switch (filter.operator) {
                         case "eq":
                             matchesAllFilters = dataValue === comparisonValue;
@@ -1403,14 +1403,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             matchesAllFilters = dataValue <= comparisonValue;
                             break;
                         case "in":
-                            // Pour les opérateurs "in" (parmi)
+                            // Pour les opÃ©rateurs "in" (parmi)
                             if (Array.isArray(comparisonValue)) {
                                 if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
-                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
+                                    // Cas insensible Ã  la casse, convertir toutes les valeurs en minuscules
                                     const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
                                     matchesAllFilters = lowerCaseValues.includes(dataValue);
                                 } else {
-                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
+                                    // Cas normal, convertir en strings pour la comparaison si nÃ©cessaire
                                     const stringComparisonValues = comparisonValue.map(v => v.toString());
                                     matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
                                 }
@@ -1426,18 +1426,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 return matchesAllFilters;
             });
             
-            // Stocker la liste des géocaches à conserver
+            // Stocker la liste des gÃ©ocaches Ã  conserver
             const geocachesToDelete = allData.filter(item => !geocachesToKeep.some(keep => keep.id === item.id));
             
-            console.log(`Sélection inverse: ${geocachesToDelete.length} géocaches à supprimer sur un total de ${allData.length}. ${geocachesToKeep.length} seront conservées.`);
+            console.log(`SÃ©lection inverse: ${geocachesToDelete.length} gÃ©ocaches Ã  supprimer sur un total de ${allData.length}. ${geocachesToKeep.length} seront conservÃ©es.`);
             
-            // Vérifier s'il y a des géocaches à supprimer
+            // VÃ©rifier s'il y a des gÃ©ocaches Ã  supprimer
             if (!geocachesToDelete || geocachesToDelete.length === 0) {
-                alert("Aucune géocache à supprimer. Toutes les géocaches correspondent aux filtres actuels.");
+                alert("Aucune gÃ©ocache Ã  supprimer. Toutes les gÃ©ocaches correspondent aux filtres actuels.");
                 return;
             }
             
-            // Stocker les géocaches pour la suppression
+            // Stocker les gÃ©ocaches pour la suppression
             selectedGeocaches = geocachesToDelete;
             
             if (geocachesCountToDelete) {
@@ -1445,7 +1445,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
             
             if (deleteConfirmText) {
-                deleteConfirmText.textContent = `Êtes-vous sûr de vouloir supprimer ${selectedGeocaches.length} géocaches ? Cette action conservera uniquement les géocaches filtrées (${geocachesToKeep.length} géocaches).`;
+                deleteConfirmText.textContent = `ÃŠtes-vous sÃ»r de vouloir supprimer ${selectedGeocaches.length} gÃ©ocaches ? Cette action conservera uniquement les gÃ©ocaches filtrÃ©es (${geocachesToKeep.length} gÃ©ocaches).`;
             }
             
             if (deleteMultipleModal) {
@@ -1465,7 +1465,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         }
 
-        // Fonction pour supprimer les géocaches sélectionnées
+        // Fonction pour supprimer les gÃ©ocaches sÃ©lectionnÃ©es
         async function deleteSelectedGeocaches() {
             const elements = getModalElements();
             if (!elements) return;
@@ -1480,10 +1480,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             let successCount = 0;
             let errorCount = 0;
             
-            // Copier la liste des géocaches à supprimer
+            // Copier la liste des gÃ©ocaches Ã  supprimer
             const geocachesToDelete = [...selectedGeocaches];
             
-            // Supprimer chaque géocache
+            // Supprimer chaque gÃ©ocache
             for (const geocache of geocachesToDelete) {
                 try {
                     const response = await fetch(`/api/geocaches/${geocache.id}`, {
@@ -1501,14 +1501,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
             }
             
-            // Mettre à jour le message
+            // Mettre Ã  jour le message
             if (successCount > 0) {
-                messageDiv.textContent = `${successCount} géocache(s) supprimée(s) avec succès.`;
+                messageDiv.textContent = `${successCount} gÃ©ocache(s) supprimÃ©e(s) avec succÃ¨s.`;
                 messageDiv.className = 'mt-2 text-green-600';
             }
             
             if (errorCount > 0) {
-                messageDiv.textContent += ` ${errorCount} géocache(s) n'ont pas pu être supprimées.`;
+                messageDiv.textContent += ` ${errorCount} gÃ©ocache(s) n'ont pas pu Ãªtre supprimÃ©es.`;
                 messageDiv.className = 'mt-2 text-orange-600';
             }
             
@@ -1526,7 +1526,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
         // Fonction pour recharger le tableau
         async function reloadTable() {
-            // Recharger les données via Tabulator
+            // Recharger les donnÃ©es via Tabulator
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             if (table) {
@@ -1539,11 +1539,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
         // Fonction pour filtrer le tableau avec le filtre simple
         function filterTable() {
-            // Appliquer tous les filtres (simples + avancés)
+            // Appliquer tous les filtres (simples + avancÃ©s)
             applyFilters();
         }
 
-        // Gestionnaires d'événements pour les filtres simples
+        // Gestionnaires d'Ã©vÃ©nements pour les filtres simples
         tableFilter.addEventListener('input', filterTable);
         statusFilter.addEventListener('change', filterTable);
         typeFilter.addEventListener('change', filterTable);
@@ -1554,7 +1554,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             filterTable();
         });
         
-        // Gestionnaires d'événements pour les filtres avancés
+        // Gestionnaires d'Ã©vÃ©nements pour les filtres avancÃ©s
         addFilterBtn.addEventListener('click', function() {
             filterForm.classList.remove('hidden');
             
@@ -1571,10 +1571,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         // Gestionnaire pour le changement de champ
         filterField.addEventListener('change', updateOperators);
         
-        // Gestionnaire pour le changement d'opérateur
+        // Gestionnaire pour le changement d'opÃ©rateur
         filterOperator.addEventListener('change', updateValues);
         
-        // Gestionnaire pour les boutons de suppression de filtre (délégation d'événements)
+        // Gestionnaire pour les boutons de suppression de filtre (dÃ©lÃ©gation d'Ã©vÃ©nements)
         activeFilters.addEventListener('click', function(e) {
             const removeButton = e.target.closest('.remove-filter');
             if (removeButton) {
@@ -1583,13 +1583,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         });
         
-        // Fonction pour initialiser les gestionnaires d'événements après le déplacement des modales
+        // Fonction pour initialiser les gestionnaires d'Ã©vÃ©nements aprÃ¨s le dÃ©placement des modales
         function initializeEventListeners() {
-            console.log("Initialisation des gestionnaires d'événements pour les modales");
+            console.log("Initialisation des gestionnaires d'Ã©vÃ©nements pour les modales");
             
             const elements = getModalElements();
             if (!elements) {
-                console.warn("Impossible d'obtenir les éléments des modales");
+                console.warn("Impossible d'obtenir les Ã©lÃ©ments des modales");
                 return;
             }
             
@@ -1624,12 +1624,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
             }
 
-            // Charger la liste des zones au démarrage
+            // Charger la liste des zones au dÃ©marrage
             if (targetZoneSelect) {
                 loadZonesList();
             }
 
-            // Gestionnaires d'événements pour la suppression multiple
+            // Gestionnaires d'Ã©vÃ©nements pour la suppression multiple
             if (deleteSelectedButton) {
                 deleteSelectedButton.addEventListener('click', openDeleteMultipleModal);
             }
@@ -1659,7 +1659,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
             }
             
-            // Gestionnaires d'événements pour l'importation GPX
+            // Gestionnaires d'Ã©vÃ©nements pour l'importation GPX
             if (importGpxButton && importGpxModal) {
                 importGpxButton.addEventListener('click', function() {
                     importGpxModal.classList.remove('hidden');
@@ -1691,15 +1691,15 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
             }
             
-            // Autres gestionnaires d'événements pour l'importation GPX à ajouter si nécessaire
+            // Autres gestionnaires d'Ã©vÃ©nements pour l'importation GPX Ã  ajouter si nÃ©cessaire
         }
         
-        // Attendre un peu pour s'assurer que les modales ont été déplacées
+        // Attendre un peu pour s'assurer que les modales ont Ã©tÃ© dÃ©placÃ©es
         setTimeout(initializeEventListeners, 100);
 
-        // Gestionnaire d'événements pour la suppression
+        // Gestionnaire d'Ã©vÃ©nements pour la suppression
         window.deleteGeocache = async function(geocacheId, gcCode) {
-            if (!confirm(`Êtes-vous sûr de vouloir supprimer la géocache ${gcCode} ?`)) {
+            if (!confirm(`ÃŠtes-vous sÃ»r de vouloir supprimer la gÃ©ocache ${gcCode} ?`)) {
                 return;
             }
 
@@ -1725,7 +1725,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         };
 
-        // Gestionnaire d'événements pour l'ajout de géocaches
+        // Gestionnaire d'Ã©vÃ©nements pour l'ajout de gÃ©ocaches
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
 
@@ -1737,10 +1737,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 messageDiv.className = 'mt-2';
                 submitButton.disabled = true;
                 
-                // Préparer les données du formulaire
+                // PrÃ©parer les donnÃ©es du formulaire
                 const formData = new FormData(form);
                 
-                // Envoyer la requête
+                // Envoyer la requÃªte
                 const response = await fetch('/api/geocaches/add', {
                     method: 'POST',
                     body: formData
@@ -1749,17 +1749,17 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 const data = await response.json();
                 
                 if (response.ok) {
-                    // Afficher le message de succès
-                    messageDiv.textContent = 'Géocache ajoutée avec succès !';
+                    // Afficher le message de succÃ¨s
+                    messageDiv.textContent = 'GÃ©ocache ajoutÃ©e avec succÃ¨s !';
                     messageDiv.className = 'mt-2 text-green-600';
                     
-                    // Réinitialiser le formulaire
+                    // RÃ©initialiser le formulaire
                     form.reset();
 
                     // Recharger le tableau
                     await reloadTable();
 
-                    // Ouvrir la page de détails de la nouvelle géocache
+                    // Ouvrir la page de dÃ©tails de la nouvelle gÃ©ocache
                     const apiUrl = window.API_BASE_URL || '';
                     const detailsUrl = `${apiUrl}/geocaches/${data.id}/details-panel`;
                     window.parent.postMessage({
@@ -1805,16 +1805,16 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 importMessage.textContent = '';
                 importMessage.className = '';
                 
-                // Préparer les données du formulaire
+                // PrÃ©parer les donnÃ©es du formulaire
                 const formData = new FormData(importGpxForm);
                 
-                // Envoyer la requête
+                // Envoyer la requÃªte
                 const response = await fetch('/api/geocaches/import-gpx', {
                     method: 'POST',
                     body: formData
                 });
                 
-                // Gérer la réponse en streaming pour la progression
+                // GÃ©rer la rÃ©ponse en streaming pour la progression
                 const reader = response.body.getReader();
                 let receivedLength = 0;
                 let chunks = [];
@@ -1829,7 +1829,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     chunks.push(value);
                     receivedLength += value.length;
                     
-                    // Essayer de parser les données reçues jusqu'à présent
+                    // Essayer de parser les donnÃ©es reÃ§ues jusqu'Ã  prÃ©sent
                     try {
                         const chunksAll = new Uint8Array(receivedLength);
                         let position = 0;
@@ -1863,11 +1863,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     }
                 }
                 
-                // Recharger le tableau une fois l'importation terminée
+                // Recharger le tableau une fois l'importation terminÃ©e
                 await reloadTable();
                 
                 // Afficher le message final
-                importMessage.textContent = 'Importation terminée avec succès !';
+                importMessage.textContent = 'Importation terminÃ©e avec succÃ¨s !';
                 importMessage.className = 'text-green-500';
                 
             } catch (error) {
@@ -1901,7 +1901,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             hideFilterForm();
         }
 
-        // Initialiser les écouteurs d'événements pour les filtres et les boutons d'action
+        // Initialiser les Ã©couteurs d'Ã©vÃ©nements pour les filtres et les boutons d'action
         addFilterBtn.addEventListener('click', showFilterForm);
         applyFilterBtn.addEventListener('click', addFilter);
         cancelFilterBtn.addEventListener('click', hideFilterForm);
@@ -1912,7 +1912,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         document.querySelector('#delete-selected-btn-{{ zone_id }}').addEventListener('click', openDeleteMultipleModal);
         document.querySelector('#keep-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
         document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', openCopyToZoneModal);
-        document.querySelector('#solve-filtered-btn-{{ zone_id }}').addEventListener('click', openMultiSolver);
 
         // Gestionnaires pour la modale de copie vers une zone
         const elements = getModalElements();
@@ -1935,7 +1934,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
             }
 
-            // Charger la liste des zones au démarrage
+            // Charger la liste des zones au dÃ©marrage
             if (targetZoneSelect) {
                 loadZonesList();
             }
@@ -1950,7 +1949,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 const response = await fetch('/api/zones');
                 const zones = await response.json();
 
-                // Vider les options existantes sauf la première
+                // Vider les options existantes sauf la premiÃ¨re
                 while (elements.targetZoneSelect.options.length > 1) {
                     elements.targetZoneSelect.remove(1);
                 }
@@ -1971,46 +1970,46 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
         // Fonction pour ouvrir la modale de copie vers une zone
         function openCopyToZoneModal(action = 'copy') {
-            console.log(`Ouverture de la modale pour ${action === 'copy' ? 'copier' : 'déplacer'} les géocaches`);
+            console.log(`Ouverture de la modale pour ${action === 'copy' ? 'copier' : 'dÃ©placer'} les gÃ©ocaches`);
             
-            // Vérifier si la modale est dans le conteneur global
+            // VÃ©rifier si la modale est dans le conteneur global
             const modalContainer = window.parent.document.getElementById('modals-container');
             if (!modalContainer) {
-                console.error("Conteneur de modales non trouvé dans le document parent");
+                console.error("Conteneur de modales non trouvÃ© dans le document parent");
                 return;
             }
             
-            // Vérifier si la modale existe dans le conteneur global
+            // VÃ©rifier si la modale existe dans le conteneur global
             let copyToZoneModal = modalContainer.querySelector('#copyToZoneModal-{{ zone_id }}');
             if (!copyToZoneModal) {
                 console.log("Recherche de la modale dans le document local...");
                 
-                // Vérifier si elle existe dans le document local
+                // VÃ©rifier si elle existe dans le document local
                 const localModal = document.getElementById('copyToZoneModal-{{ zone_id }}');
                 if (localModal) {
-                    console.log("Déplacement de la modale vers le conteneur global...");
+                    console.log("DÃ©placement de la modale vers le conteneur global...");
                     modalContainer.appendChild(localModal.cloneNode(true));
                     localModal.remove();
                     
-                    // Récupérer la référence de la modale dans le conteneur global
+                    // RÃ©cupÃ©rer la rÃ©fÃ©rence de la modale dans le conteneur global
                     copyToZoneModal = modalContainer.querySelector('#copyToZoneModal-{{ zone_id }}');
                 }
             }
 
             const elements = getModalElements();
             if (!elements) {
-                console.error("Éléments de la modale non trouvés");
+                console.error("Ã‰lÃ©ments de la modale non trouvÃ©s");
                 return;
             }
 
-            // Mettre à jour les textes selon l'action
+            // Mettre Ã  jour les textes selon l'action
             const modalTitle = copyToZoneModal.querySelector('h3');
             const modalText = copyToZoneModal.querySelector('p');
             const confirmButton = copyToZoneModal.querySelector('.confirm-copy-to-zone');
             const closeButton = copyToZoneModal.querySelector('.close-copy-to-zone-modal');
             const cancelButton = copyToZoneModal.querySelector('.cancel-copy-to-zone');
             
-            // Réinitialiser les gestionnaires d'événements
+            // RÃ©initialiser les gestionnaires d'Ã©vÃ©nements
             if (closeButton) {
                 closeButton.onclick = closeCopyToZoneModal;
             }
@@ -2037,31 +2036,31 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             };
             
             if (modalTitle) {
-                modalTitle.textContent = action === 'copy' ? 'Copier vers une zone' : 'Déplacer vers une zone';
+                modalTitle.textContent = action === 'copy' ? 'Copier vers une zone' : 'DÃ©placer vers une zone';
                 modalTitle.className = action === 'copy' ? 'text-xl font-bold text-green-500' : 'text-xl font-bold text-yellow-500';
             }
             
             if (modalText) {
-                modalText.textContent = `Sélectionnez la zone où ${action === 'copy' ? 'copier' : 'déplacer'} `;
+                modalText.textContent = `SÃ©lectionnez la zone oÃ¹ ${action === 'copy' ? 'copier' : 'dÃ©placer'} `;
                 const countSpan = modalText.querySelector('.geocaches-count-to-copy') || document.createElement('span');
                 countSpan.className = 'geocaches-count-to-copy font-semibold';
                 modalText.appendChild(countSpan);
-                modalText.appendChild(document.createTextNode(' géocaches :'));
+                modalText.appendChild(document.createTextNode(' gÃ©ocaches :'));
             }
             
             if (confirmButton) {
                 const buttonSpan = confirmButton.querySelector('span');
                 if (buttonSpan) {
-                    buttonSpan.textContent = action === 'copy' ? 'Copier' : 'Déplacer';
+                    buttonSpan.textContent = action === 'copy' ? 'Copier' : 'DÃ©placer';
                 }
                 confirmButton.className = `confirm-copy-to-zone ${action === 'copy' ? 'bg-green-500 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-700'} text-white font-bold py-2 px-4 rounded inline-flex items-center`;
             }
 
-            // Obtenir les géocaches filtrées comme pour la suppression
+            // Obtenir les gÃ©ocaches filtrÃ©es comme pour la suppression
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             if (!table) {
-                console.error("Table non trouvée");
+                console.error("Table non trouvÃ©e");
                 return;
             }
 
@@ -2069,13 +2068,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             const geocachesToCopy = getFilteredGeocaches(allData);
 
             if (!geocachesToCopy || geocachesToCopy.length === 0) {
-                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
+                alert("Aucune gÃ©ocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
                 return;
             }
 
-            // Stocker les géocaches pour la copie
+            // Stocker les gÃ©ocaches pour la copie
             selectedGeocaches = geocachesToCopy;
-            console.log(`${selectedGeocaches.length} géocaches sélectionnées pour ${action === 'copy' ? 'la copie' : 'le déplacement'}`);
+            console.log(`${selectedGeocaches.length} gÃ©ocaches sÃ©lectionnÃ©es pour ${action === 'copy' ? 'la copie' : 'le dÃ©placement'}`);
 
             if (elements.geocachesCountToCopy) {
                 elements.geocachesCountToCopy.textContent = selectedGeocaches.length;
@@ -2087,19 +2086,19 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             // Afficher la modale
             if (copyToZoneModal) {
                 copyToZoneModal.classList.remove('hidden');
-                console.log("Modale ouverte avec succès");
+                console.log("Modale ouverte avec succÃ¨s");
             } else {
-                console.error("Impossible d'ouvrir la modale : référence non trouvée");
+                console.error("Impossible d'ouvrir la modale : rÃ©fÃ©rence non trouvÃ©e");
             }
         }
 
-        // Ajouter les gestionnaires d'événements pour les boutons
+        // Ajouter les gestionnaires d'Ã©vÃ©nements pour les boutons
         document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('copy'));
         document.querySelector('#move-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('move'));
 
-        // Attendre que le DOM soit complètement chargé
+        // Attendre que le DOM soit complÃ¨tement chargÃ©
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("Initialisation des gestionnaires d'événements");
+            console.log("Initialisation des gestionnaires d'Ã©vÃ©nements");
             
             // Initialiser les boutons d'action
             const copyToZoneBtn = document.querySelector('#copy-to-zone-btn-{{ zone_id }}');
@@ -2107,10 +2106,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 console.log("Ajout du gestionnaire pour le bouton de copie");
                 copyToZoneBtn.addEventListener('click', openCopyToZoneModal);
             } else {
-                console.error("Bouton de copie non trouvé");
+                console.error("Bouton de copie non trouvÃ©");
             }
 
-            // Initialiser les éléments de la modale
+            // Initialiser les Ã©lÃ©ments de la modale
             const elements = getModalElements();
             if (elements) {
                 const { cancelCopyToZone, confirmCopyToZone, copyToZoneModal } = elements;
@@ -2141,7 +2140,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             elements.copyToZoneModal.classList.add('hidden');
         }
 
-        // Fonction pour copier les géocaches vers la zone sélectionnée
+        // Fonction pour copier les gÃ©ocaches vers la zone sÃ©lectionnÃ©e
         async function copyToSelectedZone() {
             const elements = getModalElements();
             if (!elements) return;
@@ -2150,7 +2149,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
             const targetZoneId = targetZoneSelect.value;
             if (!targetZoneId) {
-                alert("Veuillez sélectionner une zone cible.");
+                alert("Veuillez sÃ©lectionner une zone cible.");
                 return;
             }
 
@@ -2174,14 +2173,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageDiv.textContent = `${selectedGeocaches.length} géocache(s) copiée(s) avec succès vers la zone sélectionnée.`;
+                    messageDiv.textContent = `${selectedGeocaches.length} gÃ©ocache(s) copiÃ©e(s) avec succÃ¨s vers la zone sÃ©lectionnÃ©e.`;
                     messageDiv.className = 'mt-2 text-green-600';
                 } else {
                     throw new Error(data.error || 'Une erreur est survenue lors de la copie');
                 }
             } catch (error) {
                 console.error('Erreur:', error);
-                messageDiv.textContent = error.message || 'Une erreur est survenue lors de la copie des géocaches';
+                messageDiv.textContent = error.message || 'Une erreur est survenue lors de la copie des gÃ©ocaches';
                 messageDiv.className = 'mt-2 text-red-600';
             } finally {
                 // Cacher l'indicateur de chargement
@@ -2193,18 +2192,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         }
 
-        // Fonction utilitaire pour obtenir les géocaches filtrées
+        // Fonction utilitaire pour obtenir les gÃ©ocaches filtrÃ©es
         function getFilteredGeocaches(allData) {
             // Obtenir les valeurs des filtres simples
             const textFilter = tableFilter.value.toLowerCase();
             const statusValue = statusFilter.value;
             const typeValue = typeFilter.value;
 
-            // Filtrer les données selon les mêmes critères que applyFilters()
+            // Filtrer les donnÃ©es selon les mÃªmes critÃ¨res que applyFilters()
             return allData.filter(data => {
                 let matchesAllFilters = true;
 
-                // Vérifier les filtres simples
+                // VÃ©rifier les filtres simples
                 if (textFilter) {
                     const textMatch = (
                         (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
@@ -2224,7 +2223,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     if (!typeMatch) matchesAllFilters = false;
                 }
 
-                // Vérifier les filtres avancés
+                // VÃ©rifier les filtres avancÃ©s
                 for (const filter of activeFiltersList) {
                     if (!matchesAllFilters) break;
 
@@ -2307,7 +2306,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             messageDiv.className = 'mt-2 text-green-600';
         }
 
-        // Fonction pour obtenir les IDs des géocaches filtrées
+        // Fonction pour obtenir les IDs des gÃ©ocaches filtrÃ©es
         function getFilteredGeocacheIds() {
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
@@ -2318,7 +2317,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             return filteredGeocaches.map(g => g.id);
         }
 
-        // Fonction pour rafraîchir le tableau des géocaches
+        // Fonction pour rafraÃ®chir le tableau des gÃ©ocaches
         async function refreshGeocachesTable() {
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
@@ -2330,14 +2329,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         async function moveToSelectedZone() {
             const elements = getModalElements();
             if (!elements) {
-                showError('Erreur: éléments de la modale non trouvés');
+                showError('Erreur: Ã©lÃ©ments de la modale non trouvÃ©s');
                 return;
             }
 
             try {
                 const selectedZoneId = elements.targetZoneSelect.value;
                 if (!selectedZoneId) {
-                    showError('Veuillez sélectionner une zone cible');
+                    showError('Veuillez sÃ©lectionner une zone cible');
                     return;
                 }
 
@@ -2346,14 +2345,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     elements.copyLoadingIndicator.classList.remove('hidden');
                 }
 
-                // Récupérer les IDs des géocaches filtrées
+                // RÃ©cupÃ©rer les IDs des gÃ©ocaches filtrÃ©es
                 const geocacheIds = getFilteredGeocacheIds();
                 if (geocacheIds.length === 0) {
-                    showError('Aucune géocache à déplacer');
+                    showError('Aucune gÃ©ocache Ã  dÃ©placer');
                     return;
                 }
 
-                // Copier d'abord les géocaches vers la nouvelle zone
+                // Copier d'abord les gÃ©ocaches vers la nouvelle zone
                 const copyResponse = await fetch('/api/geocaches/copy-to-zone', {
                     method: 'POST',
                     headers: {
@@ -2366,10 +2365,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
 
                 if (!copyResponse.ok) {
-                    throw new Error('Erreur lors de la copie des géocaches vers la nouvelle zone');
+                    throw new Error('Erreur lors de la copie des gÃ©ocaches vers la nouvelle zone');
                 }
 
-                // Supprimer ensuite les géocaches de la zone actuelle
+                // Supprimer ensuite les gÃ©ocaches de la zone actuelle
                 const deleteResponse = await fetch(`/api/zones/{{ zone_id }}/geocaches`, {
                     method: 'DELETE',
                     headers: {
@@ -2381,13 +2380,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
 
                 if (!deleteResponse.ok) {
-                    throw new Error('Erreur lors de la suppression des géocaches de la zone actuelle');
+                    throw new Error('Erreur lors de la suppression des gÃ©ocaches de la zone actuelle');
                 }
 
-                // Fermer la modale et rafraîchir le tableau
+                // Fermer la modale et rafraÃ®chir le tableau
                 closeCopyToZoneModal();
                 await refreshGeocachesTable();
-                showSuccess('Les géocaches ont été déplacées avec succès');
+                showSuccess('Les gÃ©ocaches ont Ã©tÃ© dÃ©placÃ©es avec succÃ¨s');
 
             } catch (error) {
                 console.error('Erreur:', error);
@@ -2399,165 +2398,44 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
             }
         }
-
-        // Fonction pour ouvrir le multi-solver avec les géocaches filtrées
-        function openMultiSolver() {
-            console.log("Ouverture du multi-solver pour les géocaches filtrées");
-            
-            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
-            const tableId = `geocaches-table-{{ zone_id }}`;
-            const table = window[`tabulator_${tableId}`];
-            
-            if (!table) return;
-            
-            // Récupérer toutes les données
-            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
-            
-            // Obtenir les valeurs des filtres simples (recherche, statut, type)
-            const textFilter = tableFilter.value.toLowerCase();
-            const statusValue = statusFilter.value;
-            const typeValue = typeFilter.value;
-            
-            // Filtrer manuellement les données selon les mêmes critères que applyFilters()
-            const filteredGeocaches = allData.filter(data => {
-                let matchesAllFilters = true;
-                
-                // Vérifier les filtres simples
-                // Filtre textuel
-                if (textFilter) {
-                    const textMatch = (
-                        (data.gc_code && data.gc_code.toLowerCase().includes(textFilter)) ||
-                        (data.name && data.name.toLowerCase().includes(textFilter)) ||
-                        (data.cache_type && data.cache_type.toLowerCase().includes(textFilter))
-                    );
-                    if (!textMatch) matchesAllFilters = false;
-                }
-                
-                // Filtre de statut
-                if (statusValue && matchesAllFilters) {
-                    const statusMatch = data.solved === statusValue;
-                    if (!statusMatch) matchesAllFilters = false;
-                }
-                
-                // Filtre de type
-                if (typeValue && matchesAllFilters) {
-                    const typeMatch = data.cache_type === typeValue;
-                    if (!typeMatch) matchesAllFilters = false;
-                }
-                
-                // Vérifier les filtres avancés
-                for (const filter of activeFiltersList) {
-                    if (!matchesAllFilters) break; // Sortir si déjà non correspondant
-                    
-                    const fieldValue = data[filter.field];
-                    const filterValue = filter.value;
-                    const fieldDef = fieldDefinitions[filter.field];
-                    
-                    // Vérifier si la valeur existe
-                    if (fieldValue === undefined || fieldValue === null) {
-                        matchesAllFilters = false;
-                        continue;
-                    }
-                    
-                    // Convertir les valeurs en nombres pour les champs numériques
-                    let dataValue = fieldValue;
-                    let comparisonValue = filterValue;
-                    
-                    if (fieldDef?.type === "numeric") {
-                        dataValue = parseFloat(dataValue);
-                        comparisonValue = parseFloat(comparisonValue);
-                        
-                        // Vérifier si la conversion a réussi
-                        if (isNaN(dataValue) || isNaN(comparisonValue)) {
-                            matchesAllFilters = false;
-                            continue;
-                        }
-                    }
-                    
-                    // Pour les champs insensibles à la casse, convertir en minuscules
-                    if (fieldDef?.caseSensitive === false) {
-                        dataValue = typeof dataValue === 'string' ? dataValue.toLowerCase() : dataValue;
-                        comparisonValue = typeof comparisonValue === 'string' ? comparisonValue.toLowerCase() : comparisonValue;
-                    }
-                    
-                    // Appliquer l'opérateur approprié
-                    switch (filter.operator) {
-                        case "eq":
-                            matchesAllFilters = dataValue === comparisonValue;
-                            break;
-                        case "neq":
-                            matchesAllFilters = dataValue !== comparisonValue;
-                            break;
-                        case "gt":
-                            matchesAllFilters = dataValue > comparisonValue;
-                            break;
-                        case "gte":
-                            matchesAllFilters = dataValue >= comparisonValue;
-                            break;
-                        case "lt":
-                            matchesAllFilters = dataValue < comparisonValue;
-                            break;
-                        case "lte":
-                            matchesAllFilters = dataValue <= comparisonValue;
-                            break;
-                        case "in":
-                            // Pour les opérateurs "in" (parmi)
-                            if (Array.isArray(comparisonValue)) {
-                                if (fieldDef?.caseSensitive === false && typeof dataValue === 'string') {
-                                    // Cas insensible à la casse, convertir toutes les valeurs en minuscules
-                                    const lowerCaseValues = comparisonValue.map(v => typeof v === 'string' ? v.toLowerCase() : v.toString().toLowerCase());
-                                    matchesAllFilters = lowerCaseValues.includes(dataValue);
-                                } else {
-                                    // Cas normal, convertir en strings pour la comparaison si nécessaire
-                                    const stringComparisonValues = comparisonValue.map(v => v.toString());
-                                    matchesAllFilters = stringComparisonValues.includes(dataValue.toString());
-                                }
-                            } else {
-                                matchesAllFilters = dataValue.toString() === comparisonValue.toString();
-                            }
-                            break;
-                        default:
-                            matchesAllFilters = true;
-                    }
-                }
-                
-                return matchesAllFilters;
-            });
-            
-            console.log(`Filtrage manuel: ${filteredGeocaches.length} géocaches filtrées sur un total de ${allData.length}.`);
-            
-            // Vérifier s'il y a des géocaches correspondant aux filtres
-            if (!filteredGeocaches || filteredGeocaches.length === 0) {
-                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
-                return;
-            }
-            
-            // Préparer les données des géocaches pour le multi-solver
-            const geocachesData = filteredGeocaches.map(g => ({
-                id: g.id,
-                gc_code: g.gc_code,
-                name: g.name
-            }));
-            
-            console.log("Données des géocaches pour le multi-solver:", geocachesData);
-            
-            // Encoder les données des géocaches pour les passer via l'URL
-            const encodedGeocachesData = encodeURIComponent(JSON.stringify(geocachesData));
-            
-            // Ouvrir un nouvel onglet avec le multi-solver
-            window.parent.postMessage({
-                type: 'openMultiSolver',
-                geocaches: geocachesData,
-                component: {
-                    type: 'component',
-                    componentName: 'multi-solver',
-                    title: `Multi-Solver (${geocachesData.length} géocaches)`,
-                    componentState: {
-                        url: `/multi-solver`,
-                        geocaches: geocachesData // Passer les géocaches directement dans le componentState
-                    }
-                }
-            }, '*');
-        }
     })();
-</script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... existing code ...
+
+            // Ajout du gestionnaire pour le bouton "RÃ©soudre les caches filtrÃ©es"
+            const solveFilteredBtn = document.getElementById('solve-filtered-btn-{{ zone_id }}');
+            if (solveFilteredBtn) {
+                solveFilteredBtn.addEventListener('click', function() {
+                    console.log('Ouverture du multi-solver pour les gÃ©ocaches filtrÃ©es');
+                    
+                    // RÃ©cupÃ©rer les IDs des gÃ©ocaches filtrÃ©es
+                    const filteredIds = getFilteredGeocacheIds();
+                    
+                    if (!filteredIds || filteredIds.length === 0) {
+                        alert('Aucune gÃ©ocache ne correspond aux filtres actuels');
+                        return;
+                    }
+                    
+                    // Ouvrir une nouvelle tab avec le multi-solver
+                    if (window.mainLayout) {
+                        // Stocker temporairement les IDs des gÃ©ocaches dans une variable globale
+                        window.layoutGeoacheIdsParam = filteredIds;
+                        
+                        // CrÃ©er un nouvel onglet avec le multi-solver
+                        window.mainLayout.root.contentItems[0].addChild({
+                            type: 'component',
+                            componentName: 'multi-geocache-solver',
+                            title: `Multi-Solver (${filteredIds.length})`,
+                            componentState: { 
+                                geocacheIds: filteredIds
+                            }
+                        });
+                    } else {
+                        console.error("GoldenLayout n'est pas initialisÃ©");
+                        alert("Erreur: Impossible d'ouvrir le multi-solver");
+                    }
+                });
+            }
+        });

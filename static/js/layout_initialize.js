@@ -154,7 +154,7 @@ function initializeLayout() {
             
             // Ne logger que les messages pertinents
             if (event.data.type === 'openGeocacheDetails') {
-                console.log('=== Layout: Message reçu ===', event.data);
+                console.log('=== Layout: Message openGeocacheDetails reçu ===', event.data);
                 
                 const { geocacheId, gcCode, name } = event.data;
                 
@@ -188,15 +188,63 @@ function initializeLayout() {
                             const container = mainLayout.root.getItemsById(containerId)[0];
                             if (container && container.parent) {
                                 container.parent.addChild(newItemConfig);
-                                return;
+                            } else {
+                                root.contentItems[0].addChild(newItemConfig);
                             }
+                        } else {
+                            root.contentItems[0].addChild(newItemConfig);
                         }
-                        root.contentItems[0].addChild(newItemConfig);
                     })
                     .catch(error => {
-                        console.error("Erreur lors du chargement des détails:", error);
-                        alert("Erreur lors du chargement des détails de la géocache");
+                        console.error('Erreur lors du chargement des détails de la géocache:', error);
                     });
+            }
+            
+            // Gestionnaire pour le message openPluginInterface
+            if (event.data.type === 'openPluginInterface') {
+                console.log('=== Layout: Message openPluginInterface reçu ===', event.data);
+                
+                const { pluginName } = event.data;
+                
+                // Trouver le conteneur parent
+                const containerId = event.source.frameElement?.closest('.lm_content')?.parentElement?.id;
+                
+                // Utiliser la fonction existante pour ouvrir l'onglet du plugin
+                if (typeof window.openPluginTab === 'function') {
+                    window.openPluginTab(pluginName, pluginName);
+                } else {
+                    console.error('La fonction openPluginTab n\'est pas disponible');
+                }
+            }
+            
+            // Gestionnaire pour le message openMultiSolver
+            else if (event.data.type === 'openMultiSolver') {
+                console.log('=== Layout: Message openMultiSolver reçu ===', event.data);
+                
+                const { geocaches, component } = event.data;
+                
+                // S'assurer que les geocaches sont correctement passées au composant
+                if (geocaches && component && component.componentState) {
+                    // S'assurer que geocaches est présent dans component.componentState
+                    component.componentState.geocaches = geocaches;
+                    
+                    console.log('=== Layout: Component state après modification ===', component.componentState);
+                }
+                
+                // Trouver le conteneur parent
+                const containerId = event.source.frameElement?.closest('.lm_content')?.parentElement?.id;
+                
+                const root = mainLayout.root;
+                
+                // Ajouter le composant au parent ou à la racine
+                if (containerId) {
+                    const container = mainLayout.root.getItemsById(containerId)[0];
+                    if (container && container.parent) {
+                        container.parent.addChild(component);
+                        return;
+                    }
+                }
+                root.contentItems[0].addChild(component);
             }
         });
 
@@ -545,6 +593,134 @@ function initializeLayout() {
             const params = new URLSearchParams(state);
             const url = `/api/plugins/${state.pluginName}/interface?${params.toString()}`;
             container.getElement().load(url);
+        });
+
+        // Enregistrer le composant multi-solver
+        mainLayout.registerComponent('multi-solver', function(container, state) {
+            console.log("Création du composant multi-solver", state);
+            
+            // Définir une URL par défaut
+            let url = '/multi-solver';
+            
+            // S'assurer que les geocaches sont correctement formatées et disponibles
+            if (state.geocaches) {
+                try {
+                    let geocachesData = Array.isArray(state.geocaches) ? state.geocaches : JSON.parse(state.geocaches);
+                    console.log('Geocaches disponibles dans le component state:', {
+                        count: geocachesData.length,
+                        sample: geocachesData.slice(0, 3)
+                    });
+                    
+                    // Mettre à jour l'état pour s'assurer qu'il contient le tableau complet
+                    state.geocaches = geocachesData;
+                    
+                    // Encoder les geocaches dans l'URL
+                    const geocachesParam = encodeURIComponent(JSON.stringify(geocachesData));
+                    console.log('URL finale du multi-solver:', `/multi-solver?geocaches=${geocachesParam}`);
+                    
+                    // Construire l'URL complète
+                    url = `/multi-solver?geocaches=${geocachesParam}`;
+                    
+                    // Stocker temporairement pour l'utiliser après le chargement
+                    window.currentMultiSolverGeocaches = geocachesData;
+                } catch (e) {
+                    console.error('Erreur lors du traitement des geocaches pour multi-solver:', e);
+                }
+            }
+            
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement du multi-solver...</span>
+                    </div>
+                </div>
+            `);
+            
+            console.log("Chargement du multi-solver depuis l'URL:", url);
+            
+            // Charger le contenu du multi-solver depuis l'URL
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    // Avant d'injecter le HTML, s'assurer que les données sont préservées
+                    const currentState = container.getState() || {};
+                    
+                    // Injecter le HTML dans le conteneur
+                    container.getElement().html(html);
+                    
+                    // S'il s'agit d'un multi-solver, injecter les géocaches après le chargement
+                    if (state.geocaches) {
+                        const geocaches = window.currentMultiSolverGeocaches || [];
+                        
+                        // Rechercher ou créer l'iframe du contenu
+                        setTimeout(function() {
+                            const iframe = container.getElement().find('iframe')[0] || 
+                                          container.getElement()[0].querySelector('iframe');
+                            
+                            if (iframe) {
+                                console.log('Transmission des geocaches après chargement HTML:', geocaches.length);
+                                
+                                // Méthode 1: Stocker directement dans l'objet iframe
+                                try {
+                                    iframe.contentWindow.injectedGeocaches = geocaches;
+                                    console.log("%c[GoldenLayout] Injection directe des géocaches", "background:green; color:white");
+                                } catch (e) {
+                                    console.error('Erreur lors de l\'injection directe des geocaches:', e);
+                                }
+                                
+                                // Méthode 2: Envoyer un événement
+                                try {
+                                    const event = new CustomEvent('geocachesInjected', {
+                                        detail: { geocaches: geocaches }
+                                    });
+                                    iframe.contentDocument.dispatchEvent(event);
+                                } catch (e) {
+                                    console.error('Erreur lors de l\'envoi de l\'événement geocachesInjected:', e);
+                                }
+                            } else {
+                                console.error('Iframe non trouvé pour injecter les géocaches');
+                                
+                                // Méthode alternative: ajouter un script directement au container
+                                try {
+                                    const script = document.createElement('script');
+                                    script.textContent = `
+                                        (function() {
+                                            console.log("%c[GoldenLayout] Injection via script des géocaches", "background:purple; color:white");
+                                            window.injectedGeocaches = ${JSON.stringify(geocaches)};
+                                            
+                                            // Déclencher un événement personnalisé pour notifier le script
+                                            document.dispatchEvent(new CustomEvent('geocachesInjected', {
+                                                detail: { geocaches: window.injectedGeocaches }
+                                            }));
+                                        })();
+                                    `;
+                                    container.getElement()[0].appendChild(script);
+                                } catch (e) {
+                                    console.error('Erreur lors de l\'injection via script:', e);
+                                }
+                            }
+                        }, 500); // Délai pour s'assurer que le contenu est chargé
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors du chargement du multi-solver:", error);
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                            <div class="flex items-center justify-center h-full">
+                                <div class="text-red-500">
+                                    Erreur lors du chargement du multi-solver: ${error.message}
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                });
         });
 
         mainLayout.init();
