@@ -126,6 +126,10 @@ window.MultiSolverController = class extends Stimulus.Controller {
         
         if (!this.geocachesValue || this.geocachesValue.length === 0) {
             this.geocachesListTarget.innerHTML = '<div class="text-gray-400">Aucune géocache sélectionnée</div>';
+            // Mettre à jour le compteur à 0
+            if (typeof updateGeocachesCount === 'function') {
+                updateGeocachesCount(0);
+            }
             return;
         }
 
@@ -148,6 +152,18 @@ window.MultiSolverController = class extends Stimulus.Controller {
         });
         
         this.geocachesListTarget.innerHTML = html;
+        
+        // Mettre à jour le compteur avec le nombre de géocaches
+        if (typeof updateGeocachesCount === 'function') {
+            updateGeocachesCount(this.geocachesValue.length);
+        } else {
+            console.log("%c[MultiSolver] La fonction updateGeocachesCount n'est pas disponible", "background:orange; color:black");
+            // Fallback: mise à jour directe
+            const countElement = document.getElementById('geocaches-count');
+            if (countElement) {
+                countElement.textContent = this.geocachesValue.length || '0';
+            }
+        }
     }
 
     // Méthode pour charger les détails d'une géocache
@@ -579,7 +595,9 @@ window.MultiSolverController = class extends Stimulus.Controller {
         const pluginName = event.currentTarget.dataset.pluginName;
         const pluginZoneId = event.currentTarget.dataset.pluginZoneId;
         
-        console.log("Sélection du plugin:", pluginName, "dans la zone:", pluginZoneId);
+        console.log("%c[MultiSolver] Sélection du plugin:", "background:#222; color:cyan; font-weight:bold", {
+            pluginId, pluginName, pluginZoneId
+        });
         
         if (pluginId && pluginName) {
             try {
@@ -604,7 +622,7 @@ window.MultiSolverController = class extends Stimulus.Controller {
                 }
                 
                 // Appeler l'API pour récupérer l'interface du plugin
-                const response = await fetch(`/api/plugins/${pluginName}/interface?context=solver`);
+                const response = await fetch(`/api/plugins/${pluginName}/interface?context=solver&hide_buttons=true`);
                 
                 if (!response.ok) {
                     throw new Error(`Erreur HTTP: ${response.status}`);
@@ -617,13 +635,8 @@ window.MultiSolverController = class extends Stimulus.Controller {
                     // Insérer le HTML dans la zone
                     pluginZone.innerHTML = html;
                     
-                    // Ajouter l'attribut data-plugin-zone-id au bouton d'exécution
-                    const executeButton = pluginZone.querySelector('[data-action="click->geocache-solver#executePlugin"]');
-                    if (executeButton) {
-                        executeButton.setAttribute('data-action', 'click->multi-solver#executePlugin');
-                        executeButton.setAttribute('data-plugin-zone-id', pluginZoneId);
-                        console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution:", pluginZoneId);
-                    }
+                    // Masquer les boutons d'exécution du plugin au cas où le serveur les génère quand même
+                    this.hidePluginExecuteButtons(pluginZone);
                 } else {
                     this.pluginListTarget.innerHTML = html;
                     
@@ -632,19 +645,33 @@ window.MultiSolverController = class extends Stimulus.Controller {
                     this.pluginListTarget.id = mainPanelId;
                     this.pluginListTarget.setAttribute('data-plugin-selection-zone', 'true');
                     
-                    // Ajouter l'attribut data-plugin-zone-id au bouton d'exécution
-                    const executeButton = this.pluginListTarget.querySelector('[data-action="click->geocache-solver#executePlugin"]');
-                    if (executeButton) {
-                        executeButton.setAttribute('data-action', 'click->multi-solver#executePlugin');
-                        executeButton.setAttribute('data-plugin-zone-id', mainPanelId);
-                        console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution principal:", mainPanelId);
-                    }
+                    // Masquer les boutons d'exécution du plugin au cas où le serveur les génère quand même
+                    this.hidePluginExecuteButtons(this.pluginListTarget);
                 }
                 
                 // Mettre à jour le plugin sélectionné
-                this.selectedPluginValue = pluginId;
+                this.selectedPluginValue = pluginName;
+                
+                // Mettre à jour le texte et l'état du bouton d'exécution principal
+                const executeButton = document.getElementById('execute-plugin-button');
+                if (executeButton) {
+                    executeButton.textContent = `Exécuter ${pluginName} sur les géocaches`;
+                    executeButton.classList.remove('bg-gray-500');
+                    executeButton.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                    executeButton.dataset.pluginName = pluginName;
+                    executeButton.dataset.pluginState = 'selected';
+                }
+                
+                // Mettre à jour le message d'état
+                const pluginStatus = document.getElementById('plugin-status');
+                if (pluginStatus) {
+                    pluginStatus.textContent = `Plugin ${pluginName} sélectionné`;
+                    pluginStatus.classList.remove('text-amber-400');
+                    pluginStatus.classList.add('text-green-400');
+                }
+                
             } catch (error) {
-                console.error('Erreur lors du chargement de l\'interface du plugin:', error);
+                console.error('%c[MultiSolver] Erreur lors du chargement de l\'interface du plugin:', "background:red; color:white", error);
                 if (pluginZoneId) {
                     const pluginZone = document.getElementById(pluginZoneId);
                     if (pluginZone) {
@@ -665,6 +692,35 @@ window.MultiSolverController = class extends Stimulus.Controller {
         }
     }
     
+    // Méthode pour masquer les boutons d'exécution dans l'interface du plugin
+    hidePluginExecuteButtons(container) {
+        if (!container) return;
+        
+        // Masquer les boutons d'exécution avec data-action pour geocache-solver#executePlugin
+        const geocacheSolverButtons = container.querySelectorAll('[data-action="click->geocache-solver#executePlugin"], [data-action="submit->geocache-solver#executePlugin"]');
+        geocacheSolverButtons.forEach(button => {
+            button.style.display = 'none';
+        });
+        
+        // Masquer les boutons d'exécution avec l'attribut onclick="executePlugin()"
+        const onclickButtons = container.querySelectorAll('button[onclick*="executePlugin"]');
+        onclickButtons.forEach(button => {
+            button.style.display = 'none';
+        });
+        
+        // Masquer les divs contenant les boutons d'exécution
+        const buttonContainers = container.querySelectorAll('.flex.justify-end, .mt-6.flex.justify-end');
+        buttonContainers.forEach(div => {
+            // Vérifier si ce div contient des boutons d'exécution avant de le masquer
+            const hasExecuteButtons = div.querySelector('button[onclick*="executePlugin"], [data-action*="executePlugin"]');
+            if (hasExecuteButtons) {
+                div.style.display = 'none';
+            }
+        });
+        
+        console.log("%c[MultiSolver] Boutons d'exécution masqués dans l'interface du plugin", "background:#222; color:cyan");
+    }
+
     // Méthode pour exécuter un plugin
     async executePlugin(event) {
         // Prévenir le comportement par défaut

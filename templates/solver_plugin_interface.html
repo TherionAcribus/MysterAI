@@ -79,6 +79,7 @@
             </div>
         {% endif %}
         
+        {% if not hide_buttons %}
         <div class="flex justify-end">
             <button 
                 type="submit" 
@@ -86,6 +87,7 @@
                 Exécuter
             </button>
         </div>
+        {% endif %}
     </form>
     
     <div class="plugin-result mt-4 hidden" data-geocache-solver-target="pluginResult">

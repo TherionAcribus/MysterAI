@@ -214,7 +214,10 @@ def get_plugin_interface(plugin_name):
         # Ajouter les paramètres aux données du plugin
         plugin_data['params'] = params
         
-        return render_template('plugin_interface.html', plugin=plugin_data)
+        # Vérifier si on doit masquer les boutons (pour Multi Solver)
+        hide_buttons = request.args.get('hide_buttons', 'false').lower() == 'true'
+        
+        return render_template('plugin_interface.html', plugin=plugin_data, hide_buttons=hide_buttons)
     except Exception as e:
         print(f"Error loading plugin interface: {str(e)}")
         return jsonify({'error': str(e)}), 500
