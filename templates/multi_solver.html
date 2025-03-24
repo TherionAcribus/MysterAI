@@ -141,8 +141,24 @@
                 <!-- Options d'application -->
                 <div class="mt-4">
                     <div class="flex items-center">
-                        <input type="checkbox" id="plugin-apply-to-all" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700" checked>
-                        <label for="plugin-apply-to-all" class="ml-2 block text-sm text-gray-300">Appliquer à toutes les géocaches</label>
+                        <input type="checkbox" id="apply-to-all-geocaches" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700" checked>
+                        <label for="apply-to-all-geocaches" class="ml-2 block text-sm text-gray-300">Appliquer à toutes les géocaches</label>
+                    </div>
+                    
+                    <div class="mt-2 text-center">
+                        <button 
+                            id="execute-plugin-button"
+                            data-action="multi-solver#executePlugin"
+                            data-plugin-state="unselected"
+                            class="w-full py-2 bg-gray-500 text-white rounded-md text-sm font-medium transition-colors">
+                            <i class="fas fa-play mr-2"></i>
+                            Exécuter sur les géocaches
+                        </button>
+                    </div>
+                    
+                    <!-- Indicateur d'état pour les plugins -->
+                    <div id="plugin-status" class="mt-2 text-center text-sm text-amber-400">
+                        Veuillez d'abord sélectionner un plugin
                     </div>
                 </div>
             </div>
@@ -192,6 +208,242 @@
         </div>
     </div>
 </div>
+
+<script type="text/javascript">
+    // Fonction pour exécuter un plugin sur les géocaches
+    window.executePlugin = function(pluginName) {
+        console.log("%c[MultiSolver] Exécution de la fonction globale executePlugin pour:", "background:purple; color:white; font-weight:bold", pluginName);
+        
+        if (!pluginName) {
+            console.error("%c[MultiSolver] ERREUR: Aucun nom de plugin fourni", "background:red; color:white; font-weight:bold");
+            return;
+        }
+        
+        // Récupérer les géocaches à traiter
+        let geocaches = [];
+        
+        // Essayer d'abord de récupérer les géocaches depuis la variable globale
+        if (window.injectedGeocaches && Array.isArray(window.injectedGeocaches)) {
+            geocaches = window.injectedGeocaches;
+            console.log("%c[MultiSolver] Utilisation des géocaches injectées:", "background:green; color:white", geocaches.length);
+        } else {
+            // Sinon, essayer de récupérer depuis sessionStorage
+            try {
+                const storedGeocaches = sessionStorage.getItem('multiSolverGeocaches');
+                if (storedGeocaches) {
+                    geocaches = JSON.parse(storedGeocaches);
+                    console.log("%c[MultiSolver] Utilisation des géocaches depuis sessionStorage:", "background:green; color:white", geocaches.length);
+                }
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de la récupération des géocaches:", "background:red; color:white", error);
+            }
+        }
+        
+        if (!geocaches || geocaches.length === 0) {
+            console.error("%c[MultiSolver] Aucune géocache disponible pour le traitement", "background:red; color:white");
+            alert("Aucune géocache disponible pour appliquer le plugin.");
+            return;
+        }
+        
+        console.log("%c[MultiSolver] Démarrage du traitement pour", "background:green; color:white", {
+            plugin: pluginName,
+            geocaches: geocaches.length
+        });
+        
+        // Traiter les géocaches une par une
+        const results = [];
+        const processGeocaches = async () => {
+            try {
+                // Récupérer les données du formulaire si disponible
+                let formData = {};
+                const formElement = document.querySelector('form');
+                
+                if (formElement) {
+                    const formDataObj = new FormData(formElement);
+                    for (const [key, value] of formDataObj.entries()) {
+                        formData[key] = value;
+                    }
+                }
+                
+                // Afficher un message de chargement
+                const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
+                if (resultsTable) {
+                    resultsTable.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="px-6 py-4">
+                                <div class="flex justify-center">
+                                    <div class="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                                </div>
+                                <div class="text-center text-gray-400 mt-2">Application du plugin ${pluginName} sur ${geocaches.length} géocache(s)...</div>
+                            </td>
+                        </tr>
+                    `;
+                }
+                
+                // Traiter chaque géocache
+                for (const geocache of geocaches) {
+                    try {
+                        // Récupérer le texte de la géocache
+                        const descriptionResponse = await fetch(`/geocaches/${geocache.id}/text`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        
+                        if (!descriptionResponse.ok) {
+                            throw new Error(`Erreur HTTP: ${descriptionResponse.status}`);
+                        }
+                        
+                        const descriptionData = await descriptionResponse.json();
+                        const text = descriptionData.description;
+                        
+                        // Appeler l'API pour exécuter le plugin
+                        const response = await fetch(`/api/plugins/${pluginName}/execute`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                text: text,
+                                ...formData
+                            }),
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Erreur HTTP: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        
+                        // Extraire le résultat
+                        let resultText = '';
+                        let coordinates = null;
+                        
+                        if (data.text_output) {
+                            resultText = data.text_output;
+                        } else if (data.result?.text?.text_output) {
+                            resultText = data.result.text.text_output;
+                        } else if (data.output) {
+                            resultText = data.output;
+                        } else if (typeof data.result === 'string') {
+                            resultText = data.result;
+                        } else if (data.result) {
+                            resultText = JSON.stringify(data.result);
+                        } else {
+                            resultText = JSON.stringify(data);
+                        }
+                        
+                        // Extraire les coordonnées si présentes
+                        if (data.coordinates) {
+                            coordinates = data.coordinates;
+                        } else if (data.result?.coordinates) {
+                            coordinates = data.result.coordinates;
+                        }
+                        
+                        // Ajouter le résultat
+                        results.push({
+                            geocache: geocache,
+                            result: resultText,
+                            coordinates: coordinates,
+                            plugin: pluginName,
+                            timestamp: new Date().toISOString()
+                        });
+                        
+                    } catch (error) {
+                        console.error(`Erreur pour la géocache ${geocache.id}:`, error);
+                        results.push({
+                            geocache: geocache,
+                            result: `Erreur: ${error.message}`,
+                            error: true,
+                            plugin: pluginName,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                }
+                
+                // Mettre à jour le tableau des résultats
+                updateResultsTable(results);
+                
+            } catch (error) {
+                console.error("Erreur globale:", error);
+                alert(`Erreur lors de l'exécution du plugin: ${error.message}`);
+            }
+        };
+        
+        // Fonction pour mettre à jour le tableau des résultats
+        const updateResultsTable = (results) => {
+            const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
+            if (!resultsTable) return;
+            
+            let tableHtml = '';
+            
+            if (results.length === 0) {
+                resultsTable.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4">
+                            <div class="text-center text-gray-400">Aucun résultat disponible</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            results.forEach((result) => {
+                const geocache = result.geocache;
+                const resultClass = result.error ? 'text-red-400' : '';
+                
+                tableHtml += `
+                    <tr class="hover:bg-gray-700">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-200">${geocache.name || 'Sans nom'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm ${resultClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${result.result || 'Aucun résultat'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-200">${result.coordinates ? formatCoordinates(result.coordinates) : 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right">
+                            <button onclick="viewResult('${geocache.id}', '${result.plugin}', ${results.indexOf(result)})" class="text-blue-400 hover:text-blue-300 mr-3">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${result.coordinates ? `<button onclick="saveCoordinates('${geocache.id}', '${result.coordinates?.latitude}', '${result.coordinates?.longitude}')" class="text-green-400 hover:text-green-300">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            resultsTable.innerHTML = tableHtml;
+        };
+        
+        // Fonction pour formater les coordonnées
+        const formatCoordinates = (coords) => {
+            if (!coords) return 'N/A';
+            return `${coords.latitude}, ${coords.longitude}`;
+        };
+        
+        // Fonction pour afficher les détails d'un résultat
+        window.viewResult = function(geocacheId, plugin, resultIndex) {
+            alert(`Détails pour la géocache ${geocacheId} avec le plugin ${plugin}`);
+            // TODO: Implémenter une meilleure vue des détails
+        };
+        
+        // Fonction pour sauvegarder les coordonnées
+        window.saveCoordinates = function(geocacheId, lat, lng) {
+            alert(`Coordonnées sauvegardées pour la géocache ${geocacheId}: ${lat}, ${lng}`);
+            // TODO: Implémenter la sauvegarde des coordonnées
+        };
+        
+        // Démarrer le traitement
+        processGeocaches();
+    };
+</script>
 
 <script type="text/javascript">
     // Debug script - sera exécuté immédiatement
@@ -332,6 +584,38 @@
             }
         };
         
+        // Ajouter cette fonction pour mettre à jour l'état du bouton d'exécution
+        window.updateExecuteButtonState = function(pluginName) {
+            const executeButton = document.getElementById('execute-plugin-button');
+            const pluginStatus = document.getElementById('plugin-status');
+            
+            if (executeButton) {
+                if (pluginName) {
+                    // Un plugin est sélectionné
+                    executeButton.setAttribute('data-plugin-name', pluginName);
+                    executeButton.setAttribute('data-plugin-state', 'selected');
+                    executeButton.classList.remove('bg-gray-500');
+                    executeButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                    executeButton.innerHTML = `<i class="fas fa-play mr-2"></i>Exécuter ${pluginName} sur les géocaches`;
+                    
+                    if (pluginStatus) {
+                        pluginStatus.classList.add('hidden');
+                    }
+                } else {
+                    // Aucun plugin n'est sélectionné
+                    executeButton.removeAttribute('data-plugin-name');
+                    executeButton.setAttribute('data-plugin-state', 'unselected');
+                    executeButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    executeButton.classList.add('bg-gray-500');
+                    executeButton.innerHTML = `<i class="fas fa-play mr-2"></i>Exécuter sur les géocaches`;
+                    
+                    if (pluginStatus) {
+                        pluginStatus.classList.remove('hidden');
+                    }
+                }
+            }
+        };
+        
         // Écouter l'événement d'injection de géocaches
         document.addEventListener('geocachesInjected', function(event) {
             console.log("%c[MultiSolver] Événement geocachesInjected reçu:", "background:purple; color:white", event.detail);
@@ -401,10 +685,21 @@
                 window.activatePluginManually = function(pluginName) {
                     console.log("%c[MultiSolver] Activation manuelle du plugin:", "background:orange; color:black", pluginName);
                     
+                    // Mettre à jour l'état du bouton d'exécution
+                    window.updateExecuteButtonState(pluginName);
+                    
                     // Au lieu d'envoyer un message au parent, charger l'interface du plugin directement
                     const pluginContainer = document.getElementById('plugin-list-container');
                     if (pluginContainer) {
                         loadPluginInterface(pluginName, pluginContainer);
+                        
+                        // Mettre à jour le bouton d'exécution avec le bon gestionnaire d'événements
+                        setTimeout(() => {
+                            const execButton = document.getElementById('execute-plugin-button');
+                            if (execButton) {
+                                execButton.onclick = window.executePluginManually;
+                            }
+                        }, 500);
                     } else {
                         console.error("%c[MultiSolver] Container de plugins non trouvé lors de l'activation", "background:red; color:white");
                     }
@@ -435,6 +730,15 @@
                 
                 // Ajouter la fonctionnalité de filtrage manuel
                 setupSearchFunctionality(container);
+                
+                // Initialiser l'état du bouton d'exécution
+                window.updateExecuteButtonState(null);
+                
+                // Configurer le bouton d'exécution avec un gestionnaire direct
+                const execButton = document.getElementById('execute-plugin-button');
+                if (execButton) {
+                    execButton.onclick = window.executePluginManually;
+                }
                 
             } catch (error) {
                 console.error("%c[MultiSolver] Erreur lors du chargement manuel des plugins:", "background:red; color:white", error);
@@ -812,6 +1116,9 @@
         window.closePluginInterface = function() {
             console.log("%c[MultiSolver] Fermeture de l'interface du plugin", "background:orange; color:black");
             
+            // Réinitialiser l'état du bouton d'exécution
+            window.updateExecuteButtonState(null);
+            
             const pluginContainer = document.getElementById('plugin-list-container');
             if (pluginContainer) {
                 // Recharger la liste des plugins
@@ -821,7 +1128,47 @@
             }
         };
         
+        // Fonction pour exécuter un plugin manuellement (sans passer par Stimulus)
+        window.executePluginManually = function() {
+            const executeButton = document.getElementById('execute-plugin-button');
+            const pluginName = executeButton.dataset.pluginName;
+            
+            console.log("%c[MultiSolver] Exécution manuelle du plugin:", "background:purple; color:white", pluginName);
+            
+            // Au lieu d'essayer d'utiliser Stimulus, utiliser directement notre fonction window.executePlugin
+            if (pluginName) {
+                console.log("%c[MultiSolver] Appel de window.executePlugin directement", "background:purple; color:white");
+                window.executePlugin(pluginName);
+            } else {
+                console.error("%c[MultiSolver] Erreur: Aucun plugin sélectionné", "background:red; color:white");
+                alert("Veuillez d'abord sélectionner un plugin");
+            }
+        };
+        
         // Initialiser après un court délai pour s'assurer que le DOM est complètement chargé
         setTimeout(initialize, 200);
     })();
+</script>
+
+<script type="text/javascript">
+    // Script de secours pour s'assurer que le bouton d'exécution fonctionne
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            console.log("%c[MultiSolver] Script de secours pour le bouton d'exécution", "background:red; color:white");
+            
+            const execButton = document.getElementById('execute-plugin-button');
+            if (execButton) {
+                console.log("%c[MultiSolver] Configuration du gestionnaire d'événement de secours", "background:red; color:white");
+                execButton.onclick = function(event) {
+                    console.log("%c[MultiSolver] Clic sur le bouton d'exécution via le gestionnaire de secours", "background:red; color:white");
+                    window.executePluginManually();
+                    
+                    // Empêcher la propagation de l'événement
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return false;
+                };
+            }
+        }, 1000);
+    });
 </script>
