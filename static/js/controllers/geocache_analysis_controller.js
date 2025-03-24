@@ -45,6 +45,16 @@
                     throw new Error("ID de géocache non disponible");
                 }
                 
+                // Définir une valeur par défaut pour auto_correct
+                this.autoCorrectEnabled = false;
+                
+                // Récupérer la configuration auto_correct_coordinates
+                try {
+                    await this.getAutoCorrectSetting();
+                } catch (settingError) {
+                    console.warn("Erreur lors de la récupération du paramètre, utilisation de la valeur par défaut:", settingError);
+                }
+                
                 // Tester avec une autre approche - XMLHttpRequest au lieu de fetch
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '/api/plugins/analysis_web_page/execute');
@@ -102,6 +112,7 @@
                 
                 // Vérifier les coordonnées du parser de formules
                 if (combined.formula_parser && combined.formula_parser.coordinates && combined.formula_parser.coordinates.length > 0) {
+                    console.log("Coordonnées trouvées dans formula_parser:", combined.formula_parser.coordinates);
                     combined.formula_parser.coordinates.forEach(coord => {
                         coordinates.push({
                             original_text: `${coord.north} ${coord.east}`,
@@ -113,11 +124,48 @@
                 
                 // Vérifier les coordonnées du détecteur de couleur
                 if (combined.color_text_detector && combined.color_text_detector.coordinates && combined.color_text_detector.coordinates.exist) {
+                    console.log("Coordonnées trouvées dans color_text_detector:", combined.color_text_detector.coordinates);
                     coordinates.push({
                         original_text: combined.color_text_detector.coordinates.ddm || "Coordonnées détectées dans un texte coloré",
                         lat: combined.color_text_detector.coordinates.ddm_lat,
                         lng: combined.color_text_detector.coordinates.ddm_lon
                     });
+                }
+                
+                console.log("Toutes les coordonnées détectées:", coordinates);
+                console.log("État de autoCorrectEnabled:", this.autoCorrectEnabled);
+                
+                // Sauvegarder automatiquement les premières coordonnées si auto_correct est activé
+                if (this.autoCorrectEnabled && coordinates.length > 0) {
+                    console.log("Auto-correction activée, sauvegarde automatique des coordonnées:", coordinates[0]);
+                    
+                    // Vérifier que les coordonnées sont bien au format attendu
+                    if (coordinates[0].lat && coordinates[0].lng) {
+                        try {
+                            // Tenter de sauvegarder les coordonnées
+                            this.saveCoordinatesData(coordinates[0].lat, coordinates[0].lng);
+                        } catch (saveError) {
+                            console.error("Erreur lors de la sauvegarde automatique des coordonnées:", saveError);
+                        }
+                    } else {
+                        console.warn("Format des coordonnées invalide pour la sauvegarde automatique:", coordinates[0]);
+                    }
+                    
+                    // Ajouter un message d'information
+                    const autoSaveInfo = document.createElement('div');
+                    autoSaveInfo.className = 'bg-blue-600 text-white px-4 py-2 rounded mb-4 text-sm';
+                    autoSaveInfo.innerHTML = `
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Les coordonnées ont été automatiquement sauvegardées grâce à l'option <strong>auto_correct_coordinates</strong></span>
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        const resultsContainer = this.resultsTarget;
+                        resultsContainer.insertBefore(autoSaveInfo, resultsContainer.firstChild);
+                    }, 500);
                 }
                 
                 // Afficher les coordonnées si on en a trouvé
@@ -262,11 +310,56 @@
             }
         }
 
-        // Fonction pour sauvegarder des coordonnées comme coordonnées corrigées
-        saveCoordinates(event) {
-            const coordData = event.currentTarget.dataset;
-            const { lat, lng } = coordData;
-            
+        // Récupérer le paramètre auto_correct_coordinates
+        async getAutoCorrectSetting() {
+            try {
+                console.log("Récupération du paramètre auto_correct_coordinates...");
+                const response = await fetch('/api/settings/param/auto_correct_coordinates');
+                console.log("Réponse du serveur pour auto_correct_coordinates:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                if (response.ok) {
+                    const responseText = await response.text();
+                    console.log("Texte de réponse brut:", responseText);
+                    
+                    try {
+                        const data = JSON.parse(responseText);
+                        console.log("Données JSON pour auto_correct_coordinates:", data);
+                        
+                        // Vérifier le format de la réponse
+                        if (!data.hasOwnProperty('value') && data.hasOwnProperty('success') && data.success === true) {
+                            // Format différent de ce qu'on attend
+                            if (data.key === 'auto_correct_coordinates') {
+                                this.autoCorrectEnabled = data.value === true || data.value === 'true';
+                            } else {
+                                console.warn("Le paramètre récupéré n'est pas le bon:", data.key);
+                                this.autoCorrectEnabled = false;
+                            }
+                        } else {
+                            this.autoCorrectEnabled = data.value === true || data.value === 'true';
+                        }
+                        
+                        console.log("Auto-correction des coordonnées:", this.autoCorrectEnabled ? "activée" : "désactivée", "Type:", typeof this.autoCorrectEnabled);
+                    } catch (parseError) {
+                        console.error("Erreur de parsing de la réponse JSON:", parseError);
+                        this.autoCorrectEnabled = false;
+                    }
+                } else {
+                    console.log("Impossible de récupérer le paramètre auto_correct_coordinates, désactivation par défaut");
+                    this.autoCorrectEnabled = false;
+                }
+            } catch (error) {
+                console.error("Erreur lors de la récupération du paramètre auto_correct_coordinates:", error);
+                this.autoCorrectEnabled = false;
+                throw error; // Propager l'erreur pour que la fonction appelante puisse la gérer
+            }
+        }
+
+        // Fonction pour sauvegarder des coordonnées à partir de données brutes
+        saveCoordinatesData(lat, lng) {
             console.log("Sauvegarde des coordonnées:", { lat, lng });
             
             // Créer un FormData pour la requête
@@ -274,8 +367,16 @@
             formData.append('gc_lat', lat);
             formData.append('gc_lon', lng);
             
+            console.log("FormData créé:", {
+                'gc_lat': formData.get('gc_lat'),
+                'gc_lon': formData.get('gc_lon')
+            });
+            
+            const url = `/geocaches/${this.geocacheIdValue}/coordinates`;
+            console.log("URL pour la sauvegarde:", url);
+            
             // Appeler l'API pour mettre à jour les coordonnées
-            fetch(`/geocaches/${this.geocacheIdValue}/coordinates`, {
+            fetch(url, {
                 method: 'PUT',
                 body: formData,
                 headers: {
@@ -284,6 +385,12 @@
                 }
             })
             .then(response => {
+                console.log("Réponse de sauvegarde des coordonnées:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
                 if (response.ok) {
                     console.log("Coordonnées sauvegardées avec succès");
                     // Créer une notification de succès
@@ -309,6 +416,13 @@
                 console.error("Erreur lors de la sauvegarde des coordonnées:", error);
                 this.showError("Erreur lors de la sauvegarde des coordonnées: " + error.message);
             });
+        }
+
+        // Fonction pour sauvegarder des coordonnées comme coordonnées corrigées
+        saveCoordinates(event) {
+            const coordData = event.currentTarget.dataset;
+            const { lat, lng } = coordData;
+            this.saveCoordinatesData(lat, lng);
         }
     }
 

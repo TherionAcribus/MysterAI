@@ -88,4 +88,57 @@ def save_general_settings():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+@settings_bp.route('/param/<param_name>', methods=['GET'])
+def get_specific_param(param_name):
+    """
+    Récupère la valeur d'un paramètre spécifique par son nom
+    """
+    logger.info(f"=== DEBUG: Route /api/settings/param/{param_name} appelée ===")
+    try:
+        value = AppConfig.get_value(param_name)
+        logger.info(f"=== DEBUG: Valeur récupérée pour {param_name}: {value} ===")
+        return jsonify({
+            'success': True,
+            'key': param_name,
+            'value': value
+        })
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la récupération du paramètre {param_name}: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@settings_bp.route('/param/debug/set/<param_name>/<param_value>', methods=['GET'])
+def debug_set_param(param_name, param_value):
+    """
+    Route de débogage pour définir rapidement un paramètre
+    """
+    logger.info(f"=== DEBUG: Route de débogage pour définir {param_name}={param_value} ===")
+    try:
+        # Convertir param_value au format approprié
+        if param_value.lower() == 'true':
+            value = True
+        elif param_value.lower() == 'false':
+            value = False
+        elif param_value.isdigit():
+            value = int(param_value)
+        else:
+            value = param_value
+            
+        # Enregistrer la valeur
+        AppConfig.set_value(param_name, value, category='general')
+        
+        logger.info(f"=== DEBUG: Paramètre {param_name} défini à {value} ===")
+        return jsonify({
+            'success': True,
+            'message': f"Paramètre {param_name} défini à {value}"
+        })
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la définition du paramètre {param_name}: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500 
