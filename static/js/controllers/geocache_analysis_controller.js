@@ -128,9 +128,23 @@
                             <div class="space-y-2">
                                 ${coordinates.map(coord => `
                                     <div class="bg-gray-700 rounded p-3">
-                                        <div class="text-gray-200">${coord.original_text}</div>
-                                        <div class="text-sm text-gray-400 mt-1">
-                                            ${coord.lat}, ${coord.lng}
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <div class="text-gray-200">${coord.original_text}</div>
+                                                <div class="text-sm text-gray-400 mt-1">
+                                                    ${coord.lat}, ${coord.lng}
+                                                </div>
+                                            </div>
+                                            <button 
+                                                class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline flex items-center"
+                                                data-action="click->geocache-analysis#saveCoordinates"
+                                                data-lat="${coord.lat}"
+                                                data-lng="${coord.lng}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                                </svg>
+                                                Enregistrer
+                                            </button>
                                         </div>
                                     </div>
                                 `).join('')}
@@ -246,6 +260,55 @@
             if (errorDetails && errorMsg) {
                 errorDetails.textContent = errorMsg;
             }
+        }
+
+        // Fonction pour sauvegarder des coordonnées comme coordonnées corrigées
+        saveCoordinates(event) {
+            const coordData = event.currentTarget.dataset;
+            const { lat, lng } = coordData;
+            
+            console.log("Sauvegarde des coordonnées:", { lat, lng });
+            
+            // Créer un FormData pour la requête
+            const formData = new FormData();
+            formData.append('gc_lat', lat);
+            formData.append('gc_lon', lng);
+            
+            // Appeler l'API pour mettre à jour les coordonnées
+            fetch(`/geocaches/${this.geocacheIdValue}/coordinates`, {
+                method: 'PUT',
+                body: formData,
+                headers: {
+                    'X-Layout-Component': 'true',
+                    'Accept': 'text/html'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log("Coordonnées sauvegardées avec succès");
+                    // Créer une notification de succès
+                    const notif = document.createElement('div');
+                    notif.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in-out';
+                    notif.textContent = 'Coordonnées sauvegardées avec succès';
+                    document.body.appendChild(notif);
+                    
+                    // Supprimer la notification après 3 secondes
+                    setTimeout(() => {
+                        notif.classList.add('animate-fade-out');
+                        setTimeout(() => notif.remove(), 500);
+                    }, 3000);
+                    
+                    // Déclencher un événement pour mettre à jour les coordonnées dans l'interface
+                    document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+                } else {
+                    console.error("Erreur lors de la sauvegarde des coordonnées");
+                    this.showError("Erreur lors de la sauvegarde des coordonnées");
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la sauvegarde des coordonnées:", error);
+                this.showError("Erreur lors de la sauvegarde des coordonnées: " + error.message);
+            });
         }
     }
 
