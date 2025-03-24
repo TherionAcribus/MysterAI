@@ -23,6 +23,7 @@ import zipfile
 import io
 import tempfile
 import os.path
+from app.routes.settings import get_specific_param
 
 logger = setup_logger()
 
@@ -738,6 +739,22 @@ def update_coordinates(geocache_id):
     # Mise à jour des coordonnées
     geocache.gc_lat_corrected = gc_lat
     geocache.gc_lon_corrected = gc_lon
+    
+    # Récupération du paramètre auto_mark_solved
+    try:
+        response = get_specific_param('auto_mark_solved')
+        auto_mark_solved = response.json.get('value', False)
+        
+        # Mise à jour du statut en fonction du paramètre
+        new_status = 'solved' if auto_mark_solved else 'in_progress'
+        geocache.solved = new_status
+        
+        if new_status == 'solved':
+            geocache.solved_date = datetime.now()
+        
+        logger.debug(f"Updated solved status to {new_status} based on auto_mark_solved={auto_mark_solved}")
+    except Exception as e:
+        logger.error(f"Error while updating solved status: {str(e)}")
     
     # TODO: Implémenter la conversion des coordonnées GC en décimales
     # Pour l'instant, on ne met à jour que le format GC
