@@ -63,6 +63,42 @@ class AnalysisWebPagePlugin:
             # On stocke le résultat dans combined_results
             combined_results[plugin_name] = result
 
+        # Cas spécifique: si une coordonnée est détectée à la fois par color_text_detector et formula_parser,
+        # ne garder que celle de color_text_detector
+        if 'color_text_detector' in combined_results and 'formula_parser' in combined_results:
+            color_detector_result = combined_results['color_text_detector']
+            formula_parser_result = combined_results['formula_parser']
+            
+            # Vérifier si color_text_detector a trouvé des coordonnées
+            if (color_detector_result and 
+                isinstance(color_detector_result, dict) and 
+                'coordinates' in color_detector_result and 
+                color_detector_result['coordinates'].get('exist', False)):
+                
+                # Extraire les coordonnées du color_text_detector
+                color_coords = color_detector_result['coordinates'].get('ddm', '').strip()
+                
+                # Si formula_parser a également trouvé des coordonnées similaires, les supprimer
+                if (formula_parser_result and 
+                    isinstance(formula_parser_result, dict) and 
+                    'coordinates' in formula_parser_result and 
+                    formula_parser_result['coordinates']):
+                    
+                    # Filtrer les coordonnées qui correspondent à celles de color_text_detector
+                    new_coords = []
+                    for coord in formula_parser_result['coordinates']:
+                        formula_coord = f"{coord.get('north', '')} {coord.get('east', '')}".strip()
+                        # Normaliser les coordonnées pour la comparaison
+                        normalized_color_coords = color_coords.replace("'", "").replace("°", "°")
+                        normalized_formula_coord = formula_coord.replace("'", "").replace("°", "°")
+                        
+                        if normalized_formula_coord not in normalized_color_coords:
+                            new_coords.append(coord)
+                    
+                    # Mettre à jour les coordonnées dans formula_parser
+                    combined_results['formula_parser']['coordinates'] = new_coords
+        
+        print("combined_results", combined_results)
         # On retourne tous les résultats
         return {
             "combined_results": combined_results
