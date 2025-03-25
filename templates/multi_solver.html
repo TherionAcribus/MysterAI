@@ -391,28 +391,79 @@
                         const text = descriptionData.description;
                         
                         // Appeler l'API pour exécuter le plugin
-                        const response = await fetch(`/api/plugins/${pluginName}/execute`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                text: text,
-                                ...formData
-                            }),
+                        let response;
+                        if (pluginName === 'analysis_web_page') {
+                            // Appel direct au plugin analysis_web_page
+                            response = await fetch('/api/plugins/analysis_web_page/execute', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'  // Forcer la réponse en JSON
+                                },
+                                body: JSON.stringify({
+                                    text: text,
+                                    geocache_id: geocache.id,
+                                    _format: 'json'  // Forcer le format JSON
+                                })
+                            });
+                        } else {
+                            // Appel standard pour les autres plugins
+                            response = await fetch(`/api/plugins/${pluginName}/execute`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    text: text,
+                                    geocache_id: geocache.id,
+                                    ...formData
+                                }),
+                            });
+                        }
+                        
+                        console.log("%c[MultiSolver] Headers de la réponse:", "background:purple; color:white", {
+                            contentType: response.headers.get("content-type"),
+                            status: response.status
                         });
                         
                         if (!response.ok) {
                             throw new Error(`Erreur HTTP: ${response.status}`);
                         }
                         
-                        const data = await response.json();
+                        // Récupérer d'abord le texte brut pour le logger
+                        const responseText = await response.text();
+                        console.log("%c[MultiSolver] Réponse brute:", "background:purple; color:white", responseText);
+                        
+                        try {
+                            // Tenter de parser le texte en JSON
+                            data = JSON.parse(responseText);
+                            console.log("%c[MultiSolver] Données JSON parsées:", "background:purple; color:white", data);
+                        } catch (jsonError) {
+                            console.error("%c[MultiSolver] Erreur de parsing JSON:", "background:red; color:white", jsonError);
+                            data = {
+                                result: responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''),
+                                raw_html: responseText.includes('<') && responseText.includes('>')
+                            };
+                        }
                         
                         // Extraire le résultat
                         let resultText = '';
                         let coordinates = null;
                         
-                        if (data.text_output) {
+                        if (data.combined_results) {
+                            console.log("%c[MultiSolver] Traitement des résultats combinés:", "background:purple; color:white", data.combined_results);
+                            // Créer un affichage formaté des résultats combinés
+                            resultText = formatCombinedResults(data.combined_results);
+                            
+                            // Chercher des coordonnées dans tous les résultats
+                            coordinates = extractCoordinatesFromCombinedResults(data.combined_results);
+                            console.log("%c[MultiSolver] Coordonnées extraites:", "background:purple; color:white", coordinates);
+                        } else if (data.raw_html) {
+                            console.log("%c[MultiSolver] Traitement de HTML brut", "background:orange; color:black");
+                            const extractedText = extractTextFromHtml(data.result);
+                            resultText = extractedText ? `📄 HTML: ${extractedText}` : "⚠️ Réponse HTML reçue (non analysable)";
+                            resultText += ` <button onclick="showHtmlContent('${btoa(unescape(encodeURIComponent(data.result)))}')" class="px-1 py-0.5 bg-blue-600 text-white text-xs rounded">Voir HTML</button>`;
+                        } else if (data.text_output) {
                             resultText = data.text_output;
                         } else if (data.result?.text?.text_output) {
                             resultText = data.result.text.text_output;
@@ -426,11 +477,13 @@
                             resultText = JSON.stringify(data);
                         }
                         
-                        // Extraire les coordonnées si présentes
-                        if (data.coordinates) {
-                            coordinates = data.coordinates;
-                        } else if (data.result?.coordinates) {
-                            coordinates = data.result.coordinates;
+                        // Extraire les coordonnées additionnelles (pour les cas non-combined_results)
+                        if (!coordinates) {
+                            if (data.coordinates) {
+                                coordinates = data.coordinates;
+                            } else if (data.result?.coordinates) {
+                                coordinates = data.result.coordinates;
+                            }
                         }
                         
                         // Ajouter le résultat
@@ -554,6 +607,33 @@
         
         // Démarrer le traitement
         processGeocaches();
+        
+        // Mettre à jour les résultats dans sessionStorage
+        try {
+            // Mettre à jour les données des résultats pour inclure les coordonnées formatées
+            results.forEach(result => {
+                if (result.coordinates) {
+                    // Formater les coordonnées pour l'affichage
+                    if (typeof result.coordinates === 'object') {
+                        if (result.coordinates.ddm) {
+                            result.coordinatesDisplay = result.coordinates.ddm;
+                        } else if (result.coordinates.ddm_lat && result.coordinates.ddm_lon) {
+                            result.coordinatesDisplay = `${result.coordinates.ddm_lat} ${result.coordinates.ddm_lon}`;
+                        } else if (result.coordinates.latitude && result.coordinates.longitude) {
+                            result.coordinatesDisplay = `${result.coordinates.latitude} ${result.coordinates.longitude}`;
+                        } else if (result.coordinates.exist) {
+                            result.coordinatesDisplay = "Coordonnées trouvées";
+                        }
+                    } else if (typeof result.coordinates === 'string') {
+                        result.coordinatesDisplay = result.coordinates;
+                    }
+                }
+            });
+            
+            sessionStorage.setItem('multiSolverResults', JSON.stringify(results));
+        } catch (e) {
+            console.warn("%c[MultiSolver] Impossible de stocker les résultats dans sessionStorage", "background:orange; color:black");
+        }
     };
     
     // Fonction pour annuler le traitement en cours
@@ -1530,4 +1610,216 @@
             observer.disconnect();
         }, 10000);
     })();
+</script>
+
+<script type="text/javascript">
+    // Fonction pour extraire du texte à partir d'un contenu HTML
+    function extractTextFromHtml(html) {
+        // Créer un élément temporaire pour extraire le texte
+        const tempDiv = document.createElement('div');
+        
+        try {
+            // Nettoyer le HTML pour éviter les erreurs d'analyse potentielles
+            html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+            html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+            
+            // Insérer le HTML dans le div
+            tempDiv.innerHTML = html;
+            
+            // Extraire le texte (limité aux 300 premiers caractères)
+            const text = tempDiv.textContent || tempDiv.innerText || '';
+            return text.substring(0, 300) + (text.length > 300 ? '...' : '');
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'extraction du texte:", "background:red; color:white", error);
+            return "Erreur d'extraction du texte";
+        } finally {
+            // Nettoyer
+            tempDiv.innerHTML = '';
+        }
+    }
+    
+    // Fonction pour afficher le contenu HTML brut
+    window.showHtmlContent = function(encodedHtml) {
+        try {
+            const html = decodeURIComponent(escape(atob(encodedHtml)));
+            
+            // Créer une fenêtre modale pour afficher le HTML
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 rounded-lg p-4 max-w-3xl max-h-[80vh] overflow-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-200">Contenu HTML brut</h3>
+                        <button id="close-html-modal" class="text-gray-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="bg-gray-900 p-4 rounded overflow-auto max-h-[60vh]">
+                        <pre class="text-gray-300 text-sm whitespace-pre-wrap">${escapeHtml(html)}</pre>
+                    </div>
+                </div>
+            `;
+            
+            // Ajouter à la page
+            document.body.appendChild(modal);
+            
+            // Configurer le bouton de fermeture
+            document.getElementById('close-html-modal').addEventListener('click', function() {
+                document.body.removeChild(modal);
+            });
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'affichage du contenu HTML:", "background:red; color:white", error);
+            alert("Erreur lors de l'affichage du contenu HTML");
+        }
+    };
+    
+    // Fonction pour échapper les caractères HTML
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+
+<script type="text/javascript">
+    // Fonction pour formater les résultats combinés du plugin analysis_web_page
+    function formatCombinedResults(combined) {
+        let detections = [];
+        
+        // Traiter chaque plugin
+        Object.entries(combined).forEach(([plugin, result]) => {
+            if (!result || result === null) return;
+
+            // Traitement spécifique pour chaque type de plugin
+            if (plugin === 'color_text_detector' && result.findings) {
+                const findings = result.findings.filter(f => f.isInteresting);
+                if (findings.length > 0) {
+                    detections.push({
+                        plugin: 'Texte coloré',
+                        icon: '🎨',
+                        count: findings.length,
+                        details: findings.map(finding => ({
+                            content: finding.content,
+                            description: finding.description
+                        }))
+                    });
+                }
+            }
+            else if (plugin === 'html_comments_finder' && result.findings && result.findings.length > 0) {
+                detections.push({
+                    plugin: 'Commentaires HTML',
+                    icon: '💬',
+                    count: result.findings.length,
+                    details: result.findings.map(comment => ({
+                        content: comment
+                    }))
+                });
+            }
+            else if (plugin === 'image_alt_text_extractor' && result.findings && result.findings.length > 0) {
+                detections.push({
+                    plugin: 'Textes alt. images',
+                    icon: '🖼️',
+                    count: result.findings.length,
+                    details: result.findings.map(text => ({
+                        content: text
+                    }))
+                });
+            }
+        });
+
+        if (detections.length === 0) {
+            return '<div class="text-gray-400">Aucun élément intéressant détecté</div>';
+        }
+
+        // Générer le HTML pour chaque détection
+        return detections.map((detection, index) => `
+            <div class="bg-gray-700 p-2 rounded-lg mb-2">
+                <div class="flex items-center justify-between cursor-pointer" onclick="toggleDetectionDetails(${index})">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${detection.icon}</span>
+                        <span class="text-blue-400 font-medium">${detection.plugin}</span>
+                        <span class="text-xs text-gray-400">(${detection.count})</span>
+                    </div>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="detection-chevron-${index}"></i>
+                </div>
+                <div class="hidden mt-2 space-y-2" id="detection-details-${index}">
+                    ${detection.details.map(detail => `
+                        <div class="bg-gray-600 p-2 rounded">
+                            <div class="text-gray-200">${detail.content}</div>
+                            ${detail.description ? `
+                                <div class="text-sm text-gray-400 mt-1">${detail.description}</div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Fonction pour basculer l'affichage des détails
+    window.toggleDetectionDetails = function(index) {
+        const detailsElement = document.getElementById(`detection-details-${index}`);
+        const chevronElement = document.getElementById(`detection-chevron-${index}`);
+        
+        if (detailsElement && chevronElement) {
+            detailsElement.classList.toggle('hidden');
+            chevronElement.style.transform = detailsElement.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
+    };
+
+    // Fonction pour extraire les coordonnées des résultats combinés
+    function extractCoordinatesFromCombinedResults(combined) {
+        // Vérifier d'abord color_text_detector qui est souvent le plus fiable
+        if (combined.color_text_detector && 
+            combined.color_text_detector.coordinates && 
+            combined.color_text_detector.coordinates.exist) {
+            
+            const coords = combined.color_text_detector.coordinates;
+            return {
+                ddm: coords.ddm,
+                latitude: coords.ddm_lat,
+                longitude: coords.ddm_lon,
+                source: 'color_text_detector'
+            };
+        }
+        
+        // Ensuite, vérifier formula_parser
+        if (combined.formula_parser && 
+            combined.formula_parser.coordinates && 
+            combined.formula_parser.coordinates.length > 0) {
+            
+            const coord = combined.formula_parser.coordinates[0];
+            if (coord.north && coord.east) {
+                return {
+                    ddm: `${coord.north} ${coord.east}`,
+                    latitude: coord.north,
+                    longitude: coord.east,
+                    source: 'formula_parser'
+                };
+            }
+        }
+        
+        // Enfin, vérifier coordinates_finder
+        if (combined.coordinates_finder && 
+            combined.coordinates_finder.coordinates && 
+            combined.coordinates_finder.coordinates.length > 0) {
+            
+            const coord = combined.coordinates_finder.coordinates[0];
+            if (coord.lat && coord.lon) {
+                return {
+                    ddm: `${coord.lat} ${coord.lon}`,
+                    latitude: coord.lat,
+                    longitude: coord.lon,
+                    source: 'coordinates_finder'
+                };
+            }
+        }
+        
+        // Aucune coordonnée trouvée
+        return null;
+    }
 </script>
