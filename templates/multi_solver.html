@@ -144,8 +144,8 @@
             <!-- Options d'application -->
             <div class="mt-4">
                 <div class="flex items-center">
-                    <input type="checkbox" id="apply-to-all-geocaches" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700" checked>
-                    <label for="apply-to-all-geocaches" class="ml-2 block text-sm text-gray-300">Appliquer à toutes les géocaches</label>
+                    <input type="checkbox" id="auto-correct-coordinates" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700">
+                    <label for="auto-correct-coordinates" class="ml-2 block text-sm text-gray-300">Correction automatique des coordonnées</label>
                 </div>
                 
                 <div class="mt-2 text-center">
@@ -200,6 +200,9 @@
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                                 Coordonnées
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Statut
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                                 Actions
@@ -565,11 +568,16 @@
             const geocache = result.geocache;
             const resultClass = result.error ? 'text-red-400' : (result.canceled ? 'text-amber-400' : '');
             
-            // Créer une nouvelle ligne
+            // Échapper les valeurs des coordonnées
+            const safeCoordinates = result.coordinates ? {
+                latitude: result.coordinates.latitude ? String(result.coordinates.latitude).replace(/'/g, "\\'") : "",
+                longitude: result.coordinates.longitude ? String(result.coordinates.longitude).replace(/'/g, "\\'") : ""
+            } : null;
+            
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-700 opacity-0 transition-opacity duration-500';
+            row.setAttribute('data-geocache-id', geocache.id);
             
-            // Ajouter le contenu
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
@@ -583,24 +591,48 @@
                 <td class="px-6 py-4">
                     <div class="text-sm text-gray-200">${result.coordinates ? formatCoordinates(result.coordinates) : 'N/A'}</div>
                 </td>
+                <td class="px-6 py-4 status-cell">
+                    ${result.coordinates ? `
+                        <div class="flex items-center">
+                            <span class="text-gray-400 mr-2">Non sauvegardées</span>
+                            <button onclick="saveCoordinatesFromButton(${geocache.id}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
+                                <i class="fas fa-save mr-1"></i> Sauvegarder
+                            </button>
+                        </div>
+                    ` : 'N/A'}
+                </td>
                 <td class="px-6 py-4 text-sm text-right">
-                    ${!result.canceled ? `<button onclick="viewResult('${geocache.id}', '${result.plugin}', ${results.indexOf(result)})" class="text-blue-400 hover:text-blue-300 mr-3">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    ${result.coordinates ? `<button onclick="saveCoordinates('${geocache.id}', '${result.coordinates?.latitude}', '${result.coordinates?.longitude}')" class="text-green-400 hover:text-green-300">
-                        <i class="fas fa-map-marker-alt"></i>
-                    </button>` : ''}` : ''}
+                    ${!result.canceled ? `
+                        <button onclick="viewResult('${geocache.id}', '${result.plugin}', ${results.indexOf(result)})" class="text-blue-400 hover:text-blue-300">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    ` : ''}
                 </td>
             `;
             
-            // Ajouter au tableau
             resultsTable.appendChild(row);
             
-            // Déclencher une animation d'apparition
+            // Si auto_correct est activé et qu'il y a des coordonnées, les sauvegarder automatiquement
+            const autoCorrectCheckbox = document.getElementById('auto-correct-coordinates');
+            if (autoCorrectCheckbox && autoCorrectCheckbox.checked && result.coordinates) {
+                saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
+            }
+            
             setTimeout(() => {
                 row.classList.remove('opacity-0');
             }, 10);
         }
+        
+        // Fonction intermédiaire pour traiter les coordonnées venant du bouton
+        window.saveCoordinatesFromButton = function(geocacheId, lat, lng) {
+            // Assurer que les valeurs sont traitées comme des nombres si possible
+            const parsedLat = parseFloat(lat) || lat;
+            const parsedLng = parseFloat(lng) || lng;
+            
+            // Appeler la fonction principale de sauvegarde
+            saveCoordinates(geocacheId, parsedLat, parsedLng);
+        };
         
         // Fonction pour formater les coordonnées
         const formatCoordinates = (coords) => {
@@ -623,9 +655,51 @@
         };
         
         // Fonction pour sauvegarder les coordonnées
-        window.saveCoordinates = function(geocacheId, lat, lng) {
-            alert(`Coordonnées sauvegardées pour la géocache ${geocacheId}: ${lat}, ${lng}`);
-            // TODO: Implémenter la sauvegarde des coordonnées
+        window.saveCoordinates = async function(geocacheId, lat, lng) {
+            try {
+                console.log("Sauvegarde des coordonnées:", { geocacheId, lat, lng });
+                const formData = new FormData();
+                formData.append('gc_lat', lat);
+                formData.append('gc_lon', lng);
+                
+                const response = await fetch(`/geocaches/${geocacheId}/coordinates`, {
+                    method: 'PUT',
+                    body: formData,
+                    headers: {
+                        'X-Layout-Component': 'true',
+                        'Accept': 'text/html'
+                    }
+                });
+                
+                if (response.ok) {
+                    // Mettre à jour le statut dans le tableau
+                    const statusCell = document.querySelector(`[data-geocache-id="${geocacheId}"] .status-cell`);
+                    if (statusCell) {
+                        statusCell.innerHTML = `
+                            <div class="flex items-center">
+                                <span class="text-green-400"><i class="fas fa-check"></i> Sauvegardées</span>
+                            </div>
+                        `;
+                    }
+                    
+                    // Notification de succès
+                    const notif = document.createElement('div');
+                    notif.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in-out';
+                    notif.textContent = 'Coordonnées sauvegardées avec succès';
+                    document.body.appendChild(notif);
+                    
+                    setTimeout(() => {
+                        notif.classList.add('animate-fade-out');
+                        setTimeout(() => notif.remove(), 500);
+                    }, 3000);
+                    
+                    return true;
+                }
+                throw new Error('Erreur lors de la sauvegarde');
+            } catch (error) {
+                console.error("Erreur lors de la sauvegarde des coordonnées:", error);
+                return false;
+            }
         };
         
         // Démarrer le traitement
@@ -1845,4 +1919,253 @@
         // Aucune coordonnée trouvée
         return null;
     }
+</script>
+
+<script type="text/javascript">
+    // Fonction pour initialiser la checkbox avec plusieurs tentatives
+    function initializeAutoCorrectCheckbox(maxAttempts = 10, currentAttempt = 1) {
+        console.log(`[MultiSolver] Tentative ${currentAttempt}/${maxAttempts} d'initialisation de la checkbox...`);
+        
+        const checkbox = document.getElementById('auto-correct-coordinates');
+        if (!checkbox) {
+            if (currentAttempt < maxAttempts) {
+                console.log("[MultiSolver] Checkbox non trouvée, nouvelle tentative dans 500ms...");
+                setTimeout(() => initializeAutoCorrectCheckbox(maxAttempts, currentAttempt + 1), 500);
+            } else {
+                console.error("[MultiSolver] Échec de l'initialisation de la checkbox après", maxAttempts, "tentatives");
+            }
+            return;
+        }
+
+        // Une fois que la checkbox est trouvée, initialiser son état
+        getAutoCorrectSetting().then(autoCorrectEnabled => {
+            console.log("[MultiSolver] Valeur récupérée pour auto_correct_coordinates:", autoCorrectEnabled);
+            checkbox.checked = autoCorrectEnabled;
+            console.log("[MultiSolver] Checkbox initialisée avec la valeur:", autoCorrectEnabled);
+
+            // Ajouter l'écouteur pour les changements
+            checkbox.addEventListener('change', async function() {
+                console.log("[MultiSolver] Changement de la checkbox:", this.checked);
+                
+                try {
+                    const response = await fetch('/api/settings/param/auto_correct_coordinates', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            value: this.checked
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        console.log("[MultiSolver] Paramètre mis à jour avec succès");
+                        
+                        // Notification de mise à jour
+                        const notif = document.createElement('div');
+                        notif.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in-out';
+                        notif.textContent = 'Paramètre de correction automatique mis à jour';
+                        document.body.appendChild(notif);
+                        
+                        setTimeout(() => {
+                            notif.classList.add('animate-fade-out');
+                            setTimeout(() => notif.remove(), 500);
+                        }, 3000);
+                    } else {
+                        console.error("[MultiSolver] Erreur lors de la mise à jour du paramètre");
+                        this.checked = !this.checked;
+                    }
+                } catch (error) {
+                    console.error("[MultiSolver] Erreur lors de la mise à jour du paramètre:", error);
+                    this.checked = !this.checked;
+                }
+            });
+        });
+    }
+
+    // Démarrer l'initialisation après le chargement du DOM
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("[MultiSolver] DOMContentLoaded - Démarrage de l'initialisation de la checkbox");
+        initializeAutoCorrectCheckbox();
+    });
+
+    // Démarrer également l'initialisation après le chargement complet de la page
+    window.addEventListener('load', () => {
+        console.log("[MultiSolver] Window load - Démarrage de l'initialisation de la checkbox");
+        initializeAutoCorrectCheckbox();
+    });
+
+    // Fonction pour récupérer le paramètre auto_correct_coordinates
+    async function getAutoCorrectSetting() {
+        try {
+            console.log("[MultiSolver] Récupération du paramètre auto_correct_coordinates...");
+            const response = await fetch('/api/settings/param/auto_correct_coordinates');
+            console.log("[MultiSolver] Réponse de l'API:", response.status);
+            
+            if (response.ok) {
+                const responseText = await response.text();
+                console.log("[MultiSolver] Réponse brute:", responseText);
+                
+                try {
+                    const data = JSON.parse(responseText);
+                    console.log("[MultiSolver] Données JSON:", data);
+                    
+                    // Extraire la valeur du paramètre selon le format de la réponse
+                    let autoCorrectEnabled = false;
+                    
+                    if (data.hasOwnProperty('key') && data.key === 'auto_correct_coordinates') {
+                        autoCorrectEnabled = data.value === true || data.value === 'true';
+                    } else if (data.hasOwnProperty('value')) {
+                        autoCorrectEnabled = data.value === true || data.value === 'true';
+                    }
+                    
+                    console.log("[MultiSolver] Auto-correction des coordonnées:", autoCorrectEnabled);
+                    return autoCorrectEnabled;
+                    
+                } catch (parseError) {
+                    console.error("[MultiSolver] Erreur de parsing de la réponse JSON:", parseError);
+                    return false;
+                }
+            } else {
+                console.error("[MultiSolver] Réponse du serveur non OK:", response.status);
+                return false;
+            }
+        } catch (error) {
+            console.error("[MultiSolver] Erreur lors de la récupération du paramètre:", error);
+            return false;
+        }
+    }
+</script>
+
+<script type="text/javascript">
+    // Fonction pour initialiser la checkbox de manière agressive
+    async function initializeCheckboxAggressively() {
+        console.log("[MultiSolver] Démarrage de l'initialisation agressive de la checkbox");
+        
+        let attempts = 0;
+        const maxAttempts = 30; // 30 secondes maximum
+        
+        // Fonction pour une tentative d'initialisation
+        async function attemptInitialization() {
+            attempts++;
+            console.log(`[MultiSolver] Tentative ${attempts}/${maxAttempts} d'initialisation de la checkbox`);
+            
+            const checkbox = document.getElementById('auto-correct-coordinates');
+            if (!checkbox) {
+                console.log("[MultiSolver] Checkbox non trouvée dans le DOM");
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/settings/param/auto_correct_coordinates');
+                console.log("[MultiSolver] Réponse de l'API:", response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("[MultiSolver] Données reçues de l'API:", data);
+                    
+                    // Déterminer la valeur à partir de la réponse
+                    let value = false;
+                    if (data.hasOwnProperty('value')) {
+                        value = data.value === true || data.value === 'true';
+                    } else if (data.hasOwnProperty('key') && data.key === 'auto_correct_coordinates') {
+                        value = data.value === true || data.value === 'true';
+                    }
+                    
+                    // Mettre à jour la checkbox
+                    checkbox.checked = value;
+                    console.log("[MultiSolver] Checkbox mise à jour avec la valeur:", value);
+                    
+                    // Configurer l'écouteur d'événements s'il n'existe pas déjà
+                    if (!checkbox.hasAttribute('data-listener-attached')) {
+                        checkbox.setAttribute('data-listener-attached', 'true');
+                        checkbox.addEventListener('change', async function() {
+                            console.log("[MultiSolver] Changement de la checkbox:", this.checked);
+                            await updateAutoCorrectSetting(this.checked);
+                        });
+                    }
+                    
+                    return true;
+                } else {
+                    console.error("[MultiSolver] Erreur de l'API:", response.status);
+                    return false;
+                }
+            } catch (error) {
+                console.error("[MultiSolver] Erreur lors de l'initialisation:", error);
+                return false;
+            }
+        }
+        
+        // Première tentative immédiate
+        if (await attemptInitialization()) {
+            console.log("[MultiSolver] Initialisation réussie au premier essai");
+            return;
+        }
+        
+        // Si la première tentative échoue, continuer à essayer
+        const intervalId = setInterval(async () => {
+            if (attempts >= maxAttempts) {
+                clearInterval(intervalId);
+                console.error("[MultiSolver] Échec de l'initialisation après", maxAttempts, "tentatives");
+                return;
+            }
+            
+            if (await attemptInitialization()) {
+                clearInterval(intervalId);
+                console.log("[MultiSolver] Initialisation réussie après", attempts, "tentatives");
+            }
+        }, 1000);
+    }
+
+    // Fonction pour mettre à jour le paramètre
+    async function updateAutoCorrectSetting(value) {
+        try {
+            const response = await fetch('/api/settings/param/auto_correct_coordinates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ value: value })
+            });
+            
+            if (response.ok) {
+                console.log("[MultiSolver] Paramètre mis à jour avec succès:", value);
+                
+                // Notification de succès
+                const notif = document.createElement('div');
+                notif.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in-out';
+                notif.textContent = 'Paramètre de correction automatique mis à jour';
+                document.body.appendChild(notif);
+                
+                setTimeout(() => {
+                    notif.classList.add('animate-fade-out');
+                    setTimeout(() => notif.remove(), 500);
+                }, 3000);
+                
+                return true;
+            } else {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+        } catch (error) {
+            console.error("[MultiSolver] Erreur lors de la mise à jour du paramètre:", error);
+            return false;
+        }
+    }
+
+    // Démarrer l'initialisation à plusieurs moments clés
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("[MultiSolver] DOMContentLoaded - Démarrage de l'initialisation agressive");
+        initializeCheckboxAggressively();
+    });
+
+    window.addEventListener('load', () => {
+        console.log("[MultiSolver] Window load - Démarrage de l'initialisation agressive");
+        initializeCheckboxAggressively();
+    });
+
+    // Démarrer également après un court délai pour s'assurer que tout est chargé
+    setTimeout(() => {
+        console.log("[MultiSolver] Démarrage différé de l'initialisation agressive");
+        initializeCheckboxAggressively();
+    }, 2000);
 </script>
