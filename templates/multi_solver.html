@@ -610,8 +610,16 @@
         
         // Fonction pour afficher les détails d'un résultat
         window.viewResult = function(geocacheId, plugin, resultIndex) {
-            alert(`Détails pour la géocache ${geocacheId} avec le plugin ${plugin}`);
-            // TODO: Implémenter une meilleure vue des détails
+            console.log("%c[MultiSolver] Ouverture des détails de la géocache:", "background:orange; color:black", {
+                geocacheId, plugin, resultIndex
+            });
+            
+            // Envoyer un message au parent pour ouvrir les détails de la géocache
+            window.parent.postMessage({
+                type: 'openGeocacheDetails',
+                geocacheId: geocacheId,
+                zoneId: window.currentZoneId || null  // Utiliser la zone courante si disponible
+            }, '*');
         };
         
         // Fonction pour sauvegarder les coordonnées
