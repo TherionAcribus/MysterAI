@@ -1,8 +1,127 @@
 <script type="text/javascript">
-    // Fonction d'initialisation pour s'assurer que le compteur est mis à jour
+    // Variables globales pour Tabulator avec préfixe pour éviter les conflits
+    let multiSolverResultsTable = null;
+    let multiSolverTableResults = []; // Tableau pour stocker les résultats
+    
+    // Fonction globale pour initialiser Tabulator
+    function initializeResultsTable() {
+        console.log("%c[MultiSolver] Initialisation du tableau Tabulator (fonction globale)", "background:blue; color:white");
+        const tableElement = document.getElementById('multi-solver-results-table');
+        if (!tableElement) {
+            console.error("%c[MultiSolver] Élément du tableau non trouvé", "background:red; color:white");
+            return false;
+        }
+        
+        // Détruire l'instance existante si elle existe
+        if (multiSolverResultsTable) {
+            multiSolverResultsTable.destroy();
+        }
+
+        try {
+            // Vérifier si Tabulator est disponible
+            if (typeof Tabulator === 'undefined') {
+                console.error("%c[MultiSolver] Erreur: La bibliothèque Tabulator n'est pas chargée", "background:red; color:white");
+                return false;
+            }
+
+            // Créer une nouvelle instance de Tabulator
+            multiSolverResultsTable = new Tabulator('#multi-solver-results-table', {
+                data: multiSolverTableResults,
+                layout: "fitDataFill",
+                height: "400px", // Hauteur fixe pour le tableau
+                placeholder: "Aucun résultat disponible",
+                columns: [
+                    { title: "GC Code", field: "gc_code", headerSort: true },
+                    { title: "Nom", field: "name", headerSort: true },
+                    { 
+                        title: "Détections", 
+                        field: "result", 
+                        headerSort: true,
+                        formatter: function(cell) {
+                            const value = cell.getValue();
+                            const data = cell.getRow().getData();
+                            const cellClass = data.error ? 'text-red-400' : (data.canceled ? 'text-amber-400' : '');
+                            return `<div class="${cellClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${value || 'Aucun résultat'}</div>`;
+                        },
+                        width: 300
+                    },
+                    { 
+                        title: "Coordonnées", 
+                        field: "coordinates", 
+                        headerSort: true,
+                        formatter: function(cell) {
+                            const coords = cell.getValue();
+                            return coords ? `${coords.latitude}, ${coords.longitude}` : 'N/A';
+                        }
+                    },
+                    { 
+                        title: "Statut", 
+                        field: "status", 
+                        headerSort: true,
+                        formatter: function(cell) {
+                            const data = cell.getRow().getData();
+                            const coords = data.coordinates;
+                            
+                            if (!coords) return 'N/A';
+                            
+                            const geocacheId = data.id;
+                            const safeCoordinates = {
+                                latitude: coords.latitude ? String(coords.latitude).replace(/'/g, "\\'") : "",
+                                longitude: coords.longitude ? String(coords.longitude).replace(/'/g, "\\'") : ""
+                            };
+                            
+                            return `
+                                <div class="flex items-center">
+                                    <span class="text-gray-400 mr-2">Non sauvegardées</span>
+                                    <button onclick="saveCoordinatesFromButton(${geocacheId}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
+                                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
+                                        <i class="fas fa-save mr-1"></i> Sauvegarder
+                                    </button>
+                                </div>
+                            `;
+                        },
+                        width: 200
+                    },
+                    { 
+                        title: "Actions", 
+                        field: "actions", 
+                        headerSort: false,
+                        formatter: function(cell) {
+                            const data = cell.getRow().getData();
+                            if (data.canceled) return '';
+                            
+                            return `
+                                <button onclick="viewResult('${data.id}', '${data.plugin}', ${data.resultIndex})" class="text-blue-400 hover:text-blue-300">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            `;
+                        },
+                        width: 80,
+                        hozAlign: "center"
+                    }
+                ]
+            });
+            
+            console.log("%c[MultiSolver] Tableau Tabulator initialisé avec succès", "background:green; color:white");
+            return true;
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'initialisation de Tabulator:", "background:red; color:white", error);
+            return false;
+        }
+    }
+    
+    // Initialiser Tabulator une fois le DOM chargé
     document.addEventListener('DOMContentLoaded', function() {
         console.log("%c[MultiSolver] Initialisation précoce du compteur de géocaches", "background:red; color:white; font-weight:bold");
         
+        // Initialiser le tableau dès le départ avec plusieurs tentatives
+        setTimeout(function() {
+            if (!initializeResultsTable()) {
+                console.log("%c[MultiSolver] Première tentative d'initialisation du tableau échouée, nouvelle tentative dans 500ms", "background:orange; color:black");
+                setTimeout(initializeResultsTable, 500);
+            }
+        }, 100);
+
         function initializeCounter() {
             // Vérifier si les données de géocaches existent dans le conteneur principal
             const container = document.getElementById('multi-solver-container');
@@ -186,38 +305,7 @@
                 </div>
             </h2>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-700">
-                    <thead class="bg-gray-700">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                GC Code
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Nom
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Détections
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Coordonnées
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Statut
-                            </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody data-multi-solver-target="resultsTable" class="bg-gray-800 divide-y divide-gray-700">
-                        <!-- Cette section sera remplie dynamiquement avec les résultats -->
-                        <tr>
-                            <td colspan="5" class="px-6 py-4">
-                                <div class="text-center text-gray-400">Aucun résultat disponible</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div id="multi-solver-results-table" class="min-w-full"></div>
             </div>
         </div>
         
@@ -229,6 +317,106 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Styles pour Tabulator dans le multi-solver */
+    .tabulator {
+        background-color: transparent !important;
+        border: none !important;
+        color: #e1e1e1 !important;
+        font-size: 14px !important;
+    }
+
+    .tabulator-header {
+        background-color: #1a1a1a !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+        font-weight: 600 !important;
+    }
+
+    .tabulator-header .tabulator-col {
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #2d2d2d !important;
+        padding: 8px !important;
+    }
+
+    .tabulator-header .tabulator-col-content {
+        padding: 8px !important;
+    }
+
+    .tabulator-col-title {
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row {
+        background-color: #1e1e1e !important;
+        border-bottom: 1px solid #2d2d2d !important;
+        color: #e1e1e1 !important;
+    }
+
+    .tabulator-row.tabulator-row-even {
+        background-color: #252525 !important;
+    }
+
+    .tabulator-row.tabulator-selectable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-row .tabulator-cell {
+        padding: 8px !important;
+        border-right: 1px solid #2d2d2d !important;
+    }
+
+    .tabulator-tableholder {
+        background-color: transparent !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+    }
+
+    /* Style pour les barres de défilement de Tabulator */
+    .tabulator-tableholder::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-track {
+        background: #1e1e1e;
+        border-radius: 5px;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb {
+        background: #3c3c3c;
+        border-radius: 5px;
+        border: 2px solid #1e1e1e;
+    }
+
+    .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+        background: #4c4c4c;
+    }
+
+    /* Support Firefox */
+    .tabulator-tableholder {
+        scrollbar-width: thin;
+        scrollbar-color: #3c3c3c #1e1e1e;
+    }
+
+    /* Style pour les en-têtes de colonnes triables */
+    .tabulator-col.tabulator-sortable:hover {
+        background-color: #2d2d2d !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="none"] .tabulator-col-content:after {
+        border-top: 4px solid #666 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="asc"] .tabulator-col-content:after {
+        border-bottom: 4px solid #e1e1e1 !important;
+    }
+
+    .tabulator-col.tabulator-sortable[aria-sort="desc"] .tabulator-col-content:after {
+        border-top: 4px solid #e1e1e1 !important;
+    }
+</style>
 
 <script type="text/javascript">
     // Fonction pour exécuter un plugin sur les géocaches
@@ -297,6 +485,38 @@
         
         const processGeocaches = async () => {
             try {
+                // S'assurer que le tableau est initialisé
+                if (!multiSolverResultsTable) {
+                    console.log("%c[MultiSolver] Tentative d'initialisation de Tabulator avant le traitement", "background:blue; color:white");
+                    initializeResultsTable();
+                }
+                
+                // Réinitialiser les données du tableau
+                multiSolverTableResults = [];
+                if (multiSolverResultsTable) {
+                    multiSolverResultsTable.setData([]);
+                } else {
+                    // Si Tabulator n'est toujours pas disponible, préparer le conteneur pour le mode secours
+                    const fallbackContainer = document.getElementById('multi-solver-results-table');
+                    if (fallbackContainer) {
+                        fallbackContainer.innerHTML = `
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">GC Code</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nom</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Détections</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Coordonnées</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Statut</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="multi-solver-results-fallback" class="bg-gray-800 divide-y divide-gray-700"></tbody>
+                            </table>
+                        `;
+                    }
+                }
+                
                 // Récupérer les données du formulaire si disponible
                 let formData = {};
                 const formElement = document.querySelector('form');
@@ -308,26 +528,10 @@
                     }
                 }
                 
-                // Afficher un message de chargement
-                const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
-                if (resultsTable) {
-                    resultsTable.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="px-6 py-4">
-                                <div class="flex justify-center">
-                                    <div class="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-                                </div>
-                                <div class="text-center text-gray-400 mt-2">Application du plugin ${pluginName} sur ${geocaches.length} géocache(s)...</div>
-                            </td>
-                        </tr>
-                    `;
-                }
-                
-                // Préparer le tableau pour l'affichage progressif
-                if (resultsTable) {
-                    // Initialiser le tableau vide avec l'en-tête
-                    resultsTable.innerHTML = '';
-                }
+                console.log("%c[MultiSolver] Démarrage du traitement pour le plugin", "background:green; color:white", {
+                    plugin: pluginName,
+                    geocaches: geocaches.length
+                });
                 
                 // Traiter chaque géocache
                 for (let i = 0; i < geocaches.length; i++) {
@@ -562,66 +766,149 @@
         
         // Fonction pour ajouter un résultat au tableau de manière progressive
         function addResultToTable(result) {
-            const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
-            if (!resultsTable) return;
+            // Vérifier si le tableau Tabulator est initialisé, sinon essayer de l'initialiser
+            if (!multiSolverResultsTable) {
+                console.warn("%c[MultiSolver] Tableau Tabulator non initialisé, tentative d'initialisation...", "background:orange; color:black");
+                if (!initializeResultsTable()) {
+                    console.error("%c[MultiSolver] Échec de l'initialisation de Tabulator, mode secours activé", "background:red; color:white");
+                    // Créer un tableau HTML simple comme solution de secours
+                    const fallbackContainer = document.getElementById('multi-solver-results-table');
+                    if (fallbackContainer) {
+                        // Créer le tableau si c'est la première fois
+                        if (!fallbackContainer.querySelector('table')) {
+                            fallbackContainer.innerHTML = `
+                                <table class="min-w-full divide-y divide-gray-700">
+                                    <thead class="bg-gray-700">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">GC Code</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nom</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Détections</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Coordonnées</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Statut</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="multi-solver-results-fallback" class="bg-gray-800 divide-y divide-gray-700"></tbody>
+                                </table>
+                            `;
+                        }
+                        
+                        // Ajouter une ligne au tableau de secours
+                        const tbody = document.getElementById('multi-solver-results-fallback');
+                        if (tbody) {
+                            const geocache = result.geocache;
+                            const resultClass = result.error ? 'text-red-400' : (result.canceled ? 'text-amber-400' : '');
+                            
+                            // Échapper les valeurs des coordonnées
+                            const safeCoordinates = result.coordinates ? {
+                                latitude: result.coordinates.latitude ? String(result.coordinates.latitude).replace(/'/g, "\\'") : "",
+                                longitude: result.coordinates.longitude ? String(result.coordinates.longitude).replace(/'/g, "\\'") : ""
+                            } : null;
+                            
+                            const formatCoordinates = (coords) => {
+                                if (!coords) return 'N/A';
+                                return `${coords.latitude}, ${coords.longitude}`;
+                            };
+                            
+                            const row = document.createElement('tr');
+                            row.className = 'hover:bg-gray-700';
+                            row.setAttribute('data-geocache-id', geocache.id);
+                            
+                            row.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-200">${geocache.name || 'Sans nom'}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm ${resultClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${result.result || 'Aucun résultat'}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm text-gray-200">${result.coordinates ? formatCoordinates(result.coordinates) : 'N/A'}</div>
+                                </td>
+                                <td class="px-6 py-4 status-cell">
+                                    ${result.coordinates ? `
+                                        <div class="flex items-center">
+                                            <span class="text-gray-400 mr-2">Non sauvegardées</span>
+                                            <button onclick="saveCoordinatesFromButton(${geocache.id}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
+                                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
+                                                <i class="fas fa-save mr-1"></i> Sauvegarder
+                                            </button>
+                                        </div>
+                                    ` : 'N/A'}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-right">
+                                    ${!result.canceled ? `
+                                        <button onclick="viewResult('${geocache.id}', '${result.plugin}', ${multiSolverTableResults.length})" class="text-blue-400 hover:text-blue-300">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    ` : ''}
+                                </td>
+                            `;
+                            
+                            tbody.appendChild(row);
+                            
+                            // Même en mode secours, suivre les données pour la cohérence
+                            multiSolverTableResults.push({
+                                id: geocache.id,
+                                gc_code: geocache.gc_code || 'N/A',
+                                name: geocache.name || 'Sans nom',
+                                result: result.result || 'Aucun résultat',
+                                coordinates: result.coordinates,
+                                error: result.error || false,
+                                canceled: result.canceled || false,
+                                plugin: result.plugin,
+                                resultIndex: multiSolverTableResults.length,
+                                timestamp: result.timestamp
+                            });
+                            
+                            console.log("%c[MultiSolver] Résultat ajouté au tableau HTML de secours", "background:orange; color:black");
+                            
+                            // Si auto_correct est activé et qu'il y a des coordonnées, les sauvegarder automatiquement
+                            const autoCorrectCheckbox = document.getElementById('auto-correct-coordinates');
+                            if (autoCorrectCheckbox && autoCorrectCheckbox.checked && result.coordinates) {
+                                saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
+                            }
+                            
+                            return;
+                        }
+                    }
+                }
+            }
             
             const geocache = result.geocache;
-            const resultClass = result.error ? 'text-red-400' : (result.canceled ? 'text-amber-400' : '');
             
-            // Échapper les valeurs des coordonnées
-            const safeCoordinates = result.coordinates ? {
-                latitude: result.coordinates.latitude ? String(result.coordinates.latitude).replace(/'/g, "\\'") : "",
-                longitude: result.coordinates.longitude ? String(result.coordinates.longitude).replace(/'/g, "\\'") : ""
-            } : null;
+            // Créer une entrée Tabulator pour ce résultat
+            const tableEntry = {
+                id: geocache.id,
+                gc_code: geocache.gc_code || 'N/A',
+                name: geocache.name || 'Sans nom',
+                result: result.result || 'Aucun résultat',
+                coordinates: result.coordinates,
+                error: result.error || false,
+                canceled: result.canceled || false,
+                plugin: result.plugin,
+                resultIndex: multiSolverTableResults.length, // Index pour retrouver le résultat original
+                timestamp: result.timestamp
+            };
             
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-700 opacity-0 transition-opacity duration-500';
-            row.setAttribute('data-geocache-id', geocache.id);
+            // Ajouter aux données de la table
+            multiSolverTableResults.push(tableEntry);
             
-            row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm text-gray-200">${geocache.name || 'Sans nom'}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm ${resultClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${result.result || 'Aucun résultat'}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm text-gray-200">${result.coordinates ? formatCoordinates(result.coordinates) : 'N/A'}</div>
-                </td>
-                <td class="px-6 py-4 status-cell">
-                    ${result.coordinates ? `
-                        <div class="flex items-center">
-                            <span class="text-gray-400 mr-2">Non sauvegardées</span>
-                            <button onclick="saveCoordinatesFromButton(${geocache.id}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
-                                <i class="fas fa-save mr-1"></i> Sauvegarder
-                            </button>
-                        </div>
-                    ` : 'N/A'}
-                </td>
-                <td class="px-6 py-4 text-sm text-right">
-                    ${!result.canceled ? `
-                        <button onclick="viewResult('${geocache.id}', '${result.plugin}', ${results.indexOf(result)})" class="text-blue-400 hover:text-blue-300">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    ` : ''}
-                </td>
-            `;
-            
-            resultsTable.appendChild(row);
+            // Mettre à jour le tableau
+            try {
+                multiSolverResultsTable.replaceData(multiSolverTableResults);
+                console.log("%c[MultiSolver] Résultat ajouté au tableau Tabulator", "background:green; color:white");
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de l'ajout au tableau Tabulator:", "background:red; color:white", error);
+            }
             
             // Si auto_correct est activé et qu'il y a des coordonnées, les sauvegarder automatiquement
             const autoCorrectCheckbox = document.getElementById('auto-correct-coordinates');
             if (autoCorrectCheckbox && autoCorrectCheckbox.checked && result.coordinates) {
                 saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
             }
-            
-            setTimeout(() => {
-                row.classList.remove('opacity-0');
-            }, 10);
         }
         
         // Fonction intermédiaire pour traiter les coordonnées venant du bouton
