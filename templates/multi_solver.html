@@ -12,6 +12,115 @@
             return false;
         }
         
+        // Fonction pour formater le nom des plugins
+        window.formatPluginName = function(pluginName) {
+            const nameMap = {
+                'color_text_detector': 'Texte coloré',
+                'html_comments_finder': 'Commentaires HTML',
+                'image_alt_text_extractor': 'Texte d\'image',
+                'coordinates_finder': 'Coordonnées',
+                'formula_parser': 'Formules',
+                'additional_waypoints_analyzer': 'Waypoints additionnels'
+            };
+            
+            return nameMap[pluginName] || pluginName.replace(/_/g, ' ');
+        }
+        
+        // Fonction pour afficher le détail d'un plugin dans une popup
+        window.showDetailsPopup = function(geocacheId, pluginName) {
+            console.log("Affichage des détails:", { geocacheId, pluginName });
+            
+            // Rechercher les données complètes
+            const result = multiSolverTableResults.find(r => r.id == geocacheId);
+            if (!result || !result.original_data || !result.original_data.combined_results) {
+                console.error("Données non trouvées pour l'affichage du détail");
+                return;
+            }
+            
+            const pluginResult = result.original_data.combined_results[pluginName];
+            if (!pluginResult) {
+                console.error("Résultat du plugin non trouvé:", pluginName);
+                return;
+            }
+            
+            // Créer le contenu HTML du détail
+            let modalContent = '';
+            const formattedPluginName = formatPluginName(pluginName);
+            
+            if (pluginResult.findings && Array.isArray(pluginResult.findings) && pluginResult.findings.length > 0) {
+                modalContent += `<div class="space-y-3">`;
+                modalContent += `<h3 class="text-lg font-semibold text-blue-400">${formattedPluginName}</h3>`;
+                
+                pluginResult.findings.forEach((finding, idx) => {
+                    const isInteresting = finding.isInteresting ? 'text-green-400' : 'text-gray-400';
+                    
+                    modalContent += `
+                        <div class="bg-gray-700 p-3 rounded">
+                            <div class="mb-1 ${isInteresting} font-medium">${finding.content}</div>
+                            ${finding.description ? `<div class="text-sm text-gray-300">${finding.description}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                modalContent += `</div>`;
+            } else if (pluginResult.coordinates && pluginResult.coordinates.exist === true) {
+                // Afficher les coordonnées si elles existent
+                modalContent += `
+                    <div class="space-y-3">
+                        <h3 class="text-lg font-semibold text-blue-400">${formattedPluginName}</h3>
+                        <div class="bg-gray-700 p-3 rounded">
+                            <div class="text-green-400 font-medium">${pluginResult.coordinates.ddm || pluginResult.coordinates.ddm_lat + ' ' + pluginResult.coordinates.ddm_lon}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Afficher un message si aucun résultat intéressant n'a été trouvé
+                modalContent += `
+                    <div class="space-y-3">
+                        <h3 class="text-lg font-semibold text-blue-400">${formattedPluginName}</h3>
+                        <div class="bg-gray-700 p-3 rounded">
+                            <div class="text-gray-300">Aucun résultat intéressant trouvé.</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Créer et afficher la modale
+            const modal = document.createElement('div');
+            modal.id = 'plugin-detail-modal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-100">Détails des détections</h2>
+                        <button id="close-detail-modal" class="text-gray-400 hover:text-white">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="plugin-detail-content">
+                        ${modalContent}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Gérer la fermeture de la modale
+            document.getElementById('close-detail-modal').addEventListener('click', function() {
+                const modal = document.getElementById('plugin-detail-modal');
+                if (modal) {
+                    modal.remove();
+                }
+            });
+            
+            // Fermer la modale en cliquant en dehors
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.remove();
+                }
+            });
+        };
+        
         // Détruire l'instance existante si elle existe
         if (multiSolverResultsTable) {
             multiSolverResultsTable.destroy();
@@ -40,8 +149,61 @@
                         formatter: function(cell) {
                             const value = cell.getValue();
                             const data = cell.getRow().getData();
-                            const cellClass = data.error ? 'text-red-400' : (data.canceled ? 'text-amber-400' : '');
-                            return `<div class="${cellClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${value || 'Aucun résultat'}</div>`;
+                            
+                            // Si c'est une erreur ou annulation, afficher simplement le texte
+                            if (data.error || data.canceled) {
+                                const cellClass = data.error ? 'text-red-400' : (data.canceled ? 'text-amber-400' : '');
+                                return `<div class="${cellClass} whitespace-pre-wrap">${value || 'Aucun résultat'}</div>`;
+                            }
+                            
+                            // Vérifier si nous avons des détections dans les résultats combinés
+                            try {
+                                if (data.original_data && data.original_data.combined_results) {
+                                    const combinedResults = data.original_data.combined_results;
+                                    const activePlugins = [];
+                                    
+                                    // Parcourir les plugins pour trouver ceux qui ont des détections intéressantes
+                                    for (const [pluginName, result] of Object.entries(combinedResults)) {
+                                        if (result) {
+                                            // Vérifier si le plugin a des détections intéressantes
+                                            if (result.findings && Array.isArray(result.findings) && result.findings.length > 0) {
+                                                const interestingFindings = result.findings.filter(f => f.isInteresting === true);
+                                                if (interestingFindings.length > 0) {
+                                                    activePlugins.push({
+                                                        name: formatPluginName(pluginName),
+                                                        count: interestingFindings.length,
+                                                        plugin: pluginName
+                                                    });
+                                                }
+                                            } else if (result.coordinates && result.coordinates.exist === true) {
+                                                activePlugins.push({
+                                                    name: formatPluginName(pluginName),
+                                                    count: 1,
+                                                    plugin: pluginName
+                                                });
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (activePlugins.length > 0) {
+                                        // Créer la liste des plugins actifs
+                                        return `<div class="space-y-1">${activePlugins.map((plugin, index) => 
+                                            `<div class="bg-gray-700 py-1 px-2 rounded flex items-center justify-between">
+                                                <span class="text-blue-400">${plugin.name}</span>
+                                                <span class="text-xs text-gray-300">(${plugin.count})</span>
+                                                <button class="text-gray-400 hover:text-white ml-2" 
+                                                        onclick="showDetailsPopup('${data.id}', '${plugin.plugin}')">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </button>
+                                            </div>`).join('')}</div>`;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error("Erreur lors du traitement des résultats:", e);
+                            }
+                            
+                            // Par défaut, afficher le texte brut
+                            return `<div class="whitespace-pre-wrap max-h-20 overflow-y-auto">${value || 'Aucun résultat'}</div>`;
                         },
                         width: 300
                     },
@@ -671,9 +833,13 @@
                         // Extraire le résultat
                         let resultText = '';
                         let coordinates = null;
+                        let originalData = null;
                         
                         if (data.combined_results) {
                             console.log("%c[MultiSolver] Traitement des résultats combinés:", "background:purple; color:white", data.combined_results);
+                            // Stocker les données originales pour utilisation ultérieure
+                            originalData = data;
+                            
                             // Créer un affichage formaté des résultats combinés
                             resultText = formatCombinedResults(data.combined_results);
                             
@@ -714,6 +880,7 @@
                             result: resultText,
                             coordinates: coordinates,
                             plugin: pluginName,
+                            original_data: originalData,
                             timestamp: new Date().toISOString()
                         };
                         results.push(result);
@@ -859,6 +1026,7 @@
                                 error: result.error || false,
                                 canceled: result.canceled || false,
                                 plugin: result.plugin,
+                                original_data: result.original_data,
                                 resultIndex: multiSolverTableResults.length,
                                 timestamp: result.timestamp
                             });
@@ -889,6 +1057,7 @@
                 error: result.error || false,
                 canceled: result.canceled || false,
                 plugin: result.plugin,
+                original_data: result.original_data,
                 resultIndex: multiSolverTableResults.length, // Index pour retrouver le résultat original
                 timestamp: result.timestamp
             };
