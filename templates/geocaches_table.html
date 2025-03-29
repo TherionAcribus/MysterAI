@@ -184,6 +184,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-share mr-1"></i> Déplacer vers une zone
                     </button>
+                    <button id="reset-coordinates-btn-{{ zone_id }}" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-1 px-3 rounded">
+                        <i class="fas fa-undo-alt mr-1"></i> Réinitialiser les coordonnées
+                    </button>
                     <button id="solve-filtered-btn-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-puzzle-piece mr-1"></i> Résoudre les caches filtrées
                     </button>
@@ -1911,7 +1914,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         typeFilter.addEventListener('change', filterTable);
         document.querySelector('#delete-selected-btn-{{ zone_id }}').addEventListener('click', openDeleteMultipleModal);
         document.querySelector('#keep-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
-        document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', openCopyToZoneModal);
+        document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('copy'));
+        document.querySelector('#move-to-zone-btn-{{ zone_id }}').addEventListener('click', () => openCopyToZoneModal('move'));
+        document.querySelector('#reset-coordinates-btn-{{ zone_id }}').addEventListener('click', resetFilteredCoordinates);
         document.querySelector('#solve-filtered-btn-{{ zone_id }}').addEventListener('click', openMultiSolver);
 
         // Gestionnaires pour la modale de copie vers une zone
@@ -2558,6 +2563,101 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     }
                 }
             }, '*');
+        }
+
+        // Fonction pour réinitialiser les coordonnées des géocaches filtrées
+        function resetFilteredCoordinates() {
+            // Obtenir toutes les géocaches qui correspondent aux filtres actuels
+            const tableId = `geocaches-table-{{ zone_id }}`;
+            const table = window[`tabulator_${tableId}`];
+            
+            if (!table) return;
+            
+            // Récupérer toutes les données
+            const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            // Obtenir les géocaches filtrées
+            const filteredGeocaches = getFilteredGeocaches(allData);
+            
+            if (!filteredGeocaches || filteredGeocaches.length === 0) {
+                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
+                return;
+            }
+            
+            // Demander confirmation avant de réinitialiser
+            if (!confirm(`Êtes-vous sûr de vouloir réinitialiser les coordonnées corrigées de ${filteredGeocaches.length} géocaches ? Cette action supprimera également le statut 'résolu' des géocaches.`)) {
+                return;
+            }
+            
+            // Afficher un indicateur de chargement
+            showLoadingIndicator();
+            
+            // Utiliser une approche séquentielle pour réinitialiser chaque géocache individuellement
+            const geocacheIds = filteredGeocaches.map(g => g.id);
+            let successCount = 0;
+            let errorCount = 0;
+            let processedCount = 0;
+            
+            // Fonction pour traiter un géocache à la fois
+            const processGeocache = (index) => {
+                if (index >= geocacheIds.length) {
+                    // Tous les géocaches ont été traités
+                    hideLoadingIndicator();
+                    alert(`Réinitialisation terminée : ${successCount} géocache(s) réinitialisée(s), ${errorCount} erreur(s).`);
+                    refreshGeocachesTable();
+                    return;
+                }
+                
+                const geocacheId = geocacheIds[index];
+                
+                // Utiliser la route individuelle pour réinitialiser
+                fetch(`/geocaches/${geocacheId}/coordinates/reset`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    processedCount++;
+                    
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.error(`Erreur lors de la réinitialisation de la géocache ${geocacheId}`);
+                    }
+                    
+                    // Traiter la géocache suivante
+                    processGeocache(index + 1);
+                })
+                .catch(error => {
+                    processedCount++;
+                    errorCount++;
+                    console.error(`Erreur lors de la réinitialisation de la géocache ${geocacheId}:`, error);
+                    
+                    // Continuer avec la suivante malgré l'erreur
+                    processGeocache(index + 1);
+                });
+            };
+            
+            // Démarrer le traitement avec la première géocache
+            processGeocache(0);
+        }
+
+        // Fonction pour afficher l'indicateur de chargement
+        function showLoadingIndicator() {
+            const spinner = document.querySelector('.spinner');
+            if (spinner) {
+                spinner.style.display = 'block';
+            }
+        }
+
+        // Fonction pour masquer l'indicateur de chargement
+        function hideLoadingIndicator() {
+            const spinner = document.querySelector('.spinner');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
         }
     })();
 </script>

@@ -1859,3 +1859,41 @@ def reset_coordinates(geocache_id):
     
     logger.debug(f"Sending response with headers: {dict(response.headers)}")
     return response
+
+@geocaches_bp.route('/api/geocaches/reset-coordinates', methods=['POST'])
+def reset_multiple_coordinates():
+    """Réinitialise les coordonnées corrigées de plusieurs géocaches."""
+    try:
+        data = request.get_json()
+        if not data or 'geocache_ids' not in data:
+            return jsonify({'error': 'Liste des IDs de géocaches manquante'}), 400
+
+        geocache_ids = data['geocache_ids']
+        logger.debug(f"Reset coordinates requested for {len(geocache_ids)} geocaches")
+        
+        # Récupérer toutes les géocaches à réinitialiser
+        geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+        reset_count = 0
+
+        # Réinitialiser les coordonnées corrigées de chaque géocache
+        for geocache in geocaches:
+            if geocache.gc_lat_corrected or geocache.gc_lon_corrected or geocache.location_corrected:
+                geocache.gc_lat_corrected = None
+                geocache.gc_lon_corrected = None
+                geocache.location_corrected = None
+                geocache.solved = "not_solved"
+                geocache.solved_date = None
+                reset_count += 1
+
+        db.session.commit()
+        logger.debug(f"Successfully reset coordinates for {reset_count} geocaches")
+
+        return jsonify({
+            'message': f'Coordonnées réinitialisées pour {reset_count} géocache(s)',
+            'reset_count': reset_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error resetting coordinates for multiple geocaches: {str(e)}")
+        return jsonify({'error': str(e)}), 500
