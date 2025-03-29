@@ -1833,3 +1833,29 @@ def multi_solver_panel():
     Affiche le panneau du multi-solver pour plusieurs géocaches
     """
     return render_template('multi_solver.html')
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates/reset', methods=['POST'])
+def reset_coordinates(geocache_id):
+    """Réinitialise les coordonnées corrigées d'une géocache."""
+    logger.debug(f"Reset coordinates requested for geocache {geocache_id}")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    
+    geocache = Geocache.query.get_or_404(geocache_id)
+    
+    # Réinitialisation des coordonnées corrigées
+    geocache.gc_lat_corrected = None
+    geocache.gc_lon_corrected = None
+    geocache.location_corrected = None
+    
+    # Réinitialisation du statut de résolution
+    geocache.solved = "not_solved"
+    geocache.solved_date = None
+    
+    db.session.commit()
+    logger.debug("Coordinates reset and database updated successfully")
+    
+    response = make_response(render_template('partials/coordinates_display.html', geocache=geocache))
+    response.headers['HX-Trigger'] = 'coordinatesUpdated'
+    
+    logger.debug(f"Sending response with headers: {dict(response.headers)}")
+    return response

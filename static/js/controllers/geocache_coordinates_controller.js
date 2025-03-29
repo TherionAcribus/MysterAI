@@ -168,6 +168,56 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         console.log("Coordinates updated event received");
     }
 
+    reset(event) {
+        console.log("Reset button clicked", {
+            event,
+            currentTarget: event.currentTarget,
+            geocacheId: this.geocacheIdValue
+        })
+        
+        event.preventDefault()
+        
+        if (!confirm("Êtes-vous sûr de vouloir réinitialiser les coordonnées corrigées ? Cette action supprimera également le statut 'résolu' de la géocache.")) {
+            return;
+        }
+
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates/reset`, {
+            method: 'POST',
+            headers: {
+                'X-Layout-Component': 'true',
+                'Accept': 'text/html'
+            }
+        })
+        .then(response => {
+            console.log("Reset response received:", {
+                status: response.status,
+                headers: Object.fromEntries(response.headers.entries())
+            })
+            return response.text()
+        })
+        .then(html => {
+            console.log("Received HTML content:", {
+                length: html.length,
+                preview: html.substring(0, 100)
+            })
+            this.containerTarget.innerHTML = html
+            
+            // Mettre à jour le select de statut
+            const statusSelect = document.querySelector(`select[name="solved_status"][data-action="change->geocache-coordinates#updateSolvedStatus"]`);
+            if (statusSelect) {
+                statusSelect.value = "not_solved";
+                statusSelect.setAttribute('data-previous-value', 'not_solved');
+                console.log("Status select updated to 'not_solved'");
+            }
+            
+            // Dispatch event for GoldenLayout
+            window.dispatchEvent(new CustomEvent('coordinatesUpdated'))
+        })
+        .catch(error => {
+            console.error("Reset request failed:", error)
+        })
+    }
+
     openAnalysis(event) {
         console.log("openAnalysis method called");
         const button = event.currentTarget;

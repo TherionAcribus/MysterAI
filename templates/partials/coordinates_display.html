@@ -13,10 +13,17 @@
                     <div class="text-sm text-gray-400 mb-1">Coordonnées corrigées:</div>
                     <div class="text-green-400">{{ geocache.gc_coords_corrected }}</div>
                 </div>
-                <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                        data-action="click->geocache-coordinates#edit">
-                    Modifier
-                </button>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
+                            data-action="click->geocache-coordinates#reset"
+                            title="Réinitialiser les coordonnées">
+                        <i class="fas fa-undo-alt mr-1"></i>Réinitialiser
+                    </button>
+                    <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                            data-action="click->geocache-coordinates#edit">
+                        Modifier
+                    </button>
+                </div>
             </div>
         </div>
     {% else %}
