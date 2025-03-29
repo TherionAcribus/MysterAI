@@ -218,28 +218,30 @@
                     },
                     { 
                         title: "Statut", 
-                        field: "status", 
+                        field: "saved", // Utiliser le champ "saved" directement au lieu de "status"
+                        cssClass: "status-column", // Ajouter une classe pour identifier cette colonne
                         headerSort: true,
                         formatter: function(cell) {
                             const data = cell.getRow().getData();
                             const coords = data.coordinates;
+                            const savedValue = cell.getValue(); // Valeur directe du champ saved
                             
                             if (!coords) return 'N/A';
                             
                             const geocacheId = data.id;
                             
                             // Vérifier si les coordonnées sont déjà sauvegardées
-                            if (data.saved) {
+                            if (savedValue === true || data.saved === true) {
                                 return `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
                             }
                             
                             const safeCoordinates = {
-                                latitude: coords.latitude ? String(coords.latitude).replace(/'/g, "\\'") : "",
-                                longitude: coords.longitude ? String(coords.longitude).replace(/'/g, "\\'") : ""
+                                latitude: coords.latitude ? String(coords.latitude).replace(/'/g, "\\'").replace(/"/g, '&quot;') : "",
+                                longitude: coords.longitude ? String(coords.longitude).replace(/'/g, "\\'").replace(/"/g, '&quot;') : ""
                             };
                             
                             return `
-                                <div class="flex items-center">
+                                <div class="flex items-center status-cell" data-geocache-id="${geocacheId}">
                                     <span class="text-gray-400 mr-2">Non sauvegardées</span>
                                     <button 
                                         id="save-coords-btn-${geocacheId}"
@@ -1140,30 +1142,78 @@
             // Mettre à jour dans Tabulator si disponible
             if (multiSolverResultsTable) {
                 try {
+                    console.log("%c[MultiSolver] Tentative de mise à jour du statut pour:", "background:blue; color:white", { 
+                        geocacheId, 
+                        totalEntries: multiSolverTableResults.length 
+                    });
+                    
                     // Trouver l'index de l'entrée concernée
                     const rowIndex = multiSolverTableResults.findIndex(row => row.id == geocacheId);
+                    console.log("%c[MultiSolver] Index trouvé:", "background:blue; color:white", rowIndex);
+                    
                     if (rowIndex !== -1) {
                         // Mettre à jour l'attribut saved
                         multiSolverTableResults[rowIndex].saved = saved;
                         
-                        // Rafraîchir le tableau pour appliquer les changements
-                        multiSolverResultsTable.updateData(multiSolverTableResults);
+                        // Forcer le rafraîchissement complet du tableau
+                        multiSolverResultsTable.setData([...multiSolverTableResults]);
+                        
+                        // Essayer également de mettre à jour directement la cellule
+                        try {
+                            const row = multiSolverResultsTable.getRow(rowIndex);
+                            if (row) {
+                                row.update({ saved: saved });
+                                console.log("%c[MultiSolver] Mise à jour directe de la ligne effectuée", "background:green; color:white");
+                            }
+                        } catch (rowError) {
+                            console.warn("%c[MultiSolver] Impossible de mettre à jour directement la ligne:", "background:orange; color:black", rowError);
+                        }
                         
                         console.log("%c[MultiSolver] Statut de sauvegarde mis à jour pour", "background:green; color:white", geocacheId);
+                    } else {
+                        // Si l'ID n'est pas trouvé, essayer également une approche alternative
+                        console.warn("%c[MultiSolver] ID non trouvé dans les données du tableau, tentative alternative...", "background:orange; color:black");
+                        
+                        // Mise à jour forcée du mode secours DOM
+                        updateDOMStatusCell(geocacheId, saved);
                     }
                 } catch (error) {
                     console.error("%c[MultiSolver] Erreur lors de la mise à jour du statut:", "background:red; color:white", error);
+                    // En cas d'erreur, essayer le mode secours DOM
+                    updateDOMStatusCell(geocacheId, saved);
                 }
             } else {
                 // Mode secours: mettre à jour directement dans le DOM
-                const button = document.getElementById(`save-coords-btn-${geocacheId}`);
-                if (button) {
-                    const cell = button.closest('td');
-                    if (cell) {
-                        cell.innerHTML = `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
-                    }
+                updateDOMStatusCell(geocacheId, saved);
+            }
+        }
+        
+        // Fonction auxiliaire pour mettre à jour le statut dans le DOM
+        function updateDOMStatusCell(geocacheId, saved) {
+            // D'abord essayer avec l'ID du bouton
+            const button = document.getElementById(`save-coords-btn-${geocacheId}`);
+            if (button) {
+                const cell = button.closest('td');
+                if (cell) {
+                    cell.innerHTML = `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
+                    return;
                 }
             }
+            
+            // Ensuite essayer avec l'attribut data-geocache-id sur la ligne
+            const rows = document.querySelectorAll(`tr[data-geocache-id="${geocacheId}"]`);
+            if (rows && rows.length > 0) {
+                // Trouver la cellule de statut dans chaque ligne correspondante
+                rows.forEach(row => {
+                    const statusCell = row.querySelector('.status-cell');
+                    if (statusCell) {
+                        statusCell.innerHTML = `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
+                    }
+                });
+                return;
+            }
+            
+            console.warn("%c[MultiSolver] Impossible de trouver la cellule à mettre à jour dans le DOM", "background:orange; color:black");
         }
         
         // Fonction pour vérifier le statut d'une géocache
@@ -1244,6 +1294,20 @@
                 if (response.ok) {
                     // Mettre à jour directement le statut dans le tableau
                     updateTableSavedStatus(geocacheId, true);
+                    
+                    // Forcer un rafraîchissement complet du tableau pour s'assurer que toutes les lignes sont à jour
+                    if (multiSolverResultsTable && Array.isArray(multiSolverTableResults)) {
+                        // Marquer explicitement comme sauvegardé dans les données
+                        const rowIndex = multiSolverTableResults.findIndex(row => row.id == geocacheId);
+                        if (rowIndex !== -1) {
+                            multiSolverTableResults[rowIndex].saved = true;
+                            console.log("%c[MultiSolver] Données mises à jour pour l'index", "background:green; color:white", rowIndex);
+                        }
+                        
+                        // Rafraîchir tout le tableau
+                        multiSolverResultsTable.setData([...multiSolverTableResults]);
+                        console.log("%c[MultiSolver] Rafraîchissement complet du tableau effectué", "background:green; color:white");
+                    }
                     
                     // Notification de succès
                     const notif = document.createElement('div');
