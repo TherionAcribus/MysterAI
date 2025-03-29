@@ -227,6 +227,12 @@
                             if (!coords) return 'N/A';
                             
                             const geocacheId = data.id;
+                            
+                            // Vérifier si les coordonnées sont déjà sauvegardées
+                            if (data.saved) {
+                                return `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
+                            }
+                            
                             const safeCoordinates = {
                                 latitude: coords.latitude ? String(coords.latitude).replace(/'/g, "\\'") : "",
                                 longitude: coords.longitude ? String(coords.longitude).replace(/'/g, "\\'") : ""
@@ -235,8 +241,10 @@
                             return `
                                 <div class="flex items-center">
                                     <span class="text-gray-400 mr-2">Non sauvegardées</span>
-                                    <button onclick="saveCoordinatesFromButton(${geocacheId}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
-                                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
+                                    <button 
+                                        id="save-coords-btn-${geocacheId}"
+                                        onclick="saveCoordinatesFromButton(${geocacheId}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
                                         <i class="fas fa-save mr-1"></i> Sauvegarder
                                     </button>
                                 </div>
@@ -283,7 +291,7 @@
                 setTimeout(initializeResultsTable, 500);
             }
         }, 100);
-
+        
         function initializeCounter() {
             // Vérifier si les données de géocaches existent dans le conteneur principal
             const container = document.getElementById('multi-solver-container');
@@ -933,6 +941,18 @@
         
         // Fonction pour ajouter un résultat au tableau de manière progressive
         function addResultToTable(result) {
+            // Vérifier si nous avons des coordonnées valides
+            const hasValidCoordinates = result.coordinates && 
+                                       result.coordinates.latitude && 
+                                       result.coordinates.longitude && 
+                                       result.coordinates.latitude !== "undefined" && 
+                                       result.coordinates.longitude !== "undefined";
+            
+            // Si les coordonnées sont invalides, les mettre à null
+            if (!hasValidCoordinates) {
+                result.coordinates = null;
+            }
+            
             // Vérifier si le tableau Tabulator est initialisé, sinon essayer de l'initialiser
             if (!multiSolverResultsTable) {
                 console.warn("%c[MultiSolver] Tableau Tabulator non initialisé, tentative d'initialisation...", "background:orange; color:black");
@@ -1059,7 +1079,8 @@
                 plugin: result.plugin,
                 original_data: result.original_data,
                 resultIndex: multiSolverTableResults.length, // Index pour retrouver le résultat original
-                timestamp: result.timestamp
+                timestamp: result.timestamp,
+                saved: false // Par défaut, les coordonnées ne sont pas sauvegardées
             };
             
             // Ajouter aux données de la table
@@ -1069,6 +1090,27 @@
             try {
                 multiSolverResultsTable.replaceData(multiSolverTableResults);
                 console.log("%c[MultiSolver] Résultat ajouté au tableau Tabulator", "background:green; color:white");
+                
+                // Vérifier si les coordonnées sont déjà sauvegardées
+                if (result.coordinates) {
+                    fetch(`/geocaches/${geocache.id}`, {
+                        method: 'GET',
+                        headers: {
+                            'X-Layout-Component': 'true',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.solved === 'solved') {
+                            // Mettre à jour directement le statut si la géocache est résolue
+                            updateTableSavedStatus(geocache.id, true);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la vérification du statut:", error);
+                    });
+                }
             } catch (error) {
                 console.error("%c[MultiSolver] Erreur lors de l'ajout au tableau Tabulator:", "background:red; color:white", error);
             }
@@ -1088,7 +1130,72 @@
             
             // Appeler la fonction principale de sauvegarde
             saveCoordinates(geocacheId, parsedLat, parsedLng);
+            
+            // Note: Pas besoin de vérifier le résultat ici car saveCoordinates
+            // met déjà à jour le statut directement si la sauvegarde réussit
         };
+        
+        // Fonction pour mettre à jour le statut de sauvegarde dans le tableau
+        function updateTableSavedStatus(geocacheId, saved) {
+            // Mettre à jour dans Tabulator si disponible
+            if (multiSolverResultsTable) {
+                try {
+                    // Trouver l'index de l'entrée concernée
+                    const rowIndex = multiSolverTableResults.findIndex(row => row.id == geocacheId);
+                    if (rowIndex !== -1) {
+                        // Mettre à jour l'attribut saved
+                        multiSolverTableResults[rowIndex].saved = saved;
+                        
+                        // Rafraîchir le tableau pour appliquer les changements
+                        multiSolverResultsTable.updateData(multiSolverTableResults);
+                        
+                        console.log("%c[MultiSolver] Statut de sauvegarde mis à jour pour", "background:green; color:white", geocacheId);
+                    }
+                } catch (error) {
+                    console.error("%c[MultiSolver] Erreur lors de la mise à jour du statut:", "background:red; color:white", error);
+                }
+            } else {
+                // Mode secours: mettre à jour directement dans le DOM
+                const button = document.getElementById(`save-coords-btn-${geocacheId}`);
+                if (button) {
+                    const cell = button.closest('td');
+                    if (cell) {
+                        cell.innerHTML = `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
+                    }
+                }
+            }
+        }
+        
+        // Fonction pour vérifier le statut d'une géocache
+        async function checkGeocacheStatus(geocacheId) {
+            try {
+                const response = await fetch(`/geocaches/${geocacheId}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Layout-Component': 'true',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.warn(`Erreur HTTP lors de la vérification du statut: ${response.status}`);
+                    return { solved: 'unknown' };
+                }
+                
+                // Vérifier d'abord le type de contenu
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    console.warn(`Réponse non-JSON reçue: ${contentType}`);
+                    return { solved: 'unknown' };
+                }
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error(`Erreur lors de la vérification du statut pour ${geocacheId}:`, error);
+                return { solved: 'unknown' };
+            }
+        }
         
         // Fonction pour formater les coordonnées
         const formatCoordinates = (coords) => {
@@ -1114,6 +1221,13 @@
         window.saveCoordinates = async function(geocacheId, lat, lng) {
             try {
                 console.log("Sauvegarde des coordonnées:", { geocacheId, lat, lng });
+                
+                // Vérifier que les coordonnées sont valides avant de les envoyer
+                if (!lat || !lng || lat === "undefined" || lng === "undefined") {
+                    console.warn("Tentative de sauvegarde de coordonnées invalides ignorée");
+                    return false;
+                }
+                
                 const formData = new FormData();
                 formData.append('gc_lat', lat);
                 formData.append('gc_lon', lng);
@@ -1128,15 +1242,8 @@
                 });
                 
                 if (response.ok) {
-                    // Mettre à jour le statut dans le tableau
-                    const statusCell = document.querySelector(`[data-geocache-id="${geocacheId}"] .status-cell`);
-                    if (statusCell) {
-                        statusCell.innerHTML = `
-                            <div class="flex items-center">
-                                <span class="text-green-400"><i class="fas fa-check"></i> Sauvegardées</span>
-                            </div>
-                        `;
-                    }
+                    // Mettre à jour directement le statut dans le tableau
+                    updateTableSavedStatus(geocacheId, true);
                     
                     // Notification de succès
                     const notif = document.createElement('div');
@@ -2326,10 +2433,17 @@
 
     // Fonction pour extraire les coordonnées des résultats combinés
     function extractCoordinatesFromCombinedResults(combined) {
+        // Cas où l'objet combined n'existe pas
+        if (!combined) {
+            return null;
+        }
+        
         // Vérifier d'abord color_text_detector qui est souvent le plus fiable
         if (combined.color_text_detector && 
             combined.color_text_detector.coordinates && 
-            combined.color_text_detector.coordinates.exist) {
+            combined.color_text_detector.coordinates.exist && 
+            combined.color_text_detector.coordinates.ddm_lat && 
+            combined.color_text_detector.coordinates.ddm_lon) {
             
             const coords = combined.color_text_detector.coordinates;
             return {
@@ -2346,7 +2460,7 @@
             combined.formula_parser.coordinates.length > 0) {
             
             const coord = combined.formula_parser.coordinates[0];
-            if (coord.north && coord.east) {
+            if (coord && coord.north && coord.east) {
                 return {
                     ddm: `${coord.north} ${coord.east}`,
                     latitude: coord.north,
@@ -2362,7 +2476,7 @@
             combined.coordinates_finder.coordinates.length > 0) {
             
             const coord = combined.coordinates_finder.coordinates[0];
-            if (coord.lat && coord.lon) {
+            if (coord && coord.lat && coord.lon) {
                 return {
                     ddm: `${coord.lat} ${coord.lon}`,
                     latitude: coord.lat,
@@ -2624,4 +2738,211 @@
         console.log("[MultiSolver] Démarrage différé de l'initialisation agressive");
         initializeCheckboxAggressively();
     }, 2000);
+</script>
+
+<script type="text/javascript">
+    // Fonction pour vérifier si les coordonnées sont déjà sauvegardées
+    async function checkCoordinatesStatus(geocacheId) {
+        try {
+            const response = await fetch(`/geocaches/${geocacheId}/status`, {
+                method: 'GET',
+                headers: {
+                    'X-Layout-Component': 'true',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return data.solved === 'solved'; // Si la géocache est résolue, les coordonnées sont considérées sauvegardées
+            }
+            return false;
+        } catch (error) {
+            console.error(`Erreur lors de la vérification du statut pour ${geocacheId}:`, error);
+            return false;
+        }
+    }
+    
+    // Fonction pour ajouter un résultat au tableau de manière progressive
+    function addResultToTable(result) {
+        // Vérifier si nous avons des coordonnées valides
+        const hasValidCoordinates = result.coordinates && 
+                                   result.coordinates.latitude && 
+                                   result.coordinates.longitude && 
+                                   result.coordinates.latitude !== "undefined" && 
+                                   result.coordinates.longitude !== "undefined";
+        
+        // Si les coordonnées sont invalides, les mettre à null
+        if (!hasValidCoordinates) {
+            result.coordinates = null;
+        }
+        
+        // Vérifier si le tableau Tabulator est initialisé, sinon essayer de l'initialiser
+        if (!multiSolverResultsTable) {
+            console.warn("%c[MultiSolver] Tableau Tabulator non initialisé, tentative d'initialisation...", "background:orange; color:black");
+            if (!initializeResultsTable()) {
+                console.error("%c[MultiSolver] Échec de l'initialisation de Tabulator, mode secours activé", "background:red; color:white");
+                // Créer un tableau HTML simple comme solution de secours
+                const fallbackContainer = document.getElementById('multi-solver-results-table');
+                if (fallbackContainer) {
+                    // Créer le tableau si c'est la première fois
+                    if (!fallbackContainer.querySelector('table')) {
+                        fallbackContainer.innerHTML = `
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">GC Code</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nom</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Détections</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Coordonnées</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Statut</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="multi-solver-results-fallback" class="bg-gray-800 divide-y divide-gray-700"></tbody>
+                            </table>
+                        `;
+                    }
+                    
+                    // Ajouter une ligne au tableau de secours
+                    const tbody = document.getElementById('multi-solver-results-fallback');
+                    if (tbody) {
+                        const geocache = result.geocache;
+                        const resultClass = result.error ? 'text-red-400' : (result.canceled ? 'text-amber-400' : '');
+                        
+                        // Échapper les valeurs des coordonnées
+                        const safeCoordinates = result.coordinates ? {
+                            latitude: result.coordinates.latitude ? String(result.coordinates.latitude).replace(/'/g, "\\'") : "",
+                            longitude: result.coordinates.longitude ? String(result.coordinates.longitude).replace(/'/g, "\\'") : ""
+                        } : null;
+                        
+                        const formatCoordinates = (coords) => {
+                            if (!coords) return 'N/A';
+                            return `${coords.latitude}, ${coords.longitude}`;
+                        };
+                        
+                        const row = document.createElement('tr');
+                        row.className = 'hover:bg-gray-700';
+                        row.setAttribute('data-geocache-id', geocache.id);
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-200">${geocache.name || 'Sans nom'}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm ${resultClass} whitespace-pre-wrap max-h-20 overflow-y-auto">${result.result || 'Aucun résultat'}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-200">${result.coordinates ? formatCoordinates(result.coordinates) : 'N/A'}</div>
+                            </td>
+                            <td class="px-6 py-4 status-cell">
+                                ${result.coordinates ? `
+                                    <div class="flex items-center">
+                                        <span class="text-gray-400 mr-2">Non sauvegardées</span>
+                                        <button onclick="saveCoordinatesFromButton(${geocache.id}, '${safeCoordinates.latitude}', '${safeCoordinates.longitude}')" 
+                                                class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors">
+                                            <i class="fas fa-save mr-1"></i> Sauvegarder
+                                        </button>
+                                    </div>
+                                ` : 'N/A'}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-right">
+                                ${!result.canceled ? `
+                                    <button onclick="viewResult('${geocache.id}', '${result.plugin}', ${multiSolverTableResults.length})" class="text-blue-400 hover:text-blue-300">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                ` : ''}
+                            </td>
+                        `;
+                        
+                        tbody.appendChild(row);
+                        
+                        // Même en mode secours, suivre les données pour la cohérence
+                        multiSolverTableResults.push({
+                            id: geocache.id,
+                            gc_code: geocache.gc_code || 'N/A',
+                            name: geocache.name || 'Sans nom',
+                            result: result.result || 'Aucun résultat',
+                            coordinates: result.coordinates,
+                            error: result.error || false,
+                            canceled: result.canceled || false,
+                            plugin: result.plugin,
+                            original_data: result.original_data,
+                            resultIndex: multiSolverTableResults.length,
+                            timestamp: result.timestamp
+                        });
+                        
+                        console.log("%c[MultiSolver] Résultat ajouté au tableau HTML de secours", "background:orange; color:black");
+                        
+                        // Si auto_correct est activé et qu'il y a des coordonnées, les sauvegarder automatiquement
+                        const autoCorrectCheckbox = document.getElementById('auto-correct-coordinates');
+                        if (autoCorrectCheckbox && autoCorrectCheckbox.checked && result.coordinates) {
+                            saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
+                        }
+                        
+                        return;
+                    }
+                }
+            }
+            
+            const geocache = result.geocache;
+            
+            // Créer une entrée Tabulator pour ce résultat
+            const tableEntry = {
+                id: geocache.id,
+                gc_code: geocache.gc_code || 'N/A',
+                name: geocache.name || 'Sans nom',
+                result: result.result || 'Aucun résultat',
+                coordinates: result.coordinates,
+                error: result.error || false,
+                canceled: result.canceled || false,
+                plugin: result.plugin,
+                original_data: result.original_data,
+                resultIndex: multiSolverTableResults.length, // Index pour retrouver le résultat original
+                timestamp: result.timestamp,
+                saved: false // Par défaut, les coordonnées ne sont pas sauvegardées
+            };
+            
+            // Ajouter aux données de la table
+            multiSolverTableResults.push(tableEntry);
+            
+            // Mettre à jour le tableau
+            try {
+                multiSolverResultsTable.replaceData(multiSolverTableResults);
+                console.log("%c[MultiSolver] Résultat ajouté au tableau Tabulator", "background:green; color:white");
+                
+                // Vérifier si les coordonnées sont déjà sauvegardées
+                if (result.coordinates) {
+                    fetch(`/geocaches/${geocache.id}`, {
+                        method: 'GET',
+                        headers: {
+                            'X-Layout-Component': 'true',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.solved === 'solved') {
+                            // Mettre à jour directement le statut si la géocache est résolue
+                            updateTableSavedStatus(geocache.id, true);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la vérification du statut:", error);
+                    });
+                }
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de l'ajout au tableau Tabulator:", "background:red; color:white", error);
+            }
+            
+            // Si auto_correct est activé et qu'il y a des coordonnées, les sauvegarder automatiquement
+            const autoCorrectCheckbox = document.getElementById('auto-correct-coordinates');
+            if (autoCorrectCheckbox && autoCorrectCheckbox.checked && result.coordinates) {
+                saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
+            }
+        }
+    }
 </script>
