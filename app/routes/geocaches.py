@@ -43,26 +43,61 @@ def get_geocaches(zone_id):
     # Récupérer toutes les géocaches associées à cette zone
     geocaches = Geocache.query.join(GeocacheZone).filter(GeocacheZone.zone_id == zone_id).all()
     
-    logger.debug(f"Geocaches for zone {zone_id}: {geocaches}")
-    return jsonify([{
-        'id': cache.id,
-        'gc_code': cache.gc_code,
-        'name': cache.name,
-        'owner': cache.owner,
-        'cache_type': cache.cache_type,
-        'latitude': cache.latitude,
-        'longitude': cache.longitude,
-        'description': cache.description_text,
-        'difficulty': cache.difficulty,
-        'terrain': cache.terrain,
-        'size': cache.size,
-        'hints': cache.hints,
-        'favorites_count': cache.favorites_count,
-        'logs_count': cache.logs_count,
-        'hidden_date': cache.hidden_date.isoformat() if cache.hidden_date else None,
-        'created_at': cache.created_at.isoformat() if cache.created_at else None,
-        'solved': cache.solved
-    } for cache in geocaches])
+    result = []
+    for cache in geocaches:
+        # Vérifier si des coordonnées corrigées existent
+        has_corrected_coords = cache.location_corrected is not None
+        
+        # Préparer les données de base de la géocache
+        cache_data = {
+            'id': cache.id,
+            'gc_code': cache.gc_code,
+            'name': cache.name,
+            'owner': cache.owner,
+            'cache_type': cache.cache_type,
+            'latitude': cache.latitude,
+            'longitude': cache.longitude,
+            'description': cache.description_text,
+            'difficulty': cache.difficulty,
+            'terrain': cache.terrain,
+            'size': cache.size,
+            'hints': cache.hints,
+            'favorites_count': cache.favorites_count,
+            'logs_count': cache.logs_count,
+            'hidden_date': cache.hidden_date.isoformat() if cache.hidden_date else None,
+            'created_at': cache.created_at.isoformat() if cache.created_at else None,
+            'solved': cache.solved
+        }
+        
+        # Ajouter les coordonnées corrigées si elles existent
+        if has_corrected_coords:
+            try:
+                lat_corrected = cache.latitude_corrected
+                lon_corrected = cache.longitude_corrected
+                
+                if lat_corrected is not None and lon_corrected is not None:
+                    cache_data['latitude_corrected'] = lat_corrected
+                    cache_data['longitude_corrected'] = lon_corrected
+                    
+                    # Ajouter également l'objet corrected_coordinates pour compatibilité
+                    cache_data['corrected_coordinates'] = {
+                        'latitude': lat_corrected,
+                        'longitude': lon_corrected
+                    }
+                    
+                    logger.debug(f"Coordonnées corrigées trouvées pour {cache.gc_code}: {lat_corrected}, {lon_corrected}")
+            except Exception as e:
+                logger.error(f"Erreur lors de l'extraction des coordonnées corrigées pour {cache.gc_code}: {str(e)}")
+        
+        # Ajouter également les coordonnées corrigées au format Geocaching.com si disponibles
+        if cache.gc_lat_corrected and cache.gc_lon_corrected:
+            cache_data['gc_lat_corrected'] = cache.gc_lat_corrected
+            cache_data['gc_lon_corrected'] = cache.gc_lon_corrected
+        
+        result.append(cache_data)
+    
+    logger.debug(f"Geocaches for zone {zone_id}: {len(result)} caches found")
+    return jsonify(result)
 
 
 @geocaches_bp.route('/geocaches/fetch', methods=['POST'])

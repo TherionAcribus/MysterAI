@@ -793,15 +793,15 @@ window.MultiSolverController = class extends Stimulus.Controller {
         
         if (!this.selectedPlugin) {
           console.error("%c[MultiSolver] Aucun plugin sélectionné", "background:red; color:white");
-          return;
+            return;
         }
-        
+
         // Vérifier et attendre que le tableau Tabulator soit correctement initialisé
         const checkTabulatorInitialized = () => {
           if (window.tabulatorTable && window.tabulatorTable._initialized) {
             console.log("%c[MultiSolver] Tabulator est correctement initialisé", "background:blue; color:white");
             this.executePluginActual();
-          } else {
+        } else {
             console.log("%c[MultiSolver] Attente de l'initialisation de Tabulator...", "background:orange; color:white");
             // Initialiser Tabulator si ce n'est pas déjà fait
             if (!window.tabulatorTable) {
@@ -826,9 +826,9 @@ window.MultiSolverController = class extends Stimulus.Controller {
         if (!this.geocaches || this.geocaches.length === 0) {
           this.errorValue = "Aucune géocache sélectionnée. Ajoutez des géocaches avant d'exécuter le plugin.";
           this.loadingValue = false;
-          return;
-        }
-        
+                return;
+            }
+            
         // Récupérer toutes les informations nécessaires
         const pluginData = {
           plugin: this.selectedPlugin,
@@ -839,7 +839,7 @@ window.MultiSolverController = class extends Stimulus.Controller {
         if (window.executePlugin) {
           console.log("%c[MultiSolver] Utilisation de la fonction globale executePlugin", "background:blue; color:white");
           window.executePlugin(pluginData, this.processResults.bind(this));
-        } else {
+                    } else {
           console.error("%c[MultiSolver] La fonction executePlugin n'est pas disponible", "background:red; color:white");
           this.errorValue = "Erreur: Plugin non disponible";
           this.loadingValue = false;
@@ -1122,8 +1122,8 @@ window.MultiSolverController = class extends Stimulus.Controller {
                   }
                 ]
               });
-            }
-          } else {
+                }
+            } else {
             console.warn("%c[MultiSolver] Aucun résultat à afficher dans le tableau", "background:orange; color:white");
           }
         } catch (error) {

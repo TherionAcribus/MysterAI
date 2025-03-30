@@ -59,7 +59,11 @@ def bulk_coordinates():
         # Construire le résultat
         result = []
         for geocache in geocaches:
-            result.append({
+            # Vérifier si des coordonnées corrigées existent
+            has_corrected_coords = geocache.location_corrected is not None
+            
+            # Ajouter les informations de base de la géocache
+            geocache_data = {
                 'id': geocache.id,
                 'gc_code': geocache.gc_code,
                 'name': geocache.name,
@@ -68,8 +72,36 @@ def bulk_coordinates():
                 'cache_type': geocache.cache_type,
                 'difficulty': geocache.difficulty,
                 'terrain': geocache.terrain,
-                'solved': geocache.solved
-            })
+                'solved': geocache.solved,
+                'location_corrected': geocache.location_corrected
+            }
+            
+            # Ajouter les coordonnées corrigées si elles existent
+            if has_corrected_coords:
+                try:
+                    lat_corrected = geocache.latitude_corrected
+                    lon_corrected = geocache.longitude_corrected
+                    
+                    if lat_corrected is not None and lon_corrected is not None:
+                        geocache_data['latitude_corrected'] = lat_corrected
+                        geocache_data['longitude_corrected'] = lon_corrected
+                        
+                        # Ajouter également l'objet corrected_coordinates pour compatibilité
+                        geocache_data['corrected_coordinates'] = {
+                            'latitude': lat_corrected,
+                            'longitude': lon_corrected
+                        }
+                        
+                        logger.debug(f"Coordonnées corrigées trouvées pour {geocache.gc_code}: {lat_corrected}, {lon_corrected}")
+                except Exception as e:
+                    logger.error(f"Erreur lors de l'extraction des coordonnées corrigées pour {geocache.gc_code}: {str(e)}")
+            
+            # Ajouter également les coordonnées corrigées au format Geocaching.com si disponibles
+            if geocache.gc_lat_corrected and geocache.gc_lon_corrected:
+                geocache_data['gc_lat_corrected'] = geocache.gc_lat_corrected
+                geocache_data['gc_lon_corrected'] = geocache.gc_lon_corrected
+            
+            result.append(geocache_data)
         
         return jsonify(result)
     except Exception as e:
