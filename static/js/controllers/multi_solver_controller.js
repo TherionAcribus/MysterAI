@@ -17,30 +17,48 @@ window.MultiSolverController = class extends Stimulus.Controller {
     }
 
     connect() {
-        console.log("%c[MultiSolver] Controller connecté", "background:#222; color:lightgreen; font-weight:bold", {
-            element: this.element,
-            targets: {
-                pluginList: this.hasPluginListTarget ? "présent" : "manquant",
-                geocachesList: this.hasGeocachesListTarget ? "présent" : "manquant",
-                error: this.hasErrorTarget ? "présent" : "manquant",
-                resultsTable: this.hasResultsTableTarget ? "présent" : "manquant"
-            }
-        });
+        console.log("%c[MultiSolver] Connexion", "background:blue; color:white");
         
-        // Vérification initiale des cibles
-        if (!this.hasPluginListTarget) {
-            console.error("%c[MultiSolver] ERREUR CRITIQUE: Cible pluginList manquante!", "background:red; color:white; font-weight:bold");
+        // Vérifier les cibles nécessaires
+        if (!this.hasPluginsTarget) {
+          console.error("Cible plugins manquante");
+          return;
         }
         
-        // Initialiser le tableau des résultats
-        this.processedResultsValue = [];
+        if (!this.hasResultsTarget) {
+          console.error("Cible results manquante");
+          return;
+        }
         
-        // Générer un ID unique pour ce Multi Solver s'il n'en a pas déjà un
+        // Initialiser le tableau de résultats vide
+        this.processedResults = [];
+        
+        // Générer un ID unique pour ce Multi Solver s'il n'existe pas déjà
         if (!this.multiSolverIdValue) {
-            this.multiSolverIdValue = 'multi-solver-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            this.element.dataset.multiSolverId = this.multiSolverIdValue;
-            console.log("%c[MultiSolver] ID unique généré:", "background:#222; color:lightgreen", this.multiSolverIdValue);
+          const timestamp = new Date().getTime();
+          const randomString = Math.random().toString(36).substring(2, 15);
+          const uniqueId = `multi-solver-${timestamp}-${randomString}`;
+          this.multiSolverIdValue = uniqueId;
+          console.log("%c[MultiSolver] ID unique généré:", "background:blue; color:white", uniqueId);
         }
+        
+        // Stocker l'ID multi-solver dans sessionStorage pour que d'autres composants puissent y accéder
+        sessionStorage.setItem('currentMultiSolverId', this.multiSolverIdValue);
+        
+        // Initialiser le tableau pour stocker les résultats
+        window.multiSolverTableResults = [];
+        
+        // Initialisation du plugin sélectionné
+        this.selectedPlugin = "formula_analyzer";
+        
+        // Initialiser les écouteurs d'événements
+        this.initEventListeners();
+        
+        // Charger les géocaches à partir de l'URL si disponible
+        this.loadGeocachesFromUrl();
+        
+        // Afficher les géocaches chargées
+        this.displayGeocaches();
         
         // Ajouter un écouteur pour le changement de type de caractères autorisés
         this.setupAllowedCharsListener();
@@ -771,439 +789,60 @@ window.MultiSolverController = class extends Stimulus.Controller {
 
     // Méthode pour exécuter un plugin
     async executePlugin(event) {
-        // Prévenir le comportement par défaut
-        if (event && event.preventDefault) {
-            event.preventDefault();
+        console.log("%c[MultiSolver] Execution du plugin:", "background:blue; color:white", this.selectedPlugin);
+        
+        if (!this.selectedPlugin) {
+          console.error("%c[MultiSolver] Aucun plugin sélectionné", "background:red; color:white");
+          return;
         }
         
-        console.log("%c[MultiSolver] DÉMARRAGE DE L'EXÉCUTION DU PLUGIN", "background:red; color:white; font-size:14px; font-weight:bold");
-        
-        // Récupérer les informations du plugin
-        let currentPluginName = null;
-        
-        // 1. Essayer de récupérer depuis les attributs de l'élément cliqué
-        if (event?.currentTarget?.dataset?.pluginName) {
-            currentPluginName = event.currentTarget.dataset.pluginName;
-        } else if (this.selectedPluginValue) {
-            currentPluginName = this.selectedPluginValue;
-        } else {
-            // Chercher dans le bouton d'exécution
-            const execButton = document.getElementById('execute-plugin-button');
-            if (execButton?.dataset?.pluginName) {
-                currentPluginName = execButton.dataset.pluginName;
+        // Vérifier et attendre que le tableau Tabulator soit correctement initialisé
+        const checkTabulatorInitialized = () => {
+          if (window.tabulatorTable && window.tabulatorTable._initialized) {
+            console.log("%c[MultiSolver] Tabulator est correctement initialisé", "background:blue; color:white");
+            this.executePluginActual();
+          } else {
+            console.log("%c[MultiSolver] Attente de l'initialisation de Tabulator...", "background:orange; color:white");
+            // Initialiser Tabulator si ce n'est pas déjà fait
+            if (!window.tabulatorTable) {
+              console.log("%c[MultiSolver] Initialisation forcée de Tabulator", "background:orange; color:white");
+              window.initTabulatorTable();
             }
-        }
+            // Réessayer dans 100ms
+            setTimeout(checkTabulatorInitialized, 100);
+          }
+        };
         
-        if (!currentPluginName) {
-            this.showError("Impossible de déterminer quel plugin exécuter. Veuillez en sélectionner un d'abord.");
-            return;
-        }
-
-        // Si c'est le plugin analysis_web_page, utiliser un traitement spécial
-        if (currentPluginName === 'analysis_web_page') {
-            await this.executeAnalysisWebPage();
-            return;
-        }
-        
-        // Log détaillé de l'événement
-        console.log("%c[MultiSolver] Détails de l'événement:", "background:red; color:white", {
-            event: event,
-            type: event ? event.type : 'manuel',
-            currentTarget: event?.currentTarget,
-            dataset: event?.currentTarget?.dataset
-        });
-        
-        // Log détaillé des géocaches actuelles
-        console.log("%c[MultiSolver] Géocaches disponibles:", "background:red; color:white", {
-            geocachesValue: this.geocachesValue,
-            count: this.geocachesValue ? this.geocachesValue.length : 0,
-            sample: this.geocachesValue ? this.geocachesValue.slice(0, 2) : []
-        });
-        
-        // Récupérer les informations du plugin depuis les attributs de données
-        let pluginName = null;
-        
-        // 1. Essayer de récupérer depuis les attributs de l'élément cliqué
-        if (event?.currentTarget?.dataset?.pluginName) {
-            pluginName = event.currentTarget.dataset.pluginName;
-            console.log("%c[MultiSolver] Nom du plugin trouvé dans l'élément cliqué:", "background:green; color:white", pluginName);
-        } else {
-            // 2. Vérifier s'il y a un plugin sélectionné dans la valeur du contrôleur
-            if (this.selectedPluginValue) {
-                pluginName = this.selectedPluginValue;
-                console.log("%c[MultiSolver] Nom du plugin trouvé dans selectedPluginValue:", "background:green; color:white", pluginName);
-            } else {
-                // 3. Chercher un élément avec l'attribut data-plugin-name dans la zone des plugins
-                let pluginElement = document.querySelector('.plugin-interface [data-plugin-name]');
-                if (pluginElement) {
-                    pluginName = pluginElement.dataset.pluginName;
-                    console.log("%c[MultiSolver] Nom du plugin trouvé dans un élément de l'interface:", "background:green; color:white", pluginName);
-                } else {
-                    // 4. Chercher dans le bouton d'exécution
-                    const execButton = document.getElementById('execute-plugin-button');
-                    if (execButton?.dataset?.pluginName) {
-                        pluginName = execButton.dataset.pluginName;
-                        console.log("%c[MultiSolver] Nom du plugin trouvé dans le bouton d'exécution:", "background:green; color:white", pluginName);
-                    } else {
-                        // 5. Chercher n'importe quel élément avec data-plugin-name
-                        pluginElement = document.querySelector('[data-plugin-name]');
-                        if (pluginElement) {
-                            pluginName = pluginElement.dataset.pluginName;
-                            console.log("%c[MultiSolver] Nom du plugin trouvé ailleurs dans le DOM:", "background:green; color:white", pluginName);
-                        } else {
-                            console.error("%c[MultiSolver] ERREUR: Impossible de trouver le nom du plugin", "background:red; color:white; font-weight:bold");
-                            this.showError("Impossible de déterminer quel plugin exécuter. Veuillez en sélectionner un d'abord.");
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Log détaillé sur le plugin trouvé
-        console.log("%c[MultiSolver] Résumé de l'action:", "background:red; color:white; font-weight:bold", {
-            plugin: pluginName,
-            geocaches: this.geocachesValue ? this.geocachesValue.length : 0,
-            controller: this ? "trouvé" : "non trouvé",
-            selectedPluginValue: this.selectedPluginValue
-        });
-        
-        try {
-            console.log("%c[MultiSolver] Exécution du plugin:", "background:green; color:white; font-size:14px; font-weight:bold", pluginName);
-            
-            // Récupérer les données du formulaire si disponible
-            let formData = {};
-            const formElement = document.querySelector('form');
-            
-            if (formElement) {
-                const formDataObj = new FormData(formElement);
-                for (const [key, value] of formDataObj.entries()) {
-                    formData[key] = value;
-                }
-                console.log("%c[MultiSolver] Données du formulaire:", "background:green; color:white", formData);
-            } else {
-                console.warn("%c[MultiSolver] Aucun formulaire trouvé", "background:orange; color:black");
-            }
-            
-            // Récupérer la case à cocher "Appliquer à toutes les géocaches"
-            const applyToAllCheckbox = document.getElementById('apply-to-all-geocaches');
-            const applyToAll = applyToAllCheckbox ? applyToAllCheckbox.checked : true;
-            console.log("%c[MultiSolver] Appliquer à toutes les géocaches:", "background:green; color:white", applyToAll);
-            
-            // Vérifier s'il y a des géocaches à traiter
-            if (!this.geocachesValue || this.geocachesValue.length === 0) {
-                console.error("%c[MultiSolver] Aucune géocache disponible", "background:red; color:white");
-                this.resultsTableTarget.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="px-6 py-4">
-                            <div class="text-center text-amber-400">
-                                <p>Aucune géocache disponible pour appliquer le plugin ${pluginName}.</p>
-                                <p class="text-sm mt-2">Pour utiliser ce plugin, vous devez d'abord sélectionner des géocaches depuis la liste principale.</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            // Déterminer quelles géocaches traiter (pour l'instant, toujours toutes)
-            const geocachesToProcess = this.geocachesValue;
-            
-            console.log("%c[MultiSolver] Géocaches à traiter:", "background:green; color:white", {
-                total: this.geocachesValue.length,
-                selected: geocachesToProcess.length
-            });
-            
-            // Afficher un indicateur de chargement dans le tableau des résultats
-            this.resultsTableTarget.innerHTML = `
-                <tr>
-                    <td colspan="5" class="px-6 py-4">
-                        <div class="flex justify-center">
-                            <div class="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-                        </div>
-                        <div class="text-center text-gray-400 mt-2">Application du plugin ${pluginName} sur ${geocachesToProcess.length} géocache(s)...</div>
-                    </td>
-                </tr>
-            `;
-            
-            // Traiter chaque géocache
-            const results = [];
-            
-            for (const geocache of geocachesToProcess) {
-                try {
-                    console.log("%c[MultiSolver] Traitement de la géocache:", "background:green; color:white", {
-                        id: geocache.id,
-                        gcCode: geocache.gc_code,
-                        name: geocache.name
-                    });
-                    
-                    // Récupérer le texte de la géocache
-                    const descriptionResponse = await fetch(`/geocaches/${geocache.id}/text`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
-                    
-                    if (!descriptionResponse.ok) {
-                        throw new Error(`Erreur lors de la récupération de la description: ${descriptionResponse.status}`);
-                    }
-                    
-                    const descriptionData = await descriptionResponse.json();
-                    const text = descriptionData.description;
-                    
-                    // Préparer les données pour l'API du plugin
-                    const requestData = {
-                        text: text,
-                        // Ajouter systématiquement l'ID de la géocache pour les plugins qui en ont besoin
-                        // notamment "analysis_web_page"
-                        geocache_id: geocache.id,
-                        ...formData
-                    };
-                    
-                    console.log("%c[MultiSolver] Appel du plugin avec les données:", "background:green; color:white", requestData);
-                    
-                    // Appeler l'API pour exécuter le plugin
-                    const response = await fetch(`/api/plugins/${pluginName}/execute`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(requestData),
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Erreur HTTP: ${response.status}`);
-                    }
-                    
-                    // Vérifier si la réponse est au format JSON
-                    let data;
-                    const contentType = response.headers.get("content-type");
-                    
-                    if (contentType && contentType.includes("application/json")) {
-                        try {
-                            data = await response.json();
-                            console.log("%c[MultiSolver] Résultat du plugin (JSON):", "background:green; color:white", data);
-                        } catch (jsonError) {
-                            console.error("%c[MultiSolver] Erreur de parsing JSON:", "background:red; color:white", jsonError);
-                            const responseText = await response.text();
-                            console.warn("%c[MultiSolver] Réponse non-JSON reçue:", "background:orange; color:black", responseText.substring(0, 100));
-                            data = {
-                                result: "Erreur: La réponse n'est pas un JSON valide",
-                                raw_html: responseText.includes('<') && responseText.includes('>')
-                            };
-                        }
-                    } else {
-                        // Si la réponse n'est pas JSON, utiliser le texte brut
-                        const responseText = await response.text();
-                        console.warn("%c[MultiSolver] Réponse non-JSON reçue:", "background:orange; color:black", responseText.substring(0, 100));
-                        data = {
-                            result: responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''),
-                            raw_html: responseText.includes('<') && responseText.includes('>')
-                        };
-                    }
-                    
-                    // Extraire le résultat du plugin et l'ajouter aux résultats
-                    let resultText = '';
-                    let coordinates = null;
-                    
-                    // Extraire le texte du résultat selon plusieurs formats possibles
-                    if (data.raw_html) {
-                        try {
-                            // Essayer d'extraire le texte du HTML avec une fonction utilitaire
-                            const htmlContent = data.result;
-                            const tempDiv = document.createElement('div');
-                            
-                            // Nettoyer le HTML pour éviter les erreurs d'analyse potentielles
-                            const cleanHtml = htmlContent
-                                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                                .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-                            
-                            tempDiv.innerHTML = cleanHtml;
-                            const extractedText = tempDiv.textContent || tempDiv.innerText || '';
-                            
-                            if (extractedText && extractedText.trim()) {
-                                resultText = "📄 HTML: " + extractedText.substring(0, 300) + (extractedText.length > 300 ? '...' : '');
-                            } else {
-                                resultText = "⚠️ Réponse HTML reçue (non analysable)";
-                            }
-                        } catch (error) {
-                            console.error("%c[MultiSolver] Erreur lors de l'extraction du texte HTML:", "background:red; color:white", error);
-                            resultText = "⚠️ Réponse HTML reçue (non analysable)";
-                        }
-                    } 
-                    // Cas spécial pour analysis_web_page qui retourne combined_results
-                    else if (data.combined_results) {
-                        console.log("%c[MultiSolver] Résultat format combined_results détecté:", "background:purple; color:white", data.combined_results);
-                        
-                        // Si la fonction existe (définie dans le HTML), l'utiliser pour formater les résultats
-                        if (window.formatCombinedResults) {
-                            resultText = window.formatCombinedResults(data.combined_results);
-                        } else {
-                            resultText = `Analyse complète: ${Object.keys(data.combined_results).length} plugins exécutés`;
-                        }
-                        
-                        // Extraire les coordonnées si disponibles
-                        if (window.extractCoordinatesFromCombinedResults) {
-                            coordinates = window.extractCoordinatesFromCombinedResults(data.combined_results);
-                            console.log("%c[MultiSolver] Coordonnées extraites:", "background:green; color:white", coordinates);
-                        }
-                    }
-                    else if (data.text_output) {
-                        resultText = data.text_output;
-                    } else if (data.result?.text?.text_output) {
-                        resultText = data.result.text.text_output;
-                    } else if (data.output) {
-                        resultText = data.output;
-                    } else if (typeof data.result === 'string') {
-                        resultText = data.result;
-                    } else if (data.result) {
-                        resultText = JSON.stringify(data.result);
-                    } else {
-                        resultText = JSON.stringify(data);
-                    }
-                    
-                    // Extraire les coordonnées si présentes
-                    if (data.coordinates) {
-                        coordinates = data.coordinates;
-                    } else if (data.result?.coordinates) {
-                        coordinates = data.result.coordinates;
-                    }
-                    
-                    // Ajouter le résultat à la liste
-                    results.push({
-                        geocache: geocache,
-                        result: resultText,
-                        coordinates: coordinates,
-                        // Format spécial pour les résultats des métaplugins (comme analysis_web_page)
-                        isCombinedResult: !!data.combined_results,
-                        rawData: data.combined_results || null,
-                        plugin: pluginName,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                } catch (error) {
-                    console.error("%c[MultiSolver] Erreur lors du traitement de la géocache:", "background:red; color:white", error);
-                    
-                    // Ajouter une entrée d'erreur aux résultats
-                    results.push({
-                        geocache: geocache,
-                        result: `Erreur: ${error.message}`,
-                        error: true,
-                        plugin: pluginName,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-            
-            // Mettre à jour les résultats et le tableau
-            this.processedResultsValue = results;
-            this.updateResultsTable();
-            
-            console.log("%c[MultiSolver] Exécution terminée avec succès", "background:green; color:white; font-size:14px; font-weight:bold");
-            
-        } catch (error) {
-            console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin:", "background:red; color:white", error);
-            this.showError(`Erreur lors de l'exécution du plugin: ${error.message}`);
-        }
+        // Démarrer la vérification
+        checkTabulatorInitialized();
     }
-
-    // Nouvelle méthode pour exécuter spécifiquement le plugin analysis_web_page
-    async executeAnalysisWebPage() {
-        try {
-            if (!this.geocachesValue || this.geocachesValue.length === 0) {
-                this.showError("Aucune géocache à traiter.");
-                return;
-            }
-
-            // Afficher un indicateur de chargement
-            this.resultsTableTarget.innerHTML = `
-                <tr>
-                    <td colspan="5" class="px-6 py-4">
-                        <div class="flex justify-center">
-                            <div class="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-                        </div>
-                        <div class="text-center text-gray-400 mt-2">Analyse des géocaches en cours...</div>
-                    </td>
-                </tr>
-            `;
-
-            const results = [];
-            
-            for (const geocache of this.geocachesValue) {
-                try {
-                    // Récupérer le texte de la géocache
-                    const descriptionResponse = await fetch(`/geocaches/${geocache.id}/text`);
-                    if (!descriptionResponse.ok) {
-                        throw new Error(`Erreur lors de la récupération de la description: ${descriptionResponse.status}`);
-                    }
-                    
-                    const descriptionData = await descriptionResponse.json();
-                    
-                    // Appeler l'API du plugin
-                    const response = await fetch('/api/plugins/analysis_web_page/execute', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            text: descriptionData.description,
-                            geocache_id: geocache.id
-                        })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Erreur HTTP: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    
-                    // Traiter les résultats
-                    let detectedPlugins = [];
-                    let coordinates = null;
-
-                    if (data.combined_results) {
-                        for (const [subPluginName, result] of Object.entries(data.combined_results)) {
-                            if (result.success) {
-                                detectedPlugins.push({
-                                    name: subPluginName,
-                                    result: result.result
-                                });
-                                
-                                // Vérifier si ce plugin a trouvé des coordonnées
-                                if (result.result?.coordinates?.exist) {
-                                    coordinates = result.result.coordinates;
-                                }
-                            }
-                        }
-                    }
-
-                    results.push({
-                        geocache: geocache,
-                        detectedPlugins: detectedPlugins,
-                        coordinates: coordinates,
-                        plugin: 'analysis_web_page',
-                        timestamp: new Date().toISOString()
-                    });
-
-                } catch (error) {
-                    console.error(`Erreur pour la géocache ${geocache.id}:`, error);
-                    results.push({
-                        geocache: geocache,
-                        error: error.message,
-                        plugin: 'analysis_web_page',
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-
-            // Mettre à jour le tableau des résultats
-            this.processedResultsValue = results;
-            this.updateAnalysisWebPageResults();
-
-        } catch (error) {
-            console.error("Erreur lors de l'exécution du plugin analysis_web_page:", error);
-            this.showError(`Erreur: ${error.message}`);
+    
+    executePluginActual() {
+        // L'ancien code de executePlugin
+        this.loadingValue = true;
+        this.errorValue = '';
+        
+        // Vérifier si des geocaches sont sélectionnées
+        if (!this.geocaches || this.geocaches.length === 0) {
+          this.errorValue = "Aucune géocache sélectionnée. Ajoutez des géocaches avant d'exécuter le plugin.";
+          this.loadingValue = false;
+          return;
+        }
+        
+        // Récupérer toutes les informations nécessaires
+        const pluginData = {
+          plugin: this.selectedPlugin,
+          geocaches: this.geocaches
+        };
+        
+        // Exécuter le plugin global
+        if (window.executePlugin) {
+          console.log("%c[MultiSolver] Utilisation de la fonction globale executePlugin", "background:blue; color:white");
+          window.executePlugin(pluginData, this.processResults.bind(this));
+        } else {
+          console.error("%c[MultiSolver] La fonction executePlugin n'est pas disponible", "background:red; color:white");
+          this.errorValue = "Erreur: Plugin non disponible";
+          this.loadingValue = false;
         }
     }
 
@@ -1344,43 +983,152 @@ window.MultiSolverController = class extends Stimulus.Controller {
 
     // Méthode pour mettre à jour le tableau des résultats
     updateResultsTable() {
-        if (!this.hasResultsTableTarget) {
-            console.error("%c[MultiSolver] ERREUR: Cible resultsTable manquante", "background:red; color:white");
-            return;
-        }
+        console.log("%c[MultiSolver] Mise à jour du tableau des résultats", "background:blue; color:white");
         
-        // Nettoyer le tableau existant s'il existe
-        if (this.resultsTableTarget._tabulator) {
-            this.resultsTableTarget._tabulator.destroy();
-        }
-        
-        // Données pour le tableau
-        const tableData = this.processedResultsValue;
-        console.log("%c[MultiSolver] Mise à jour du tableau de résultats", "background:#333; color:lightblue", tableData);
-        
-        // Création du tableau Tabulator
-        this.resultsTableTarget._tabulator = new Tabulator(this.resultsTableTarget, {
-            // Configuration du tableau...
-            data: tableData,
-            // ... le reste de la configuration existante ...
-        });
-        
-        // S'assurer que le Multi Solver a un ID unique
+        // Générer un ID unique pour ce MultiSolver s'il n'existe pas déjà
         if (!this.multiSolverIdValue) {
-            this.multiSolverIdValue = 'multi-solver-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            this.element.dataset.multiSolverId = this.multiSolverIdValue;
-            console.log("%c[MultiSolver] ID unique généré:", "background:#222; color:lightgreen", this.multiSolverIdValue);
+          const timestamp = new Date().getTime();
+          const randomString = Math.random().toString(36).substring(2, 15);
+          const uniqueId = `multi-solver-${timestamp}-${randomString}`;
+          this.multiSolverIdValue = uniqueId;
+          console.log("%c[MultiSolver] ID unique généré:", "background:blue; color:white", uniqueId);
+          
+          // Mise à jour de l'attribut data-multi-solver-id sur l'élément
+          this.element.dataset.multiSolverId = uniqueId;
         }
         
-        // Déclencher un événement pour informer la carte que les données ont été mises à jour
-        console.log("%c[MultiSolver] Déclenchement de l'événement multiSolverDataUpdated", "background:#333; color:lightblue");
-        const event = new CustomEvent('multiSolverDataUpdated', {
-            detail: { 
-                multiSolverId: this.multiSolverIdValue,
-                data: tableData 
+        // S'assurer que la variable multiSolverTableResults est initialisée
+        if (!window.multiSolverTableResults) {
+          window.multiSolverTableResults = [];
+        }
+        
+        // Stocker les données actuelles des géocaches dans sessionStorage
+        try {
+          // Normaliser les données - s'assurer que toutes les géocaches ont les bonnes propriétés
+          let geocachesForStorage = this.geocaches.map(geocache => {
+            // Chercher si cette geocache a déjà des résultats
+            const existingResult = window.multiSolverTableResults.find(result => result.id === geocache.id);
+            
+            const normalizedGeocache = {
+              ...geocache,
+              coordinates: existingResult?.coordinates || null,
+              saved: existingResult?.saved || false
+            };
+            
+            // Vérifier si les coordonnées existent et les normaliser
+            if (normalizedGeocache.coordinates && 
+                normalizedGeocache.coordinates.latitude && 
+                normalizedGeocache.coordinates.longitude) {
+              
+              // S'assurer que latitude/longitude sont disponibles au niveau supérieur pour la carte
+              normalizedGeocache.latitude = normalizedGeocache.coordinates.latitude;
+              normalizedGeocache.longitude = normalizedGeocache.coordinates.longitude;
             }
-        });
-        window.dispatchEvent(event);
+            
+            return normalizedGeocache;
+          });
+          
+          // Mettre à jour sessionStorage
+          sessionStorage.setItem('multiSolverGeocaches', JSON.stringify(geocachesForStorage));
+          console.log("%c[MultiSolver] Données sauvegardées dans sessionStorage:", "background:blue; color:white", geocachesForStorage.length);
+          
+          // Mettre à jour window.multiSolverTableResults pour utilisation ultérieure
+          window.multiSolverTableResults = geocachesForStorage;
+        } catch (error) {
+          console.error("%c[MultiSolver] Erreur lors de la sauvegarde dans sessionStorage:", "background:red; color:white", error);
+        }
+        
+        // Émettre un événement pour informer la carte des mises à jour
+        console.log("%c[MultiSolver] Émission de l'événement multiSolverDataUpdated", "background:blue; color:white");
+        window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+          detail: {
+            multiSolverId: this.multiSolverIdValue,
+            data: this.geocaches
+          }
+        }));
+        
+        // Mettre à jour le tableau Tabulator si nécessaire
+        try {
+          // Nettoyer le tableau existant s'il existe
+          if (this.resultsTableTarget._tabulator) {
+            console.log("%c[MultiSolver] Destruction du tableau Tabulator existant", "background:blue; color:white");
+            this.resultsTableTarget._tabulator.destroy();
+          }
+          
+          // Vérifier si on a des résultats à afficher
+          if (this.processedResults && this.processedResults.length > 0) {
+            console.log("%c[MultiSolver] Création d'un nouveau tableau Tabulator avec", "background:blue; color:white", this.processedResults.length, "résultats");
+            
+            // Initialiser Tabulator avec notre tableau de données
+            if (window.tabulatorTable) {
+              console.log("%c[MultiSolver] Utilisation du tableau Tabulator global", "background:blue; color:white");
+              window.tabulatorTable.setData(this.processedResults);
+            } else {
+              console.log("%c[MultiSolver] Création d'un nouveau tableau Tabulator local", "background:blue; color:white");
+              this.resultsTableTarget._tabulator = new Tabulator(this.resultsTableTarget, {
+                data: this.processedResults,
+                layout: "fitColumns",
+                columns: [
+                  // Configuration des colonnes selon vos besoins
+                  { title: "GC Code", field: "geocache.gc_code", width: 100 },
+                  { title: "Nom", field: "geocache.name", width: 200 },
+                  { title: "Résultat", field: "result", formatter: "html" },
+                  { 
+                    title: "Coordonnées", 
+                    field: "coordinates", 
+                    formatter: function(cell) {
+                      const value = cell.getValue();
+                      if (!value) return "";
+                      
+                      // Différents formats possibles de coordonnées
+                      if (value.ddm) return value.ddm;
+                      if (value.latitude && value.longitude) return `${value.latitude} ${value.longitude}`;
+                      if (typeof value === 'string') return value;
+                      
+                      return JSON.stringify(value);
+                    } 
+                  },
+                  { 
+                    title: "Actions", 
+                    formatter: function(cell) {
+                      const geocache = cell.getRow().getData().geocache;
+                      const coordinates = cell.getRow().getData().coordinates;
+                      
+                      if (!coordinates) return "";
+                      
+                      return `<button 
+                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs save-coordinates" 
+                        data-geocache-id="${geocache.id}">
+                        Sauvegarder
+                      </button>`;
+                    },
+                    cellClick: function(e, cell) {
+                      if (e.target.classList.contains('save-coordinates')) {
+                        const geocacheId = e.target.getAttribute('data-geocache-id');
+                        const rowData = cell.getRow().getData();
+                        const coordinates = rowData.coordinates;
+                        
+                        if (coordinates && (coordinates.latitude || coordinates.ddm_lat)) {
+                          const lat = coordinates.latitude || coordinates.ddm_lat;
+                          const lng = coordinates.longitude || coordinates.ddm_lon;
+                          
+                          // Appeler la fonction de sauvegarde
+                          if (window.saveCoordinates) {
+                            window.saveCoordinates(geocacheId, lat, lng, rowData.plugin);
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              });
+            }
+          } else {
+            console.warn("%c[MultiSolver] Aucun résultat à afficher dans le tableau", "background:orange; color:white");
+          }
+        } catch (error) {
+          console.error("%c[MultiSolver] Erreur lors de la mise à jour du tableau:", "background:red; color:white", error);
+        }
     }
     
     // Méthode pour voir les détails d'un résultat
@@ -1459,6 +1207,343 @@ window.MultiSolverController = class extends Stimulus.Controller {
         } catch (error) {
             console.error("Erreur lors de la sauvegarde des coordonnées:", error);
             alert(`Erreur lors de la sauvegarde des coordonnées: ${error.message}`);
+        }
+    }
+
+    get multiSolverIdValue() {
+        return this.multiSolverIdTarget.value;
+    }
+
+    set multiSolverIdValue(value) {
+        this.multiSolverIdTarget.value = value;
+        // Mettre à jour également l'attribut data-multi-solver-id sur l'élément
+        this.element.dataset.multiSolverId = value;
+    }
+
+    // Fonction pour extraire et formatter correctement les coordonnées depuis les résultats
+    extractCoordinates(combinedResults) {
+        console.log("%c[MultiSolver] Extraction des coordonnées depuis:", "background:purple; color:white", combinedResults);
+        
+        // Rechercher d'abord dans color_text_detector qui est généralement le plus fiable
+        if (combinedResults.color_text_detector && 
+            combinedResults.color_text_detector.coordinates && 
+            combinedResults.color_text_detector.coordinates.exist) {
+          
+          const coords = combinedResults.color_text_detector.coordinates;
+          console.log("%c[MultiSolver] Coordonnées trouvées dans color_text_detector:", "background:green; color:white", coords);
+          
+          // On a besoin de coordonnées numériques pour la carte
+          const ddmLat = coords.ddm_lat;
+          const ddmLon = coords.ddm_lon;
+          
+          // Convertir les coordonnées au format numérique
+          const numericCoords = this.convertDDMToDecimal(ddmLat, ddmLon);
+          
+          if (numericCoords) {
+            return {
+              ddm: coords.ddm,
+              ddm_lat: ddmLat,
+              ddm_lon: ddmLon,
+              latitude: numericCoords.latitude, 
+              longitude: numericCoords.longitude,
+              source: 'color_text_detector'
+            };
+          }
+          
+          // Si la conversion a échoué mais qu'on a quand même les coordonnées DDM
+          return {
+            ddm: coords.ddm,
+            ddm_lat: ddmLat,
+            ddm_lon: ddmLon,
+            source: 'color_text_detector'
+          };
+        }
+        
+        // Vérifier aussi dans coordinates_finder
+        if (combinedResults.coordinates_finder && 
+            combinedResults.coordinates_finder.coordinates && 
+            combinedResults.coordinates_finder.coordinates.exist) {
+          
+          const coords = combinedResults.coordinates_finder.coordinates;
+          console.log("%c[MultiSolver] Coordonnées trouvées dans coordinates_finder:", "background:green; color:white", coords);
+          
+          const ddmLat = coords.ddm_lat;
+          const ddmLon = coords.ddm_lon;
+          
+          // Convertir les coordonnées au format numérique
+          const numericCoords = this.convertDDMToDecimal(ddmLat, ddmLon);
+          
+          if (numericCoords) {
+            return {
+              ddm: coords.ddm,
+              ddm_lat: ddmLat,
+              ddm_lon: ddmLon,
+              latitude: numericCoords.latitude, 
+              longitude: numericCoords.longitude,
+              source: 'coordinates_finder'
+            };
+          }
+          
+          return {
+            ddm: coords.ddm,
+            ddm_lat: ddmLat,
+            ddm_lon: ddmLon,
+            source: 'coordinates_finder'
+          };
+        }
+        
+        console.log("%c[MultiSolver] Aucune coordonnée trouvée dans les résultats", "background:orange; color:white");
+        return null;
+    }
+    
+    // Convertir des coordonnées DDM (N 49° 46.587') en décimal (49.77645)
+    convertDDMToDecimal(latDDM, lonDDM) {
+        if (!latDDM || !lonDDM) return null;
+        
+        console.log("%c[MultiSolver] Conversion DDM -> Decimal:", "background:blue; color:white", {latDDM, lonDDM});
+        
+        try {
+          // Regex pour extraire les parties des coordonnées
+          const latRegex = /([NS])\s*(\d+)°\s*(\d+\.\d+)[']/i;
+          const lonRegex = /([EW])\s*(\d+)°\s*(\d+\.\d+)[']/i;
+          
+          const latMatch = latDDM.match(latRegex);
+          const lonMatch = lonDDM.match(lonRegex);
+          
+          if (!latMatch || !lonMatch) {
+            console.error("%c[MultiSolver] Format de coordonnées non reconnu:", "background:red; color:white", {latDDM, lonDDM});
+            return null;
+          }
+          
+          // Extraire les composants
+          const latDir = latMatch[1].toUpperCase();
+          const latDeg = parseInt(latMatch[2], 10);
+          const latMin = parseFloat(latMatch[3]);
+          
+          const lonDir = lonMatch[1].toUpperCase();
+          const lonDeg = parseInt(lonMatch[2], 10);
+          const lonMin = parseFloat(lonMatch[3]);
+          
+          // Calculer les valeurs décimales
+          let latitude = latDeg + (latMin / 60);
+          if (latDir === 'S') latitude = -latitude;
+          
+          let longitude = lonDeg + (lonMin / 60);
+          if (lonDir === 'W') longitude = -longitude;
+          
+          console.log("%c[MultiSolver] Conversion réussie:", "background:green; color:white", {latitude, longitude});
+          
+          return {
+            latitude: latitude,
+            longitude: longitude
+          };
+        } catch (error) {
+          console.error("%c[MultiSolver] Erreur lors de la conversion des coordonnées:", "background:red; color:white", error);
+          return null;
+        }
+    }
+
+    // Dans processResults(), remplacer la partie qui traite les coordonnées
+    processResults(results) {
+        console.log("%c[MultiSolver] Traitement des résultats reçus:", "background:blue; color:white", results);
+        this.loadingValue = false;
+        
+        if (!results || results.length === 0) {
+          console.warn("%c[MultiSolver] Aucun résultat reçu", "background:orange; color:white");
+          this.errorValue = "Aucun résultat reçu";
+          return;
+        }
+        
+        // Traitement pour chaque géocache analysée
+        for (const result of results) {
+          console.log("%c[MultiSolver] Traitement du résultat:", "background:purple; color:white", result);
+          
+          // Si c'est un résultat de "analysis_web_page" (combined_results)
+          if (result.combined_results) {
+            console.log("%c[MultiSolver] Traitement des résultats combinés:", "background:purple; color:white", result.combined_results);
+            
+            // Utiliser notre fonction d'extraction des coordonnées
+            const extractedCoords = this.extractCoordinates(result.combined_results);
+            
+            if (extractedCoords) {
+              console.log("%c[MultiSolver] Coordonnées extraites:", "background:green; color:white", extractedCoords);
+              
+              // Ajouter le résultat au tableau des résultats
+              this.addResultToTable({
+                geocacheId: result.geocache_id,
+                result: this.formatCombinedResultsHTML(result.combined_results),
+                coordinates: extractedCoords,
+                latitude: extractedCoords.latitude,
+                longitude: extractedCoords.longitude,
+                plugin: 'analysis_web_page'
+              });
+            } else {
+              console.warn("%c[MultiSolver] Aucune coordonnée extraite des résultats combinés", "background:orange; color:white");
+              
+              // Ajouter quand même le résultat sans coordonnées
+              this.addResultToTable({
+                geocacheId: result.geocache_id,
+                result: this.formatCombinedResultsHTML(result.combined_results),
+                plugin: 'analysis_web_page'
+              });
+            }
+          } 
+          // Pour les autres types de résultats
+          else {
+            console.log("%c[MultiSolver] Résultat de plugin standard", "background:blue; color:white");
+            
+            // Extraire les coordonnées s'il y en a
+            let coordinates = null;
+            if (result.coordinates) {
+              coordinates = result.coordinates;
+              
+              // Essayer de convertir en numérique si ce sont des coordonnées DDM
+              if (coordinates.ddm_lat && coordinates.ddm_lon) {
+                const numericCoords = this.convertDDMToDecimal(coordinates.ddm_lat, coordinates.ddm_lon);
+                if (numericCoords) {
+                  coordinates = {
+                    ...coordinates,
+                    ...numericCoords
+                  };
+                }
+              }
+            }
+            
+            // Ajouter le résultat au tableau
+            this.addResultToTable({
+              geocacheId: result.geocache_id,
+              result: result.result || JSON.stringify(result),
+              coordinates: coordinates,
+              latitude: coordinates?.latitude,
+              longitude: coordinates?.longitude,
+              plugin: result.plugin
+            });
+          }
+        }
+        
+        // Mise à jour de la table et de la carte
+        this.updateResultsTable();
+    }
+    
+    // Formater les résultats combinés en HTML pour affichage
+    formatCombinedResultsHTML(combinedResults) {
+        // Si cette fonction a été appelée avec un argument vide
+        if (!combinedResults) return "Aucun résultat";
+        
+        let html = '<div class="bg-gray-700 p-2 rounded-lg">';
+        
+        // Parcourir tous les résultats des plugins
+        for (const [pluginName, result] of Object.entries(combinedResults)) {
+          // Ignorer les plugins sans résultat
+          if (!result) continue;
+          
+          html += `<div class="mb-2 last:mb-0">`;
+          html += `<div class="font-bold text-green-400">${this.formatPluginName(pluginName)}</div>`;
+          
+          // Coordonnées trouvées?
+          if (result.coordinates && result.coordinates.exist) {
+            html += `<div class="text-yellow-300 font-mono">${result.coordinates.ddm || ''}</div>`;
+          }
+          
+          // Findings
+          if (result.findings && result.findings.length > 0) {
+            html += `<div class="pl-2 border-l-2 border-gray-500">`;
+            
+            for (const finding of result.findings) {
+              const findingClass = finding.isInteresting ? 'text-yellow-300' : 'text-gray-300';
+              
+              html += `<div class="${findingClass} text-sm">
+                <span class="font-bold">${finding.type || 'Trouvé'}</span>: 
+                ${finding.content || finding.description || 'Non spécifié'}
+              </div>`;
+            }
+            
+            html += `</div>`;
+          }
+          
+          html += `</div>`;
+        }
+        
+        html += '</div>';
+        return html;
+    }
+    
+    // Formater le nom du plugin pour l'affichage
+    formatPluginName(name) {
+        // Convertir snake_case en title case avec espaces
+        return name
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+    }
+
+    // Dans addResultToTable(), s'assurer que les coordonnées sont bien préparées
+    addResultToTable(data) {
+        console.log("%c[MultiSolver] Résultat ajouté au tableau Tabulator", "background:blue; color:white");
+        
+        // Trouver la géocache correspondante
+        const geocache = this.geocaches.find(gc => gc.id === data.geocacheId);
+        
+        if (!geocache) {
+          console.error("%c[MultiSolver] Géocache non trouvée pour l'ID:", "background:red; color:white", data.geocacheId);
+          return;
+        }
+        
+        // Vérifier si ce résultat existe déjà
+        const existingIndex = this.processedResults.findIndex(r => r.geocache.id === data.geocacheId);
+        
+        // Préparer l'objet de résultat
+        const resultObject = {
+          geocache: geocache,
+          result: data.result,
+          coordinates: data.coordinates,
+          plugin: data.plugin,
+          timestamp: new Date().toISOString()
+        };
+        
+        // S'assurer que les coordonnées sont aussi au niveau supérieur pour la carte
+        if (data.coordinates && (data.latitude || data.coordinates.latitude)) {
+          // Priorité aux coordonnées numériques
+          resultObject.latitude = data.latitude || data.coordinates.latitude;
+          resultObject.longitude = data.longitude || data.coordinates.longitude;
+          
+          // Sauvegarder ces coordonnées dans la géocache aussi
+          geocache.latitude = resultObject.latitude;
+          geocache.longitude = resultObject.longitude;
+          geocache.coordinates = data.coordinates;
+        }
+        
+        // Mettre à jour ou ajouter le résultat
+        if (existingIndex >= 0) {
+          this.processedResults[existingIndex] = resultObject;
+        } else {
+          this.processedResults.push(resultObject);
+        }
+        
+        // Si des coordonnées sont présentes, proposer de les sauvegarder
+        if (data.coordinates && (data.coordinates.ddm || data.coordinates.latitude)) {
+          this.saveCoordinates(
+            data.geocacheId, 
+            data.coordinates.latitude || data.coordinates.ddm_lat,
+            data.coordinates.longitude || data.coordinates.ddm_lon,
+            data.plugin
+          );
+        }
+        
+        // Vérifier le statut de sauvegarde pour cette géocache
+        try {
+          fetch(`/geocaches/${data.geocacheId}`)
+            .then(response => response.json())
+            .then(geocacheData => {
+              if (geocacheData && geocacheData.saved_coordinates) {
+                this.updateTableSavedStatus(data.geocacheId, this.processedResults.length);
+              }
+            })
+            .catch(error => {
+              console.warn("%c[MultiSolver] Erreur lors de la vérification du statut:", "background:orange; color:white", error);
+            });
+        } catch (error) {
+          console.warn("%c[MultiSolver] Erreur lors de la vérification du statut:", "background:orange; color:white", error);
         }
     }
 }

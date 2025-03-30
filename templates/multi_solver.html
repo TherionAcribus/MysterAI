@@ -3363,30 +3363,109 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken || '',
-                'X-Layout-Component': 'true'
+                'X-CSRF-Token': csrfToken || '',
+                'Accept': 'application/json'
             },
             body: JSON.stringify(requestData)
         })
         .then(response => {
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
+            if (response.ok) {
+                // Mettre à jour directement le statut dans le tableau
+                updateTableSavedStatus(geocacheId, true);
+                
+                // Mettre à jour les autres éléments de l'interface
+                const statusCells = document.querySelectorAll(`.status-cell[data-geocache-id="${geocacheId}"]`);
+                statusCells.forEach(cell => {
+                    cell.innerHTML = `<span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>`;
+                });
+                
+                // Forcer un rafraîchissement complet du tableau pour s'assurer que toutes les lignes sont à jour
+                if (multiSolverResultsTable && Array.isArray(multiSolverTableResults)) {
+                    // Marquer explicitement comme sauvegardé dans les données
+                    const rowIndex = multiSolverTableResults.findIndex(row => row.id == geocacheId);
+                    if (rowIndex !== -1) {
+                        multiSolverTableResults[rowIndex].saved = true;
+                        // Mettre à jour les coordonnées dans les données
+                        if (!multiSolverTableResults[rowIndex].coordinates) {
+                            multiSolverTableResults[rowIndex].coordinates = {};
+                        }
+                        multiSolverTableResults[rowIndex].coordinates.latitude = latitude;
+                        multiSolverTableResults[rowIndex].coordinates.longitude = longitude;
+                        console.log("%c[MultiSolver] Données mises à jour pour l'index", "background:green; color:white", rowIndex);
+                    }
+                    
+                    // Rafraîchir tout le tableau
+                    multiSolverResultsTable.setData([...multiSolverTableResults]);
+                    console.log("%c[MultiSolver] Rafraîchissement complet du tableau effectué", "background:green; color:white");
+                    
+                    // Émettre un événement pour mettre à jour la carte
+                    const multiSolverContainer = document.getElementById('multi-solver-container');
+                    const multiSolverId = multiSolverContainer?.dataset?.multiSolverId || '';
+                    
+                    if (multiSolverId) {
+                        console.log("%c[MultiSolver] Émission de l'événement multiSolverDataUpdated après sauvegarde", "background:green; color:white");
+                        
+                        // Conserver les anciennes données pour la carte
+                        let allGeocaches = [];
+                        
+                        // Récupérer les données depuis sessionStorage si disponible
+                        try {
+                            const storedGeocaches = sessionStorage.getItem('multiSolverGeocaches');
+                            if (storedGeocaches) {
+                                const parsedGeocaches = JSON.parse(storedGeocaches);
+                                // Construire un tableau combiné de toutes les géocaches avec leurs coordonnées
+                                allGeocaches = parsedGeocaches.map(geocache => {
+                                    // Chercher si cette géocache a des coordonnées dans les résultats
+                                    const resultEntry = multiSolverTableResults.find(r => r.id == geocache.id);
+                                    if (resultEntry && resultEntry.coordinates) {
+                                        return {
+                                            ...geocache,
+                                            latitude: resultEntry.coordinates.latitude,
+                                            longitude: resultEntry.coordinates.longitude,
+                                            saved: resultEntry.saved || false
+                                        };
+                                    }
+                                    return geocache;
+                                });
+                            }
+                        } catch (error) {
+                            console.error("%c[MultiSolver] Erreur lors de la récupération des données depuis sessionStorage:", "background:red; color:white", error);
+                        }
+                        
+                        // Si aucune donnée n'est trouvée, utiliser seulement les résultats du tableau
+                        if (allGeocaches.length === 0) {
+                            allGeocaches = multiSolverTableResults;
+                        }
+                        
+                        window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+                            detail: { 
+                                multiSolverId: multiSolverId,
+                                data: allGeocaches
+                            }
+                        }));
+                    }
+                }
+                
+                // Notification de succès
+                const notif = document.createElement('div');
+                notif.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+                notif.textContent = 'Coordonnées sauvegardées avec succès';
+                document.body.appendChild(notif);
+                
+                setTimeout(() => {
+                    notif.classList.add('animate-fade-out');
+                    setTimeout(() => notif.remove(), 500);
+                }, 3000);
+                
+                return true;
             }
-            return response.json();
-        })
-        .then(data => {
-            console.log("%c[MultiSolver] Coordonnées sauvegardées avec succès", "background:green; color:white", data);
-            
-            // Mettre à jour l'état d'enregistrement dans le tableau
-            updateTableSavedStatus(geocacheId, true);
-            
-            // Mettre à jour la carte si elle est ouverte
-            updateMapWithNewCoordinates(geocacheId, latitude, longitude);
-            
-            return true;
+            return response.json().then(data => {
+                console.error("%c[MultiSolver] Erreur lors de la sauvegarde des coordonnées:", "background:red; color:white", data);
+                return false;
+            });
         })
         .catch(error => {
-            console.error("%c[MultiSolver] Erreur lors de la sauvegarde:", "background:red; color:white", error);
+            console.error("%c[MultiSolver] Erreur lors de la sauvegarde des coordonnées:", "background:red; color:white", error);
             return false;
         });
     }
