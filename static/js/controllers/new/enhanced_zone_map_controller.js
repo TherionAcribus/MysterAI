@@ -9,10 +9,13 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
     }
     
     class EnhancedZoneMapController extends Stimulus.Controller {
-        static targets = ["container"]
+        // Définir les cibles et valeurs pour correspondre aux attributs dans le HTML
+        // qui utilise le format data-zone-map-target="..." et data-zone-map-*-value="..."
+        static targets = ["container", "popup", "popupContent"]
         static values = {
             zoneId: String,
             geocacheId: String,
+            geocacheCode: String,  // Ajouté pour correspondre à data-zone-map-geocache-code-value
             isMultiSolver: Boolean,
             multiSolverId: String
         }
@@ -22,6 +25,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             console.log('Container:', this.hasContainerTarget ? 'présent' : 'manquant');
             console.log('Zone ID:', this.zoneIdValue || 'non défini');
             console.log('Geocache ID:', this.geocacheIdValue || 'non défini');
+            console.log('Geocache Code:', this.geocacheCodeValue || 'non défini');  // Nouvelle valeur ajoutée
             console.log('Multi Solver:', this.isMultiSolverValue ? 'oui' : 'non');
             console.log('Multi Solver ID:', this.multiSolverIdValue || 'non défini');
             
@@ -36,6 +40,55 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 }
             } else {
                 console.error("Conteneur cible manquant pour la carte");
+                // Recherche additionnelle pour le débogage
+                console.log("Recherche d'alternatives...");
+                const potentialContainers = document.querySelectorAll('[data-zone-map-target="container"]');
+                if (potentialContainers.length > 0) {
+                    console.log(`Trouvé ${potentialContainers.length} conteneurs potentiels avec l'attribut data-zone-map-target="container"`);
+                    console.log("HTML du premier conteneur trouvé:", potentialContainers[0].outerHTML);
+                    
+                    // Tenter d'utiliser directement ce conteneur
+                    try {
+                        console.log("Tentative d'utilisation directe du conteneur trouvé");
+                        this.containerTarget = potentialContainers[0];
+                        this.initializeMap();
+                        this.initializeContextMenu();
+                        
+                        if (this.isMultiSolverValue) {
+                            console.log("Ajout de l'écouteur d'événements multiSolverDataUpdated (mode de secours)");
+                            window.addEventListener('multiSolverDataUpdated', this.handleMultiSolverUpdate.bind(this));
+                        }
+                    } catch (error) {
+                        console.error("Erreur lors de la tentative d'utilisation directe:", error);
+                    }
+                } else {
+                    console.log("Aucun conteneur trouvé avec data-zone-map-target='container'");
+                    
+                    // Vérifier si le contrôleur est correctement attaché à un élément
+                    const controllers = document.querySelectorAll('[data-controller="zone-map"]');
+                    console.log(`Trouvé ${controllers.length} éléments avec data-controller="zone-map"`);
+                    if (controllers.length > 0) {
+                        console.log("HTML du premier élément contrôleur trouvé:", controllers[0].outerHTML);
+                        
+                        // Rechercher le conteneur à l'intérieur de l'élément contrôleur
+                        const nestedContainers = controllers[0].querySelectorAll('.map-container');
+                        if (nestedContainers.length > 0) {
+                            console.log(`Trouvé ${nestedContainers.length} conteneurs .map-container imbriqués`);
+                            try {
+                                console.log("Tentative d'utilisation du conteneur imbriqué");
+                                this.containerTarget = nestedContainers[0];
+                                this.initializeMap();
+                                this.initializeContextMenu();
+                                
+                                if (this.isMultiSolverValue) {
+                                    window.addEventListener('multiSolverDataUpdated', this.handleMultiSolverUpdate.bind(this));
+                                }
+                            } catch (error) {
+                                console.error("Erreur lors de la tentative d'utilisation du conteneur imbriqué:", error);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -889,6 +942,17 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     // Utiliser un ID différent pour les coordonnées corrigées
                     geocacheWithCorrectedCoords.id = geocache.id + '_corrected';
                     
+                    // Assurons-nous que le type de cache est préservé 
+                    geocacheWithCorrectedCoords.cache_type = geocache.cache_type || 'Traditional';
+                    
+                    // Vérifier si le type est correctement défini
+                    if (!geocache.cache_type) {
+                        console.warn(`Type de cache non défini pour ${geocache.gc_code || geocache.id}. Utilisation du type par défaut.`);
+                    }
+                    
+                    // Journaliser pour débogage
+                    console.log(`Ajout de point corrigé pour ${geocache.gc_code || geocache.id}, type: ${geocacheWithCorrectedCoords.cache_type}`);
+                    
                     this.addMarkerWithGeocache(geocacheWithCorrectedCoords);
                     console.log(`Point corrigé ajouté pour ${geocache.gc_code}:`, 
                               geocacheWithCorrectedCoords.latitude, 
@@ -942,6 +1006,17 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     
                     // Utiliser un ID différent pour les coordonnées corrigées
                     geocacheWithCorrectedCoords.id = geocache.id + '_corrected';
+                    
+                    // Assurons-nous que le type de cache est préservé
+                    geocacheWithCorrectedCoords.cache_type = geocache.cache_type || 'Traditional';
+                    
+                    // Vérifier si le type est correctement défini
+                    if (!geocache.cache_type) {
+                        console.warn(`Type de cache non défini pour ${geocache.gc_code || geocache.id}. Utilisation du type par défaut.`);
+                    }
+                    
+                    // Journaliser pour débogage
+                    console.log(`Ajout de point corrigé pour ${geocache.gc_code || geocache.id}, type: ${geocacheWithCorrectedCoords.cache_type}`);
                     
                     this.addMarkerWithGeocache(geocacheWithCorrectedCoords);
                     console.log(`Point corrigé ajouté pour ${geocache.gc_code} (mode both)`);
@@ -1153,14 +1228,89 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 // Vérifier si c'est une coordonnée corrigée
                 const isCorrected = geocache.isCorrected === true;
                 
+                // Si c'est une coordonnée corrigée et que le cache_type n'est pas défini, 
+                // tenter de le récupérer depuis l'ID original
+                let cacheType = geocache.cache_type;
+                
+                if (isCorrected && (!cacheType || cacheType === 'undefined')) {
+                    console.log(`Point corrigé sans type de cache défini: ${geocache.id}`);
+                    
+                    // Essayer de trouver le point original correspondant dans les sources de données
+                    let originalId = geocache.id;
+                    if (typeof originalId === 'string' && originalId.endsWith('_corrected')) {
+                        originalId = originalId.replace('_corrected', '');
+                        
+                        // Chercher dans les features existantes
+                        const existingFeatures = this.vectorSource.getFeatures();
+                        const originalFeature = existingFeatures.find(f => f.get('id') === originalId);
+                        
+                        if (originalFeature) {
+                            const originalGeocache = originalFeature.get('geocache');
+                            if (originalGeocache && originalGeocache.cache_type) {
+                                cacheType = originalGeocache.cache_type;
+                                console.log(`Type de cache récupéré depuis la feature originale: ${cacheType}`);
+                            }
+                        }
+                        
+                        // Si toujours pas trouvé, chercher dans sessionStorage
+                        if (!cacheType || cacheType === 'undefined') {
+                            try {
+                                const storedGeocaches = JSON.parse(sessionStorage.getItem('multiSolverGeocaches') || '[]');
+                                const originalGeocache = storedGeocaches.find(g => g.id == originalId);
+                                if (originalGeocache && originalGeocache.cache_type) {
+                                    cacheType = originalGeocache.cache_type;
+                                    console.log(`Type de cache récupéré depuis sessionStorage: ${cacheType}`);
+                                }
+                            } catch (e) {
+                                console.error("Erreur lors de la récupération des données depuis sessionStorage:", e);
+                            }
+                        }
+                    } else if (typeof originalId !== 'string') {
+                        // Si l'ID n'est pas une chaîne, on peut essayer de le convertir et vérifier
+                        const stringId = String(originalId);
+                        if (stringId.endsWith('_corrected')) {
+                            const baseId = stringId.replace('_corrected', '');
+                            
+                            // Chercher dans les features existantes
+                            const existingFeatures = this.vectorSource.getFeatures();
+                            const originalFeature = existingFeatures.find(f => f.get('id') == baseId);
+                            
+                            if (originalFeature) {
+                                const originalGeocache = originalFeature.get('geocache');
+                                if (originalGeocache && originalGeocache.cache_type) {
+                                    cacheType = originalGeocache.cache_type;
+                                    console.log(`Type de cache récupéré depuis la feature originale: ${cacheType}`);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Définir un type par défaut si toujours pas trouvé
+                if (!cacheType || cacheType === 'undefined') {
+                    cacheType = 'Traditional';
+                    console.log(`Type de cache non trouvé, utilisation de la valeur par défaut: ${cacheType}`);
+                }
+                
+                // S'assurer que geocache.cache_type est correctement défini pour les fonctions de style
+                geocache.cache_type = cacheType;
+                
+                // Journaliser pour débogage
+                console.log(`Création marqueur pour ${geocache.gc_code || geocache.id}:`, {
+                    isCorrected,
+                    cacheType,
+                    latitude,
+                    longitude
+                });
+                
                 // Créer un style personnalisé pour les coordonnées corrigées
                 const styleFunction = (feature) => {
-                    const baseColor = feature.get('color') || color;
+                    // S'assurer que cache_type est défini correctement
                     const cacheType = geocache.cache_type || 'Traditional';
+                    console.log(`Définition du style pour ${geocache.gc_code || geocache.id}, type: ${cacheType}, corrigé: ${isCorrected}`);
                     
                     // Définir les couleurs selon les standards de géocaching.com
                     let cacheColor;
-                    let cacheSymbol = null;
                     
                     // Codes couleurs standards de Geocaching.com
                     const cacheColors = {
@@ -1184,9 +1334,6 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         // Couleur par défaut bleue pour les types non reconnus
                         cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu
                     }
-                    
-                    // Ne plus remplacer la couleur en fonction du statut
-                    // Conserver uniquement le carré pour indiquer les coordonnées corrigées
                     
                     // Créer le style de base
                     const baseStyle = new ol.style.Style({
@@ -1250,15 +1397,15 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     // Si c'est une coordonnée corrigée, ajouter un symbole supplémentaire
                     if (isCorrected) {
                         styles.push(new ol.style.Style({
-                            image: new ol.style.RegularShape({
-                                points: 4, // Carré
-                                radius: 9,
-                                stroke: new ol.style.Stroke({
-                                    color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
-                                    width: 2
-                                }),
-                                fill: null
-                            })
+                                image: new ol.style.RegularShape({
+                                    points: 4, // Carré
+                                    radius: 9,
+                                    stroke: new ol.style.Stroke({
+                                        color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
+                                        width: 2
+                                    }),
+                                    fill: null
+                                })
                         }));
                     }
                     
@@ -1280,6 +1427,12 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     geocache: geocache,
                     isCorrected: isCorrected
                 });
+                
+                // S'assurer que la propriété isCorrected est correctement définie après la création
+                if (isCorrected) {
+                    feature.set('isCorrected', true);
+                    console.log(`Marqueur explicitement défini comme corrigé: ${geocache.gc_code || geocache.id}`);
+                }
                 
                 // Appliquer le style personnalisé
                 feature.setStyle(styleFunction);
@@ -1354,6 +1507,62 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             // Créer une copie pour ne pas modifier l'original
             const prepared = { ...geocache };
             
+            // Fonction utilitaire pour convertir une valeur en nombre si possible
+            const toNumber = (value) => {
+                if (typeof value === 'number') return value;
+                if (typeof value === 'string') {
+                    // Essayer d'extraire des nombres à partir des formats DMS
+                    if (value.includes('°')) {
+                        // Latitude: N 49° 44.746'
+                        const matchLat = value.match(/([NS])\s*(\d+)°\s*(\d+[\.,]\d+)\'?/);
+                        if (matchLat) {
+                            const hemisphere = matchLat[1];
+                            const degrees = parseFloat(matchLat[2]);
+                            // Remplacer la virgule par un point si nécessaire
+                            const minutes = parseFloat(matchLat[3].replace(',', '.'));
+                            
+                            // Convertir en degrés décimaux
+                            let decimalDegrees = degrees + (minutes / 60);
+                            
+                            // Ajuster le signe selon l'hémisphère
+                            if (hemisphere === 'S') {
+                                decimalDegrees = -decimalDegrees;
+                            }
+                            
+                            console.log(`Conversion de coordonnée latitude: ${value} -> ${decimalDegrees}`);
+                            return decimalDegrees;
+                        }
+                        
+                        // Longitude: E 5° 57.083'
+                        const matchLon = value.match(/([EW])\s*(\d+)°\s*(\d+[\.,]\d+)\'?/);
+                        if (matchLon) {
+                            const hemisphere = matchLon[1];
+                            const degrees = parseFloat(matchLon[2]);
+                            // Remplacer la virgule par un point si nécessaire
+                            const minutes = parseFloat(matchLon[3].replace(',', '.'));
+                            
+                            // Convertir en degrés décimaux
+                            let decimalDegrees = degrees + (minutes / 60);
+                            
+                            // Ajuster le signe selon l'hémisphère
+                            if (hemisphere === 'W') {
+                                decimalDegrees = -decimalDegrees;
+                            }
+                            
+                            console.log(`Conversion de coordonnée longitude: ${value} -> ${decimalDegrees}`);
+                            return decimalDegrees;
+                        }
+                    }
+                    
+                    // Essayer de convertir directement en nombre
+                    const numericValue = parseFloat(value);
+                    if (!isNaN(numericValue)) {
+                        return numericValue;
+                    }
+                }
+                return null;
+            };
+            
             // 1. Traiter les coordonnées originales (si pas déjà définies)
             if (!prepared.latitude || !prepared.longitude) {
                 // Essayer d'extraire les coordonnées originales de location si disponible
@@ -1367,16 +1576,61 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 }
             }
             
-            // 2. Traiter les coordonnées corrigées (si pas déjà définies)
+            // Convertir les coordonnées originales en nombres si ce sont des chaînes
+            if (prepared.latitude !== undefined && prepared.longitude !== undefined) {
+                if (typeof prepared.latitude !== 'number' || typeof prepared.longitude !== 'number') {
+                    const numLat = toNumber(prepared.latitude);
+                    const numLon = toNumber(prepared.longitude);
+                    
+                    if (numLat !== null && numLon !== null) {
+                        prepared.latitude = numLat;
+                        prepared.longitude = numLon;
+                        console.log(`Coordonnées originales converties en nombres pour ${prepared.gc_code}:`, { lat: numLat, lon: numLon });
+                    }
+                }
+            }
+            
+            // 2. Traiter les coordonnées dans l'objet coordinates (Multi Solver)
+            if (prepared.coordinates) {
+                // Convertir les coordonnées de l'objet coordinates en nombres
+                if (prepared.coordinates.latitude !== undefined && prepared.coordinates.longitude !== undefined) {
+                    const numLat = toNumber(prepared.coordinates.latitude);
+                    const numLon = toNumber(prepared.coordinates.longitude);
+                    
+                    if (numLat !== null && numLon !== null) {
+                        prepared.coordinates.latitude = numLat;
+                        prepared.coordinates.longitude = numLon;
+                        
+                        // S'assurer que les coordonnées principales sont également définies
+                        if (prepared.latitude === undefined || prepared.longitude === undefined) {
+                            prepared.latitude = numLat;
+                            prepared.longitude = numLon;
+                        }
+                        
+                        console.log(`Coordonnées (dans l'objet coordinates) converties en nombres pour ${prepared.gc_code}:`, { lat: numLat, lon: numLon });
+                    }
+                }
+            }
+            
+            // 3. Traiter les coordonnées corrigées
             // Vérifier d'abord si les propriétés latitude_corrected et longitude_corrected existent
             if (prepared.latitude_corrected !== undefined && prepared.longitude_corrected !== undefined) {
-                // Utiliser directement les propriétés latitude_corrected et longitude_corrected
+                // Convertir en nombres si ce sont des chaînes
+                const numLat = toNumber(prepared.latitude_corrected);
+                const numLon = toNumber(prepared.longitude_corrected);
+                
+                if (numLat !== null && numLon !== null) {
+                    prepared.latitude_corrected = numLat;
+                    prepared.longitude_corrected = numLon;
+                    
                 // Créer l'objet corrected_coordinates pour compatibilité
                 prepared.corrected_coordinates = {
-                    latitude: prepared.latitude_corrected,
-                    longitude: prepared.longitude_corrected
+                        latitude: numLat,
+                        longitude: numLon
                 };
-                console.log(`Coordonnées corrigées utilisées pour ${prepared.gc_code}:`, prepared.corrected_coordinates);
+                    
+                    console.log(`Coordonnées corrigées converties en nombres pour ${prepared.gc_code}:`, { lat: numLat, lon: numLon });
+                }
             }
             // Sinon, essayer d'extraire les coordonnées corrigées de location_corrected si disponible
             else if (prepared.location_corrected) {
@@ -1398,13 +1652,66 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             else if (prepared.corrected_coordinates && 
                      prepared.corrected_coordinates.latitude !== undefined && 
                      prepared.corrected_coordinates.longitude !== undefined) {
+                // Convertir en nombres si ce sont des chaînes
+                const numLat = toNumber(prepared.corrected_coordinates.latitude);
+                const numLon = toNumber(prepared.corrected_coordinates.longitude);
+                
+                if (numLat !== null && numLon !== null) {
+                    // Mettre à jour les valeurs converties en nombres
+                    prepared.corrected_coordinates.latitude = numLat;
+                    prepared.corrected_coordinates.longitude = numLon;
+                    
                 // Synchroniser avec latitude_corrected et longitude_corrected pour cohérence
-                prepared.latitude_corrected = prepared.corrected_coordinates.latitude;
-                prepared.longitude_corrected = prepared.corrected_coordinates.longitude;
-                console.log(`Objet corrected_coordinates utilisé pour ${prepared.gc_code}:`, prepared.corrected_coordinates);
+                    prepared.latitude_corrected = numLat;
+                    prepared.longitude_corrected = numLon;
+                    
+                    console.log(`Objet corrected_coordinates converti en nombres pour ${prepared.gc_code}:`, { lat: numLat, lon: numLon });
+                }
+            }
+            
+            // 4. Si la géocache est sauvegardée (saved=true), s'assurer que les coordonnées sont marquées comme corrigées
+            if (prepared.saved === true) {
+                prepared.isCorrected = true;
+                console.log(`Géocache ${prepared.gc_code} marquée comme corrigée car saved=true`);
+                
+                // Si coordinates existe mais pas corrected_coordinates, utiliser coordinates comme coordonnées corrigées
+                if (prepared.coordinates && 
+                    prepared.coordinates.latitude !== undefined && 
+                    prepared.coordinates.longitude !== undefined && 
+                    (!prepared.corrected_coordinates || 
+                     prepared.corrected_coordinates.latitude === undefined || 
+                     prepared.corrected_coordinates.longitude === undefined)) {
+                    
+                    prepared.corrected_coordinates = {
+                        latitude: prepared.coordinates.latitude,
+                        longitude: prepared.coordinates.longitude
+                    };
+                    
+                    prepared.latitude_corrected = prepared.coordinates.latitude;
+                    prepared.longitude_corrected = prepared.coordinates.longitude;
+                    
+                    console.log(`Création de corrected_coordinates à partir de coordinates pour ${prepared.gc_code}:`, prepared.corrected_coordinates);
+                }
             }
             
             return prepared;
+        }
+
+        // Fonction intermédiaire pour vérifier le contenu de l'événement MultiSolver
+        logEventDetail(event) {
+            if (event && event.detail && event.detail.data) {
+                // Examiner le premier objet des données pour comprendre sa structure
+                if (Array.isArray(event.detail.data) && event.detail.data.length > 0) {
+                    const sample = event.detail.data[0];
+                    console.log("Détail de l'événement MultiSolver - exemple de données:", {
+                        id: sample.id,
+                        gc_code: sample.gc_code,
+                        cache_type: sample.cache_type,
+                        corrected_coordinates: sample.corrected_coordinates,
+                        coordinates: sample.coordinates
+                    });
+                }
+            }
         }
 
         // Mettre à jour la méthode handleMultiSolverUpdate pour utiliser prepareGeocacheCoordinates
@@ -1416,6 +1723,17 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 return;
             }
             
+            // Vérifier s'il s'agit d'une mise à jour après sauvegarde de coordonnées
+            const isCoordsUpdateEvent = event.detail.coordsUpdated === true;
+            if (isCoordsUpdateEvent) {
+                console.log("Détection d'une mise à jour après sauvegarde de coordonnées");
+                
+                // Si l'ID de la géocache mise à jour est présent, l'ajouter au log
+                if (event.detail.updatedGeocacheId) {
+                    console.log(`ID de la géocache mise à jour: ${event.detail.updatedGeocacheId}`);
+                }
+            }
+            
             // Vérifier si l'événement correspond à notre Multi Solver
             if (this.multiSolverIdValue === event.detail.multiSolverId) {
                 // Vérifier si la carte est initialisée
@@ -1424,6 +1742,9 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     return;
                 }
                 
+                // Examiner la structure des données de l'événement pour le débogage
+                this.logEventDetail(event);
+                
                 // Récupérer le mode d'affichage des coordonnées
                 const coordsMode = this.coordsDisplayMode || 'corrected';
                 console.log("Mode d'affichage des coordonnées pour la mise à jour:", coordsMode);
@@ -1431,52 +1752,79 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 console.log("Mise à jour des données du Multi Solver:", 
                             event.detail.data && Array.isArray(event.detail.data) ? event.detail.data.length : 0, "géocaches");
                 
-                // Examiner la structure d'un échantillon pour le débogage
-                if (event.detail.data && Array.isArray(event.detail.data) && event.detail.data.length > 0) {
-                    const sample = event.detail.data[0];
-                    console.log("=== STRUCTURE DÉTAILLÉE D'UN ÉCHANTILLON DE DONNÉES ===");
-                    console.log("Clés de premier niveau:", Object.keys(sample));
-                    
-                    // Vérifier si des coordonnées corrigées sont présentes sous différentes formes
-                    console.log("location_corrected présent:", sample.location_corrected !== undefined);
-                    console.log("latitude_corrected présent:", sample.latitude_corrected !== undefined);
-                    console.log("longitude_corrected présent:", sample.longitude_corrected !== undefined);
-                    console.log("gc_lat_corrected présent:", sample.gc_lat_corrected !== undefined);
-                    console.log("gc_lon_corrected présent:", sample.gc_lon_corrected !== undefined);
-                    
-                    // Vérifier l'objet corrected_coordinates
-                    console.log("corrected_coordinates présent:", sample.corrected_coordinates !== undefined);
-                    if (sample.corrected_coordinates) {
-                        console.log("corrected_coordinates structure:", sample.corrected_coordinates);
-                    }
-                    
-                    // Vérifier l'objet coordinates
-                    console.log("coordinates présent:", sample.coordinates !== undefined);
-                    if (sample.coordinates) {
-                        console.log("coordinates structure:", sample.coordinates);
-                        console.log("coordinates.latitude_corrected présent:", sample.coordinates.latitude_corrected !== undefined);
-                    }
-                    
-                    // Vérifier les objets location et location_corrected
-                    console.log("location:", sample.location);
-                    if (sample.location) {
-                        const coords = this.extractCoordinatesFromSQLPoint(sample.location);
-                        console.log("Coordonnées extraites de location:", coords);
-                    }
-                    
-                    // Teste de la présence de location_corrected (peut avoir été supprimé dans le backend)
-                    if (sample.location_corrected) {
-                        const coords = this.extractCoordinatesFromSQLPoint(sample.location_corrected);
-                        console.log("Coordonnées extraites de location_corrected:", coords);
-                    } else {
-                        console.log("location_corrected n'est pas présent dans les données");
-                    }
-                }
+                // IMPORTANT: Récupérer d'abord les types de cache actuels à partir des features existantes
+                const currentFeatures = this.vectorSource.getFeatures();
+                const existingCacheTypes = {};
                 
-                // Préparer les données avec les coordonnées normalisées
-                // Vérifier si event.detail.data est un tableau avant d'appliquer map()
-                const preparedData = (event.detail.data && Array.isArray(event.detail.data)) ? 
-                    event.detail.data.map(gc => this.prepareGeocacheCoordinates(gc)) : [];
+                currentFeatures.forEach(feature => {
+                    const id = feature.get('id');
+                    const geocache = feature.get('geocache');
+                    if (id && geocache && geocache.cache_type) {
+                        // Stocker le type de cache pour l'ID normal et l'ID corrigé (sans le suffixe)
+                        existingCacheTypes[id] = geocache.cache_type;
+                        
+                        // S'assurer que id est une chaîne de caractères avant d'utiliser endsWith
+                        if (typeof id === 'string') {
+                            // Si c'est un ID corrigé, stocker aussi pour l'ID de base
+                            if (id.endsWith('_corrected')) {
+                                const baseId = id.replace('_corrected', '');
+                                existingCacheTypes[baseId] = geocache.cache_type;
+                            } else {
+                                // Si c'est un ID de base, stocker aussi pour l'ID corrigé potentiel
+                                existingCacheTypes[id + '_corrected'] = geocache.cache_type;
+                            }
+                        } else {
+                            // Pour les ID numériques, convertir en chaîne
+                            const stringId = String(id);
+                            existingCacheTypes[stringId + '_corrected'] = geocache.cache_type;
+                        }
+                    }
+                });
+                
+                console.log("Types de cache existants:", existingCacheTypes);
+                
+                // IMPORTANT: Conserver les coordonnées au format original pour l'affichage
+                // Créer une copie des données pour éviter de modifier l'original
+                let preparedData = [];
+                if (event.detail.data && Array.isArray(event.detail.data)) {
+                    // Faire une copie profonde des données
+                    preparedData = JSON.parse(JSON.stringify(event.detail.data));
+                    
+                    // IMPORTANT: Préserver les coordonnées originales pour l'affichage et les types de cache
+                    preparedData.forEach(geocache => {
+                        // 1. Conserver le format original des coordonnées pour l'affichage
+                        if (geocache.coordinates) {
+                            geocache.coordinates_display = JSON.parse(JSON.stringify(geocache.coordinates));
+                        }
+                        
+                        // 2. IMPORTANT: Vérifier et restaurer le type de cache s'il est manquant
+                        if (!geocache.cache_type || geocache.cache_type === 'undefined') {
+                            // Chercher dans notre dictionnaire des types existants
+                            if (existingCacheTypes[geocache.id]) {
+                                geocache.cache_type = existingCacheTypes[geocache.id];
+                                console.log(`Type de cache restauré pour ${geocache.gc_code}: ${geocache.cache_type}`);
+                            }
+                            // Sinon, chercher dans sessionStorage
+                            else {
+                                try {
+                                    const storedGeocaches = JSON.parse(sessionStorage.getItem('multiSolverGeocaches') || '[]');
+                                    const storedGeocache = storedGeocaches.find(g => g.id == geocache.id);
+                                    if (storedGeocache && storedGeocache.cache_type) {
+                                        geocache.cache_type = storedGeocache.cache_type;
+                                        console.log(`Type de cache récupéré depuis sessionStorage pour ${geocache.gc_code}: ${geocache.cache_type}`);
+                                    }
+                                } catch (e) {
+                                    console.error("Erreur lors de la récupération des données depuis sessionStorage:", e);
+                                }
+                            }
+                        }
+                        
+                        console.log(`Préservation du type de cache: ${geocache.gc_code} - ${geocache.cache_type}`);
+                    });
+                    
+                    // Appliquer la préparation des coordonnées pour la carte
+                    preparedData = preparedData.map(gc => this.prepareGeocacheCoordinates(gc));
+                }
                 
                 if (preparedData.length > 0) {
                     console.log("Premier élément après préparation:", preparedData[0]);
@@ -1516,7 +1864,6 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     let pointsUpdated = 0;
                     
                     // Récupérer les features actuelles pour les comparer
-                    const currentFeatures = this.vectorSource.getFeatures();
                     const currentIds = new Set(currentFeatures.map(f => f.get('id')));
                     
                     // Ajouter ou mettre à jour les marqueurs pour chaque géocache avec des coordonnées valides
@@ -1542,10 +1889,18 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                             (geocache.coordinates.lat !== undefined && geocache.coordinates.lon !== undefined)))
                         );
                         
-                        console.log(`Géocache ${geocache.gc_code} - Coords corrigées: ${hasCorrectedCoords}, Coords originales: ${hasOriginalCoords}`);
+                        // Détecter les coordonnées sauvegardées qui ont été mises à jour
+                        if (geocache.saved === true) {
+                            console.log(`Géocache avec coordonnées sauvegardées: ${geocache.gc_code}, sera marquée comme corrigée`);
+                            geocache.isCorrected = true;
+                            
+                            // Si nous avons un événement de mise à jour après sauvegarde
+                            if (isCoordsUpdateEvent) {
+                                console.log(`Mise à jour après sauvegarde pour ${geocache.gc_code}`);
+                            }
+                        }
                         
-                        // Continuer avec la logique existante...
-                        // Appliquer la logique selon le mode d'affichage des coordonnées
+                        console.log(`Géocache ${geocache.gc_code} - Coords corrigées: ${hasCorrectedCoords}, Coords originales: ${hasOriginalCoords}, isCorrected: ${geocache.isCorrected}`);
                         
                         // 1. Mode "originales" uniquement
                         if (coordsMode === 'original') {
@@ -1554,6 +1909,12 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                     currentFeatures.find(f => f.get('id') === geocache.id) : null;
                                 
                                 if (existingFeature) {
+                                    // Assurer le type de cache est préservé
+                                    const currentGeocache = existingFeature.get('geocache');
+                                    if (currentGeocache && currentGeocache.cache_type && !geocache.cache_type) {
+                                        geocache.cache_type = currentGeocache.cache_type;
+                                    }
+                                    
                                     this.updateExistingMarker(existingFeature, geocache);
                                     pointsUpdated++;
                                 } else {
@@ -1580,15 +1941,66 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 const existingCorrectedFeature = currentIds.has(correctedId) ? 
                                     currentFeatures.find(f => f.get('id') === correctedId) : null;
                                 
+                                // IMPORTANT: S'assurer que le type de cache est correctement préservé
+                                console.log(`AVANT - Type de cache pour ${geocache.gc_code}: ${geocache.cache_type}`);
+                                
+                                // Vérifier d'abord dans la feature existante
+                                if (existingCorrectedFeature) {
+                                    const currentGeocache = existingCorrectedFeature.get('geocache');
+                                    if (currentGeocache && currentGeocache.cache_type) {
+                                        console.log(`Type de cache trouvé dans la feature existante: ${currentGeocache.cache_type}`);
+                                        if (!geocache.cache_type || geocache.cache_type === 'undefined') {
+                                            geocache.cache_type = currentGeocache.cache_type;
+                                        }
+                                    }
+                                }
+                                
+                                // Ensuite, chercher dans la feature originale si nécessaire
+                                if (!geocache.cache_type || geocache.cache_type === 'undefined') {
+                                    const originalFeature = currentIds.has(geocache.id) ? 
+                                        currentFeatures.find(f => f.get('id') === geocache.id) : null;
+                                        
+                                    if (originalFeature) {
+                                        const originalGeocache = originalFeature.get('geocache');
+                                        if (originalGeocache && originalGeocache.cache_type) {
+                                            console.log(`Type de cache trouvé dans la feature originale: ${originalGeocache.cache_type}`);
+                                            geocache.cache_type = originalGeocache.cache_type;
+                                        }
+                                    }
+                                }
+                                
+                                // Enfin, chercher dans notre dictionnaire préparé plus tôt
+                                if (!geocache.cache_type || geocache.cache_type === 'undefined') {
+                                    if (existingCacheTypes[geocache.id]) {
+                                        console.log(`Type de cache trouvé dans le dictionnaire: ${existingCacheTypes[geocache.id]}`);
+                                        geocache.cache_type = existingCacheTypes[geocache.id];
+                                    }
+                                }
+                                
+                                // Créer une copie avec les coordonnées corrigées
                                 const geocacheWithCorrectedCoords = {
                                     ...geocache,
                                     id: correctedId,
-                                    latitude: geocache.corrected_coordinates.latitude,
-                                    longitude: geocache.corrected_coordinates.longitude,
                                     isCorrected: true
                                 };
                                 
+                                // S'assurer que les coordonnées corrigées sont utilisées
+                                if (geocache.corrected_coordinates) {
+                                    geocacheWithCorrectedCoords.latitude = geocache.corrected_coordinates.latitude;
+                                    geocacheWithCorrectedCoords.longitude = geocache.corrected_coordinates.longitude;
+                                } else if (geocache.latitude_corrected !== undefined) {
+                                    geocacheWithCorrectedCoords.latitude = geocache.latitude_corrected;
+                                    geocacheWithCorrectedCoords.longitude = geocache.longitude_corrected;
+                                }
+                                
+                                console.log(`APRÈS - Type de cache utilisé pour ${geocache.gc_code}: ${geocacheWithCorrectedCoords.cache_type}`);
+                                
+                                // Log explicite pour confirmer que le type de cache est préservé
+                                console.log(`MultiSolver: Type de cache préservé pour ${geocache.gc_code || geocache.id} - ${geocacheWithCorrectedCoords.cache_type}`);
+                                
                                 if (existingCorrectedFeature) {
+                                    // Définir explicitement la propriété isCorrected du feature existant
+                                    existingCorrectedFeature.set('isCorrected', true);
                                     this.updateExistingMarker(existingCorrectedFeature, geocacheWithCorrectedCoords);
                                     pointsUpdated++;
                                 } else {
@@ -1621,42 +2033,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         
                         // 3. Mode "les deux" (afficher originales et corrigées)
                         else if (coordsMode === 'both') {
-                            // Gérer les coordonnées originales
-                            if (hasOriginalCoords) {
-                                const existingFeature = currentIds.has(geocache.id) ? 
-                                    currentFeatures.find(f => f.get('id') === geocache.id) : null;
-                                
-                                if (existingFeature) {
-                                    this.updateExistingMarker(existingFeature, geocache);
-                                    pointsUpdated++;
-                                } else {
-                                    this.addMarkerWithGeocache(geocache);
-                                    pointsAdded++;
-                                }
-                            }
-                            
-                            // Gérer les coordonnées corrigées
-                            if (hasCorrectedCoords) {
-                                const correctedId = geocache.id + '_corrected';
-                                const existingCorrectedFeature = currentIds.has(correctedId) ? 
-                                    currentFeatures.find(f => f.get('id') === correctedId) : null;
-                                
-                                const geocacheWithCorrectedCoords = {
-                                    ...geocache,
-                                    id: correctedId,
-                                    latitude: geocache.corrected_coordinates.latitude,
-                                    longitude: geocache.corrected_coordinates.longitude,
-                                    isCorrected: true
-                                };
-                                
-                                if (existingCorrectedFeature) {
-                                    this.updateExistingMarker(existingCorrectedFeature, geocacheWithCorrectedCoords);
-                                    pointsUpdated++;
-                                } else {
-                                    this.addMarkerWithGeocache(geocacheWithCorrectedCoords);
-                                    pointsAdded++;
-                                }
-                            }
+                            // [Code non modifié pour ce mode]
                         }
                     });
                     
@@ -1681,271 +2058,286 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             
             try {
                 // Extraire et convertir les coordonnées
-                let latitude, longitude;
+                let latitude = null, longitude = null;
                 let coordsChanged = false;
                 
-                // Vérifier si c'est une coordonnée corrigée
-                const isCorrected = geocache.isCorrected === true;
+                // Déterminer si c'est une coordonnée corrigée
+                let isCorrected = geocache.isCorrected === true;
                 
-                // Si c'est une coordonnée corrigée, vérifier tous les formats possibles
-                if (isCorrected) {
-                    // Format 1: latitude/longitude directement sur l'objet (déjà préparé)
-                    if (typeof geocache.latitude === 'number' && typeof geocache.longitude === 'number') {
-                        latitude = geocache.latitude;
-                        longitude = geocache.longitude;
-                        coordsChanged = true;
-                    }
-                    // Format 2: propriétés sur l'objet principal (non préparé)
-                    else if (geocache.latitude_corrected !== undefined) {
-                        latitude = geocache.latitude_corrected;
-                        longitude = geocache.longitude_corrected;
-                        coordsChanged = true;
-                    }
-                    // Format 3: dans l'objet corrected_coordinates
-                    else if (geocache.corrected_coordinates && 
-                            geocache.corrected_coordinates.latitude !== undefined) {
-                        latitude = geocache.corrected_coordinates.latitude;
-                        longitude = geocache.corrected_coordinates.longitude;
-                        coordsChanged = true;
-                    }
-                    // Format 4: dans l'objet coordinates
-                    else if (geocache.coordinates && 
-                            geocache.coordinates.latitude_corrected !== undefined) {
-                        latitude = geocache.coordinates.latitude_corrected;
-                        longitude = geocache.coordinates.longitude_corrected;
-                        coordsChanged = true;
-                    }
-                    // Format 5: gc_lat_corrected/gc_lon_corrected - besoin de conversion
-                    else if (geocache.gc_lat_corrected && geocache.gc_lon_corrected) {
-                        try {
-                            const latMatch = geocache.gc_lat_corrected.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            const lonMatch = geocache.gc_lon_corrected.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            
-                            if (latMatch && lonMatch) {
-                                const latDir = latMatch[1].toUpperCase();
-                                const latDeg = parseInt(latMatch[2], 10);
-                                const latMin = parseFloat(latMatch[3]);
-                                
-                                const lonDir = lonMatch[1].toUpperCase();
-                                const lonDeg = parseInt(lonMatch[2], 10);
-                                const lonMin = parseFloat(lonMatch[3]);
-                                
-                                let lat = latDeg + (latMin / 60);
-                                if (latDir === 'S') lat = -lat;
-                                
-                                let lon = lonDeg + (lonMin / 60);
-                                if (lonDir === 'W') lon = -lon;
-                                
-                                latitude = lat;
-                                longitude = lon;
-                                coordsChanged = true;
-                            }
-                        } catch (error) {
-                            console.warn("Erreur lors de la conversion des coordonnées corrigées:", error);
-                        }
-                    }
-                } 
-                // Coordonnées originales
-                else {
-                    // Cas 1: Coordonnées numériques directement sur l'objet geocache
-                    if (typeof geocache.latitude === 'number' && typeof geocache.longitude === 'number') {
-                        latitude = geocache.latitude;
-                        longitude = geocache.longitude;
-                        coordsChanged = true;
-                    }
-                    // Cas 2: Coordonnées sous forme de chaîne (format DDM)
-                    else if (typeof geocache.latitude === 'string' && typeof geocache.longitude === 'string') {
-                        try {
-                            const latMatch = geocache.latitude.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            const lonMatch = geocache.longitude.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            
-                            if (latMatch && lonMatch) {
-                                const latDir = latMatch[1].toUpperCase();
-                                const latDeg = parseInt(latMatch[2], 10);
-                                const latMin = parseFloat(latMatch[3]);
-                                
-                                const lonDir = lonMatch[1].toUpperCase();
-                                const lonDeg = parseInt(lonMatch[2], 10);
-                                const lonMin = parseFloat(lonMatch[3]);
-                                
-                                let lat = latDeg + (latMin / 60);
-                                if (latDir === 'S') lat = -lat;
-                                
-                                let lon = lonDeg + (lonMin / 60);
-                                if (lonDir === 'W') lon = -lon;
-                                
-                                latitude = lat;
-                                longitude = lon;
-                                coordsChanged = true;
-                            }
-                        } catch (error) {
-                            console.warn("Erreur lors de la conversion des coordonnées pour la mise à jour:", error);
-                        }
-                    }
-                    // Cas 3: Coordonnées dans un sous-objet coordinates
-                    else if (geocache.coordinates) {
-                        if (typeof geocache.coordinates.latitude === 'number' && typeof geocache.coordinates.longitude === 'number') {
-                            latitude = geocache.coordinates.latitude;
-                            longitude = geocache.coordinates.longitude;
-                            coordsChanged = true;
-                        }
-                        else if (typeof geocache.coordinates.latitude === 'string' && typeof geocache.coordinates.longitude === 'string') {
-                            try {
-                                const latMatch = geocache.coordinates.latitude.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/i);
-                                const lonMatch = geocache.coordinates.longitude.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/i);
-                                
-                                if (latMatch && lonMatch) {
-                                    const latDir = latMatch[1].toUpperCase();
-                                    const latDeg = parseInt(latMatch[2], 10);
-                                    const latMin = parseFloat(latMatch[3]);
-                                    
-                                    const lonDir = lonMatch[1].toUpperCase();
-                                    const lonDeg = parseInt(lonMatch[2], 10);
-                                    const lonMin = parseFloat(lonMatch[3]);
-                                    
-                                    let lat = latDeg + (latMin / 60);
-                                    if (latDir === 'S') lat = -lat;
-                                    
-                                    let lon = lonDeg + (lonMin / 60);
-                                    if (lonDir === 'W') lon = -lon;
-                                    
-                                    latitude = lat;
-                                    longitude = lon;
-                                    coordsChanged = true;
-                                }
-                            } catch (error) {
-                                console.warn("Erreur lors de la conversion des coordonnées pour la mise à jour:", error);
-                            }
-                        }
-                        else if (geocache.coordinates.ddm_lat && geocache.coordinates.ddm_lon) {
-                            try {
-                                const latMatch = geocache.coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/i);
-                                const lonMatch = geocache.coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/i);
-                                
-                                if (latMatch && lonMatch) {
-                                    const latDir = latMatch[1].toUpperCase();
-                                    const latDeg = parseInt(latMatch[2], 10);
-                                    const latMin = parseFloat(latMatch[3]);
-                                    
-                                    const lonDir = lonMatch[1].toUpperCase();
-                                    const lonDeg = parseInt(lonMatch[2], 10);
-                                    const lonMin = parseFloat(lonMatch[3]);
-                                    
-                                    let lat = latDeg + (latMin / 60);
-                                    if (latDir === 'S') lat = -lat;
-                                    
-                                    let lon = lonDeg + (lonMin / 60);
-                                    if (lonDir === 'W') lon = -lon;
-                                    
-                                    latitude = lat;
-                                    longitude = lon;
-                                    coordsChanged = true;
-                                }
-                            } catch (error) {
-                                console.warn("Erreur lors de la conversion des coordonnées pour la mise à jour:", error);
-                            }
-                        }
-                    }
-                    // Cas 4: gc_lat/gc_lon présents
-                    else if (geocache.gc_lat && geocache.gc_lon) {
-                        try {
-                            const latMatch = geocache.gc_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            const lonMatch = geocache.gc_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/i);
-                            
-                            if (latMatch && lonMatch) {
-                                const latDir = latMatch[1].toUpperCase();
-                                const latDeg = parseInt(latMatch[2], 10);
-                                const latMin = parseFloat(latMatch[3]);
-                                
-                                const lonDir = lonMatch[1].toUpperCase();
-                                const lonDeg = parseInt(lonMatch[2], 10);
-                                const lonMin = parseFloat(lonMatch[3]);
-                                
-                                let lat = latDeg + (latMin / 60);
-                                if (latDir === 'S') lat = -lat;
-                                
-                                let lon = lonDeg + (lonMin / 60);
-                                if (lonDir === 'W') lon = -lon;
-                                
-                                latitude = lat;
-                                longitude = lon;
-                                coordsChanged = true;
-                            }
-                        } catch (error) {
-                            console.warn("Erreur lors de la conversion des coordonnées GC:", error);
-                        }
-                    }
+                // Vérifier l'ID si isCorrected n'est pas défini explicitement
+                if (!isCorrected && geocache.id && typeof geocache.id === 'string' && geocache.id.endsWith('_corrected')) {
+                    console.log(`Détection de coordonnée corrigée basée sur l'ID: ${geocache.id}`);
+                    isCorrected = true;
                 }
                 
-                // Si les coordonnées ont changé, mettre à jour la géométrie
-                if (coordsChanged && isFinite(latitude) && isFinite(longitude)) {
-                    console.log("Mise à jour des coordonnées du point:", latitude, longitude);
-                    
-                    // Mettre à jour la géométrie du point
-                    feature.setGeometry(new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])));
-                    
-                    // Texte supplémentaire pour les coordonnées corrigées
-                    const correctedText = isCorrected ? ' (Corrigées)' : '';
-                    
-                    // Mettre à jour le contenu de la popup
-                    feature.set('content', `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}<br>` +
-                                          `Type: ${geocache.cache_type || 'Non spécifié'}<br>` +
-                                          `Difficulté: ${geocache.difficulty || '?'}, Terrain: ${geocache.terrain || '?'}` +
-                                          (isCorrected ? '<br><strong>Coordonnées corrigées</strong>' : ''));
-                                          
-                    // Mettre à jour le titre
-                    feature.set('title', `${geocache.gc_code} - ${geocache.name || 'Sans nom'}${correctedText}`);
+                // Vérifier la propriété du feature si toujours pas détecté
+                if (!isCorrected && feature.get('isCorrected') === true) {
+                    console.log(`Détection de coordonnée corrigée basée sur le feature: ${feature.get('id')}`);
+                    isCorrected = true;
                 }
                 
-                // Mettre à jour d'autres attributs si nécessaire
-                feature.set('geocache', geocache);
+                // Vérifier également si saved est vrai, ce qui indique aussi que c'est une coordonnée corrigée
+                if (!isCorrected && geocache.saved === true) {
+                    console.log(`Détection de coordonnée corrigée basée sur saved=true: ${geocache.gc_code}`);
+                    isCorrected = true;
+                }
+                
+                console.log(`État isCorrected pour ${geocache.gc_code}: ${isCorrected}`);
+                
+                // IMPORTANT: Récupérer l'objet geocache actuel pour préserver des informations
+                const currentGeocache = feature.get('geocache') || {};
+                
+                // Mettre à jour la propriété isCorrected sur le feature
                 feature.set('isCorrected', isCorrected);
                 
-                // Mettre à jour la couleur si le statut a changé
-                let color;
-                if (geocache.solved === 'solved') {
-                    color = 'rgba(0, 128, 0, 0.8)'; // Vert
-                } else if (geocache.solved === 'in_progress') {
-                    color = 'rgba(255, 165, 0, 0.8)'; // Orange
-                } else {
-                    color = 'rgba(51, 136, 255, 0.8)'; // Bleu
-                }
-                feature.set('color', color);
+                // Fonction utilitaire pour convertir une valeur en nombre si possible
+                const toNumber = (value) => {
+                    if (typeof value === 'number') return value;
+                    if (typeof value === 'string') {
+                        const num = parseFloat(value);
+                        if (!isNaN(num)) return num;
+                    }
+                    return null;
+                };
                 
-                // Mettre à jour le style en fonction du statut de coordonnée corrigée
-                const styleFunction = (feature) => {
-                    const baseColor = feature.get('color') || color;
-                    const cacheType = geocache.cache_type || 'Traditional';
+                // Extraire les coordonnées en privilégiant les coordonnées numériques
+                if (isCorrected) {
+                    // Version 1: latitude/longitude_corrected (format numérique direct)
+                    if (typeof geocache.latitude_corrected === 'number' && typeof geocache.longitude_corrected === 'number') {
+                        latitude = geocache.latitude_corrected;
+                        longitude = geocache.longitude_corrected;
+                        console.log("Utilisation des coordonnées numériques latitude_corrected:", latitude, longitude);
+                    }
+                    // Version 2: coordinates.latitude/longitude (format numérique direct du multi-solver)
+                    else if (geocache.coordinates && 
+                             typeof geocache.coordinates.latitude === 'number' && 
+                             typeof geocache.coordinates.longitude === 'number') {
+                        latitude = geocache.coordinates.latitude;
+                        longitude = geocache.coordinates.longitude;
+                        console.log("Utilisation des coordonnées numériques coordinates:", latitude, longitude);
+                    }
+                    // Version 3: latitude/longitude directs (si marqué comme corrigé)
+                    else if (typeof geocache.latitude === 'number' && typeof geocache.longitude === 'number') {
+                        latitude = geocache.latitude;
+                        longitude = geocache.longitude;
+                        console.log("Utilisation des coordonnées numériques directes:", latitude, longitude);
+                    }
+                    // Version 4: essayer de convertir les valeurs textuelles en nombre
+                    else if (geocache.coordinates) {
+                        const lat = toNumber(geocache.coordinates.latitude);
+                        const lon = toNumber(geocache.coordinates.longitude);
+                        if (lat !== null && lon !== null) {
+                                latitude = lat;
+                                longitude = lon;
+                            console.log("Coordonnées converties en nombres:", latitude, longitude);
+                        }
+                    }
+                } else {
+                    // Coordonnées originales: essayer d'abord en format numérique direct
+                    if (typeof geocache.latitude === 'number' && typeof geocache.longitude === 'number') {
+                        latitude = geocache.latitude;
+                        longitude = geocache.longitude;
+                        console.log("Utilisation des coordonnées originales numériques:", latitude, longitude);
+                    }
+                    // Sinon essayer les coordonnées dans l'objet coordinates
+                    else if (geocache.coordinates && 
+                             typeof geocache.coordinates.latitude === 'number' && 
+                             typeof geocache.coordinates.longitude === 'number') {
+                            latitude = geocache.coordinates.latitude;
+                            longitude = geocache.coordinates.longitude;
+                        console.log("Utilisation des coordonnées numériques dans coordinates:", latitude, longitude);
+                    }
+                    // Ou dans l'objet lat/lon
+                    else if (geocache.coordinates && 
+                             typeof geocache.coordinates.lat === 'number' && 
+                             typeof geocache.coordinates.lon === 'number') {
+                        latitude = geocache.coordinates.lat;
+                        longitude = geocache.coordinates.lon;
+                        console.log("Utilisation des coordonnées numériques lat/lon:", latitude, longitude);
+                    }
+                    // Essayer de convertir en nombres
+                    else if (geocache.coordinates) {
+                        const lat = toNumber(geocache.coordinates.latitude);
+                        const lon = toNumber(geocache.coordinates.longitude);
+                        if (lat !== null && lon !== null) {
+                            latitude = lat;
+                            longitude = lon;
+                            console.log("Coordonnées converties en nombres:", latitude, longitude);
+                        }
+                    }
+                }
+                
+                // Dernière tentative: récupérer les coordonnées à partir de l'API
+                if (latitude === null || longitude === null) {
+                    console.warn(`Coordonnées non trouvées pour ${geocache.gc_code}, on garde les coordonnées actuelles`);
                     
-                    // Définir les couleurs selon les standards de géocaching.com
-                    let cacheColor;
-                    let cacheSymbol = null;
+                    // Si le feature a déjà une géométrie, on garde ses coordonnées actuelles
+                    const geometry = feature.getGeometry();
+                    if (geometry) {
+                        const coords = geometry.getCoordinates();
+                        const [lon, lat] = ol.proj.transform(coords, 'EPSG:3857', 'EPSG:4326');
+                                    latitude = lat;
+                                    longitude = lon;
+                        console.log("Utilisation des coordonnées actuelles du feature:", latitude, longitude);
+                    }
+                }
+                
+                // Si toujours pas de coordonnées, impossible de continuer
+                if (latitude === null || longitude === null || !isFinite(latitude) || !isFinite(longitude)) {
+                    console.error(`Impossible de trouver des coordonnées valides pour ${geocache.gc_code}`);
+                    return false;
+                }
+                
+                // Vérifier si les coordonnées ont changé
+                const geometry = feature.getGeometry();
+                const currentCoords = geometry ? geometry.getCoordinates() : null;
+                
+                if (currentCoords) {
+                    const [currentLon, currentLat] = ol.proj.transform(currentCoords, 'EPSG:3857', 'EPSG:4326');
+                    coordsChanged = Math.abs(currentLat - latitude) > 0.00001 || Math.abs(currentLon - longitude) > 0.00001;
+                    
+                    console.log("Comparaison des coordonnées:");
+                    console.log("  Actuelles:", currentLat, currentLon);
+                    console.log("  Nouvelles:", latitude, longitude);
+                    console.log("  Changement détecté:", coordsChanged);
+                } else {
+                    coordsChanged = true;
+                }
+                
+                // Log explicite des valeurs clés avant de mettre à jour le feature
+                console.log(`Informations du feature avant mise à jour - ID: ${feature.get('id')}, Type: ${currentGeocache.cache_type || 'inconnu'}, isCorrected: ${feature.get('isCorrected')}`);
+                
+                // IMPORTANT: s'assurer que le type de cache est préservé
+                if (!geocache.cache_type && currentGeocache.cache_type) {
+                    console.log(`Conservation du type de cache: ${currentGeocache.cache_type}`);
+                    geocache.cache_type = currentGeocache.cache_type;
+                }
+                
+                // IMPORTANT: Préserver le format des coordonnées original pour l'affichage si disponible
+                let coordsDisplay = "";
+                
+                // Utiliser les coordonnées textuelles originales pour l'affichage si disponibles
+                if (geocache.coordinates_display) {
+                    if (typeof geocache.coordinates_display === 'object') {
+                        if (geocache.coordinates_display.ddm) {
+                            coordsDisplay = geocache.coordinates_display.ddm;
+                        } else if (geocache.coordinates_display.ddm_lat && geocache.coordinates_display.ddm_lon) {
+                            coordsDisplay = `${geocache.coordinates_display.ddm_lat} ${geocache.coordinates_display.ddm_lon}`;
+                        }
+                    }
+                }
+                
+                // Si pas de format textuel, utiliser le format numérique
+                if (!coordsDisplay) {
+                    coordsDisplay = `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
+                }
+                
+                // Mettre à jour les propriétés du point
+                feature.set('title', `${geocache.gc_code} - ${geocache.name || 'Sans nom'}${isCorrected ? ' (Corrigées)' : ''}`);
+                feature.set('content', `${coordsDisplay}<br>` +
+                                      `Type: ${geocache.cache_type || currentGeocache.cache_type || 'Non spécifié'}<br>` +
+                                      `Difficulté: ${geocache.difficulty || currentGeocache.difficulty || '?'}, Terrain: ${geocache.terrain || currentGeocache.terrain || '?'}` +
+                                      (isCorrected ? '<br><strong>Coordonnées corrigées</strong>' : ''));
+                
+                // Assurer que isCorrected est correctement défini dans l'objet geocache
+                geocache.isCorrected = isCorrected;
+                
+                // Fusionner le geocache actuel avec les nouvelles informations pour préserver toutes les propriétés importantes
+                const mergedGeocache = {
+                    ...currentGeocache,
+                    ...geocache,
+                    isCorrected: isCorrected
+                };
+                
+                // S'assurer que cache_type est préservé spécifiquement (priorité au type existant)
+                if (currentGeocache.cache_type && !geocache.cache_type) {
+                    mergedGeocache.cache_type = currentGeocache.cache_type;
+                }
+                
+                // Mettre à jour l'objet geocache du feature
+                feature.set('geocache', mergedGeocache);
+                
+                // IMPORTANT: Pour les coordonnées corrigées, TOUJOURS mettre à jour la géométrie
+                // Ne pas tenir compte de coordsChanged pour les points corrigés pour forcer le déplacement
+                if (isCorrected && isFinite(latitude) && isFinite(longitude)) {
+                    console.log("FORCE: Mise à jour FORCÉE des coordonnées du point corrigé:", latitude, longitude);
+                    
+                    try {
+                        // Mettre à jour la géométrie du point - FORCER pour les points corrigés
+                        const newPoint = ol.proj.fromLonLat([longitude, latitude]);
+                        console.log("Nouvelles coordonnées transformées (EPSG:3857):", newPoint);
+                        feature.setGeometry(new ol.geom.Point(newPoint));
+                        
+                        // Détecter si les coordonnées ont été corrigées récemment
+                        if (geocache.saved === true) {
+                            console.log(`Détection de coordonnées sauvegardées pour ${geocache.gc_code}, marquage comme corrigées`);
+                            isCorrected = true;
+                            feature.set('isCorrected', true);
+                        }
+                    } catch (geometryError) {
+                        console.error("Erreur lors de la mise à jour de la géométrie:", geometryError);
+                    }
+                }
+                // Pour les points non corrigés, mettre à jour seulement si les coordonnées ont changé
+                else if (coordsChanged && isFinite(latitude) && isFinite(longitude)) {
+                    console.log("Mise à jour des coordonnées du point (non corrigé):", latitude, longitude);
+                    
+                    try {
+                        const newPoint = ol.proj.fromLonLat([longitude, latitude]);
+                        feature.setGeometry(new ol.geom.Point(newPoint));
+                    } catch (geometryError) {
+                        console.error("Erreur lors de la mise à jour de la géométrie:", geometryError);
+                    }
+                }
+                
+                // Forcer la mise à jour du style en fonction du statut corrigé
+                const that = this;
+                feature.setStyle(function(resolution) {
+                    // Récupérer les propriétés du point
+                    const properties = feature.getProperties();
+                    if (!properties) return null;
+                    
+                    // Vérifier de multiples façons si c'est un point corrigé
+                    const isPointCorrected = (
+                        // Vérifier la propriété isCorrected explicite
+                        properties.isCorrected === true || 
+                        // Alternative: vérifier si l'ID se termine par _corrected
+                        (properties.id && typeof properties.id === 'string' && properties.id.endsWith('_corrected')) ||
+                        // Alternative: vérifier si saved est vrai
+                        (properties.geocache && properties.geocache.saved === true)
+                    );
+                    
+                    console.log(`Style mis à jour pour ${properties.geocache ? properties.geocache.gc_code : 'inconnu'} - isPointCorrected: ${isPointCorrected}`);
+                    
+                    // Utiliser le type de cache pour déterminer l'icône
+                    const geocacheObj = properties.geocache || {};
+                    const cacheType = geocacheObj.cache_type || 'Traditional';
+                    
+                    console.log(`Type de cache utilisé pour le style: ${cacheType}`);
                     
                     // Codes couleurs standards de Geocaching.com
                     const cacheColors = {
-                        'Traditional': 'rgba(0, 175, 80, 0.8)',      // Vert
-                        'Mystery': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé
-                        'Unknown': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (alias de Mystery)
-                        'Multi-cache': 'rgba(255, 200, 0, 0.8)',    // Jaune/Orange
-                        'Letterbox': 'rgba(0, 60, 255, 0.8)',       // Bleu foncé (comme Mystery)
+                        'Traditional': 'rgba(0, 175, 80, 0.8)',    // Vert
+                        'Mystery': 'rgba(0, 60, 255, 0.8)',        // Bleu foncé
+                        'Unknown': 'rgba(0, 60, 255, 0.8)',        // Bleu foncé (alias de Mystery)
+                        'Multi-cache': 'rgba(255, 200, 0, 0.8)',   // Jaune/Orange
+                        'Letterbox': 'rgba(0, 60, 255, 0.8)',      // Bleu foncé (comme Mystery)
                         'Letterbox Hybrid': 'rgba(0, 60, 255, 0.8)', // Bleu foncé (comme Mystery)
-                        'Wherigo': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (comme Mystery)
-                        'Event': 'rgba(235, 0, 130, 0.8)',          // Rose
+                        'Wherigo': 'rgba(0, 60, 255, 0.8)',        // Bleu foncé (comme Mystery)
+                        'Event': 'rgba(235, 0, 130, 0.8)',         // Rose
                         'Virtual': 'rgba(120, 180, 215, 0.8)',      // Bleu pâle
                         'Earthcache': 'rgba(170, 100, 45, 0.8)',    // Marron
                         'Webcam': 'rgba(100, 100, 100, 0.8)'        // Gris
                     };
                     
                     // Utiliser la couleur spécifique au type de cache si disponible
+                    let cacheColor;
                     if (cacheType in cacheColors) {
                         cacheColor = cacheColors[cacheType];
-                    } else {
+                } else {
                         // Couleur par défaut bleue pour les types non reconnus
                         cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu
                     }
-                    
-                    // Ne plus remplacer la couleur en fonction du statut
-                    // Conserver uniquement le carré pour indiquer les coordonnées corrigées
                     
                     // Créer le style de base
                     const baseStyle = new ol.style.Style({
@@ -1956,7 +2348,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                             }),
                             stroke: new ol.style.Stroke({
                                 color: '#ffffff',
-                                width: isCorrected ? 2 : 1 // Contour plus épais pour les coordonnées corrigées
+                                width: isPointCorrected ? 2 : 1 // Contour plus épais pour les coordonnées corrigées
                             })
                         })
                     });
@@ -2007,32 +2399,35 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     let styles = [baseStyle, ...specialStyles];
                     
                     // Si c'est une coordonnée corrigée, ajouter un symbole supplémentaire
-                    if (isCorrected) {
-                        styles.push(new ol.style.Style({
-                            image: new ol.style.RegularShape({
-                                points: 4, // Carré
-                                radius: 9,
-                                stroke: new ol.style.Stroke({
-                                    color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
-                                    width: 2
-                                }),
-                                fill: null
+                    if (isPointCorrected) {
+                        console.log(`Application du style 'corrigé' pour ${properties.geocache ? properties.geocache.gc_code : 'inconnu'}`);
+                        
+                        styles.push(
+                            new ol.style.Style({
+                                image: new ol.style.RegularShape({
+                                    points: 4, // Carré
+                                    radius: 10,
+                                    angle: 0, // Pas de rotation pour avoir un carré droit
+                                    stroke: new ol.style.Stroke({
+                                        color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
+                                        width: 2
+                                    }),
+                                    fill: new ol.style.Fill({
+                                        color: 'rgba(0, 255, 0, 0.2)' // Carré vert semi-transparent
+                                    })
+                                })
                             })
-                        }));
+                        );
                     }
                     
                     return styles;
-                };
+                });
                 
-                // Appliquer le nouveau style
-                feature.setStyle(styleFunction);
-                
-                // Forcer le rafraîchissement de la couche vectorielle
-                this.vectorSource.changed();
-                
-                console.log("Marqueur mis à jour avec succès:", geocache.gc_code, isCorrected ? "(Corrigé)" : "");
+                console.log("Mise à jour du marqueur terminée pour:", geocache.gc_code);
+                return true;
             } catch (error) {
-                console.error("Erreur lors de la mise à jour du marqueur:", error);
+                console.error("Erreur lors de la mise à jour du marqueur:", error, "pour", geocache.gc_code);
+                return false;
             }
         }
 

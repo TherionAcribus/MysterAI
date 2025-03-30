@@ -1337,7 +1337,9 @@
                             window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
                                 detail: {
                                     multiSolverId: multiSolverId,
-                                    data: multiSolverTableResults
+                                    data: multiSolverTableResults,
+                                    coordsUpdated: true, // Indiquer que des coordonnées ont été mises à jour
+                                    updatedGeocacheId: geocacheId // Ajouter l'ID de la géocache mise à jour
                                 }
                             }));
                         }
@@ -3428,7 +3430,8 @@
                                             ...geocache,
                                             latitude: resultEntry.coordinates.latitude,
                                             longitude: resultEntry.coordinates.longitude,
-                                            saved: resultEntry.saved || false
+                                            saved: resultEntry.saved || false,
+                                            isCorrected: resultEntry.saved || false // Marquer comme corrigée si sauvegardée
                                         };
                                     }
                                     return geocache;
@@ -3446,7 +3449,8 @@
                         window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
                             detail: { 
                                 multiSolverId: multiSolverId,
-                                data: allGeocaches
+                                data: allGeocaches,
+                                coordsUpdated: true // Indiquer que des coordonnées ont été mises à jour
                             }
                         }));
                     }
