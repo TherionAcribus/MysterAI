@@ -461,23 +461,31 @@
         <div class="bg-gray-800 rounded-lg p-4 mt-4">
             <h2 class="text-lg font-semibold text-gray-100 mb-3 flex items-center justify-between">
                 <span>Résultats</span>
-                <div id="progress-container" class="hidden">
-                    <div class="flex items-center">
-                        <div class="w-48 bg-gray-700 rounded-full h-2.5 mr-2">
-                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                <div class="flex items-center space-x-2">
+                    <button 
+                        id="open-map-button"
+                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center"
+                        onclick="openMultiSolverMap()">
+                        <i class="fas fa-map-marked-alt mr-1"></i> Voir la carte
+                    </button>
+                    <div id="progress-container" class="hidden">
+                        <div class="flex items-center">
+                            <div class="w-48 bg-gray-700 rounded-full h-2.5 mr-2">
+                                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <span id="progress-text" class="text-xs text-gray-300">0/0</span>
+                            <button 
+                                id="cancel-progress-button"
+                                onclick="cancelProcessing()"
+                                class="ml-2 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition-colors">
+                                Annuler
+                            </button>
                         </div>
-                        <span id="progress-text" class="text-xs text-gray-300">0/0</span>
-                        <button 
-                            id="cancel-progress-button"
-                            onclick="cancelProcessing()"
-                            class="ml-2 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition-colors">
-                            Annuler
-                        </button>
                     </div>
                 </div>
             </h2>
             <div class="overflow-x-auto">
-                <div id="multi-solver-results-table" class="min-w-full"></div>
+                <div id="multi-solver-results-table" class="min-w-full" data-multi-solver-target="resultsTable"></div>
             </div>
         </div>
         
@@ -1301,12 +1309,32 @@
                         const rowIndex = multiSolverTableResults.findIndex(row => row.id == geocacheId);
                         if (rowIndex !== -1) {
                             multiSolverTableResults[rowIndex].saved = true;
+                            // Mettre à jour les coordonnées dans les données
+                            if (!multiSolverTableResults[rowIndex].coordinates) {
+                                multiSolverTableResults[rowIndex].coordinates = {};
+                            }
+                            multiSolverTableResults[rowIndex].coordinates.latitude = lat;
+                            multiSolverTableResults[rowIndex].coordinates.longitude = lng;
                             console.log("%c[MultiSolver] Données mises à jour pour l'index", "background:green; color:white", rowIndex);
                         }
                         
                         // Rafraîchir tout le tableau
                         multiSolverResultsTable.setData([...multiSolverTableResults]);
                         console.log("%c[MultiSolver] Rafraîchissement complet du tableau effectué", "background:green; color:white");
+                        
+                        // Émettre un événement pour mettre à jour la carte
+                        const multiSolverContainer = document.getElementById('multi-solver-container');
+                        const multiSolverId = multiSolverContainer?.dataset?.multiSolverId || '';
+                        
+                        if (multiSolverId) {
+                            console.log("%c[MultiSolver] Émission de l'événement multiSolverDataUpdated après sauvegarde", "background:green; color:white");
+                            window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+                                detail: {
+                                    multiSolverId: multiSolverId,
+                                    data: multiSolverTableResults
+                                }
+                            }));
+                        }
                     }
                     
                     // Notification de succès
@@ -2174,6 +2202,44 @@
                 }
             }, 500);
         }
+        
+        // Initialisation forcée de la carte
+        setTimeout(() => {
+            console.log("%c[MultiSolver] Initialisation forcée de la carte", "background:blue; color:white");
+            
+            const mapContainer = document.getElementById('map-container');
+            if (mapContainer) {
+                // Récupérer l'ID du Multi Solver
+                const multiSolverContainer = document.getElementById('multi-solver-container');
+                const multiSolverId = multiSolverContainer?.dataset?.multiSolverId || '';
+                
+                if (multiSolverId) {
+                    console.log("%c[MultiSolver] ID du Multi Solver récupéré pour la carte:", "background:blue; color:white", multiSolverId);
+                    
+                    // Mettre à jour l'attribut multi-solver-id de la carte
+                    mapContainer.setAttribute('data-map-multi-solver-id-value', multiSolverId);
+                    
+                    // Si le contrôleur de carte est déjà initialisé
+                    if (window.StimulusApp && mapContainer.getAttribute('data-controller') === 'map') {
+                        // Forcer l'événement pour mettre à jour la carte
+                        setTimeout(() => {
+                            const event = new CustomEvent('multiSolverDataUpdated', {
+                                detail: { 
+                                    multiSolverId: multiSolverId,
+                                    data: [] // Les données seront récupérées par le contrôleur lui-même
+                                }
+                            });
+                            window.dispatchEvent(event);
+                            console.log("%c[MultiSolver] Événement de mise à jour de la carte déclenché", "background:blue; color:white");
+                        }, 500);
+                    }
+                } else {
+                    console.warn("%c[MultiSolver] Pas d'ID de Multi Solver trouvé pour la carte", "background:orange; color:black");
+                }
+            } else {
+                console.warn("%c[MultiSolver] Conteneur de carte non trouvé", "background:orange; color:black");
+            }
+        }, 1500);
     });
 
     // Cette fonction sera appelée après que la page ait complètement chargé
@@ -3008,5 +3074,374 @@
                 saveCoordinates(geocache.id, result.coordinates.latitude, result.coordinates.longitude);
             }
         }
+    }
+</script>
+
+<script>
+    // Fonction pour ouvrir la carte dans le panneau inférieur
+    function openMultiSolverMap() {
+        console.log("%c[MultiSolver] Ouverture de la carte dans le panneau inférieur", "background:blue; color:white");
+        
+        // Récupérer l'ID du Multi Solver
+        const multiSolverContainer = document.getElementById('multi-solver-container');
+        const multiSolverController = window.MultiSolverController ? window.MultiSolverController.instances[0] : null;
+        
+        // Obtenir l'ID soit depuis l'élément, soit depuis le contrôleur
+        let multiSolverId = '';
+        
+        if (multiSolverContainer && multiSolverContainer.dataset.multiSolverId) {
+            multiSolverId = multiSolverContainer.dataset.multiSolverId;
+            console.log("%c[MultiSolver] ID récupéré depuis l'attribut dataset:", "background:green; color:white", multiSolverId);
+        } else if (multiSolverController && multiSolverController.multiSolverIdValue) {
+            multiSolverId = multiSolverController.multiSolverIdValue;
+            console.log("%c[MultiSolver] ID récupéré depuis le contrôleur:", "background:green; color:white", multiSolverId);
+        } else {
+            // Générer un ID si aucun n'existe
+            multiSolverId = 'multi-solver-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            console.log("%c[MultiSolver] Nouvel ID généré:", "background:orange; color:black", multiSolverId);
+            
+            // Stocker l'ID dans l'élément pour une utilisation future
+            if (multiSolverContainer) {
+                multiSolverContainer.dataset.multiSolverId = multiSolverId;
+            }
+        }
+        
+        if (!multiSolverId) {
+            console.error("%c[MultiSolver] Pas d'ID Multi Solver trouvé", "background:red; color:white");
+            return;
+        }
+        
+        // Activer l'onglet Map du panneau inférieur
+        const mapPanelTab = document.querySelector('.bottom-panel-tab[data-panel="map-panel"]');
+        if (mapPanelTab) {
+            // Activer l'onglet Map
+            if (typeof switchTab === 'function') {
+                switchTab(mapPanelTab, 'map-panel');
+            } else {
+                // Fallback si la fonction switchTab n'est pas disponible
+                mapPanelTab.click();
+            }
+            
+            // Assurer que le panneau inférieur est bien visible
+            const bottomPanelContainer = document.querySelector('.bottom-panel-container');
+            if (bottomPanelContainer) {
+                bottomPanelContainer.classList.add('expanded');
+                if (parseInt(bottomPanelContainer.style.height || '0') < 300) {
+                    bottomPanelContainer.style.height = '300px';
+                }
+            }
+            
+            // Collecte des IDs de géocaches ici pour préparer la requête bulk
+            const geocacheIds = collectGeocacheIds();
+            
+            // Préparer les paramètres URL pour le panneau carte
+            let mapUrl = `/api/logs/map_panel?multiSolverId=${multiSolverId}&isMultiSolver=true`;
+            
+            // Charger les données du Multi Solver dans le panneau carte
+            const mapPanel = document.getElementById('map-panel');
+            if (mapPanel) {
+                // Mettre à jour les attributs du panneau carte
+                mapPanel.setAttribute('data-map-multi-solver-id-value', multiSolverId);
+                mapPanel.setAttribute('data-map-is-multi-solver-value', 'true');
+                
+                // Charger le contenu de la carte via HTMX
+                if (window.htmx) {
+                    console.log("%c[MultiSolver] Chargement de la carte avec HTMX", "background:blue; color:white");
+                    window.htmx.ajax('GET', mapUrl, {
+                        target: '#map-panel',
+                        swap: 'innerHTML'
+                    });
+                } else {
+                    // Fallback si HTMX n'est pas disponible
+                    console.log("%c[MultiSolver] Chargement de la carte avec fetch", "background:blue; color:white");
+                    fetch(mapUrl)
+                        .then(response => response.text())
+                        .then(html => {
+                            mapPanel.innerHTML = html;
+                            // Déclencher un événement pour informer que le contenu a été chargé
+                            mapPanel.dispatchEvent(new CustomEvent('contentLoaded'));
+                        })
+                        .catch(error => {
+                            console.error("%c[MultiSolver] Erreur lors du chargement de la carte:", "background:red; color:white", error);
+                        });
+                }
+                
+                console.log("%c[MultiSolver] Carte activée dans le panneau inférieur avec ID:", "background:green; color:white", multiSolverId);
+                
+                // Une fois la carte chargée, charger les coordonnées en masse si nous avons des IDs
+                if (geocacheIds.length > 0) {
+                    console.log("%c[MultiSolver] Chargement des coordonnées en masse pour", "background:green; color:white", geocacheIds.length, "géocaches");
+                    
+                    // Attendre un peu pour s'assurer que la carte est bien initialisée
+                    setTimeout(() => {
+                        // Appel API pour récupérer les coordonnées en masse
+                        fetch('/api/multi-solver/bulk-coordinates', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                ids: geocacheIds
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(geocachesWithCoords => {
+                            console.log("%c[MultiSolver] Coordonnées récupérées pour", "background:green; color:white", geocachesWithCoords.length, "géocaches");
+                            
+                            // Émettre l'événement avec les données complètes
+                            window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+                                detail: { 
+                                    multiSolverId: multiSolverId,
+                                    data: geocachesWithCoords
+                                }
+                            }));
+                        })
+                        .catch(error => {
+                            console.error("%c[MultiSolver] Erreur lors du chargement des coordonnées en masse:", "background:red; color:white", error);
+                        });
+                    }, 1000); // Délai pour s'assurer que la carte est bien chargée
+                }
+            } else {
+                console.error("%c[MultiSolver] Panneau carte non trouvé", "background:red; color:white");
+            }
+        } else {
+            console.error("%c[MultiSolver] Onglet du panneau carte non trouvé", "background:red; color:white");
+        }
+    }
+    
+    // Fonction utilitaire pour collecter les IDs de géocaches à partir de différentes sources
+    function collectGeocacheIds() {
+        const geocacheIds = [];
+        
+        // 1. Essayer de récupérer depuis sessionStorage
+        try {
+            const storedGeocaches = sessionStorage.getItem('multiSolverGeocaches');
+            if (storedGeocaches) {
+                const parsedGeocaches = JSON.parse(storedGeocaches);
+                console.log("%c[MultiSolver] Géocaches récupérées depuis sessionStorage:", "background:green; color:white", parsedGeocaches.length);
+                
+                parsedGeocaches.forEach(geocache => {
+                    if (geocache.id && !geocacheIds.includes(geocache.id)) {
+                        geocacheIds.push(geocache.id);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de la récupération depuis sessionStorage:", "background:red; color:white", error);
+        }
+        
+        // 2. Si toujours aucun ID, essayer window.injectedGeocaches
+        if (geocacheIds.length === 0 && window.injectedGeocaches && Array.isArray(window.injectedGeocaches)) {
+            window.injectedGeocaches.forEach(geocache => {
+                if (geocache.id && !geocacheIds.includes(geocache.id)) {
+                    geocacheIds.push(geocache.id);
+                }
+            });
+            if (geocacheIds.length > 0) {
+                console.log("%c[MultiSolver] IDs récupérés depuis window.injectedGeocaches:", "background:green; color:white", geocacheIds.length);
+            }
+        }
+        
+        // 3. Si toujours aucun ID, essayer la liste des géocaches dans le DOM
+        if (geocacheIds.length === 0) {
+            const geocachesList = document.querySelector('[data-multi-solver-target="geocachesList"]');
+            if (geocachesList) {
+                const items = geocachesList.querySelectorAll('.geocache-item');
+                console.log("%c[MultiSolver] Éléments de géocache trouvés:", "background:blue; color:white", items.length);
+                
+                items.forEach(item => {
+                    try {
+                        let id = null;
+                        
+                        // Essayer de trouver l'ID dans le texte (ID: 12345)
+                        const idElement = item.querySelector('.text-xs.text-gray-400');
+                        if (idElement) {
+                            const idMatch = idElement.textContent.match(/ID:\s*(\d+)/);
+                            if (idMatch && idMatch[1]) {
+                                id = idMatch[1];
+                            }
+                        }
+                        
+                        // Si pas trouvé, chercher dans le bouton
+                        if (!id) {
+                            const button = item.querySelector('button[onclick]');
+                            if (button) {
+                                const onclickAttr = button.getAttribute('onclick');
+                                const idMatch = onclickAttr ? onclickAttr.match(/openGeocacheDetails\((\d+)/) : null;
+                                if (idMatch && idMatch[1]) {
+                                    id = idMatch[1];
+                                }
+                            }
+                        }
+                        
+                        if (id && !geocacheIds.includes(id)) {
+                            geocacheIds.push(id);
+                        }
+                    } catch (error) {
+                        console.warn("%c[MultiSolver] Erreur lors de l'extraction d'ID:", "background:orange; color:black", error);
+                    }
+                });
+                
+                if (geocacheIds.length > 0) {
+                    console.log("%c[MultiSolver] IDs récupérés depuis la liste:", "background:blue; color:white", geocacheIds.length);
+                }
+            }
+        }
+        
+        return geocacheIds;
+    }
+    
+    // Fonction pour détecter si l'utilisateur est sur l'onglet Map au chargement
+    document.addEventListener('DOMContentLoaded', function() {
+        // Attendre que le contrôleur soit entièrement initialisé
+        setTimeout(function() {
+            const multiSolverContainer = document.getElementById('multi-solver-container');
+            const tabs = document.querySelectorAll('.multi-solver-tab');
+            
+            // Vérifier si l'onglet Map est actif
+            let mapTabActive = false;
+            tabs.forEach(tab => {
+                if (tab.classList.contains('active') && tab.getAttribute('data-tab') === 'map') {
+                    mapTabActive = true;
+                }
+            });
+            
+            // Si l'onglet Map est actif, ouvrir automatiquement la carte
+            if (mapTabActive) {
+                console.log("%c[MultiSolver] Onglet Map actif au chargement, ouverture automatique de la carte", "background:blue; color:white");
+                openMultiSolverMap();
+            }
+            
+            // Ajouter un écouteur pour les changements d'onglet
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabType = this.getAttribute('data-tab');
+                    if (tabType === 'map') {
+                        // Ouvrir automatiquement la carte lorsque l'utilisateur clique sur l'onglet Map
+                        console.log("%c[MultiSolver] Changement vers l'onglet Map, ouverture automatique de la carte", "background:blue; color:white");
+                        setTimeout(() => openMultiSolverMap(), 100);
+                    }
+                });
+            });
+        }, 500);
+    });
+</script>
+
+<script type="text/javascript">
+    // Fonction pour sauvegarder les coordonnées depuis le bouton
+    function saveCoordinatesFromButton(geocacheId, latitude, longitude) {
+        console.log("%c[MultiSolver] Sauvegarde des coordonnées", "background:blue; color:white", {
+            geocacheId: geocacheId,
+            latitude: latitude,
+            longitude: longitude
+        });
+        
+        saveCoordinates(geocacheId, latitude, longitude);
+    }
+
+    // Fonction pour sauvegarder les coordonnées d'une géocache
+    function saveCoordinates(geocacheId, latitude, longitude) {
+        // Vérifier que les coordonnées sont valides
+        if (!geocacheId || !latitude || !longitude) {
+            console.error("%c[MultiSolver] Coordonnées ou ID invalides", "background:red; color:white");
+            return false;
+        }
+        
+        // Récupérer le token CSRF
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        
+        // Préparer les données
+        const requestData = {
+            geocache_id: geocacheId,
+            latitude: latitude,
+            longitude: longitude
+        };
+        
+        // Appeler l'API pour sauvegarder les coordonnées
+        fetch('/api/geocaches/coordinates', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || '',
+                'X-Layout-Component': 'true'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("%c[MultiSolver] Coordonnées sauvegardées avec succès", "background:green; color:white", data);
+            
+            // Mettre à jour l'état d'enregistrement dans le tableau
+            updateTableSavedStatus(geocacheId, true);
+            
+            // Mettre à jour la carte si elle est ouverte
+            updateMapWithNewCoordinates(geocacheId, latitude, longitude);
+            
+            return true;
+        })
+        .catch(error => {
+            console.error("%c[MultiSolver] Erreur lors de la sauvegarde:", "background:red; color:white", error);
+            return false;
+        });
+    }
+
+    // Fonction pour mettre à jour le statut "sauvegardé" dans le tableau
+    function updateTableSavedStatus(geocacheId, savedStatus) {
+        try {
+            // Mise à jour dans Tabulator
+            if (multiSolverResultsTable && typeof multiSolverResultsTable.updateData === 'function') {
+                multiSolverResultsTable.updateData([{id: geocacheId, saved: savedStatus}]);
+            }
+            
+            // Mise à jour dans le tableau HTML standard (pour le fallback)
+            const statusCell = document.querySelector(`.status-cell[data-geocache-id="${geocacheId}"]`);
+            if (statusCell) {
+                statusCell.innerHTML = `
+                    <span class="text-green-500 font-medium"><i class="fas fa-check-circle mr-1"></i> Coordonnées sauvegardées</span>
+                `;
+            }
+            
+            // Mise à jour des données dans le tableau multiSolverTableResults
+            const resultIndex = multiSolverTableResults.findIndex(r => r.id == geocacheId);
+            if (resultIndex >= 0) {
+                multiSolverTableResults[resultIndex].saved = true;
+            }
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de la mise à jour du statut:", "background:red; color:white", error);
+        }
+    }
+
+    // Fonction pour mettre à jour la carte avec les nouvelles coordonnées
+    function updateMapWithNewCoordinates(geocacheId, latitude, longitude) {
+        // Trouver la géocache dans nos données
+        const geocache = multiSolverTableResults.find(g => g.id == geocacheId);
+        if (!geocache) return;
+        
+        // Mettre à jour les coordonnées dans notre objet local
+        geocache.coordinates = {
+            latitude: latitude,
+            longitude: longitude
+        };
+        
+        // Récupérer l'ID du Multi Solver
+        const multiSolverContainer = document.getElementById('multi-solver-container');
+        const multiSolverId = multiSolverContainer?.dataset?.multiSolverId || '';
+        
+        if (!multiSolverId) return;
+        
+        // Émettre un événement pour mettre à jour la carte
+        console.log("%c[MultiSolver] Émission de l'événement multiSolverDataUpdated après sauvegarde", "background:green; color:white");
+        window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+            detail: {
+                multiSolverId: multiSolverId,
+                data: multiSolverTableResults
+            }
+        }));
     }
 </script>

@@ -14,7 +14,9 @@
             isGoldenLayout: Boolean,
             zoneId: String,
             showAllPoints: Boolean,
-            showNames: Boolean
+            showNames: Boolean,
+            isMultiSolver: Boolean,
+            multiSolverId: String
         }
 
         connect() {
@@ -25,8 +27,14 @@
                 popupContent: this.hasPopupContentTarget
             });
             
-            if (this.hasContainerTarget && this.geocacheIdValue) {
-                this.initMap()
+            if (this.hasContainerTarget) {
+                if (this.geocacheIdValue) {
+                    this.initMap();
+                } else if (this.isMultiSolverValue) {
+                    console.log("Initializing map for Multi Solver:", this.multiSolverIdValue);
+                    this.initMap();
+                    // On connect, we don't load geocaches yet as the Multi Solver might not be ready
+                }
             }
 
             // Créer le menu contextuel
@@ -39,6 +47,11 @@
             document.addEventListener('click', () => {
                 this.contextMenu.style.display = 'none';
             });
+
+            // Écouter les événements du Multi Solver
+            if (this.isMultiSolverValue) {
+                window.addEventListener('multiSolverDataUpdated', this.handleMultiSolverUpdate.bind(this));
+            }
         }
 
         disconnect() {
@@ -54,11 +67,16 @@
         onActivated(event) {
             console.log("Map panel activated", event);
             const activeComponent = window.layoutStateManager.getActiveComponentInfo();
-            if (activeComponent && activeComponent.state && activeComponent.state.geocacheId) {
-                htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${activeComponent.state.geocacheId}`, {
-                    target: this.element,
-                    swap: 'innerHTML'
-                });
+            if (activeComponent && activeComponent.state) {
+                if (activeComponent.state.geocacheId) {
+                    htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${activeComponent.state.geocacheId}`, {
+                        target: this.element,
+                        swap: 'innerHTML'
+                    });
+                } else if (activeComponent.state.multiSolverId) {
+                    console.log("Multi Solver map panel activated:", activeComponent.state.multiSolverId);
+                    this.loadMultiSolverGeocaches(activeComponent.state.multiSolverId);
+                }
             }
         }
 
@@ -172,8 +190,12 @@
                 this.map.getViewport().style.cursor = hit ? 'pointer' : '';
             });
 
-            // Load geocache coordinates
-            this.loadGeocacheCoordinates();
+            // Load appropriate geocache coordinates
+            if (this.geocacheIdValue) {
+                this.loadGeocacheCoordinates();
+            } else if (this.isMultiSolverValue && this.multiSolverIdValue) {
+                this.loadMultiSolverGeocaches(this.multiSolverIdValue);
+            }
 
             // Si on est dans GoldenLayout et qu'on a un zoneId, charger tous les points
             if (this.isGoldenLayoutValue && this.zoneIdValue) {
@@ -838,6 +860,247 @@
             this.contextMenu.style.left = (event.clientX) + 'px';
             this.contextMenu.style.top = (event.clientY) + 'px';
             this.contextMenu.style.display = 'block';
+        }
+
+        async loadMultiSolverGeocaches(multiSolverId) {
+            if (!this.map) {
+                console.log("Map not initialized, cannot load Multi Solver geocaches");
+                return;
+            }
+
+            try {
+                console.log("Loading geocaches for Multi Solver ID:", multiSolverId);
+                
+                // Clear existing markers
+                this.clearMarkers();
+                
+                // Get the Multi Solver container element
+                const multiSolverElement = document.querySelector(`[data-multi-solver-id="${multiSolverId}"]`);
+                if (!multiSolverElement) {
+                    console.error("Multi Solver element not found with ID:", multiSolverId);
+                    
+                    // Try to use the container directly if we're inside the multi-solver page
+                    const container = document.getElementById('multi-solver-container');
+                    if (container) {
+                        console.log("Using multi-solver-container directly");
+                        this.tryLoadFromContainer(container);
+                        return;
+                    }
+                    return;
+                }
+                
+                this.tryLoadFromContainer(multiSolverElement);
+                
+            } catch (error) {
+                console.error('Error loading Multi Solver geocaches:', error);
+            }
+        }
+        
+        // Helper method to try loading from a container
+        tryLoadFromContainer(container) {
+            // Find the table in the Multi Solver
+            const tableElement = container.querySelector('[data-multi-solver-target="resultsTable"]') || 
+                                 document.getElementById('multi-solver-results-table');
+                
+            if (!tableElement) {
+                console.warn("Multi Solver table element not found, waiting for it to be ready");
+                
+                // Try again after a delay
+                setTimeout(() => {
+                    const tableElement = container.querySelector('[data-multi-solver-target="resultsTable"]') || 
+                                        document.getElementById('multi-solver-results-table');
+                    
+                    if (tableElement && tableElement._tabulator) {
+                        console.log("Table found after delay, loading geocaches");
+                        this.loadGeocachesFromTable(tableElement);
+                    } else {
+                        console.warn("Table still not ready after delay");
+                    }
+                }, 1000);
+                return;
+            }
+            
+            if (!tableElement._tabulator) {
+                console.warn("Tabulator not initialized on table element, waiting for it to be ready");
+                
+                // Try again after a delay
+                setTimeout(() => {
+                    if (tableElement._tabulator) {
+                        console.log("Tabulator ready after delay, loading geocaches");
+                        this.loadGeocachesFromTable(tableElement);
+                    } else {
+                        console.warn("Tabulator still not ready after delay");
+                        
+                        // Fall back to loading from geocaches list if table is not ready
+                        const geocachesListElement = container.querySelector('[data-multi-solver-target="geocachesList"]');
+                        if (geocachesListElement) {
+                            console.log("Trying to load from geocaches list instead");
+                            this.loadFromGeocachesList(geocachesListElement);
+                        }
+                    }
+                }, 1000);
+                return;
+            }
+            
+            this.loadGeocachesFromTable(tableElement);
+        }
+        
+        // Load geocaches from table
+        loadGeocachesFromTable(tableElement) {
+            // Get the table data
+            const geocaches = tableElement._tabulator.getData();
+            console.log("Loaded geocaches from Multi Solver:", geocaches.length);
+            
+            // Add markers for each geocache
+            geocaches.forEach(geocache => {
+                if (geocache.latitude && geocache.longitude) {
+                    // Determine the color based on solved status
+                    let color;
+                    switch(geocache.solved) {
+                        case 'solved':
+                            color = 'green';
+                            break;
+                        case 'in_progress':
+                            color = 'orange';
+                            break;
+                        default:
+                            color = 'red';
+                    }
+                    
+                    this.addMarker(
+                        geocache.id, 
+                        {
+                            latitude: geocache.latitude,
+                            longitude: geocache.longitude,
+                            gc_lat: geocache.gc_lat,
+                            gc_lon: geocache.gc_lon
+                        }, 
+                        `${geocache.gc_code} - ${geocache.name}`, 
+                        color
+                    );
+                }
+            });
+            
+            // Fit view to show all markers
+            this.fitMapToMarkers();
+        }
+        
+        // Attempt to load from geocaches list if table is not available
+        loadFromGeocachesList(listElement) {
+            try {
+                // Find all geocache items
+                const geocacheItems = listElement.querySelectorAll('.geocache-item');
+                console.log("Found geocache items:", geocacheItems.length);
+                
+                if (geocacheItems.length === 0) return;
+                
+                // Extract geocache data
+                Array.from(geocacheItems).forEach(item => {
+                    const gcCode = item.querySelector('.font-medium')?.textContent.split('-')[0]?.trim();
+                    const name = item.querySelector('.font-medium')?.textContent.split('-')[1]?.trim();
+                    const id = item.querySelector('[data-geocache-id]')?.dataset.geocacheId;
+                    
+                    if (id && (gcCode || name)) {
+                        // Make API call to get coordinates
+                        fetch(`/api/geocaches/${id}/coordinates`)
+                            .then(response => response.json())
+                            .then(coords => {
+                                if (coords.original) {
+                                    this.addMarker(
+                                        id,
+                                        coords.original,
+                                        `${gcCode || 'GC'} - ${name || 'Géocache'}`,
+                                        'red'
+                                    );
+                                    this.fitMapToMarkers();
+                                }
+                            })
+                            .catch(err => console.error("Error loading coordinates for geocache:", id, err));
+                    }
+                });
+            } catch (error) {
+                console.error("Error loading from geocaches list:", error);
+            }
+        }
+        
+        // Handler for Multi Solver data updates
+        handleMultiSolverUpdate(event) {
+            if (!event.detail || !event.detail.multiSolverId) {
+                console.error("Invalid Multi Solver update event:", event);
+                return;
+            }
+            
+            console.log("Multi Solver data update received:", event.detail);
+            
+            // Check if this event is for our Multi Solver
+            if (this.multiSolverIdValue === event.detail.multiSolverId) {
+                console.log("Multi Solver data updated, refreshing map with", event.detail.data ? event.detail.data.length : 0, "geocaches");
+                
+                // Si des données sont fournies directement dans l'événement, les utiliser
+                if (event.detail.data && Array.isArray(event.detail.data)) {
+                    this.processMultiSolverData(event.detail.data);
+                } else {
+                    // Sinon, essayer de charger les données à partir du conteneur
+                    this.loadMultiSolverGeocaches(this.multiSolverIdValue);
+                }
+            }
+        }
+        
+        // Process Multi Solver data directly from event
+        async processMultiSolverData(geocaches) {
+            if (!geocaches || !Array.isArray(geocaches) || geocaches.length === 0) {
+                console.warn("No geocaches data to process");
+                return;
+            }
+            
+            // Clear existing markers
+            this.clearMarkers();
+            
+            console.log("Processing Multi Solver data:", geocaches);
+            
+            const promises = [];
+            
+            // Add markers for each geocache
+            geocaches.forEach(geocache => {
+                if (geocache.coordinates && geocache.coordinates.latitude && geocache.coordinates.longitude) {
+                    // Si les coordonnées sont déjà présentes dans les données
+                    let color = geocache.saved ? 'green' : 'red';
+                    
+                    this.addMarker(
+                        geocache.id, 
+                        geocache.coordinates, 
+                        `${geocache.gc_code} - ${geocache.name}`, 
+                        color
+                    );
+                } else if (geocache.id) {
+                    // Si les coordonnées ne sont pas présentes, les récupérer via l'API
+                    const promise = fetch(`/api/geocaches/${geocache.id}/coordinates`)
+                        .then(response => response.json())
+                        .then(coords => {
+                            if (coords && coords.original) {
+                                this.addMarker(
+                                    geocache.id,
+                                    coords.original,
+                                    `${geocache.gc_code || 'GC'} - ${geocache.name || 'Géocache'}`,
+                                    'red'
+                                );
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error fetching coordinates for geocache:", geocache.id, error);
+                        });
+                        
+                    promises.push(promise);
+                }
+            });
+            
+            // Attendre que toutes les coordonnées soient récupérées
+            if (promises.length > 0) {
+                await Promise.allSettled(promises);
+            }
+            
+            // Fit view to show all markers
+            this.fitMapToMarkers();
         }
     }
 

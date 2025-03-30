@@ -398,6 +398,49 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant map-panel
+        mainLayout.registerComponent('map-panel', function(container, state) {
+            console.log("Création du composant map-panel avec l'état:", state);
+            
+            // Construire les paramètres de requête
+            let queryParams = [];
+            
+            if (state.geocacheId) {
+                queryParams.push(`geocacheId=${state.geocacheId}`);
+            }
+            
+            if (state.isMultiSolver && state.multiSolverId) {
+                queryParams.push(`multiSolverId=${state.multiSolverId}`);
+                queryParams.push(`isMultiSolver=true`);
+            }
+            
+            const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+            const url = `/api/logs/map_panel${queryString}`;
+            
+            console.log("Chargement de la carte depuis:", url);
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    container.getElement().html(html);
+                })
+                .catch(error => {
+                    console.error("Erreur lors du chargement de la carte:", error);
+                    container.getElement().html(`
+                        <div class="flex items-center justify-center h-full">
+                            <div class="text-red-500">
+                                Erreur lors du chargement de la carte: ${error.message}
+                            </div>
+                        </div>
+                    `);
+                });
+        });
+
         // Enregistrer le composant openGeocacheDetails
         mainLayout.registerComponent('openGeocacheDetails', function(container, state) {
             console.log("Création du composant openGeocacheDetails pour la zone", state.zoneId);

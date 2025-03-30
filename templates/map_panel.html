@@ -1,20 +1,50 @@
 {% if geocache %}
 <div id="map-panel" 
-     data-controller="map"
-     data-map-geocache-id-value="{{ geocache_id }}"
-     data-map-geocache-code-value="{{ geocache.gc_code }}"
+     data-controller="zone-map"
+     data-zone-map-geocache-id-value="{{ geocache_id }}"
+     data-zone-map-geocache-code-value="{{ geocache.gc_code }}"
+     {% if multi_solver_id %}data-zone-map-multi-solver-id-value="{{ multi_solver_id }}"{% endif %}
+     {% if is_multi_solver %}data-zone-map-is-multi-solver-value="true"{% endif %}
      class="h-full">
-    <div class="map-container h-full relative" data-map-target="container">
+    <div class="map-container h-full relative" data-zone-map-target="container">
         <div id="base-layer-selector"></div>
     </div>
     <div id="popup" 
-         data-map-target="popup"
+         data-zone-map-target="popup"
          class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
          style="display: none; pointer-events: none; background-color: white; color: black;">
-        <div data-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+        <div data-zone-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
         <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
             <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
         </div>
+    </div>
+</div>
+{% elif is_multi_solver %}
+<div id="map-panel" 
+     data-controller="zone-map"
+     data-zone-map-is-multi-solver-value="true"
+     data-zone-map-multi-solver-id-value="{{ multi_solver_id }}"
+     class="h-full">
+    <div class="map-container h-full relative" data-zone-map-target="container">
+        <div id="base-layer-selector"></div>
+    </div>
+    <div id="popup" 
+         data-zone-map-target="popup"
+         class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
+         style="display: none; pointer-events: none; background-color: white; color: black;">
+        <div data-zone-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+        <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+            <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
+        </div>
+    </div>
+</div>
+{% elif zone_id %}
+<div id="map-panel" 
+     data-controller="zone-map"
+     data-zone-map-zone-id-value="{{ zone_id }}"
+     class="h-full">
+    <div class="map-container h-full relative" data-zone-map-target="container">
+        <!-- La carte sera initialisée par le contrôleur -->
     </div>
 </div>
 {% else %}

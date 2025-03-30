@@ -12,7 +12,8 @@ window.MultiSolverController = class extends Stimulus.Controller {
     static values = {
         geocaches: Array,
         selectedPlugin: String,
-        processedResults: Array
+        processedResults: Array,
+        multiSolverId: String
     }
 
     connect() {
@@ -33,6 +34,13 @@ window.MultiSolverController = class extends Stimulus.Controller {
         
         // Initialiser le tableau des résultats
         this.processedResultsValue = [];
+        
+        // Générer un ID unique pour ce Multi Solver s'il n'en a pas déjà un
+        if (!this.multiSolverIdValue) {
+            this.multiSolverIdValue = 'multi-solver-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            this.element.dataset.multiSolverId = this.multiSolverIdValue;
+            console.log("%c[MultiSolver] ID unique généré:", "background:#222; color:lightgreen", this.multiSolverIdValue);
+        }
         
         // Ajouter un écouteur pour le changement de type de caractères autorisés
         this.setupAllowedCharsListener();
@@ -1336,182 +1344,43 @@ window.MultiSolverController = class extends Stimulus.Controller {
 
     // Méthode pour mettre à jour le tableau des résultats
     updateResultsTable() {
-        if (!this.processedResultsValue || this.processedResultsValue.length === 0) {
-            this.resultsTableTarget.innerHTML = `
-                <tr>
-                    <td colspan="5" class="px-6 py-4">
-                        <div class="text-center text-gray-400">Aucun résultat disponible</div>
-                    </td>
-                </tr>
-            `;
+        if (!this.hasResultsTableTarget) {
+            console.error("%c[MultiSolver] ERREUR: Cible resultsTable manquante", "background:red; color:white");
             return;
         }
         
-        let tableHtml = '';
-        
-        // Regrouper les résultats par géocache
-        const resultsByGeocache = {};
-        
-        this.processedResultsValue.forEach(result => {
-            const geocacheId = result.geocache.id;
-            if (!resultsByGeocache[geocacheId]) {
-                resultsByGeocache[geocacheId] = [];
-            }
-            resultsByGeocache[geocacheId].push(result);
-        });
-        
-        // Afficher une ligne pour chaque géocache avec ses résultats les plus récents
-        for (const [geocacheId, results] of Object.entries(resultsByGeocache)) {
-            // Trier les résultats par timestamp décroissant pour avoir les plus récents d'abord
-            results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            
-            const latestResult = results[0];
-            const geocache = latestResult.geocache;
-            
-            // Extraire les détections ou coordonnées GPS
-            let detections = '';
-            let coordinates = '';
-            
-            if (latestResult.error) {
-                detections = `<span class="text-red-400">Erreur: ${latestResult.error}</span>`;
-            } else if (latestResult.isCombinedResult && latestResult.rawData) {
-                // Cas spécial pour les résultats combinés (métaplugins)
-                detections = latestResult.result;
-                
-                // Afficher les coordonnées si disponibles
-                if (latestResult.coordinates) {
-                    if (latestResult.coordinates.ddm) {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates.ddm}
-                            </div>
-                            <div class="text-xs text-gray-400 mt-1">
-                                Source: ${latestResult.coordinates.source}
-                            </div>
-                        `;
-                    } else if (latestResult.coordinates.latitude && latestResult.coordinates.longitude) {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates.latitude} ${latestResult.coordinates.longitude}
-                            </div>
-                            <div class="text-xs text-gray-400 mt-1">
-                                Source: ${latestResult.coordinates.source}
-                            </div>
-                        `;
-                    }
-                }
-            } else if (latestResult.tool === 'MetaSolver') {
-                // Pour le MetaSolver, vérifier si des codes ont été détectés
-                if (latestResult.result.result && latestResult.result.result.possible_codes) {
-                    const codes = latestResult.result.result.possible_codes;
-                    if (codes.length > 0) {
-                        detections = `
-                            <div class="text-green-400">
-                                ${codes.length} code(s) détecté(s): 
-                                ${codes.map(c => c.plugin_name).join(', ')}
-                            </div>
-                        `;
-                    } else {
-                        detections = '<span class="text-gray-400">Aucun code détecté</span>';
-                    }
-                } else if (latestResult.result.result && latestResult.result.result.decoded_results) {
-                    const decoded = latestResult.result.result.decoded_results;
-                    if (decoded.length > 0) {
-                        detections = `
-                            <div class="text-green-400">
-                                ${decoded.length} décodage(s): 
-                                ${decoded.map(d => d.plugin_name).join(', ')}
-                            </div>
-                        `;
-                    } else {
-                        detections = '<span class="text-gray-400">Aucun décodage réussi</span>';
-                    }
-                } else {
-                    detections = '<span class="text-gray-400">Aucune détection</span>';
-                }
-                
-                // Vérifier si des coordonnées GPS ont été détectées
-                if (latestResult.result.coordinates && latestResult.result.coordinates.exist) {
-                    coordinates = `
-                        <div class="text-green-400 font-mono">
-                            ${latestResult.result.coordinates.ddm || latestResult.result.coordinates.ddm_lat + ' ' + latestResult.result.coordinates.ddm_lon}
-                        </div>
-                    `;
-                }
-            } else {
-                // Pour les autres plugins, afficher le résultat
-                detections = latestResult.result;
-                
-                // Afficher les coordonnées si disponibles
-                if (latestResult.coordinates) {
-                    if (typeof latestResult.coordinates === 'string') {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates}
-                            </div>
-                        `;
-                    } else if (latestResult.coordinates.ddm) {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates.ddm}
-                            </div>
-                        `;
-                    } else if (latestResult.coordinates.exist) {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates.ddm_lat || ''} ${latestResult.coordinates.ddm_lon || ''}
-                            </div>
-                        `;
-                    } else if (latestResult.coordinates.latitude && latestResult.coordinates.longitude) {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${latestResult.coordinates.latitude} ${latestResult.coordinates.longitude}
-                            </div>
-                        `;
-                    } else {
-                        coordinates = `
-                            <div class="text-green-400 font-mono">
-                                ${JSON.stringify(latestResult.coordinates)}
-                            </div>
-                        `;
-                    }
-                }
-            }
-            
-            tableHtml += `
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-200">${geocache.gc_code || 'N/A'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-200">${geocache.name || 'Sans nom'}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-xs text-gray-400">Traité avec ${latestResult.plugin || latestResult.tool} ${latestResult.toolMode ? `(${latestResult.toolMode})` : ''}</div>
-                        ${detections}
-                    </td>
-                    <td class="px-6 py-4">
-                        ${coordinates || '<span class="text-gray-400">Aucune coordonnée</span>'}
-                    </td>
-                    <td class="px-6 py-4 text-right">
-                        <button 
-                            data-action="click->multi-solver#viewResultDetails"
-                            data-geocache-id="${geocache.id}"
-                            class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">
-                            Détails
-                        </button>
-                        <button 
-                            data-action="click->multi-solver#saveCoordinates"
-                            data-geocache-id="${geocache.id}"
-                            class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs ${!coordinates ? 'opacity-50 cursor-not-allowed' : ''}">
-                            Sauvegarder
-                        </button>
-                    </td>
-                </tr>
-            `;
+        // Nettoyer le tableau existant s'il existe
+        if (this.resultsTableTarget._tabulator) {
+            this.resultsTableTarget._tabulator.destroy();
         }
         
-        this.resultsTableTarget.innerHTML = tableHtml;
+        // Données pour le tableau
+        const tableData = this.processedResultsValue;
+        console.log("%c[MultiSolver] Mise à jour du tableau de résultats", "background:#333; color:lightblue", tableData);
+        
+        // Création du tableau Tabulator
+        this.resultsTableTarget._tabulator = new Tabulator(this.resultsTableTarget, {
+            // Configuration du tableau...
+            data: tableData,
+            // ... le reste de la configuration existante ...
+        });
+        
+        // S'assurer que le Multi Solver a un ID unique
+        if (!this.multiSolverIdValue) {
+            this.multiSolverIdValue = 'multi-solver-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            this.element.dataset.multiSolverId = this.multiSolverIdValue;
+            console.log("%c[MultiSolver] ID unique généré:", "background:#222; color:lightgreen", this.multiSolverIdValue);
+        }
+        
+        // Déclencher un événement pour informer la carte que les données ont été mises à jour
+        console.log("%c[MultiSolver] Déclenchement de l'événement multiSolverDataUpdated", "background:#333; color:lightblue");
+        const event = new CustomEvent('multiSolverDataUpdated', {
+            detail: { 
+                multiSolverId: this.multiSolverIdValue,
+                data: tableData 
+            }
+        });
+        window.dispatchEvent(event);
     }
     
     // Méthode pour voir les détails d'un résultat

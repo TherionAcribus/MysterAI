@@ -22,6 +22,9 @@ def get_notes_panel():
 def get_map_panel():
     """Render the map panel template"""
     geocache_id = request.args.get('geocacheId')
+    multi_solver_id = request.args.get('multiSolverId')
+    is_multi_solver = request.args.get('isMultiSolver', 'false').lower() == 'true'
+    zone_id = request.args.get('zoneId')
     
     if geocache_id:
         geocache = Geocache.query.get(geocache_id)
@@ -29,6 +32,23 @@ def get_map_panel():
             return render_template('map_panel.html', 
                                 geocache=geocache,
                                 geocache_id=geocache_id)
+    
+    if multi_solver_id and is_multi_solver:
+        # Mode Multi Solver
+        print(f"Rendering map panel for Multi Solver: {multi_solver_id}")
+        return render_template('map_panel.html', 
+                            geocache=None,
+                            geocache_id=None,
+                            is_multi_solver=True,
+                            multi_solver_id=multi_solver_id)
+    
+    if zone_id:
+        # Mode Zone Map
+        print(f"Rendering map panel for Zone: {zone_id}")
+        return render_template('map_panel.html', 
+                            geocache=None,
+                            geocache_id=None,
+                            zone_id=zone_id)
     
     return render_template('map_panel.html', 
                          geocache=None,

@@ -348,8 +348,8 @@
                     <div class="bottom-panel-content">
                         <div id="map-panel" 
                              class="panel-content active"
-                             data-controller="map"
-                             data-action="tab-activated@window->map#onActivated"
+                             data-controller="zone-map"
+                             data-action="tab-activated@window->zone-map#onActivated"
                              hx-get="/api/logs/map_panel"
                              hx-trigger="load"
                              hx-swap="innerHTML">
@@ -416,6 +416,9 @@
 
     <!-- Initialisation du layout et gestion-->
     <script src="/js/layout_initialize.js"></script>
+    
+    <!-- Contrôleur de carte amélioré pour le Multi Solver -->
+    <script src="/js/controllers/new/enhanced_zone_map_controller.js"></script>
 
     <!-- Conteneur pour les modals -->
     <div id="modals-container"></div>
