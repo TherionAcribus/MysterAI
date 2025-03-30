@@ -511,22 +511,135 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         showPopup(coordinates, title, content) {
             if (!this.popupElement) return;
             
+            // Récupérer le conteneur de la carte
+            const mapContainer = this.map.getTargetElement();
+            const mapRect = mapContainer.getBoundingClientRect();
+            
+            // Convertir les coordonnées en pixels
             const pixel = this.map.getPixelFromCoordinate(coordinates);
             if (!pixel) return;
             
+            // Calcul des positions absolues en tenant compte du scroll
+            const absoluteX = mapRect.left + window.pageXOffset;
+            const absoluteY = mapRect.top + window.pageYOffset;
+            
+            // Préparer le contenu de la popup
             this.popupElement.innerHTML = `
                 <div class="font-bold mb-1 text-black">${title}</div>
                 <div class="font-mono text-sm text-black">${content}</div>
             `;
             
-            const mapElement = this.map.getTargetElement();
-            const rect = mapElement.getBoundingClientRect();
-            const x = rect.left + pixel[0];
-            const y = rect.top + pixel[1] - 10; // Décalage vers le haut pour éviter de chevaucher le point
+            // Réinitialiser le style pour éviter les effets de calculs précédents
+            this.popupElement.style.position = 'fixed';
+            this.popupElement.style.transform = 'none';
+            this.popupElement.style.transition = 'none';
             
-            this.popupElement.style.left = `${x}px`;
-            this.popupElement.style.top = `${y}px`;
+            // Rendre visible pour mesurer les dimensions
             this.popupElement.style.display = 'block';
+            this.popupElement.style.visibility = 'hidden'; // Caché mais mesurable
+            
+            // Obtenir les dimensions de la popup
+            const popupWidth = this.popupElement.offsetWidth;
+            const popupHeight = this.popupElement.offsetHeight;
+            
+            // Position du point sur l'écran
+            const pointX = mapRect.left + pixel[0];
+            const pointY = mapRect.top + pixel[1];
+            
+            // Décalage pour centrer la popup au-dessus du point
+            // Position préférée : centrée au-dessus du point
+            let popupLeft = pointX - (popupWidth / 2);
+            let popupTop = pointY - popupHeight - 15; // 15px au-dessus du point
+            
+            // Ajustements pour éviter de sortir de l'écran
+            // Horizontalement
+            if (popupLeft < 0) {
+                popupLeft = 5; // Marge de 5px du bord gauche
+            } else if (popupLeft + popupWidth > window.innerWidth) {
+                popupLeft = window.innerWidth - popupWidth - 5; // Marge de 5px du bord droit
+            }
+            
+            // Verticalement
+            if (popupTop < 0) {
+                // Si pas assez de place au-dessus, afficher en dessous
+                popupTop = pointY + 15; // 15px en dessous du point
+            }
+            
+            // Appliquer la position finale
+            this.popupElement.style.left = `${popupLeft}px`;
+            this.popupElement.style.top = `${popupTop}px`;
+            this.popupElement.style.visibility = 'visible';
+            
+            // Ajouter une flèche qui pointe vers le point
+            const existingArrow = this.popupElement.querySelector('.popup-arrow');
+            if (existingArrow) {
+                existingArrow.remove();
+            }
+            
+            const arrow = document.createElement('div');
+            arrow.className = 'popup-arrow';
+            
+            // Déterminer la position et l'orientation de la flèche
+            let arrowStyle;
+            
+            if (popupTop < pointY) {
+                // Popup au-dessus du point, flèche en bas
+                arrowStyle = `
+                    position: absolute;
+                    left: ${Math.max(0, Math.min(popupWidth - 16, (pointX - popupLeft) - 8))}px;
+                    bottom: -8px;
+                    width: 0;
+                    height: 0;
+                    border-left: 8px solid transparent;
+                    border-right: 8px solid transparent;
+                    border-top: 8px solid white;
+                `;
+            } else {
+                // Popup en dessous du point, flèche en haut
+                arrowStyle = `
+                    position: absolute;
+                    left: ${Math.max(0, Math.min(popupWidth - 16, (pointX - popupLeft) - 8))}px;
+                    top: -8px;
+                    width: 0;
+                    height: 0;
+                    border-left: 8px solid transparent;
+                    border-right: 8px solid transparent;
+                    border-bottom: 8px solid white;
+                `;
+            }
+            
+            arrow.style.cssText = arrowStyle;
+            this.popupElement.appendChild(arrow);
+            
+            // Ajouter un bouton de fermeture
+            const closeButton = document.createElement('div');
+            closeButton.className = 'popup-close';
+            closeButton.style.cssText = `
+                position: absolute;
+                top: 2px;
+                right: 2px;
+                cursor: pointer;
+                width: 20px;
+                height: 20px;
+                text-align: center;
+                line-height: 20px;
+                color: #999;
+                font-size: 16px;
+                font-weight: bold;
+            `;
+            closeButton.innerHTML = '×';
+            closeButton.addEventListener('click', () => this.hidePopup());
+            
+            this.popupElement.appendChild(closeButton);
+            
+            // Ajouter un léger effet de fondu
+            this.popupElement.style.opacity = '0';
+            this.popupElement.style.transition = 'opacity 0.2s ease-in-out';
+            
+            // Animation de fade-in
+            setTimeout(() => {
+                this.popupElement.style.opacity = '1';
+            }, 10);
         }
 
         hidePopup() {
