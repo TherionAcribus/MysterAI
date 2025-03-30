@@ -695,6 +695,17 @@ function initializeLayout() {
                     // Avant d'injecter le HTML, s'assurer que les données sont préservées
                     const currentState = container.getState() || {};
                     
+                    // Nettoyer ou préparer le conteneur pour éviter les conflits de noms
+                    try {
+                        // Retirer les variables qui pourraient causer des conflits lors d'une réinjection
+                        if (window.multiSolverResultsTable && window.multiSolverResultsTable.destroy) {
+                            console.log("%c[Layout] Nettoyage du tableau existant avant injection", "background:orange; color:black");
+                            window.multiSolverResultsTable.destroy();
+                        }
+                    } catch (e) {
+                        console.warn("Erreur lors du nettoyage préalable:", e);
+                    }
+                    
                     // Injecter le HTML dans le conteneur
                     container.getElement().html(html);
                     

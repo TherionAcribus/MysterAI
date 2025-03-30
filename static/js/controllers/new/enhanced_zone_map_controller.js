@@ -325,6 +325,9 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             coordsSelect.className = 'block w-full p-1 border border-gray-300 rounded-md text-sm';
             coordsSelect.addEventListener('change', (e) => this.changeCoordinatesMode(e.target.value));
             
+            // Stocker une référence pour pouvoir mettre à jour le sélecteur plus tard
+            this.coordsSelect = coordsSelect;
+            
             const options = [
                 { value: 'corrected', text: 'Corrigées (si disponibles)' },
                 { value: 'original', text: 'Originales' },
@@ -1285,23 +1288,40 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             }
             
             // 2. Traiter les coordonnées corrigées (si pas déjà définies)
-            if (!prepared.latitude_corrected || !prepared.longitude_corrected) {
-                // Essayer d'extraire les coordonnées corrigées de location_corrected si disponible
-                if (prepared.location_corrected) {
-                    const coords = this.extractCoordinatesFromSQLPoint(prepared.location_corrected);
-                    if (coords) {
-                        prepared.latitude_corrected = coords.latitude;
-                        prepared.longitude_corrected = coords.longitude;
-                        
-                        // Créer également l'objet corrected_coordinates pour compatibilité
-                        prepared.corrected_coordinates = {
-                            latitude: coords.latitude,
-                            longitude: coords.longitude
-                        };
-                        
-                        console.log(`Coordonnées corrigées extraites pour ${prepared.gc_code}:`, coords);
-                    }
+            // Vérifier d'abord si les propriétés latitude_corrected et longitude_corrected existent
+            if (prepared.latitude_corrected !== undefined && prepared.longitude_corrected !== undefined) {
+                // Utiliser directement les propriétés latitude_corrected et longitude_corrected
+                // Créer l'objet corrected_coordinates pour compatibilité
+                prepared.corrected_coordinates = {
+                    latitude: prepared.latitude_corrected,
+                    longitude: prepared.longitude_corrected
+                };
+                console.log(`Coordonnées corrigées utilisées pour ${prepared.gc_code}:`, prepared.corrected_coordinates);
+            }
+            // Sinon, essayer d'extraire les coordonnées corrigées de location_corrected si disponible
+            else if (prepared.location_corrected) {
+                const coords = this.extractCoordinatesFromSQLPoint(prepared.location_corrected);
+                if (coords) {
+                    prepared.latitude_corrected = coords.latitude;
+                    prepared.longitude_corrected = coords.longitude;
+                    
+                    // Créer également l'objet corrected_coordinates pour compatibilité
+                    prepared.corrected_coordinates = {
+                        latitude: coords.latitude,
+                        longitude: coords.longitude
+                    };
+                    
+                    console.log(`Coordonnées corrigées extraites pour ${prepared.gc_code}:`, coords);
                 }
+            }
+            // Vérifier aussi si l'objet corrected_coordinates existe déjà
+            else if (prepared.corrected_coordinates && 
+                     prepared.corrected_coordinates.latitude !== undefined && 
+                     prepared.corrected_coordinates.longitude !== undefined) {
+                // Synchroniser avec latitude_corrected et longitude_corrected pour cohérence
+                prepared.latitude_corrected = prepared.corrected_coordinates.latitude;
+                prepared.longitude_corrected = prepared.corrected_coordinates.longitude;
+                console.log(`Objet corrected_coordinates utilisé pour ${prepared.gc_code}:`, prepared.corrected_coordinates);
             }
             
             return prepared;
@@ -1329,10 +1349,10 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 console.log("Mode d'affichage des coordonnées pour la mise à jour:", coordsMode);
                 
                 console.log("Mise à jour des données du Multi Solver:", 
-                            event.detail.data ? event.detail.data.length : 0, "géocaches");
+                            event.detail.data && Array.isArray(event.detail.data) ? event.detail.data.length : 0, "géocaches");
                 
                 // Examiner la structure d'un échantillon pour le débogage
-                if (event.detail.data && event.detail.data.length > 0) {
+                if (event.detail.data && Array.isArray(event.detail.data) && event.detail.data.length > 0) {
                     const sample = event.detail.data[0];
                     console.log("=== STRUCTURE DÉTAILLÉE D'UN ÉCHANTILLON DE DONNÉES ===");
                     console.log("Clés de premier niveau:", Object.keys(sample));
@@ -1359,21 +1379,23 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     
                     // Vérifier les objets location et location_corrected
                     console.log("location:", sample.location);
-                    console.log("location_corrected:", sample.location_corrected);
-                    
-                    // Tester l'extraction des coordonnées
                     if (sample.location) {
                         const coords = this.extractCoordinatesFromSQLPoint(sample.location);
                         console.log("Coordonnées extraites de location:", coords);
                     }
+                    
+                    // Teste de la présence de location_corrected (peut avoir été supprimé dans le backend)
                     if (sample.location_corrected) {
                         const coords = this.extractCoordinatesFromSQLPoint(sample.location_corrected);
                         console.log("Coordonnées extraites de location_corrected:", coords);
+                    } else {
+                        console.log("location_corrected n'est pas présent dans les données");
                     }
                 }
                 
                 // Préparer les données avec les coordonnées normalisées
-                const preparedData = event.detail.data ? 
+                // Vérifier si event.detail.data est un tableau avant d'appliquer map()
+                const preparedData = (event.detail.data && Array.isArray(event.detail.data)) ? 
                     event.detail.data.map(gc => this.prepareGeocacheCoordinates(gc)) : [];
                 
                 if (preparedData.length > 0) {
@@ -1885,8 +1907,15 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             try {
                 const storedGeocaches = sessionStorage.getItem('multiSolverGeocaches');
                 if (storedGeocaches) {
-                    const parsedGeocaches = JSON.parse(storedGeocaches);
-                    console.log("Récupération initiale des données depuis sessionStorage:", parsedGeocaches.length);
+                    let parsedGeocaches;
+                    try {
+                        parsedGeocaches = JSON.parse(storedGeocaches);
+                        console.log("Récupération initiale des données depuis sessionStorage:", 
+                                   Array.isArray(parsedGeocaches) ? parsedGeocaches.length : "Non-tableau");
+                    } catch (parseError) {
+                        console.error("Erreur de parsing JSON:", parseError);
+                        parsedGeocaches = null;
+                    }
                     
                     let pointsAdded = 0;
                     
@@ -1906,12 +1935,6 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 sample.corrected_coordinates !== undefined);
                             console.log("latitude_corrected présent après préparation:", 
                                 sample.latitude_corrected !== undefined);
-                            
-                            if (sample.location_corrected) {
-                                console.log("location_corrected trouvé, tentons d'extraire les coordonnées");
-                                const coords = this.extractCoordinatesFromSQLPoint(sample.location_corrected);
-                                console.log("Coordonnées corrigées extraites:", coords);
-                            }
                         }
                         
                         // Ajouter les points depuis sessionStorage selon le mode sélectionné
@@ -1956,8 +1979,10 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                             }
                         }
                     } else {
-                        console.warn("Les données récupérées depuis sessionStorage ne sont pas un tableau valide");
+                        console.warn("Les données récupérées depuis sessionStorage ne sont pas un tableau valide ou sont vides");
                     }
+                } else {
+                    console.log("Pas de données dans sessionStorage pour ce Multi Solver");
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération initiale des données depuis sessionStorage:", error);

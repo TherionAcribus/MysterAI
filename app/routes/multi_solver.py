@@ -72,8 +72,7 @@ def bulk_coordinates():
                 'cache_type': geocache.cache_type,
                 'difficulty': geocache.difficulty,
                 'terrain': geocache.terrain,
-                'solved': geocache.solved,
-                'location_corrected': geocache.location_corrected
+                'solved': geocache.solved
             }
             
             # Ajouter les coordonnées corrigées si elles existent

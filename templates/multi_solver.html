@@ -1,7 +1,13 @@
 <script type="text/javascript">
     // Variables globales pour Tabulator avec préfixe pour éviter les conflits
-    let multiSolverResultsTable = null;
-    let multiSolverTableResults = []; // Tableau pour stocker les résultats
+    // Utilisation de l'objet window pour éviter les redéclarations
+    if (typeof window.multiSolverResultsTable === 'undefined') {
+        window.multiSolverResultsTable = null;
+    }
+    
+    if (typeof window.multiSolverTableResults === 'undefined') {
+        window.multiSolverTableResults = []; // Tableau pour stocker les résultats
+    }
     
     // Fonction globale pour initialiser Tabulator
     function initializeResultsTable() {
@@ -122,8 +128,8 @@
         };
         
         // Détruire l'instance existante si elle existe
-        if (multiSolverResultsTable) {
-            multiSolverResultsTable.destroy();
+        if (window.multiSolverResultsTable) {
+            window.multiSolverResultsTable.destroy();
         }
 
         try {
@@ -134,8 +140,8 @@
             }
 
             // Créer une nouvelle instance de Tabulator
-            multiSolverResultsTable = new Tabulator('#multi-solver-results-table', {
-                data: multiSolverTableResults,
+            window.multiSolverResultsTable = new Tabulator('#multi-solver-results-table', {
+                data: window.multiSolverTableResults,
                 layout: "fitDataFill",
                 height: "400px", // Hauteur fixe pour le tableau
                 placeholder: "Aucun résultat disponible",
@@ -666,15 +672,15 @@
         const processGeocaches = async () => {
             try {
                 // S'assurer que le tableau est initialisé
-                if (!multiSolverResultsTable) {
+                if (!window.multiSolverResultsTable) {
                     console.log("%c[MultiSolver] Tentative d'initialisation de Tabulator avant le traitement", "background:blue; color:white");
                     initializeResultsTable();
                 }
                 
                 // Réinitialiser les données du tableau
-                multiSolverTableResults = [];
-                if (multiSolverResultsTable) {
-                    multiSolverResultsTable.setData([]);
+                window.multiSolverTableResults = [];
+                if (window.multiSolverResultsTable) {
+                    window.multiSolverResultsTable.setData([]);
                 } else {
                     // Si Tabulator n'est toujours pas disponible, préparer le conteneur pour le mode secours
                     const fallbackContainer = document.getElementById('multi-solver-results-table');
@@ -3499,7 +3505,7 @@
     // Fonction pour mettre à jour la carte avec les nouvelles coordonnées
     function updateMapWithNewCoordinates(geocacheId, latitude, longitude) {
         // Trouver la géocache dans nos données
-        const geocache = multiSolverTableResults.find(g => g.id == geocacheId);
+        const geocache = window.multiSolverTableResults.find(g => g.id == geocacheId);
         if (!geocache) return;
         
         // Mettre à jour les coordonnées dans notre objet local
@@ -3519,8 +3525,12 @@
         window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
             detail: {
                 multiSolverId: multiSolverId,
-                data: multiSolverTableResults
+                data: window.multiSolverTableResults
             }
         }));
     }
+    
+    // Note: Toutes les références à multiSolverResultsTable et multiSolverTableResults
+    // ont été modifiées pour utiliser window.multiSolverResultsTable et window.multiSolverTableResults
+    // afin d'éviter les erreurs de redéclaration de variables lors de multiples chargements du template.
 </script>
