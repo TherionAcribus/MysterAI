@@ -448,6 +448,13 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             // Gérer les clics sur les éléments du menu
             const detailsButton = this.contextMenu.querySelector('[data-action="open-details"]');
             detailsButton.addEventListener('click', () => {
+                // Extraire l'ID numérique original (sans le suffixe _corrected)
+                let geocacheId = geocache.id;
+                if (typeof geocacheId === 'string' && geocacheId.endsWith('_corrected')) {
+                    geocacheId = geocacheId.replace('_corrected', '');
+                    console.log("ID corrigé détecté, utilisation de l'ID original:", geocacheId);
+                }
+                
                 // Ouvrir les détails dans un nouvel onglet
                 if (window.mainLayout) {
                     window.mainLayout.root.contentItems[0].addChild({
@@ -455,7 +462,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         componentName: 'geocache-details',
                         title: `${geocache.gc_code} - ${geocache.name}`,
                         componentState: { 
-                            geocacheId: geocache.id,
+                            geocacheId: geocacheId,
                             gcCode: geocache.gc_code,
                             name: geocache.name
                         }
@@ -467,7 +474,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     
                     // Alternative: ouvrir les détails via HTMX si disponible
                     if (window.htmx) {
-                        window.htmx.ajax('GET', `/geocaches/${geocache.id}`, {
+                        window.htmx.ajax('GET', `/geocaches/${geocacheId}`, {
                             target: 'body',
                             swap: 'innerHTML'
                         });
