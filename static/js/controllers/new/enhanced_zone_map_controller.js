@@ -1149,13 +1149,44 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 // Créer un style personnalisé pour les coordonnées corrigées
                 const styleFunction = (feature) => {
                     const baseColor = feature.get('color') || color;
+                    const cacheType = geocache.cache_type || 'Traditional';
                     
-                    // Style de base pour tous les points
+                    // Définir les couleurs selon les standards de géocaching.com
+                    let cacheColor;
+                    let cacheSymbol = null;
+                    
+                    // Codes couleurs standards de Geocaching.com
+                    const cacheColors = {
+                        'Traditional': 'rgba(0, 175, 80, 0.8)',      // Vert
+                        'Mystery': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé
+                        'Unknown': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (alias de Mystery)
+                        'Multi-cache': 'rgba(255, 200, 0, 0.8)',    // Jaune/Orange
+                        'Letterbox': 'rgba(0, 60, 255, 0.8)',       // Bleu foncé (comme Mystery)
+                        'Letterbox Hybrid': 'rgba(0, 60, 255, 0.8)', // Bleu foncé (comme Mystery)
+                        'Wherigo': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (comme Mystery)
+                        'Event': 'rgba(235, 0, 130, 0.8)',          // Rose
+                        'Virtual': 'rgba(120, 180, 215, 0.8)',      // Bleu pâle
+                        'Earthcache': 'rgba(170, 100, 45, 0.8)',    // Marron
+                        'Webcam': 'rgba(100, 100, 100, 0.8)'        // Gris
+                    };
+                    
+                    // Utiliser la couleur spécifique au type de cache si disponible
+                    if (cacheType in cacheColors) {
+                        cacheColor = cacheColors[cacheType];
+                    } else {
+                        // Couleur par défaut bleue pour les types non reconnus
+                        cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu
+                    }
+                    
+                    // Ne plus remplacer la couleur en fonction du statut
+                    // Conserver uniquement le carré pour indiquer les coordonnées corrigées
+                    
+                    // Créer le style de base
                     const baseStyle = new ol.style.Style({
                         image: new ol.style.Circle({
                             radius: 6,
                             fill: new ol.style.Fill({
-                                color: baseColor
+                                color: cacheColor
                             }),
                             stroke: new ol.style.Stroke({
                                 color: '#ffffff',
@@ -1164,25 +1195,67 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         })
                     });
                     
+                    // Styles spécifiques pour certains types de caches
+                    const specialStyles = [];
+                    
+                    // Ajouter un symbole spécifique pour les types de caches demandés
+                    if (cacheType === 'Mystery' || cacheType === 'Unknown') {
+                        // Point d'interrogation blanc pour les Mystery/Unknown
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '?',
+                                font: 'bold 12px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    } else if (cacheType === 'Letterbox' || cacheType === 'Letterbox Hybrid') {
+                        // Symbole d'enveloppe pour les Letterbox
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '✉',
+                                font: '10px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    } else if (cacheType === 'Wherigo') {
+                        // Symbole de triangle pour les Wherigo
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '▲',
+                                font: '10px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    }
+                    
+                    // Combinaison des styles
+                    let styles = [baseStyle, ...specialStyles];
+                    
                     // Si c'est une coordonnée corrigée, ajouter un symbole supplémentaire
                     if (isCorrected) {
-                        return [
-                            baseStyle,
-                            new ol.style.Style({
-                                image: new ol.style.RegularShape({
-                                    points: 4, // Carré
-                                    radius: 9,
-                                    stroke: new ol.style.Stroke({
-                                        color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
-                                        width: 2
-                                    }),
-                                    fill: null
-                                })
+                        styles.push(new ol.style.Style({
+                            image: new ol.style.RegularShape({
+                                points: 4, // Carré
+                                radius: 9,
+                                stroke: new ol.style.Stroke({
+                                    color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
+                                    width: 2
+                                }),
+                                fill: null
                             })
-                        ];
-                    } else {
-                        return baseStyle;
+                        }));
                     }
+                    
+                    return styles;
                 };
                 
                 // Texte supplémentaire pour indiquer si ce sont des coordonnées corrigées
@@ -1835,13 +1908,44 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 // Mettre à jour le style en fonction du statut de coordonnée corrigée
                 const styleFunction = (feature) => {
                     const baseColor = feature.get('color') || color;
+                    const cacheType = geocache.cache_type || 'Traditional';
                     
-                    // Style de base pour tous les points
+                    // Définir les couleurs selon les standards de géocaching.com
+                    let cacheColor;
+                    let cacheSymbol = null;
+                    
+                    // Codes couleurs standards de Geocaching.com
+                    const cacheColors = {
+                        'Traditional': 'rgba(0, 175, 80, 0.8)',      // Vert
+                        'Mystery': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé
+                        'Unknown': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (alias de Mystery)
+                        'Multi-cache': 'rgba(255, 200, 0, 0.8)',    // Jaune/Orange
+                        'Letterbox': 'rgba(0, 60, 255, 0.8)',       // Bleu foncé (comme Mystery)
+                        'Letterbox Hybrid': 'rgba(0, 60, 255, 0.8)', // Bleu foncé (comme Mystery)
+                        'Wherigo': 'rgba(0, 60, 255, 0.8)',         // Bleu foncé (comme Mystery)
+                        'Event': 'rgba(235, 0, 130, 0.8)',          // Rose
+                        'Virtual': 'rgba(120, 180, 215, 0.8)',      // Bleu pâle
+                        'Earthcache': 'rgba(170, 100, 45, 0.8)',    // Marron
+                        'Webcam': 'rgba(100, 100, 100, 0.8)'        // Gris
+                    };
+                    
+                    // Utiliser la couleur spécifique au type de cache si disponible
+                    if (cacheType in cacheColors) {
+                        cacheColor = cacheColors[cacheType];
+                    } else {
+                        // Couleur par défaut bleue pour les types non reconnus
+                        cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu
+                    }
+                    
+                    // Ne plus remplacer la couleur en fonction du statut
+                    // Conserver uniquement le carré pour indiquer les coordonnées corrigées
+                    
+                    // Créer le style de base
                     const baseStyle = new ol.style.Style({
                         image: new ol.style.Circle({
                             radius: 6,
                             fill: new ol.style.Fill({
-                                color: baseColor
+                                color: cacheColor
                             }),
                             stroke: new ol.style.Stroke({
                                 color: '#ffffff',
@@ -1850,25 +1954,67 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         })
                     });
                     
+                    // Styles spécifiques pour certains types de caches
+                    const specialStyles = [];
+                    
+                    // Ajouter un symbole spécifique pour les types de caches demandés
+                    if (cacheType === 'Mystery' || cacheType === 'Unknown') {
+                        // Point d'interrogation blanc pour les Mystery/Unknown
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '?',
+                                font: 'bold 12px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    } else if (cacheType === 'Letterbox' || cacheType === 'Letterbox Hybrid') {
+                        // Symbole d'enveloppe pour les Letterbox
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '✉',
+                                font: '10px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    } else if (cacheType === 'Wherigo') {
+                        // Symbole de triangle pour les Wherigo
+                        specialStyles.push(new ol.style.Style({
+                            text: new ol.style.Text({
+                                text: '▲',
+                                font: '10px sans-serif',
+                                fill: new ol.style.Fill({
+                                    color: '#ffffff'
+                                }),
+                                offsetY: 1
+                            })
+                        }));
+                    }
+                    
+                    // Combinaison des styles
+                    let styles = [baseStyle, ...specialStyles];
+                    
                     // Si c'est une coordonnée corrigée, ajouter un symbole supplémentaire
                     if (isCorrected) {
-                        return [
-                            baseStyle,
-                            new ol.style.Style({
-                                image: new ol.style.RegularShape({
-                                    points: 4, // Carré
-                                    radius: 9,
-                                    stroke: new ol.style.Stroke({
-                                        color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
-                                        width: 2
-                                    }),
-                                    fill: null
-                                })
+                        styles.push(new ol.style.Style({
+                            image: new ol.style.RegularShape({
+                                points: 4, // Carré
+                                radius: 9,
+                                stroke: new ol.style.Stroke({
+                                    color: 'rgba(0, 128, 0, 0.8)', // Vert pour les coordonnées corrigées
+                                    width: 2
+                                }),
+                                fill: null
                             })
-                        ];
-                    } else {
-                        return baseStyle;
+                        }));
                     }
+                    
+                    return styles;
                 };
                 
                 // Appliquer le nouveau style
