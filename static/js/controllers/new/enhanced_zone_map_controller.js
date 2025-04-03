@@ -656,56 +656,193 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         }
         
         handleMultiSolverUpdate(event) {
-            console.log("Événement multiSolverDataUpdated reçu:", event.detail);
+            // Validation de base des données d'événement
+            if (!event || !event.detail) {
+                console.error("Événement multiSolverDataUpdated reçu sans détails");
+                return;
+            }
             
-            if (!event.detail || !event.detail.multiSolverId) {
-                console.error("Événement multiSolverDataUpdated invalide");
+            const { multiSolverId, data } = event.detail;
+            
+            // Validation de l'ID du Multi Solver
+            if (!multiSolverId) {
+                console.error("Événement multiSolverDataUpdated sans ID de Multi Solver");
                 return;
             }
             
             // Vérifier si l'événement correspond à notre Multi Solver
-            if (this.multiSolverIdValue === event.detail.multiSolverId) {
-                // Effacer les marqueurs existants avant de traiter les nouvelles données
-                this.clearMarkers();
+            if (this.multiSolverIdValue !== multiSolverId) {
+                // Ignorer silencieusement les événements qui ne nous concernent pas
+                return;
+            }
+            
+            // Log limité aux informations essentielles
+            console.log(`Mise à jour de la carte avec ${data?.length || 0} géocaches du Multi Solver ${multiSolverId}`);
+            
+            // Effacer les marqueurs existants avant de traiter les nouvelles données
+            this.clearMarkers();
+            
+            // Vérifier si nous avons des données valides
+            if (!Array.isArray(data) || data.length === 0) {
+                console.warn("Aucune donnée valide reçue dans l'événement multiSolverDataUpdated");
+                return;
+            }
+            
+            try {
+                // Compteurs pour le reporting
+                let markersAdded = 0;
+                let markersSkipped = 0;
                 
-                console.log("Mise à jour des données du Multi Solver:", 
-                            event.detail.data ? event.detail.data.length : 0, "géocaches");
+                // Ajouter les marqueurs pour chaque géocache
+                data.forEach(geocache => {
+                    if (geocache && geocache.latitude && geocache.longitude) {
+                        this.addMarkerWithGeocache(geocache);
+                        markersAdded++;
+                    } else {
+                        markersSkipped++;
+                    }
+                });
                 
-                // Si des données sont fournies, les traiter directement
-                if (event.detail.data && Array.isArray(event.detail.data) && event.detail.data.length > 0) {
-                    console.log("Données détaillées:", event.detail.data[0]);
-                    
-                    // Ajouter les marqueurs pour chaque géocache
-                    event.detail.data.forEach(geocache => {
-                        if (geocache.latitude && geocache.longitude) {
-                            this.addMarkerWithGeocache(geocache);
-                        }
-                    });
-                    
-                    // Ajuster la vue pour montrer tous les marqueurs
+                // Log des résultats
+                console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}`);
+                
+                // Ajuster la vue pour montrer tous les marqueurs
+                if (markersAdded > 0) {
                     this.fitMapToMarkers();
-                } else {
-                    console.warn("Aucune donnée valide dans l'événement multiSolverDataUpdated");
                 }
+            } catch (error) {
+                console.error("Erreur lors du traitement des données du Multi Solver:", error);
             }
         }
 
-        // Simplifier la méthode de chargement des géocaches du MultiSolver
+        // Méthode améliorée de chargement des géocaches du MultiSolver
         async loadMultiSolverGeocaches(multiSolverId) {
-            console.log("Chargement des geocaches pour le Multi Solver ID:", multiSolverId);
+            if (!multiSolverId) {
+                console.error("ID Multi Solver manquant - impossible de charger les géocaches");
+                return;
+            }
+            
+            console.log(`Chargement des géocaches pour Multi Solver: ${multiSolverId}`);
             
             if (!this.map) {
-                console.error("La carte n'est pas initialisée");
+                console.error("La carte n'est pas initialisée - impossible de charger les géocaches");
                 return;
             }
             
             // Effacer les marqueurs existants
             this.clearMarkers();
             
-            // L'API bulk_coordinates sera appelée par le template multi_solver.html
-            // Nous n'avons rien d'autre à faire ici, les données arriveront via 
-            // l'événement multiSolverDataUpdated que nous écoutons déjà
-            console.log("En attente des données du Multi Solver via l'événement multiSolverDataUpdated");
+            try {
+                let geocaches = [];
+                let dataSource = '';
+                
+                // 1. Essayer de récupérer depuis Tabulator
+                if (window.multiSolverTableResults && window.multiSolverTableResults.length > 0) {
+                    geocaches = window.multiSolverTableResults;
+                    dataSource = 'Tabulator';
+                }
+                // 2. Essayer de récupérer depuis le stockage de session
+                else if (window.sessionStorage) {
+                    try {
+                        const stored = sessionStorage.getItem('multiSolverResults');
+                        if (stored) {
+                            const parsed = JSON.parse(stored);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                geocaches = parsed;
+                                dataSource = 'sessionStorage';
+                            }
+                        }
+                    } catch (storageError) {
+                        console.warn("Erreur lors de la récupération depuis sessionStorage:", storageError);
+                    }
+                }
+                // 3. Essayer de récupérer depuis le DOM
+                if (geocaches.length === 0) {
+                    const multiSolverTable = document.getElementById('multi-solver-results-table');
+                    if (multiSolverTable && multiSolverTable._tabulator) {
+                        geocaches = multiSolverTable._tabulator.getData();
+                        dataSource = 'DOM';
+                    }
+                }
+                
+                // Si nous avons trouvé des données, les traiter
+                if (geocaches.length > 0) {
+                    console.log(`${geocaches.length} géocaches trouvées depuis ${dataSource}`);
+                    
+                    // Compteurs pour le reporting
+                    let markersAdded = 0;
+                    let markersSkipped = 0;
+                    
+                    // Traiter chaque géocache
+                    geocaches.forEach(geocache => {
+                        // Vérifier si nous avons des coordonnées directes ou dans un sous-objet coordinates
+                        if ((geocache.latitude && geocache.longitude) || 
+                            (geocache.coordinates && geocache.coordinates.latitude && geocache.coordinates.longitude)) {
+                            
+                            // Préparer l'objet pour l'ajout du marqueur
+                            const markerData = {
+                                ...geocache,
+                                latitude: geocache.latitude || geocache.coordinates.latitude,
+                                longitude: geocache.longitude || geocache.coordinates.longitude,
+                                gc_code: geocache.gc_code,
+                                name: geocache.name,
+                                id: geocache.id,
+                                cache_type: geocache.cache_type || 'Unknown',
+                                difficulty: geocache.difficulty || '?',
+                                terrain: geocache.terrain || '?',
+                                solved: geocache.saved ? 'solved' : 'unsolved'
+                            };
+                            
+                            this.addMarkerWithGeocache(markerData);
+                            markersAdded++;
+                        } else {
+                            markersSkipped++;
+                        }
+                    });
+                    
+                    console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}`);
+                    
+                    // Ajuster la vue pour montrer tous les marqueurs si nous en avons ajouté
+                    if (markersAdded > 0) {
+                        this.fitMapToMarkers();
+                        return; // Sortir de la fonction si nous avons réussi
+                    }
+                }
+                
+                // Si nous n'avons pas pu trouver ou traiter des données, demander via un événement
+                console.log("Aucune donnée disponible localement, émission d'une demande de données");
+                window.dispatchEvent(new CustomEvent('multiSolverDataRequested', {
+                    detail: {
+                        multiSolverId: multiSolverId,
+                        requesterId: this.element?.id || 'enhanced-zone-map'
+                    }
+                }));
+                
+                // Informer l'utilisateur via un message dans la console
+                console.log("En attente des données du Multi Solver via l'événement multiSolverDataUpdated");
+            } catch (error) {
+                console.error("Erreur lors du chargement des géocaches du Multi Solver:", error);
+                
+                // Notifier l'erreur sur la carte si possible
+                this.notifyError("Erreur lors du chargement des géocaches");
+            }
+        }
+        
+        // Méthode utilitaire pour afficher une erreur sur la carte
+        notifyError(message) {
+            if (this.containerTarget) {
+                const errorElement = document.createElement('div');
+                errorElement.className = 'absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
+                errorElement.textContent = message;
+                this.containerTarget.appendChild(errorElement);
+                
+                // Supprimer le message d'erreur après 5 secondes
+                setTimeout(() => {
+                    if (errorElement.parentNode) {
+                        errorElement.parentNode.removeChild(errorElement);
+                    }
+                }, 5000);
+            }
         }
     }
 
