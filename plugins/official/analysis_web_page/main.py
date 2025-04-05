@@ -1,4 +1,5 @@
 import json
+import re
 
 class AnalysisWebPagePlugin:
     def __init__(self):
@@ -98,8 +99,88 @@ class AnalysisWebPagePlugin:
                     # Mettre à jour les coordonnées dans formula_parser
                     combined_results['formula_parser']['coordinates'] = new_coords
         
+        # Extraire les coordonnées corrigées pour les retourner plus facilement
+        corrected_coordinates = {
+            "exist": False,
+            "formatted": "",
+            "latitude": None,
+            "longitude": None,
+            "source_plugin": None
+        }
+        
+        # Fonction pour convertir un format DDM en coordonnées décimales
+        def convert_ddm_to_decimal(ddm_string):
+            # Pattern pour extraire les composants du format DDM (N XX° YY.YYY' E XX° YY.YYY')
+            pattern = r'([NS])\s*(\d+)°\s*([0-9.]+)\'?\s*([EW])\s*(\d+)°\s*([0-9.]+)\'?'
+            match = re.search(pattern, ddm_string, re.IGNORECASE)
+            if match:
+                # Extraire les composants
+                lat_dir, lat_deg, lat_min, lon_dir, lon_deg, lon_min = match.groups()
+                
+                # Convertir en décimal
+                lat = float(lat_deg) + float(lat_min) / 60
+                if lat_dir.upper() == 'S':
+                    lat = -lat
+                    
+                lon = float(lon_deg) + float(lon_min) / 60
+                if lon_dir.upper() == 'W':
+                    lon = -lon
+                    
+                return lat, lon
+            return None, None
+        
+        # Priorité 1: Coordonnées du color_text_detector
+        if ('color_text_detector' in combined_results and 
+            isinstance(combined_results['color_text_detector'], dict) and
+            'coordinates' in combined_results['color_text_detector'] and
+            combined_results['color_text_detector']['coordinates'].get('exist', False)):
+            
+            corrected_coordinates["exist"] = True
+            corrected_coordinates["formatted"] = combined_results['color_text_detector']['coordinates'].get('ddm', '')
+            corrected_coordinates["source_plugin"] = "color_text_detector"
+            
+            # Récupérer latitude/longitude décimales si disponibles
+            if ('latitude' in combined_results['color_text_detector']['coordinates'] and
+                'longitude' in combined_results['color_text_detector']['coordinates']):
+                corrected_coordinates["latitude"] = combined_results['color_text_detector']['coordinates']['latitude']
+                corrected_coordinates["longitude"] = combined_results['color_text_detector']['coordinates']['longitude']
+            # Sinon, convertir le format DDM en décimal
+            elif corrected_coordinates["formatted"]:
+                lat, lon = convert_ddm_to_decimal(corrected_coordinates["formatted"])
+                if lat is not None and lon is not None:
+                    corrected_coordinates["latitude"] = lat
+                    corrected_coordinates["longitude"] = lon
+        
+        # Priorité 2: Coordonnées du formula_parser (seulement si color_text_detector n'a rien trouvé)
+        elif ('formula_parser' in combined_results and
+              isinstance(combined_results['formula_parser'], dict) and
+              'coordinates' in combined_results['formula_parser'] and
+              combined_results['formula_parser']['coordinates'] and
+              len(combined_results['formula_parser']['coordinates']) > 0):
+            
+            # Prendre la première coordonnée trouvée
+            first_coord = combined_results['formula_parser']['coordinates'][0]
+            
+            if first_coord.get('north') and first_coord.get('east'):
+                corrected_coordinates["exist"] = True
+                corrected_coordinates["formatted"] = f"{first_coord.get('north')} {first_coord.get('east')}"
+                corrected_coordinates["source_plugin"] = "formula_parser"
+                
+                # Récupérer latitude/longitude décimales si disponibles
+                if 'latitude' in first_coord and 'longitude' in first_coord:
+                    corrected_coordinates["latitude"] = first_coord['latitude']
+                    corrected_coordinates["longitude"] = first_coord['longitude']
+                # Sinon, convertir le format DDM en décimal
+                else:
+                    lat, lon = convert_ddm_to_decimal(corrected_coordinates["formatted"])
+                    if lat is not None and lon is not None:
+                        corrected_coordinates["latitude"] = lat
+                        corrected_coordinates["longitude"] = lon
+        
         print("combined_results", combined_results)
+        print("corrected_coordinates", corrected_coordinates)
         # On retourne tous les résultats
         return {
-            "combined_results": combined_results
+            "combined_results": combined_results,
+            "corrected_coordinates": corrected_coordinates
         }

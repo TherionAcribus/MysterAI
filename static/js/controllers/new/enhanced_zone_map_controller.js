@@ -622,41 +622,32 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         
         addMarkerWithGeocache(geocache) {
             try {
-                // Validation des données minimales requises
-            if (!geocache || !geocache.latitude || !geocache.longitude) {
-                    console.error("Données de géocache invalides ou incomplètes:", geocache);
+                if (!geocache || !geocache.gc_code) {
+                    console.error("Données de géocache invalides pour l'ajout du marqueur");
                     return null;
                 }
                 
-                // Extraire et formater les coordonnées
+                // Vérifier que nous avons des coordonnées valides
                 const latitude = parseFloat(geocache.latitude);
                 const longitude = parseFloat(geocache.longitude);
                 
-                // Vérifier la validité des coordonnées après conversion
                 if (isNaN(latitude) || isNaN(longitude)) {
-                    console.error("Coordonnées invalides pour la géocache:", { 
-                        gc_code: geocache.gc_code,
-                        latitude: geocache.latitude, 
-                        longitude: geocache.longitude,
-                        parseLatitude: latitude,
-                        parseLongitude: longitude
-                    });
+                    console.error("Coordonnées invalides pour la géocache:", geocache.gc_code);
                     return null;
                 }
                 
-                // Déterminer si ce point a des coordonnées corrigées
-                const corrected = !!geocache.corrected;
-                const saved = !!geocache.saved;
+                // Déterminer si c'est un point corrigé et/ou sauvegardé
+                let corrected = geocache.corrected === true;
+                let saved = geocache.saved === true;
                 
-                const detailsMessage = corrected 
-                    ? `Marqueur avec coordonnées corrigées (${saved ? 'sauvegardées' : 'non sauvegardées'})` 
-                    : "Marqueur avec coordonnées originales";
-                    
-                console.log(`Ajout de marqueur pour ${geocache.gc_code}: ${detailsMessage}`, { 
+                // Log détaillé pour débogage
+                console.log(`Ajout de marqueur pour ${geocache.gc_code}: ${corrected ? 
+                    (saved ? 'Marqueur avec coordonnées corrigées (sauvegardées)' : 'Marqueur avec coordonnées corrigées (non sauvegardées)') : 
+                    'Marqueur avec coordonnées originales'}`, {
                     latitude, 
-                    longitude,
-                    corrected,
-                    saved,
+                    longitude, 
+                    corrected, 
+                    saved, 
                     originalCoordinates: geocache.original_coordinates || 'aucune',
                     type: geocache.cache_type
                 });
@@ -705,28 +696,31 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         
         // Fonction pour obtenir une couleur en fonction du type de géocache
         getColorForCacheType(cacheType) {
-            // Correspondance des types de géocaches avec des couleurs
+            // Retourne une couleur en fonction du type de cache
+            if (!cacheType) return '#999999'; // Gris par défaut
+            
             const cacheTypeColors = {
-                'Traditional Cache': '#00AA00', // Vert
-                'Mystery Cache': '#0066FF',     // Bleu (modifié selon la demande)
-                'Unknown Cache': '#0066FF',     // Bleu (modifié selon la demande)
-                'Multi-cache': '#FFAA00',       // Orange
-                'EarthCache': '#AA7700',        // Marron
-                'Virtual Cache': '#AA00AA',     // Violet
-                'Letterbox Hybrid': '#0066FF',  // Bleu (modifié selon la demande)
-                'Wherigo Cache': '#00AAAA',     // Cyan
-                'Event Cache': '#FF0000',       // Rouge
-                'Mega-Event Cache': '#FF0000',  // Rouge
-                'Giga-Event Cache': '#FF0000',  // Rouge
-                'Cache In Trash Out Event': '#444444', // Gris foncé
-                'Webcam Cache': '#000000',      // Noir
-                'GPS Adventures Exhibit': '#AAAAAA', // Gris
-                'Groundspeak HQ': '#AAAAAA',    // Gris
-                'Lab Cache': '#FFFFFF'          // Blanc
+                'Traditional Cache': '#00aa00', // Vert
+                'Mystery Cache': '#ffff00', // Jaune
+                'Unknown Cache': '#ffff00', // Jaune
+                'Multi-cache': '#ff6600', // Orange
+                'Letterbox Hybrid': '#aa00aa', // Violet
+                'Event Cache': '#0099ff', // Bleu clair
+                'Earthcache': '#ff9900', // Orange doré
+                'Webcam Cache': '#0066ff', // Bleu foncé
+                'Virtual Cache': '#0099ff', // Bleu clair
+                'Wherigo Cache': '#00ccff', // Bleu clair
+                'Cache In Trash Out Event': '#00aa66', // Vert turquoise
+                'Mega-Event Cache': '#0099ff', // Bleu clair
+                'Giga-Event Cache': '#0099ff', // Bleu clair
+                'Geocaching HQ Celebration': '#0099ff', // Bleu clair
+                'Project APE Cache': '#ff0000', // Rouge
+                'Groundspeak HQ': '#0099ff', // Bleu clair
+                'GPS Adventures Exhibit': '#0099ff', // Bleu clair
+                'Lab Cache': '#ffffff' // Blanc
             };
             
-            // Retourner la couleur correspondante ou une couleur par défaut
-            return cacheTypeColors[cacheType] || '#888888'; // Gris par défaut
+            return cacheTypeColors[cacheType] || '#999999'; // Gris si type non reconnu
         }
         
         // Initialisation de la couche vectorielle pour les marqueurs
@@ -1142,65 +1136,51 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                             }
                         }
                     } catch (e) {
-                        console.error("Erreur lors de la récupération depuis sessionStorage:", e);
+                        console.error("Erreur lors de la récupération des données de session:", e);
                     }
                 }
                 
-                console.log(`handleMultiSolverUpdate: Reçu ${geocaches.length} géocaches pour multiSolverId: ${multiSolverId}`);
-                
-                // Vérifier si notre ID correspond
-                if (this.multiSolverIdValue !== multiSolverId) {
-                    console.log(`Événement ignoré : ID du Multi Solver (${multiSolverId}) ne correspond pas à notre ID (${this.multiSolverIdValue})`);
+                // Si nous n'avons aucune donnée, quitter
+                if (!geocaches || geocaches.length === 0) {
+                    console.warn("Aucune géocache trouvée dans l'événement ou dans sessionStorage");
                 return;
             }
             
-                // Dump complet pour analyser la structure
-                if (geocaches.length > 0) {
-                    console.log("Structure détaillée de la première géocache:", JSON.stringify(geocaches[0]));
-                    
-                    // Vérifier les champs nested pour trouver des coordonnées
-                    const gc = geocaches[0];
-                    const potentialCoordinateFields = [
-                        'corrected_coordinates', 
-                        'coordinates', 
-                        'original_data', 
-                        'original_data.combined_results', 
-                        'combined_results',
-                        'results'
-                    ];
-                    
-                    console.log("Analyse des champs potentiels de coordonnées:");
-                    potentialCoordinateFields.forEach(field => {
-                        const parts = field.split('.');
-                        let value = gc;
-                        for (const part of parts) {
-                            value = value?.[part];
-                        }
-                        console.log(`- Champ "${field}": ${value ? 'présent' : 'absent'}`);
-                        if (value && typeof value === 'object') {
-                            console.log(`  Sous-champs: ${Object.keys(value).join(', ')}`);
-                        }
-                    });
+                // Si l'ID ne correspond pas, ignorer
+                if (this.multiSolverIdValue && multiSolverId && this.multiSolverIdValue !== multiSolverId) {
+                    console.warn(`ID Multi Solver différent: Actuel=${this.multiSolverIdValue}, Événement=${multiSolverId}`);
+                    return;
                 }
                 
-                console.log("Format des données reçues:", {
-                    multiSolverId: multiSolverId,
+                // Analyser le format des données pour débogage
+                const firstItem = geocaches[0];
+                console.log("Format des données MultiSolver:", {
                     nombreGéocaches: geocaches.length,
-                    structureCachePrincipales: geocaches.length > 0 ? Object.keys(geocaches[0]).join(', ') : 'aucune',
-                    formatCoordonnées: geocaches.length > 0 ? (
-                        geocaches[0].corrected_coordinates ? 
-                            'corrected_coordinates: ' + JSON.stringify(geocaches[0].corrected_coordinates) : 
-                            (geocaches[0].coordinates ? 
-                                'coordinates: ' + JSON.stringify(geocaches[0].coordinates) : 'pas de coordonnées')
-                    ) : 'aucune'
+                    premierÉlément: firstItem ? {
+                        hasGcCode: !!firstItem.gc_code,
+                        hasCoordinates: !!firstItem.coordinates,
+                        hasCorrectedCoordinates: !!firstItem.corrected_coordinates,
+                        hasResults: !!firstItem.results, 
+                        hasOriginalData: !!firstItem.original_data,
+                        hasRawCombinedResults: firstItem.original_data && firstItem.original_data.combined_results ? 
+                            Object.keys(firstItem.original_data.combined_results) : null
+                    } : 'aucune',
+                    clés: firstItem ? Object.keys(firstItem) : [],
+                    exempleCoordonnées: firstItem && firstItem.coordinates ? 
+                        (firstItem.coordinates.ddm ? 'format DDM' : 
+                        (firstItem.coordinates.latitude ? 'format décimal' : 'format inconnu')) : 'pas de coordonnées',
+                    exempleCorrection: firstItem && firstItem.corrected_coordinates ? 
+                        (firstItem.corrected_coordinates.exist ? 'coordination corrigée existe' : 'pas d\'info de correction') : 'pas de correction',
+                    exempleRésultat: firstItem && firstItem.results ? 
+                        (firstItem.results.coordinates ? 
+                        'coordinates: ' + JSON.stringify(firstItem.results.coordinates) : 'pas de coordonnées') : 'aucune'
                 });
                 
                 // Vérifier si des données de débogage sont disponibles
                 const hasOriginalData = geocaches.some(gc => gc.original_data);
                 const hasCorrectedCoordinates = geocaches.some(gc => 
                     gc.corrected_coordinates && 
-                    gc.corrected_coordinates.latitude && 
-                    gc.corrected_coordinates.longitude);
+                    gc.corrected_coordinates.exist);
                 
                 console.log("Analyse des données:", {
                     nombreGéocaches: geocaches.length,
@@ -1208,10 +1188,9 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     contientCoordonnéesCorrigées: hasCorrectedCoordinates
                 });
                 
-                // Si nous avons des données valides, effacer les marqueurs existants
-                if (geocaches.length > 0) {
-                this.clearMarkers();
-                    console.log("Marqueurs existants effacés pour intégrer les nouvelles données");
+                // *** IMPORTANT: Ne pas effacer tous les marqueurs - modification pour éviter la régression
+                // this.clearMarkers();
+                // console.log("Marqueurs existants effacés pour intégrer les nouvelles données");
                     
                     // Paramètres pour l'auto-correction
                     const autoCorrectEnabled = document.getElementById('auto-correct-coordinates')?.checked || false;
@@ -1219,8 +1198,21 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     
                     // Compteurs pour le suivi
                     let markersAdded = 0; 
+                let markersUpdated = 0;
                     let markersSkipped = 0;
                     let coordinatesCorrected = 0;
+                
+                // Créer un dictionnaire des marqueurs existants (pour une mise à jour rapide)
+                const existingMarkers = new Map();
+                if (this.markers && this.markers.length > 0) {
+                    this.markers.forEach(marker => {
+                        if (marker.geocache && marker.geocache.gc_code) {
+                            existingMarkers.set(marker.geocache.gc_code, marker);
+                        }
+                    });
+                }
+                
+                console.log(`Marqueurs existants: ${existingMarkers.size}`);
                     
                     // Traiter chaque géocache
                     for (let i = 0; i < geocaches.length; i++) {
@@ -1234,40 +1226,182 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         }
                         
                         // IMPORTANT: Pour le débogage, analyser uniquement certaines géocaches
-                        const isDebugCache = ['GCAP99D'].includes(geocache.gc_code);
-                        
-                        // Initialiser les attributs
+                    const isDebugCache = geocache.gc_code === 'GCAPF4B';
+                    
+                    if (isDebugCache) {
+                        console.log(`Analyse détaillée de la géocache ${geocache.gc_code}:`, {
+                            hasCoordinates: !!geocache.coordinates,
+                            hasCorrectedCoordinates: !!geocache.corrected_coordinates,
+                            hasResults: !!geocache.results,
+                            hasOriginalData: !!geocache.original_data,
+                            coordFormat: geocache.coordinates ? Object.keys(geocache.coordinates) : null,
+                            correctedFormat: geocache.corrected_coordinates ? Object.keys(geocache.corrected_coordinates) : null,
+                            resultsKeys: geocache.results ? Object.keys(geocache.results) : null,
+                            originalDataKeys: geocache.original_data ? Object.keys(geocache.original_data) : null
+                        });
+                    }
+                    
+                    // Initialiser les attributs pour le marqueur
                         let corrected = false;
                         let saved = false;
                         let latitude = null;
                         let longitude = null;
                         let originalCoordinates = null;
                         
-                        // Tracer tous les détails pour le débogage pour géocaches spécifiques
-                        if (isDebugCache) {
-                            console.log(`DÉBOGAGE DÉTAILLÉ POUR ${geocache.gc_code}:`, JSON.stringify(geocache));
+                    // Vérifier d'abord si c'est déjà une géocache avec coordonnées sauvegardées
+                        if (geocache.corrected_coordinates) {
+                            try {
+                                let hasValidCoordinates = false;
+                                
+                                // Première tentative: utiliser latitude/longitude numériques
+                                if (geocache.corrected_coordinates.latitude && geocache.corrected_coordinates.longitude) {
+                                    latitude = parseFloat(geocache.corrected_coordinates.latitude);
+                                    longitude = parseFloat(geocache.corrected_coordinates.longitude);
+                                    
+                                    if (!isNaN(latitude) && !isNaN(longitude)) {
+                                        hasValidCoordinates = true;
+                                        console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées numériques valides trouvées:`, {
+                                            latitude,
+                                            longitude
+                                        });
+                                    } else {
+                                        console.warn(`Géocache ${i} (${geocache.gc_code}): Échec du parsing numérique:`, {
+                                            raw_latitude: geocache.corrected_coordinates.latitude,
+                                            raw_longitude: geocache.corrected_coordinates.longitude
+                                        });
+                                    }
+                                }
+                                
+                                // Deuxième tentative: essayer gc_lat/gc_lon qui pourraient être au format DDM
+                                if (!hasValidCoordinates && geocache.corrected_coordinates.gc_lat && geocache.corrected_coordinates.gc_lon) {
+                                    const lat = this.parseCoordinateString(geocache.corrected_coordinates.gc_lat);
+                                    const lon = this.parseCoordinateString(geocache.corrected_coordinates.gc_lon);
+                                    
+                                    if (lat !== null && lon !== null) {
+                                        latitude = lat;
+                                        longitude = lon;
+                                        hasValidCoordinates = true;
+                                        console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées parsées depuis gc_lat/gc_lon:`, {
+                                            gc_lat: geocache.corrected_coordinates.gc_lat,
+                                            gc_lon: geocache.corrected_coordinates.gc_lon,
+                                            latitude,
+                                            longitude
+                                        });
+                                    } else {
+                                        console.warn(`Géocache ${i} (${geocache.gc_code}): Échec du parsing DDM:`, {
+                                            gc_lat: geocache.corrected_coordinates.gc_lat,
+                                            gc_lon: geocache.corrected_coordinates.gc_lon
+                                        });
+                                    }
+                                }
+                                
+                                // Si nous avons des coordonnées valides, procéder avec les coordonnées corrigées
+                                if (hasValidCoordinates) {
+                                    // Stocker les coordonnées originales si disponibles
+                                    if (geocache.coordinates && 
+                                        geocache.coordinates.latitude && 
+                                        geocache.coordinates.longitude) {
+                                        originalCoordinates = {
+                                            latitude: parseFloat(geocache.coordinates.latitude),
+                                            longitude: parseFloat(geocache.coordinates.longitude)
+                                        };
+                                    }
+                                    
+                                    // Marquer comme corrigées et sauvegardées
+                                    corrected = true;
+                                    saved = true;
+                                    coordinatesCorrected++;
+                                    
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées sauvegardées utilisées`);
+                                } else {
+                                    // Solution de secours: essayer d'utiliser les coordonnées standards
+                                    if (geocache.coordinates && 
+                                        geocache.coordinates.latitude && 
+                                        geocache.coordinates.longitude) {
+                                        try {
+                                            const stdLat = parseFloat(geocache.coordinates.latitude);
+                                            const stdLon = parseFloat(geocache.coordinates.longitude);
+                                            
+                                            if (!isNaN(stdLat) && !isNaN(stdLon)) {
+                                                latitude = stdLat;
+                                                longitude = stdLon;
+                                                corrected = false; // Important: marquer comme non-corrigé car on utilise les coordonnées standards
+                                                saved = false;
+                                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards comme solution de secours`);
+                                            }
+                                        } catch (fallbackError) {
+                                            console.error(`Géocache ${i} (${geocache.gc_code}): Erreur lors de la solution de secours:`, fallbackError);
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error(`Géocache ${i} (${geocache.gc_code}): Exception lors du traitement des coordonnées corrigées:`, error);
+                            }
+                        }
+                    // Sinon, essayer d'extraire des coordonnées corrigées du original_data
+                    else if (geocache.original_data && geocache.original_data.corrected_coordinates &&
+                            geocache.original_data.corrected_coordinates.exist) {
+                        
+                        let coordsSuccess = false;
+                        
+                        // Si latitude/longitude sont disponibles directement
+                        if (geocache.original_data.corrected_coordinates.latitude &&
+                            geocache.original_data.corrected_coordinates.longitude) {
+                            
+                            try {
+                                latitude = parseFloat(geocache.original_data.corrected_coordinates.latitude);
+                                longitude = parseFloat(geocache.original_data.corrected_coordinates.longitude);
+                                coordsSuccess = !isNaN(latitude) && !isNaN(longitude);
+                                
+                                if (coordsSuccess) {
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées extraites du nouveau format corrected_coordinates (latitude/longitude):`, {
+                                        latitude,
+                                        longitude,
+                                        source: geocache.original_data.corrected_coordinates.source_plugin
+                                    });
+                                }
+                            } catch (e) {
+                                console.warn(`Erreur lors du parsing des coordonnées décimales:`, e);
+                            }
                         }
                         
-                        // Log d'analyse condensé
-                        console.log(`Analyse de la géocache ${geocache.gc_code}:`, {
-                            hasCoords: !!geocache.coordinates,
-                            coordFormat: geocache.coordinates ? 
-                                `lat: ${geocache.coordinates.latitude}, lon: ${geocache.coordinates.longitude}` : 'aucune',
-                            hasCorrectedCoords: !!geocache.corrected_coordinates,
-                            correctedFormat: geocache.corrected_coordinates ? 
-                                `lat: ${geocache.corrected_coordinates.latitude}, lon: ${geocache.corrected_coordinates.longitude}` : 'aucune',
-                            hasOriginalData: !!geocache.original_data,
-                            originalDataKeys: geocache.original_data ? Object.keys(geocache.original_data).join(', ') : 'aucune'
-                        });
+                        // Si on n'a pas réussi avec lat/lon directs, essayer de parser le format DDM
+                        if (!coordsSuccess && geocache.original_data.corrected_coordinates.formatted) {
+                            try {
+                                const formattedCoords = geocache.original_data.corrected_coordinates.formatted;
+                                const regex = /([NS])\s*(\d+)°\s*([0-9.]+)'?\s*([EW])\s*(\d+)°\s*([0-9.]+)'?/i;
+                                const match = formattedCoords.match(regex);
+                                
+                                if (match) {
+                                    const northDir = match[1].toUpperCase();
+                                    const northDeg = parseInt(match[2]);
+                                    const northMin = parseFloat(match[3]);
+                                    const eastDir = match[4].toUpperCase();
+                                    const eastDeg = parseInt(match[5]);
+                                    const eastMin = parseFloat(match[6]);
+                                    
+                                    // Convertir en décimal
+                                    latitude = northDeg + (northMin / 60);
+                                    if (northDir === 'S') latitude = -latitude;
+                                    
+                                    longitude = eastDeg + (eastMin / 60);
+                                    if (eastDir === 'W') longitude = -longitude;
+                                    
+                                    coordsSuccess = true;
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées extraites du nouveau format corrected_coordinates (DDM parsé):`, {
+                                        formatted: formattedCoords,
+                                        latitude,
+                                        longitude
+                                    });
+                                } else {
+                                    console.warn(`Format DDM non reconnu:`, formattedCoords);
+                                }
+                            } catch (e) {
+                                console.warn(`Erreur lors du parsing du format DDM:`, e);
+                            }
+                        }
                         
-                        // 1. Priorité: Coordonnées corrigées déjà sauvegardées dans la géocache
-                        if (geocache.corrected_coordinates && 
-                            geocache.corrected_coordinates.latitude && 
-                            geocache.corrected_coordinates.longitude) {
-                            
-                            latitude = parseFloat(geocache.corrected_coordinates.latitude);
-                            longitude = parseFloat(geocache.corrected_coordinates.longitude);
-                            
+                        if (coordsSuccess) {
                             // Stocker les coordonnées originales si disponibles
                             if (geocache.coordinates && 
                                 geocache.coordinates.latitude && 
@@ -1278,14 +1412,18 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 };
                             }
                             
-                            // Marquer comme corrigées et sauvegardées
                             corrected = true;
-                            saved = true;
+                            saved = autoCorrectEnabled; // Sauvegarder si l'auto-correction est activée
                             coordinatesCorrected++;
                             
-                            console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées corrigées sauvegardées`);
+                            // Sauvegarder automatiquement si l'option est activée
+                            if (autoCorrectEnabled && geocache.id) {
+                                this.saveCoordinates(geocache.id, latitude, longitude)
+                                    .then(success => console.log(`Auto-sauvegarde pour ${geocache.gc_code}: ${success ? 'réussie' : 'échouée'}`));
+                            }
                         }
-                        // 2. Vérifier si les coordonnées sont dans un autre champ (résultats multi-solver)
+                    }
+                    // Vérifier si les coordonnées sont dans results
                         else if (geocache.results && geocache.results.coordinates) {
                             const coords = geocache.results.coordinates;
                             if (coords.latitude && coords.longitude) {
@@ -1308,7 +1446,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées trouvées dans results.coordinates`);
                             }
                         }
-                        // 3. Coordonnées extraites des données brutes
+                    // Coordonnées extraites des données brutes combined_results
                         else if (geocache.original_data && geocache.original_data.combined_results) {
                             if (isDebugCache) {
                                 console.log(`Tentative d'extraction de coordonnées pour ${geocache.gc_code}:`, 
@@ -1350,25 +1488,45 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                             }
                         }
                         
-                        // 4. Utiliser les coordonnées standards si aucune correction n'est disponible
-                        if (!latitude || !longitude) {
-                            // Essayer d'abord geocache.coordinates
-                            if (geocache.coordinates && 
-                                geocache.coordinates.latitude && 
-                                geocache.coordinates.longitude) {
+                    // Utiliser les coordonnées standards si aucune correction n'est disponible OU corrected = false
+                    if ((!latitude || !longitude || !corrected) && geocache.coordinates) {
+                        // Essayer d'abord geocache.coordinates
+                        if (geocache.coordinates.latitude && 
+                            geocache.coordinates.longitude) {
+                            
+                            // On vérifie d'abord si corrected est déjà true, ce qui signifie qu'on a déjà trouvé et défini des coordonnées corrigées
+                            if (!corrected) {
                                 latitude = parseFloat(geocache.coordinates.latitude);
                                 longitude = parseFloat(geocache.coordinates.longitude);
+                                
+                                // Important: ne pas marquer comme corrigé s'il s'agit des coordonnées d'origine
+                                corrected = false;
+                                saved = false;
+                                
                                 console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards`);
-                            }
-                            // Sinon, essayer les propriétés directes
-                            else if (geocache.latitude && geocache.longitude) {
-                                latitude = parseFloat(geocache.latitude);
-                                longitude = parseFloat(geocache.longitude);
-                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées directes`);
+                            } else {
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées standards ignorées car déjà des coordonnées corrigées`);
                             }
                         }
+                    }
+                    // Sinon, essayer les propriétés directes
+                    else if ((!latitude || !longitude || !corrected) && geocache.latitude && geocache.longitude) {
+                        // On vérifie d'abord si corrected est déjà true, ce qui signifie qu'on a déjà trouvé et défini des coordonnées corrigées
+                        if (!corrected) {
+                            latitude = parseFloat(geocache.latitude);
+                            longitude = parseFloat(geocache.longitude);
+                            
+                            // Important: ne pas marquer comme corrigé s'il s'agit des coordonnées d'origine
+                            corrected = false;
+                            saved = false;
+                            
+                            console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées directes`);
+                        } else {
+                            console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées directes ignorées car déjà des coordonnées corrigées`);
+                        }
+                    }
                         
-                        // Ajouter le marqueur si nous avons des coordonnées valides
+                    // Ajouter ou mettre à jour le marqueur si nous avons des coordonnées valides
                         if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
                             // Préparer les données complètes pour le marqueur
                             const markerData = {
@@ -1386,7 +1544,39 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 original_coordinates: originalCoordinates
                             };
                             
-                            // Ajouter le marqueur
+                        // Vérifier si ce marqueur existe déjà
+                        const existingMarker = existingMarkers.get(geocache.gc_code);
+                        
+                        if (existingMarker) {
+                            // Si le marqueur existe, mettre à jour sa position et ses attributs
+                            try {
+                                // Récupérer la feature OpenLayers
+                                const feature = existingMarker.feature;
+                                if (feature) {
+                                    // Mettre à jour la position
+                                    const newCoords = ol.proj.fromLonLat([longitude, latitude]);
+                                    feature.getGeometry().setCoordinates(newCoords);
+                                    
+                                    // Mettre à jour les attributs
+                                    feature.set('corrected', corrected);
+                                    feature.set('saved', saved);
+                                    feature.set('latitude', latitude);
+                                    feature.set('longitude', longitude);
+                                    feature.set('original_coordinates', originalCoordinates);
+                                    
+                                    // Mettre à jour les données dans le marqueur
+                                    existingMarker.geocache = markerData;
+                                    
+                                    markersUpdated++;
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Marqueur mis à jour`);
+                                } else {
+                                    console.warn(`Géocache ${i} (${geocache.gc_code}): Feature non trouvée pour marqueur existant`);
+                                }
+                            } catch (error) {
+                                console.error(`Erreur lors de la mise à jour du marqueur ${geocache.gc_code}:`, error);
+                            }
+                        } else {
+                            // Si le marqueur n'existe pas, l'ajouter
                             const marker = this.addMarkerWithGeocache(markerData);
                             
                             if (marker) {
@@ -1394,7 +1584,8 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 
                                 // Loguer les détails si c'est un point corrigé
                                 if (corrected) {
-                                    console.log(`Géocache ${i} (${geocache.gc_code}): Marqueur ajouté comme ${corrected && saved ? 'losange' : 'carré'}`);
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Nouveau marqueur ajouté comme ${corrected && saved ? 'losange' : 'carré'}`);
+                                }
                                 }
                             }
                         } else {
@@ -1404,20 +1595,14 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     }
                     
                     // Log des résultats finaux
-                    console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}, coordonnées corrigées: ${coordinatesCorrected}`);
+                console.log(`Marqueurs ajoutés: ${markersAdded}, mis à jour: ${markersUpdated}, ignorés: ${markersSkipped}, coordonnées corrigées: ${coordinatesCorrected}`);
                     
-                    // Ajuster la vue de la carte
+                // Ajuster la vue de la carte seulement si de nouveaux marqueurs ont été ajoutés
                     if (markersAdded > 0) {
                     this.fitMapToMarkers();
-                } else {
-                        console.warn("Aucun marqueur n'a pu être ajouté à la carte");
-                    }
-                } else {
-                    console.warn("Aucune géocache reçue dans l'événement multiSolverDataUpdated");
                 }
             } catch (error) {
                 console.error("Erreur lors de la gestion de la mise à jour du Multi Solver:", error);
-                this.notifyError("Erreur lors de la mise à jour des géocaches");
             }
         }
         
@@ -1429,78 +1614,165 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                 if (!combinedResults) return result;
                 
                 console.log(`Tentative d'extraction des coordonnées pour ${gcCode}:`, {
+                    hasCorrectedCoordinates: !!combinedResults.corrected_coordinates,
                     hasColorTextDetector: !!combinedResults.color_text_detector,
                     hasFormulaParser: !!combinedResults.formula_parser
                 });
                 
-                // Vérifier d'abord le détecteur de texte coloré (prioritaire)
-                if (combinedResults.color_text_detector && 
-                    combinedResults.color_text_detector.coordinates &&
-                    combinedResults.color_text_detector.coordinates.exist) {
+                // Vérifier d'abord le nouveau format corrected_coordinates
+                if (combinedResults.corrected_coordinates && 
+                    combinedResults.corrected_coordinates.exist && 
+                    combinedResults.corrected_coordinates.formatted) {
                     
-                    let north, east;
-                    
-                    // Format DDM complet
-                    if (combinedResults.color_text_detector.coordinates.ddm) {
-                        const ddm = combinedResults.color_text_detector.coordinates.ddm;
-                        const parts = ddm.split(/\s+/);
-                        if (parts.length >= 4) {
-                            north = parts.slice(0, 2).join(' ');
-                            east = parts.slice(2, 4).join(' ');
-                            console.log(`Géocache ${index} (${gcCode}): Coordonnées DDM extraites:`, { north, east });
+                    // Si on a directement latitude/longitude en décimal
+                    if (combinedResults.corrected_coordinates.latitude && 
+                        combinedResults.corrected_coordinates.longitude) {
+                        
+                        try {
+                            const lat = parseFloat(combinedResults.corrected_coordinates.latitude);
+                            const lon = parseFloat(combinedResults.corrected_coordinates.longitude);
+                            
+                            if (!isNaN(lat) && !isNaN(lon)) {
+                                result.success = true;
+                                result.latitude = lat;
+                                result.longitude = lon;
+                                result.source = combinedResults.corrected_coordinates.source_plugin;
+                                
+                                console.log(`Géocache ${index} (${gcCode}): Coordonnées trouvées dans corrected_coordinates décimales:`, {
+                                    latitude: result.latitude,
+                                    longitude: result.longitude,
+                                    source: result.source
+                                });
+                                
+                                return result;
+                            }
+                        } catch (e) {
+                            console.warn(`Géocache ${index} (${gcCode}): Erreur lors du parsing des coordonnées décimales:`, e);
                         }
-                    } 
-                    // Format DDM séparé (latitude/longitude)
-                    else if (combinedResults.color_text_detector.coordinates.ddm_lat && 
-                             combinedResults.color_text_detector.coordinates.ddm_lon) {
-                        north = combinedResults.color_text_detector.coordinates.ddm_lat;
-                        east = combinedResults.color_text_detector.coordinates.ddm_lon;
                     }
                     
-                    if (north && east) {
-                        const converted = this.convertDDMToDecimal(north, east);
-                        if (converted) {
+                    // Essayer de convertir le format DDM en décimal
+                    try {
+                        const formattedCoords = combinedResults.corrected_coordinates.formatted;
+                        // Extraire les parties Nord et Est
+                        const regex = /([NS])\s*(\d+)°\s*([0-9.]+)'?\s*([EW])\s*(\d+)°\s*([0-9.]+)'?/i;
+                        const match = formattedCoords.match(regex);
+                        
+                        if (match) {
+                            const northDir = match[1].toUpperCase();
+                            const northDeg = parseInt(match[2]);
+                            const northMin = parseFloat(match[3]);
+                            const eastDir = match[4].toUpperCase();
+                            const eastDeg = parseInt(match[5]);
+                            const eastMin = parseFloat(match[6]);
+                            
+                            // Convertir en décimal
+                            let latitude = northDeg + (northMin / 60);
+                            if (northDir === 'S') latitude = -latitude;
+                            
+                            let longitude = eastDeg + (eastMin / 60);
+                            if (eastDir === 'W') longitude = -longitude;
+                            
                             result.success = true;
-                            result.latitude = converted.lat;
-                            result.longitude = converted.lon;
-                            console.log(`Coordonnées extraites avec color_text_detector pour ${gcCode}`, result);
+                            result.latitude = latitude;
+                            result.longitude = longitude;
+                            result.source = combinedResults.corrected_coordinates.source_plugin;
+                            
+                            console.log(`Géocache ${index} (${gcCode}): Coordonnées DDM converties depuis corrected_coordinates:`, {
+                                formatted: formattedCoords,
+                                latitude: result.latitude,
+                                longitude: result.longitude,
+                                source: result.source
+                            });
+                            
                             return result;
+                        } else {
+                            console.warn(`Géocache ${index} (${gcCode}): Format DDM non reconnu:`, formattedCoords);
                         }
+                    } catch (e) {
+                        console.warn(`Géocache ${index} (${gcCode}): Erreur lors de la conversion du format DDM:`, e);
                     }
                 }
                 
-                // Vérifier ensuite le parseur de formule
+                // Ensuite, vérifier formula_parser
                 if (combinedResults.formula_parser && 
                     combinedResults.formula_parser.coordinates && 
                     combinedResults.formula_parser.coordinates.length > 0) {
                     
-                    const firstCoord = combinedResults.formula_parser.coordinates[0];
-                    if (firstCoord.north && firstCoord.east) {
-                        const converted = this.convertDDMToDecimal(firstCoord.north, firstCoord.east);
-                        if (converted) {
+                    // Prendre le premier résultat
+                    const coords = combinedResults.formula_parser.coordinates[0];
+                    
+                    if (coords) {
+                        // Si on a des coordonnées décimales directement
+                        if (coords.latitude !== undefined && coords.longitude !== undefined) {
+                            try {
+                                const lat = parseFloat(coords.latitude);
+                                const lon = parseFloat(coords.longitude);
+                                
+                                if (!isNaN(lat) && !isNaN(lon)) {
                             result.success = true;
-                            result.latitude = converted.lat;
-                            result.longitude = converted.lon;
-                            console.log(`Coordonnées extraites avec formula_parser pour ${gcCode}`, result);
+                                    result.latitude = lat;
+                                    result.longitude = lon;
+                                    result.source = "formula_parser";
+                                    console.log(`Géocache ${index} (${gcCode}): Coordonnées décimales formula_parser:`, result);
                             return result;
+                                }
+                            } catch (e) {
+                                console.warn(`Géocache ${index} (${gcCode}): Erreur de parsing des coordonnées formula_parser:`, e);
+                            }
+                        }
+                        // Si on a format DDM
+                        else if (coords.north && coords.east) {
+                            try {
+                                const coordinates = this.convertDDMToDecimal(coords.north, coords.east);
+                                if (coordinates && !isNaN(coordinates.latitude) && !isNaN(coordinates.longitude)) {
+                                    result.success = true;
+                                    result.latitude = parseFloat(coordinates.latitude);
+                                    result.longitude = parseFloat(coordinates.longitude);
+                                    result.source = "formula_parser";
+                                    console.log(`Géocache ${index} (${gcCode}): Conversion DDM formula_parser réussie:`, result);
+                                    return result;
+                                }
+                            } catch (e) {
+                                console.warn(`Géocache ${index} (${gcCode}): Erreur de conversion DDM formula_parser:`, e);
+                            }
                         }
                     }
                 }
                 
-                // Vérifier les coordonnées décimales directes si disponibles
-                if (combinedResults.corrected_coordinates && 
-                    combinedResults.corrected_coordinates.latitude && 
-                    combinedResults.corrected_coordinates.longitude) {
+                // Enfin vérifier coordinates_finder
+                if (combinedResults.coordinates_finder && 
+                    combinedResults.coordinates_finder.coordinates) {
                     
+                    // Parcourir les coordonnées trouvées
+                    const coordsList = combinedResults.coordinates_finder.coordinates;
+                    
+                    if (Array.isArray(coordsList) && coordsList.length > 0) {
+                        const firstCoord = coordsList[0];
+                        
+                        if (firstCoord && firstCoord.latitude && firstCoord.longitude) {
+                            try {
+                                const lat = parseFloat(firstCoord.latitude);
+                                const lon = parseFloat(firstCoord.longitude);
+                                
+                                if (!isNaN(lat) && !isNaN(lon)) {
                     result.success = true;
-                    result.latitude = parseFloat(combinedResults.corrected_coordinates.latitude);
-                    result.longitude = parseFloat(combinedResults.corrected_coordinates.longitude);
-                    console.log(`Coordonnées décimales directes trouvées pour ${gcCode}`, result);
+                                    result.latitude = lat;
+                                    result.longitude = lon;
+                                    result.source = "coordinates_finder";
+                                    console.log(`Géocache ${index} (${gcCode}): Coordonnées depuis coordinates_finder:`, result);
                     return result;
+                                }
+                            } catch (e) {
+                                console.warn(`Géocache ${index} (${gcCode}): Erreur de parsing des coordonnées coordinates_finder:`, e);
+                            }
+                        }
+                    }
                 }
                 
-                console.log(`Aucune coordonnée extraite pour ${gcCode}`);
+                console.log(`Géocache ${index} (${gcCode}): Aucune coordonnée trouvée dans les résultats combinés.`);
                 return result;
+                
             } catch (error) {
                 console.error(`Erreur lors de l'extraction des coordonnées pour ${gcCode}:`, error);
                 return result;
@@ -2274,30 +2546,94 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                         let originalCoordinates = null;
                         
                         // 1. Priorité: Coordonnées corrigées déjà sauvegardées
-                        if (geocache.corrected_coordinates && 
-                            geocache.corrected_coordinates.latitude && 
-                            geocache.corrected_coordinates.longitude) {
-                            
-                            // Utiliser les coordonnées corrigées
-                            latitude = parseFloat(geocache.corrected_coordinates.latitude);
-                            longitude = parseFloat(geocache.corrected_coordinates.longitude);
-                            
-                            // Stocker les coordonnées originales si disponibles
-                            if (geocache.coordinates && 
-                                geocache.coordinates.latitude && 
-                                geocache.coordinates.longitude) {
-                                originalCoordinates = {
-                                    latitude: parseFloat(geocache.coordinates.latitude),
-                                    longitude: parseFloat(geocache.coordinates.longitude)
-                                };
+                        if (geocache.corrected_coordinates) {
+                            try {
+                                let hasValidCoordinates = false;
+                                
+                                // Première tentative: utiliser latitude/longitude numériques
+                                if (geocache.corrected_coordinates.latitude && geocache.corrected_coordinates.longitude) {
+                                    latitude = parseFloat(geocache.corrected_coordinates.latitude);
+                                    longitude = parseFloat(geocache.corrected_coordinates.longitude);
+                                    
+                                    if (!isNaN(latitude) && !isNaN(longitude)) {
+                                        hasValidCoordinates = true;
+                                        console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées numériques valides trouvées:`, {
+                                            latitude,
+                                            longitude
+                                        });
+                                    } else {
+                                        console.warn(`Géocache ${i} (${geocache.gc_code}): Échec du parsing numérique:`, {
+                                            raw_latitude: geocache.corrected_coordinates.latitude,
+                                            raw_longitude: geocache.corrected_coordinates.longitude
+                                        });
+                                    }
+                                }
+                                
+                                // Deuxième tentative: essayer gc_lat/gc_lon qui pourraient être au format DDM
+                                if (!hasValidCoordinates && geocache.corrected_coordinates.gc_lat && geocache.corrected_coordinates.gc_lon) {
+                                    const lat = this.parseCoordinateString(geocache.corrected_coordinates.gc_lat);
+                                    const lon = this.parseCoordinateString(geocache.corrected_coordinates.gc_lon);
+                                    
+                                    if (lat !== null && lon !== null) {
+                                        latitude = lat;
+                                        longitude = lon;
+                                        hasValidCoordinates = true;
+                                        console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées parsées depuis gc_lat/gc_lon:`, {
+                                            gc_lat: geocache.corrected_coordinates.gc_lat,
+                                            gc_lon: geocache.corrected_coordinates.gc_lon,
+                                            latitude,
+                                            longitude
+                                        });
+                                    } else {
+                                        console.warn(`Géocache ${i} (${geocache.gc_code}): Échec du parsing DDM:`, {
+                                            gc_lat: geocache.corrected_coordinates.gc_lat,
+                                            gc_lon: geocache.corrected_coordinates.gc_lon
+                                        });
+                                    }
+                                }
+                                
+                                // Si nous avons des coordonnées valides, procéder avec les coordonnées corrigées
+                                if (hasValidCoordinates) {
+                                    // Stocker les coordonnées originales si disponibles
+                                    if (geocache.coordinates && 
+                                        geocache.coordinates.latitude && 
+                                        geocache.coordinates.longitude) {
+                                        originalCoordinates = {
+                                            latitude: parseFloat(geocache.coordinates.latitude),
+                                            longitude: parseFloat(geocache.coordinates.longitude)
+                                        };
+                                    }
+                                    
+                                    // Marquer comme corrigées et sauvegardées
+                                    corrected = true;
+                                    saved = true;
+                                    coordinatesCorrected++;
+                                    
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées corrigées sauvegardées utilisées`);
+                                } else {
+                                    // Solution de secours: essayer d'utiliser les coordonnées standards
+                                    if (geocache.coordinates && 
+                                        geocache.coordinates.latitude && 
+                                        geocache.coordinates.longitude) {
+                                        try {
+                                            const stdLat = parseFloat(geocache.coordinates.latitude);
+                                            const stdLon = parseFloat(geocache.coordinates.longitude);
+                                            
+                                            if (!isNaN(stdLat) && !isNaN(stdLon)) {
+                                                latitude = stdLat;
+                                                longitude = stdLon;
+                                                corrected = false; // Important: marquer comme non-corrigé car on utilise les coordonnées standards
+                                                saved = false;
+                                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards comme solution de secours`);
+                                            }
+                                        } catch (fallbackError) {
+                                            console.error(`Géocache ${i} (${geocache.gc_code}): Erreur lors de la solution de secours:`, fallbackError);
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error(`Géocache ${i} (${geocache.gc_code}): Exception lors du traitement des coordonnées corrigées:`, error);
                             }
-                            
-                            // Marquer comme corrigées et sauvegardées
-                            corrected = true;
-                            saved = true;
-                            coordinatesCorrected++;
-                            
-                            console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées corrigées sauvegardées`);
                         }
                         // 2. Coordonnées extraites des données brutes
                         else if (geocache.original_data && geocache.original_data.combined_results) {
@@ -2342,12 +2678,16 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                                 geocache.coordinates.longitude) {
                                 latitude = parseFloat(geocache.coordinates.latitude);
                                 longitude = parseFloat(geocache.coordinates.longitude);
+                                // Important: ne pas modifier les flags corrected/saved ici
+                                // On utilise les coordonnées standards seulement si aucune coordonnée corrigée n'a été trouvée
                                 console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards`);
                             }
                             // Sinon, essayer les propriétés directes
                             else if (geocache.latitude && geocache.longitude) {
                                 latitude = parseFloat(geocache.latitude);
                                 longitude = parseFloat(geocache.longitude);
+                                // Important: ne pas modifier les flags corrected/saved ici
+                                // On utilise les coordonnées standards seulement si aucune coordonnée corrigée n'a été trouvée
                                 console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées directes`);
                             }
                         }
@@ -2418,35 +2758,40 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         // Fonction utilitaire pour convertir les coordonnées DDM en coordonnées décimales
         convertDDMToDecimal(north, east) {
             try {
+                if (!north || !east) {
+                    console.error("Coordonnées DDM invalides: north ou east manquant");
+                    return null;
+                }
+                
                 // Extraire les parties des coordonnées
                 const northMatch = north.match(/([NS])\s*(\d+)°\s*([\d.]+)/i);
                 const eastMatch = east.match(/([EW])\s*(\d+)°\s*([\d.]+)/i);
                 
                 if (!northMatch || !eastMatch) {
-                    console.warn("Format de coordonnées DDM invalide:", north, east);
+                    console.error("Format de coordonnées DDM non reconnu:", { north, east });
                     return null;
                 }
                 
-                // Extraire les composants nord
-                const northHemi = northMatch[1].toUpperCase();
-                const northDeg = parseInt(northMatch[2], 10);
-                const northMin = parseFloat(northMatch[3]);
+                // Décomposer les parties
+                const latDir = northMatch[1].toUpperCase();
+                const latDeg = parseInt(northMatch[2], 10);
+                const latMin = parseFloat(northMatch[3]);
                 
-                // Extraire les composants est
-                const eastHemi = eastMatch[1].toUpperCase();
-                const eastDeg = parseInt(eastMatch[2], 10);
-                const eastMin = parseFloat(eastMatch[3]);
+                const lonDir = eastMatch[1].toUpperCase();
+                const lonDeg = parseInt(eastMatch[2], 10);
+                const lonMin = parseFloat(eastMatch[3]);
                 
-                // Convertir en décimal
-                let lat = northDeg + (northMin / 60);
-                if (northHemi === 'S') lat = -lat;
+                // Convertir en degrés décimaux
+                let lat = latDeg + (latMin / 60);
+                if (latDir === 'S') lat = -lat;
                 
-                let lon = eastDeg + (eastMin / 60);
-                if (eastHemi === 'W') lon = -lon;
+                let lon = lonDeg + (lonMin / 60);
+                if (lonDir === 'W') lon = -lon;
                 
+                // Retourner les coordonnées converties
                 return { lat, lon };
             } catch (error) {
-                console.error("Erreur lors de la conversion des coordonnées DDM:", error);
+                console.error("Erreur lors de la conversion DDM -> décimal:", error);
                 return null;
             }
         }
@@ -2454,27 +2799,97 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         // Fonction pour sauvegarder les coordonnées sur le serveur
         async saveCoordinates(geocacheId, lat, lon) {
             try {
-                console.log("Sauvegarde automatique des coordonnées:", { geocacheId, lat, lon });
-                
-                const formData = new FormData();
-                formData.append('gc_lat', lat);
-                formData.append('gc_lon', lon);
-                
-                const response = await fetch(`/geocaches/${geocacheId}/coordinates`, {
-                    method: 'PUT',
-                    body: formData,
-                    headers: {
-                        'X-Layout-Component': 'true'
-                    }
-                });
-                
-                if (response.ok) {
-                    console.log("Coordonnées sauvegardées avec succès pour:", geocacheId);
-                    return true;
-                } else {
-                    console.error("Erreur lors de la sauvegarde des coordonnées:", response.statusText);
+                if (!geocacheId) {
+                    console.error("ID de géocache manquant pour la sauvegarde");
                     return false;
                 }
+                
+                // Vérifier si lat et lon sont des nombres
+                let latitude = lat;
+                let longitude = lon;
+                
+                // Si ce sont des chaînes de caractères au format DDM, essayer de les convertir
+                if (typeof lat === 'string' && typeof lon === 'string') {
+                    // Vérifier si le format semble être du DDM
+                    const latRegex = /([NS])\s*(\d+)°\s*([0-9.]+)/i;
+                    const lonRegex = /([EW])\s*(\d+)°\s*([0-9.]+)/i;
+                    
+                    if (latRegex.test(lat) && lonRegex.test(lon)) {
+                        console.log("Coordonnées au format DDM détectées, tentative de conversion...");
+                        const latMatch = lat.match(latRegex);
+                        const lonMatch = lon.match(lonRegex);
+                        
+                        if (latMatch && lonMatch) {
+                            const latDir = latMatch[1].toUpperCase();
+                            const latDeg = parseInt(latMatch[2]);
+                            const latMin = parseFloat(latMatch[3]);
+                            
+                            const lonDir = lonMatch[1].toUpperCase();
+                            const lonDeg = parseInt(lonMatch[2]);
+                            const lonMin = parseFloat(lonMatch[3]);
+                            
+                            // Conversion en décimal
+                            latitude = latDeg + (latMin / 60);
+                            if (latDir === 'S') latitude = -latitude;
+                            
+                            longitude = lonDeg + (lonMin / 60);
+                            if (lonDir === 'W') longitude = -longitude;
+                            
+                            console.log("Coordonnées converties:", { latitude, longitude });
+                        }
+                    } else {
+                        // Si lat et lon sont des chaînes mais pas au format DDM, essayer de les parser en flottants
+                        const parsedLat = parseFloat(lat);
+                        const parsedLon = parseFloat(lon);
+                        
+                        if (!isNaN(parsedLat) && !isNaN(parsedLon)) {
+                            latitude = parsedLat;
+                            longitude = parsedLon;
+                } else {
+                            console.error("Format de coordonnées non reconnu:", { lat, lon });
+                    return false;
+                }
+                    }
+                }
+                
+                // À ce stade, latitude et longitude devraient être des nombres décimaux
+                if (isNaN(latitude) || isNaN(longitude)) {
+                    console.error("Coordonnées invalides après conversion:", { latitude, longitude });
+                    return false;
+                }
+                
+                console.log(`Sauvegarde des coordonnées pour ${geocacheId}: ${latitude}, ${longitude}`);
+                
+                // Récupérer le token CSRF si présent
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                
+                // Construire les données de la requête
+                const requestData = {
+                    geocache_id: geocacheId,
+                    latitude: latitude,
+                    longitude: longitude
+                };
+                
+                // Appeler l'API pour sauvegarder les coordonnées
+                const response = await fetch('/api/geocaches/coordinates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRFToken': csrfToken || ''
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    console.error(`Erreur HTTP lors de la sauvegarde: ${response.status} ${response.statusText}`);
+                    return false;
+                }
+                
+                const result = await response.json();
+                console.log("Résultat de la sauvegarde:", result);
+                
+                return true;
             } catch (error) {
                 console.error("Erreur lors de la sauvegarde des coordonnées:", error);
                 return false;
@@ -2724,6 +3139,52 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             }
             
             console.groupEnd();
+        }
+
+        // Fonction utilitaire pour convertir une chaîne de coordonnées au format DMS/DDM en décimal
+        parseCoordinateString(coordString) {
+            if (!coordString || typeof coordString !== 'string') {
+                return null;
+            }
+            
+            // Essayer d'abord de parser directement comme un nombre décimal
+            const directParse = parseFloat(coordString);
+            if (!isNaN(directParse)) {
+                return directParse;
+            }
+            
+            // Essayer de parser le format DDM (Degrés, Minutes Décimales)
+            // Exemple: "N 49° 45.269'" ou "E 5° 56.356'"
+            const ddmPattern = /^([NSEW])\s*(\d+)°\s*(\d+\.\d+)['′]?$/i;
+            const ddmMatch = coordString.match(ddmPattern);
+            
+            if (ddmMatch) {
+                const direction = ddmMatch[1].toUpperCase();
+                const degrees = parseFloat(ddmMatch[2]);
+                const minutes = parseFloat(ddmMatch[3]);
+                
+                if (isNaN(degrees) || isNaN(minutes)) {
+                    console.warn(`Échec du parsing DDM pour: "${coordString}" - valeurs non numériques`);
+                    return null;
+                }
+                
+                // Convertir en décimal
+                let decimal = degrees + (minutes / 60);
+                
+                // Appliquer le signe selon la direction
+                if (direction === 'S' || direction === 'W') {
+                    decimal = -decimal;
+                }
+                
+                return decimal;
+            }
+            
+            console.warn(`Format de coordonnées non reconnu: "${coordString}"`);
+            return null;
+        }
+
+        getColorForCacheType(type) {
+            // ... existing code ...
         }
     }
 

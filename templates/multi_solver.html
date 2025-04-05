@@ -2568,7 +2568,18 @@
             return null;
         }
         
-        // Vérifier d'abord color_text_detector qui est souvent le plus fiable
+        // Vérifier d'abord si les coordonnées corrigées sont directement disponibles
+        if (combined.corrected_coordinates && combined.corrected_coordinates.exist) {
+            return {
+                ddm: combined.corrected_coordinates.formatted,
+                latitude: combined.corrected_coordinates.latitude,
+                longitude: combined.corrected_coordinates.longitude,
+                source: combined.corrected_coordinates.source_plugin,
+                exist: true
+            };
+        }
+        
+        // Si pas dans le nouveau format, vérifier color_text_detector qui est souvent le plus fiable
         if (combined.color_text_detector && 
             combined.color_text_detector.coordinates && 
             combined.color_text_detector.coordinates.exist && 
@@ -2580,7 +2591,8 @@
                 ddm: coords.ddm,
                 latitude: coords.ddm_lat,
                 longitude: coords.ddm_lon,
-                source: 'color_text_detector'
+                source: 'color_text_detector',
+                exist: true
             };
         }
         
@@ -2595,7 +2607,8 @@
                     ddm: `${coord.north} ${coord.east}`,
                     latitude: coord.north,
                     longitude: coord.east,
-                    source: 'formula_parser'
+                    source: 'formula_parser',
+                    exist: true
                 };
             }
         }
@@ -2611,7 +2624,8 @@
                     ddm: `${coord.lat} ${coord.lon}`,
                     latitude: coord.lat,
                     longitude: coord.lon,
-                    source: 'coordinates_finder'
+                    source: 'coordinates_finder',
+                    exist: true
                 };
             }
         }
