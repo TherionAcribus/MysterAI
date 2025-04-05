@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app, session
 import logging
 import json
 import urllib.parse
@@ -59,7 +59,11 @@ def bulk_coordinates():
         # Construire le résultat
         result = []
         for geocache in geocaches:
-            result.append({
+            # Vérifier si la géocache a des coordonnées corrigées
+            has_corrected_coords = geocache.gc_lat_corrected is not None and geocache.gc_lon_corrected is not None
+            
+            # Construire les données de base
+            geocache_data = {
                 'id': geocache.id,
                 'gc_code': geocache.gc_code,
                 'name': geocache.name,
@@ -69,9 +73,121 @@ def bulk_coordinates():
                 'difficulty': geocache.difficulty,
                 'terrain': geocache.terrain,
                 'solved': geocache.solved
-            })
+            }
+            
+            # Ajouter les coordonnées corrigées si disponibles
+            if has_corrected_coords:
+                geocache_data['corrected_coordinates'] = {
+                    'latitude': geocache.gc_lat_corrected,
+                    'longitude': geocache.gc_lon_corrected
+                }
+                
+                # Ajouter les coordonnées originales dans un format standard pour comparaison
+                geocache_data['coordinates'] = {
+                    'latitude': geocache.latitude,
+                    'longitude': geocache.longitude
+                }
+                
+                # Ajouter les formats Geocaching.com si disponibles
+                if geocache.gc_coords_corrected:
+                    geocache_data['corrected_coordinates']['gc_coords'] = geocache.gc_coords_corrected
+                    geocache_data['corrected_coordinates']['gc_lat'] = geocache.gc_lat_corrected
+                    geocache_data['corrected_coordinates']['gc_lon'] = geocache.gc_lon_corrected
+                
+                if geocache.gc_coords:
+                    geocache_data['coordinates']['gc_coords'] = geocache.gc_coords
+                    geocache_data['coordinates']['gc_lat'] = geocache.gc_lat
+                    geocache_data['coordinates']['gc_lon'] = geocache.gc_lon
+            
+            result.append(geocache_data)
+            print('bulk-coordinates', geocache_data)
         
         return jsonify(result)
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des coordonnées en masse: {str(e)}")
-        return jsonify({'error': f'Erreur de serveur: {str(e)}'}), 500 
+        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500 
+
+@multi_solver_bp.route('/api/multi-solvers/<string:solver_id>/geocaches', methods=['GET'])
+def get_multi_solver_geocaches(solver_id):
+    """
+    Récupère les géocaches associées à un multi-solver spécifique.
+    Cette route est utilisée par le composant carte pour afficher les géocaches.
+    """
+    logger.info(f"Récupération des géocaches pour le multi-solver: {solver_id}")
+    
+    try:
+        # Extraire les IDs des géocaches depuis la session si disponible
+        geocache_ids = []
+        if 'multiSolverResults' in session:
+            try:
+                stored_data = session['multiSolverResults']
+                if isinstance(stored_data, list):
+                    geocache_ids = [item.get('id') for item in stored_data if item.get('id')]
+                    logger.info(f"Récupéré {len(geocache_ids)} IDs depuis la session")
+            except Exception as e:
+                logger.error(f"Erreur lors de la lecture des données de session: {str(e)}")
+        
+        # Si pas d'IDs dans la session, essayer de les récupérer d'une autre façon
+        # Par exemple, depuis une base de données temporaire ou un cache
+        if not geocache_ids:
+            logger.warning(f"Aucun ID de géocache trouvé pour {solver_id}. Tentative de récupération alternative.")
+            # Logique supplémentaire pour récupérer les IDs si nécessaire...
+        
+        if not geocache_ids:
+            return jsonify([]), 200  # Retourner un tableau vide plutôt qu'une erreur
+        
+        # Récupérer les géocaches avec leurs coordonnées
+        geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+        
+        # Construire le résultat
+        result = []
+        for geocache in geocaches:
+            # Vérifier si la géocache a des coordonnées corrigées
+            has_corrected_coords = geocache.latitude_corrected is not None and geocache.longitude_corrected is not None
+            
+            # Construire les données de base
+            geocache_data = {
+                'id': geocache.id,
+                'gc_code': geocache.gc_code,
+                'name': geocache.name,
+                'latitude': geocache.latitude,
+                'longitude': geocache.longitude,
+                'cache_type': geocache.cache_type,
+                'difficulty': geocache.difficulty,
+                'terrain': geocache.terrain,
+                'solved': geocache.solved
+            }
+            
+            # Ajouter les coordonnées corrigées si disponibles
+            if has_corrected_coords:
+                geocache_data['corrected_coordinates'] = {
+                    'latitude': geocache.latitude_corrected,
+                    'longitude': geocache.longitude_corrected
+                }
+                
+                # Ajouter les coordonnées originales dans un format standard pour comparaison
+                geocache_data['coordinates'] = {
+                    'latitude': geocache.latitude,
+                    'longitude': geocache.longitude
+                }
+                
+                # Ajouter les formats Geocaching.com si disponibles
+                if geocache.gc_coords_corrected:
+                    geocache_data['corrected_coordinates']['gc_coords'] = geocache.gc_coords_corrected
+                    geocache_data['corrected_coordinates']['gc_lat'] = geocache.gc_lat_corrected
+                    geocache_data['corrected_coordinates']['gc_lon'] = geocache.gc_lon_corrected
+                
+                if geocache.gc_coords:
+                    geocache_data['coordinates']['gc_coords'] = geocache.gc_coords
+                    geocache_data['coordinates']['gc_lat'] = geocache.gc_lat
+                    geocache_data['coordinates']['gc_lon'] = geocache.gc_lon
+            
+            result.append(geocache_data)
+            print('get_multi_solver_geocaches', geocache_data)
+        
+        logger.info(f"Renvoi de {len(result)} géocaches pour le multi-solver {solver_id}")
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des géocaches pour le multi-solver {solver_id}: {str(e)}")
+        return jsonify({'error': f'Erreur serveur: {str(e)}'}), 500 

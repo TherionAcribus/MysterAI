@@ -9,7 +9,7 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
     }
     
     class EnhancedZoneMapController extends Stimulus.Controller {
-        static targets = ["container"]
+        static targets = ["container", "popup", "popupContent"]
         static values = {
             zoneId: String,
             geocacheId: String,
@@ -17,25 +17,90 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             multiSolverId: String
         }
 
-        connect() {
-            console.log('=== DEBUG: Enhanced Zone Map Controller connecté ===');
-            console.log('Container:', this.hasContainerTarget ? 'présent' : 'manquant');
-            console.log('Zone ID:', this.zoneIdValue || 'non défini');
-            console.log('Geocache ID:', this.geocacheIdValue || 'non défini');
-            console.log('Multi Solver:', this.isMultiSolverValue ? 'oui' : 'non');
-            console.log('Multi Solver ID:', this.multiSolverIdValue || 'non défini');
+        // Méthode de débogage - Affiche les informations importantes sur le contrôleur
+        debug(message = "Debug Info") {
+            console.group(`🔍 ${message} - EnhancedZoneMapController`);
             
-            if (this.hasContainerTarget) {
-                this.initializeMap();
-                this.initializeContextMenu();
+            // Informations sur l'élément du contrôleur
+            console.log("Élément:", this.element);
+            console.log("ID de l'élément:", this.element?.id || "non défini");
+            console.log("Dimensions:", {
+                width: this.element?.clientWidth,
+                height: this.element?.clientHeight
+            });
+            
+            // Informations sur les cibles
+            console.log("Cible container:", this.hasContainerTarget ? "présente" : "absente");
+            console.log("Cible popup:", this.hasPopupTarget ? "présente" : "absente");
+            console.log("Cible popupContent:", this.hasPopupContentTarget ? "présente" : "absente");
+            
+            // Informations sur les valeurs
+            console.log("Zone ID:", this.zoneIdValue || "non définie");
+            console.log("Geocache ID:", this.geocacheIdValue || "non définie");
+            console.log("Is Multi Solver:", this.isMultiSolverValue || false);
+            console.log("Multi Solver ID:", this.multiSolverIdValue || "non définie");
+            
+            // État actuel
+            console.log("Carte initialisée:", this.map ? "oui" : "non");
+            console.log("Marqueurs:", this.markers?.length || 0);
+            
+            console.groupEnd();
+        }
+
+        connect() {
+            try {
+                console.log("Initialisation de la carte améliorée");
                 
-                // Écouter les événements du Multi Solver si nécessaire
-                if (this.isMultiSolverValue) {
-                    console.log("Ajout de l'écouteur d'événements multiSolverDataUpdated");
-                    window.addEventListener('multiSolverDataUpdated', this.handleMultiSolverUpdate.bind(this));
+                // Déboguer l'état initial
+                this.debug("Connexion initiale");
+                
+                // Vérifier que l'élément du contrôleur existe
+                if (!this.element) {
+                    console.error("Élément du contrôleur 'zone-map' introuvable");
+                    return;
                 }
-            } else {
-                console.error("Conteneur cible manquant pour la carte");
+                
+                // Vérifier que la bibliothèque OpenLayers est disponible
+                if (typeof ol === 'undefined') {
+                    console.error("La bibliothèque OpenLayers (ol) n'est pas chargée");
+                    
+                    // Ajouter un message d'erreur directement dans l'élément
+                    this.element.innerHTML = `
+                        <div class="p-4 bg-red-100 text-red-800 rounded">
+                            <p class="font-bold">Erreur de chargement de la carte</p>
+                            <p>La bibliothèque OpenLayers (ol) n'est pas chargée.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // S'assurer que l'élément a une taille suffisante
+                if (this.element.clientWidth === 0 || this.element.clientHeight === 0) {
+                    console.warn("L'élément du contrôleur a une taille nulle, définition d'une hauteur minimale");
+                    this.element.style.minHeight = '300px';
+                }
+                
+                // Initialiser les tableaux pour stocker les marqueurs et les popups
+                this.markers = [];
+                this.popups = [];
+                
+                // Créer la carte OpenLayers
+                this.initMap();
+                
+                // Configurer la gestion des événements de la carte
+                this.setupEventListeners();
+                
+                // Si un ID de Multi Solver est défini, charger ses géocaches
+                if (this.multiSolverIdValue) {
+                    this.loadMultiSolverGeocaches(this.multiSolverIdValue);
+                }
+                
+                // Indiquer que la carte est prête
+                this.mapReady = true;
+                console.log("Carte améliorée initialisée avec succès");
+            } catch (error) {
+                console.error("Erreur lors de l'initialisation de la carte améliorée:", error);
+                this.notifyError("Erreur lors de l'initialisation de la carte");
             }
         }
 
@@ -126,143 +191,73 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             });
         }
         
-        async initializeMap() {
-            console.log('=== DEBUG: Initialisation de la carte ===');
+        initMap() {
             try {
-                // Sources de tuiles OSM
-                this.tileSources = {
-                    'OSM Standard': new ol.source.OSM(),
-                    'OSM Cyclo': new ol.source.OSM({
-                        url: 'https://{a-c}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png'
-                    }),
-                    'OSM Topo': new ol.source.OSM({
-                        url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png'
-                    })
-                };
-
-                // Créer le menu de sélection des fonds de carte
-                this.createBaseLayerSelector();
-
-                // Créer la source de données pour les points
-                this.vectorSource = new ol.source.Vector();
-
-                // Créer la source de données pour les cercles
-                this.circlesSource = new ol.source.Vector();
-
-                // Créer la couche vectorielle pour les cercles
-                this.circlesLayer = new ol.layer.Vector({
-                    source: this.circlesSource,
-                    style: new ol.style.Style({
-                        stroke: new ol.style.Stroke({
-                            color: 'rgba(255, 0, 0, 0.8)',
-                            width: 1
-                        }),
-                        fill: new ol.style.Fill({
-                            color: 'rgba(255, 0, 0, 0.1)'
-                        })
-                    })
-                });
-
-                // Créer la couche vectorielle pour les points
-                this.vectorLayer = new ol.layer.Vector({
-                    source: this.vectorSource,
-                    style: (feature) => {
-                        const color = feature.get('color') || 'rgba(51, 136, 255, 0.8)';
-                        return new ol.style.Style({
-                            image: new ol.style.Circle({
-                                radius: 6,
-                                fill: new ol.style.Fill({
-                                    color: color
-                                }),
-                                stroke: new ol.style.Stroke({
-                                    color: '#ffffff',
-                                    width: 1
-                                })
-                            })
-                        });
-                    }
-                });
-
-                // Initialiser la carte OpenLayers
+                // Vérifier si la bibliothèque OpenLayers est disponible
+                if (typeof ol === 'undefined') {
+                    throw new Error("La bibliothèque OpenLayers (ol) n'est pas chargée");
+                }
+                
+                // Vérifier si nous avons un élément conteneur valide
+                let targetElement = null;
+                
+                // Essayer d'abord d'utiliser la cible définie par Stimulus
+                if (this.hasContainerTarget) {
+                    targetElement = this.containerTarget;
+                }
+                // Sinon, utiliser l'élément du contrôleur lui-même
+                else {
+                    targetElement = this.element;
+                    console.warn("Cible 'container' non trouvée, utilisation de l'élément du contrôleur à la place");
+                }
+                
+                // Créer les contrôles de base en fonction de la version d'OpenLayers
+                let defaultControls = [];
+                let additionalControls = [];
+                
+                // Vérifier la syntaxe à utiliser pour les contrôles selon la version
+                if (ol.control && typeof ol.control.defaults === 'function') {
+                    // Version plus récente d'OpenLayers
+                    defaultControls = ol.control.defaults();
+                    
+                    // Ajouter des contrôles supplémentaires si disponibles
+                    if (ol.control.ScaleLine) additionalControls.push(new ol.control.ScaleLine());
+                    if (ol.control.FullScreen) additionalControls.push(new ol.control.FullScreen());
+                    if (ol.control.ZoomToExtent) additionalControls.push(new ol.control.ZoomToExtent());
+                } else {
+                    // Version plus ancienne ou différente
+                    if (ol.control && ol.control.Zoom) additionalControls.push(new ol.control.Zoom());
+                    if (ol.control && ol.control.Attribution) additionalControls.push(new ol.control.Attribution());
+                    if (ol.control && ol.control.ScaleLine) additionalControls.push(new ol.control.ScaleLine());
+                }
+                
+                // Créer la carte OpenLayers
                 this.map = new ol.Map({
-                    target: this.containerTarget,
+                    target: targetElement,
+                    controls: [...defaultControls, ...additionalControls],
                     layers: [
+                        // Couche de base OSM
                         new ol.layer.Tile({
-                            source: this.tileSources['OSM Standard']
-                        }),
-                        this.circlesLayer,
-                        this.vectorLayer
+                            source: new ol.source.OSM(),
+                            name: 'osm-base'
+                        })
                     ],
                     view: new ol.View({
-                        center: ol.proj.fromLonLat([1.888334, 46.603354]),
-                        zoom: 6
+                        center: ol.proj.fromLonLat([2.3522, 48.8566]), // Paris par défaut
+                        zoom: 10
                     })
                 });
 
-                // Créer l'élément popup avec des styles
-                const popupElement = document.createElement('div');
-                popupElement.id = 'map-popup';
-                popupElement.style.cssText = `
-                    background-color: white;
-                    padding: 10px;
-                    border-radius: 4px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                    color: black;
-                    min-width: 200px;
-                    display: none;
-                    position: absolute;
-                    z-index: 1000;
-                `;
+                // Créer la source vectorielle et la couche pour les marqueurs
+                this.initVectorLayer();
                 
-                this.containerTarget.appendChild(popupElement);
-                this.popupElement = popupElement;
-
-                // Gérer les clics sur la carte
-                this.map.on('click', (evt) => {
-                    const feature = this.map.forEachFeatureAtPixel(evt.pixel, (feature) => feature);
-                    if (feature) {
-                        const coordinates = feature.getGeometry().getCoordinates();
-                        const title = feature.get('title') || 'Point';
-                        const content = feature.get('content') || '';
-                        
-                        this.showPopup(coordinates, title, content);
-                    } else {
-                        this.hidePopup();
-                    }
-                });
-
-                // Gérer le clic droit sur la carte
-                this.map.getViewport().addEventListener('contextmenu', (evt) => {
-                    evt.preventDefault();
-                    const pixel = this.map.getEventPixel(evt);
-                    const feature = this.map.forEachFeatureAtPixel(pixel, (feature) => feature);
-                    
-                    if (feature) {
-                        const geocache = feature.get('geocache');
-                        if (geocache) {
-                            this.showContextMenu(evt.pageX, evt.pageY, geocache);
-                        } else {
-                            // Si ce n'est pas une géocache, montrer le menu de coordonnées
-                            const coordinates = feature.getGeometry().getCoordinates();
-                            this.showCoordinateContextMenu(evt, coordinates);
-                        }
-                    } else {
-                        // Pour un clic droit ailleurs sur la carte
-                        const coordinates = this.map.getCoordinateFromPixel(pixel);
-                        this.showCoordinateContextMenu(evt, coordinates);
-                    }
-                });
-
-                // Charger les données appropriées
-                if (this.geocacheIdValue) {
-                    await this.loadGeocacheCoordinates();
-                } else if (this.isMultiSolverValue && this.multiSolverIdValue) {
-                    await this.loadMultiSolverGeocaches(this.multiSolverIdValue);
-                } else if (this.zoneIdValue) {
-                    await this.loadZoneGeocaches();
-                }
+                // Ajouter des interactions pour la sélection des marqueurs
+                this.addSelectInteraction();
+                
+                console.log("Carte OpenLayers créée");
             } catch (error) {
-                console.error('Erreur lors de l\'initialisation de la carte:', error);
+                console.error("Erreur lors de la création de la carte:", error);
+                throw error;
             }
         }
 
@@ -626,92 +621,1488 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
         }
         
         addMarkerWithGeocache(geocache) {
+            try {
+                // Validation des données minimales requises
             if (!geocache || !geocache.latitude || !geocache.longitude) {
-                console.warn("Géocache invalide:", geocache);
-                return;
-            }
-            
-            console.log("Adding geocache marker:", geocache.gc_code);
-            
-            // Déterminer la couleur en fonction du statut
-            let color;
-            if (geocache.solved === 'solved') {
-                color = 'rgba(0, 128, 0, 0.8)'; // Vert
-            } else if (geocache.solved === 'in_progress') {
-                color = 'rgba(255, 165, 0, 0.8)'; // Orange
-            } else {
-                color = 'rgba(51, 136, 255, 0.8)'; // Bleu
-            }
-            
+                    console.error("Données de géocache invalides ou incomplètes:", geocache);
+                    return null;
+                }
+                
+                // Extraire et formater les coordonnées
+                const latitude = parseFloat(geocache.latitude);
+                const longitude = parseFloat(geocache.longitude);
+                
+                // Vérifier la validité des coordonnées après conversion
+                if (isNaN(latitude) || isNaN(longitude)) {
+                    console.error("Coordonnées invalides pour la géocache:", { 
+                        gc_code: geocache.gc_code,
+                        latitude: geocache.latitude, 
+                        longitude: geocache.longitude,
+                        parseLatitude: latitude,
+                        parseLongitude: longitude
+                    });
+                    return null;
+                }
+                
+                // Déterminer si ce point a des coordonnées corrigées
+                const corrected = !!geocache.corrected;
+                const saved = !!geocache.saved;
+                
+                const detailsMessage = corrected 
+                    ? `Marqueur avec coordonnées corrigées (${saved ? 'sauvegardées' : 'non sauvegardées'})` 
+                    : "Marqueur avec coordonnées originales";
+                    
+                console.log(`Ajout de marqueur pour ${geocache.gc_code}: ${detailsMessage}`, { 
+                    latitude, 
+                    longitude,
+                    corrected,
+                    saved,
+                    originalCoordinates: geocache.original_coordinates || 'aucune',
+                    type: geocache.cache_type
+                });
+                
+                // Convertir en format OpenLayers
+                const coordinates = ol.proj.fromLonLat([longitude, latitude]);
+                
+                // Créer la feature avec propriétés étendues
             const feature = new ol.Feature({
-                geometry: new ol.geom.Point(ol.proj.fromLonLat([parseFloat(geocache.longitude), parseFloat(geocache.latitude)])),
+                    geometry: new ol.geom.Point(coordinates),
+                    name: geocache.name || 'Sans nom',
+                    gc_code: geocache.gc_code,
+                    cache_type: geocache.cache_type || 'Unknown',
+                    difficulty: geocache.difficulty || '?',
+                    terrain: geocache.terrain || '?',
                 id: geocache.id,
-                title: `${geocache.gc_code} - ${geocache.name}`,
-                content: `Type: ${geocache.cache_type || 'Non spécifié'}<br>Difficulté: ${geocache.difficulty || '?'}, Terrain: ${geocache.terrain || '?'}`,
-                color: color,
-                geocache: geocache
-            });
-
+                    // Attributs pour la forme du marqueur
+                    corrected: corrected,
+                    saved: saved,
+                    original_coordinates: geocache.original_coordinates,
+                    // Coordonnées pour le popup
+                    latitude: latitude,
+                    longitude: longitude
+                });
+                
+                // Assigner un ID spécifique pour cette feature
+                feature.setId(`gc-${geocache.gc_code}`);
+                
+                // Ajouter au layer de vecteur
+                if (this.vectorSource) {
             this.vectorSource.addFeature(feature);
+                } else {
+                    console.error("Source du vecteur non initialisée");
+                    return null;
+                }
+                
+                // Ajouter aux marqueurs pour référence
+                this.markers.push({ feature, geocache });
+                
+                return feature;
+            } catch (error) {
+                console.error("Erreur lors de l'ajout du marqueur:", error);
+                return null;
+            }
         }
         
+        // Fonction pour obtenir une couleur en fonction du type de géocache
+        getColorForCacheType(cacheType) {
+            // Correspondance des types de géocaches avec des couleurs
+            const cacheTypeColors = {
+                'Traditional Cache': '#00AA00', // Vert
+                'Mystery Cache': '#0066FF',     // Bleu (modifié selon la demande)
+                'Unknown Cache': '#0066FF',     // Bleu (modifié selon la demande)
+                'Multi-cache': '#FFAA00',       // Orange
+                'EarthCache': '#AA7700',        // Marron
+                'Virtual Cache': '#AA00AA',     // Violet
+                'Letterbox Hybrid': '#0066FF',  // Bleu (modifié selon la demande)
+                'Wherigo Cache': '#00AAAA',     // Cyan
+                'Event Cache': '#FF0000',       // Rouge
+                'Mega-Event Cache': '#FF0000',  // Rouge
+                'Giga-Event Cache': '#FF0000',  // Rouge
+                'Cache In Trash Out Event': '#444444', // Gris foncé
+                'Webcam Cache': '#000000',      // Noir
+                'GPS Adventures Exhibit': '#AAAAAA', // Gris
+                'Groundspeak HQ': '#AAAAAA',    // Gris
+                'Lab Cache': '#FFFFFF'          // Blanc
+            };
+            
+            // Retourner la couleur correspondante ou une couleur par défaut
+            return cacheTypeColors[cacheType] || '#888888'; // Gris par défaut
+        }
+        
+        // Initialisation de la couche vectorielle pour les marqueurs
+        initVectorLayer() {
+            try {
+                // Créer une source vecteur vide
+                this.vectorSource = new ol.source.Vector();
+                
+                // Cache pour les styles (utiliser une Map pour de meilleures performances)
+                this.styleCache = new Map();
+                this.loggedStyles = new Set(); // Pour éviter de logger plusieurs fois le même style
+                
+                // Définir le style par défaut basé sur l'état de la sélection et les attributs du marqueur
+                const styleFunction = (feature, resolution) => {
+                    try {
+                        // Style par défaut en cas d'erreur
+                        const defaultStyle = this.createDefaultStyle();
+                        
+                        // Extraire les attributs du point
+                        const gc_code = feature.get('gc_code');
+                        const cacheType = feature.get('cache_type') || 'Unknown';
+                        const corrected = feature.get('corrected') === true;
+                        const saved = feature.get('saved') === true;
+                        
+                        // Créer une clé de cache unique pour ce style
+                        const cacheKey = `${gc_code}_${cacheType}_${corrected}_${saved}_${resolution}`;
+                        
+                        // Utiliser un style en cache si disponible
+                        if (this.styleCache.has(cacheKey)) {
+                            return this.styleCache.get(cacheKey);
+                        }
+                        
+                        // Log limité (uniquement la première fois qu'on crée le style pour un gc_code)
+                        if (!this.loggedStyles.has(gc_code)) {
+                            console.log(`Style pour ${gc_code}:`, {
+                                cacheType,
+                                corrected,
+                                saved
+                            });
+                            this.loggedStyles.add(gc_code); // Marquer comme loggé
+                        }
+                        
+                        // Déterminer la couleur en fonction du type de cache
+                        let color;
+                        switch(cacheType) {
+                            case 'Traditional Cache':
+                                color = '#1bcc23'; // Vert
+                                break;
+                            case 'Mystery Cache':
+                            case 'Unknown Cache':
+                                color = '#0037cf'; // Bleu
+                                break;
+                            case 'Multi-cache':
+                                color = '#ffbf00'; // Orange
+                                break;
+                            case 'Letterbox Hybrid':
+                                color = '#0037cf'; // Bleu (comme Mystery)
+                                break;
+                            case 'EarthCache':
+                                color = '#aa7a00'; // Marron
+                                break;
+                            case 'Wherigo Cache':
+                                color = '#00cccc'; // Cyan
+                                break;
+                            default:
+                                color = '#989898'; // Gris pour les autres
+                        }
+                        
+                        // Déterminer la forme en fonction des attributs corrected et saved
+                        let markerShape;
+                        
+                        if (corrected && saved) {
+                            // Coordonnées corrigées et sauvegardées => Losange
+                            markerShape = 'diamond';
+                        } else if (corrected) {
+                            // Coordonnées corrigées mais pas sauvegardées => Carré
+                            markerShape = 'square';
+                        } else {
+                            // Coordonnées originales => Cercle
+                            markerShape = 'circle';
+                        }
+                        
+                        // Créer le style approprié pour ce type de cache
+                        const style = this.createMarkerStyleWithIcon(markerShape, color, cacheType, false);
+                        
+                        // Mettre en cache le style pour les appels futurs
+                        this.styleCache.set(cacheKey, style);
+                        
+                        return style;
+                    } catch (error) {
+                        console.error("Erreur dans la fonction de style:", error);
+                        return defaultStyle;
+                    }
+                };
+                
+                // Créer la couche vectorielle avec le style personnalisé
+                this.vectorLayer = new ol.layer.Vector({
+                    source: this.vectorSource,
+                    style: styleFunction,
+                    updateWhileAnimating: true,
+                    updateWhileInteracting: true
+                });
+                
+                // Définir un nom pour la couche (utile pour le débogage)
+                this.vectorLayer.set('name', 'markers');
+                
+                // Ajouter la couche à la carte
+                this.map.addLayer(this.vectorLayer);
+                
+                console.log("Couche vectorielle initialisée");
+            } catch (error) {
+                console.error("Erreur lors de l'initialisation de la couche vectorielle:", error);
+            }
+        }
+        
+        // Méthode pour créer un style de marqueur avec icône et symbole
+        createMarkerStyleWithIcon(markerShape, color, cacheType, selected = false) {
+            try {
+                // Augmenter légèrement la taille de base
+                const baseRadius = 7;
+                const radius = selected ? baseRadius + 2 : baseRadius;
+                let style;
+                
+                // Créer une clé de cache pour ce style
+                const styleKey = `${markerShape}_${color}_${cacheType}_${selected}`;
+                
+                // Initialiser le cache interne si nécessaire
+                if (!this._iconStyleCache) {
+                    this._iconStyleCache = new Map();
+                }
+                
+                // Vérifier si nous avons déjà ce style en cache
+                if (this._iconStyleCache.has(styleKey)) {
+                    return this._iconStyleCache.get(styleKey);
+                }
+                
+                // Log des paramètres pour débogage - uniquement en mode développement
+                if (window.devMode) {
+                    console.log(`Création de style pour ${cacheType}:`, {
+                        markerShape,
+                        color,
+                        selected
+                    });
+                }
+                
+                // Vérifier les paramètres
+                if (!markerShape) markerShape = 'circle';
+                if (!color) color = '#999999';
+                
+                // Définir le style en fonction de la forme demandée
+                if (markerShape === 'circle') {
+                    // Forme de base - cercle pour les coordonnées originales
+                    style = new ol.style.Style({
+                        image: new ol.style.Circle({
+                            radius: radius,
+                            fill: new ol.style.Fill({
+                                color: color
+                            }),
+                            stroke: new ol.style.Stroke({
+                                color: '#000000',
+                                width: 1
+                            })
+                        })
+                    });
+                    
+                    // Ajouter un symbole pour certains types de caches
+                    if (cacheType === 'Mystery Cache' || cacheType === 'Unknown Cache') {
+                        // Ajouter un point d'interrogation
+                        const textStyle = new ol.style.Text({
+                            text: '?',
+                            fill: new ol.style.Fill({
+                                color: 'white'
+                            }),
+                            font: `bold ${selected ? 12 : 10}px Arial`,
+                            offsetY: 1, // Centrage vertical
+                            textAlign: 'center',
+                            textBaseline: 'middle'
+                        });
+                        
+                        style.setText(textStyle);
+                    } else if (cacheType === 'Letterbox Hybrid') {
+                        // Ajouter un symbole d'enveloppe
+                        const textStyle = new ol.style.Text({
+                            text: '✉',
+                            fill: new ol.style.Fill({
+                                color: 'white'
+                            }),
+                            font: `${selected ? 10 : 8}px Arial`,
+                            offsetY: 1, // Centrage vertical
+                            textAlign: 'center',
+                            textBaseline: 'middle'
+                        });
+                        
+                        style.setText(textStyle);
+                    }
+                } else if (markerShape === 'square') {
+                    // Forme carrée - pour coordonnées corrigées mais non sauvegardées
+                    if (ol.style.RegularShape) {
+                        style = new ol.style.Style({
+                            image: new ol.style.RegularShape({
+                                points: 4,
+                                radius: radius + 1,
+                                angle: Math.PI / 4, // 45 degrés pour un carré droit
+                                fill: new ol.style.Fill({
+                                    color: color
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#000000',
+                                    width: 1
+                                })
+                            })
+                        });
+                        
+                        // Ajouter des symboles spécifiques aux types de caches
+                        if (cacheType === 'Mystery Cache' || cacheType === 'Unknown Cache') {
+                            const textStyle = new ol.style.Text({
+                                text: '?',
+                                fill: new ol.style.Fill({
+                                    color: 'white'
+                                }),
+                                font: `bold ${selected ? 12 : 10}px Arial`,
+                                offsetY: 1,
+                                textAlign: 'center',
+                                textBaseline: 'middle'
+                            });
+                            
+                            style.setText(textStyle);
+                        } else if (cacheType === 'Letterbox Hybrid') {
+                            const textStyle = new ol.style.Text({
+                                text: '✉',
+                                fill: new ol.style.Fill({
+                                    color: 'white'
+                                }),
+                                font: `${selected ? 10 : 8}px Arial`,
+                                offsetY: 1,
+                                textAlign: 'center',
+                                textBaseline: 'middle'
+                            });
+                            
+                            style.setText(textStyle);
+                        }
+                    } else {
+                        // Fallback si RegularShape n'est pas disponible
+                        console.warn("ol.style.RegularShape n'est pas disponible, utilisation du cercle comme fallback");
+                        style = new ol.style.Style({
+                            image: new ol.style.Circle({
+                                radius: radius,
+                                fill: new ol.style.Fill({
+                                    color: color
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#000000',
+                                    width: 1
+                                })
+                            })
+                        });
+                    }
+                } else if (markerShape === 'diamond') {
+                    // Forme losange - pour coordonnées corrigées et sauvegardées
+                    if (ol.style.RegularShape) {
+                        style = new ol.style.Style({
+                            image: new ol.style.RegularShape({
+                                points: 4,
+                                radius: radius + 2, // Légèrement plus grand pour distinguer
+                                angle: 0, // 0 degrés pour un losange
+                                fill: new ol.style.Fill({
+                                    color: color
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#000000',
+                                    width: 1
+                                })
+                            })
+                        });
+                        
+                        // Ajouter des symboles pour les types de caches
+                        if (cacheType === 'Mystery Cache' || cacheType === 'Unknown Cache') {
+                            const textStyle = new ol.style.Text({
+                                text: '?',
+                                fill: new ol.style.Fill({
+                                    color: 'white'
+                                }),
+                                font: `bold ${selected ? 12 : 10}px Arial`,
+                                offsetY: 1,
+                                textAlign: 'center',
+                                textBaseline: 'middle'
+                            });
+                            
+                            style.setText(textStyle);
+                        } else if (cacheType === 'Letterbox Hybrid') {
+                            const textStyle = new ol.style.Text({
+                                text: '✉',
+                                fill: new ol.style.Fill({
+                                    color: 'white'
+                                }),
+                                font: `${selected ? 10 : 8}px Arial`,
+                                offsetY: 1,
+                                textAlign: 'center',
+                                textBaseline: 'middle'
+                            });
+                            
+                            style.setText(textStyle);
+                        }
+                    } else {
+                        // Fallback
+                        console.warn("ol.style.RegularShape n'est pas disponible, utilisation du cercle comme fallback");
+                        style = new ol.style.Style({
+                            image: new ol.style.Circle({
+                                radius: radius,
+                                fill: new ol.style.Fill({
+                                    color: color
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#000000',
+                                    width: 1
+                                })
+                            })
+                        });
+                    }
+                } else {
+                    // Fallback pour les formes non reconnues
+                    console.warn(`Forme de marqueur non reconnue: ${markerShape}, utilisation du cercle comme fallback`);
+                    style = new ol.style.Style({
+                        image: new ol.style.Circle({
+                            radius: radius,
+                            fill: new ol.style.Fill({
+                                color: color
+                            }),
+                            stroke: new ol.style.Stroke({
+                                color: '#000000',
+                                width: 1
+                            })
+                        })
+                    });
+                }
+                
+                // Mettre en cache le style
+                this._iconStyleCache.set(styleKey, style);
+                
+                return style;
+            } catch (error) {
+                console.error("Erreur lors de la création du style de marqueur:", error);
+                // Style minimal de secours
+                return new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 5,
+                        fill: new ol.style.Fill({
+                            color: '#ff0000'
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: '#000000',
+                            width: 1
+                        })
+                    })
+                });
+            }
+        }
+        
+        // Créer un style par défaut simple
+        createDefaultStyle() {
+            try {
+                return this.createMarkerStyleWithIcon('circle', '#888888', 'Unknown', false);
+            } catch (error) {
+                console.error("Erreur lors de la création du style par défaut:", error);
+                // Style de secours vraiment minimal
+                return new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 5,
+                        fill: new ol.style.Fill({
+                            color: '#888888'
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: '#000000',
+                            width: 1
+                        })
+                    })
+                });
+            }
+        }
+        
+        // Méthode pour gérer les mises à jour MultiSolver
         handleMultiSolverUpdate(event) {
-            // Validation de base des données d'événement
-            if (!event || !event.detail) {
-                console.error("Événement multiSolverDataUpdated reçu sans détails");
+            try {
+                // Vérifier que nous avons les données nécessaires
+                if (!event || !event.detail) {
+                    console.error("Événement invalide reçu par handleMultiSolverUpdate");
+                    return;
+                }
+
+                const detail = event.detail;
+                const multiSolverId = detail.multiSolverId;
+                
+                // Extraire et valider les géocaches - vérifier tous les formats possibles
+                let geocaches = [];
+                if (Array.isArray(detail.geocaches)) {
+                    geocaches = detail.geocaches;
+                    console.log("Données trouvées dans detail.geocaches");
+                } else if (Array.isArray(detail.data)) {
+                    geocaches = detail.data;
+                    console.log("Données trouvées dans detail.data");
+                } else if (detail.results && Array.isArray(detail.results.geocaches)) {
+                    geocaches = detail.results.geocaches;
+                    console.log("Données trouvées dans detail.results.geocaches");
+                } else {
+                    console.warn("Format de données non reconnu dans l'événement multiSolverDataUpdated:", Object.keys(detail));
+                    // Essayons de reconstruire à partir des données de session
+                    try {
+                        if (sessionStorage && sessionStorage.getItem('multiSolverResults')) {
+                            const storedData = JSON.parse(sessionStorage.getItem('multiSolverResults'));
+                            if (Array.isArray(storedData) && storedData.length > 0) {
+                                geocaches = storedData;
+                                console.log("Données récupérées depuis sessionStorage comme fallback");
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Erreur lors de la récupération depuis sessionStorage:", e);
+                    }
+                }
+                
+                console.log(`handleMultiSolverUpdate: Reçu ${geocaches.length} géocaches pour multiSolverId: ${multiSolverId}`);
+                
+                // Vérifier si notre ID correspond
+                if (this.multiSolverIdValue !== multiSolverId) {
+                    console.log(`Événement ignoré : ID du Multi Solver (${multiSolverId}) ne correspond pas à notre ID (${this.multiSolverIdValue})`);
                 return;
             }
             
-            const { multiSolverId, data } = event.detail;
-            
-            // Validation de l'ID du Multi Solver
-            if (!multiSolverId) {
-                console.error("Événement multiSolverDataUpdated sans ID de Multi Solver");
-                return;
+                // Dump complet pour analyser la structure
+                if (geocaches.length > 0) {
+                    console.log("Structure détaillée de la première géocache:", JSON.stringify(geocaches[0]));
+                    
+                    // Vérifier les champs nested pour trouver des coordonnées
+                    const gc = geocaches[0];
+                    const potentialCoordinateFields = [
+                        'corrected_coordinates', 
+                        'coordinates', 
+                        'original_data', 
+                        'original_data.combined_results', 
+                        'combined_results',
+                        'results'
+                    ];
+                    
+                    console.log("Analyse des champs potentiels de coordonnées:");
+                    potentialCoordinateFields.forEach(field => {
+                        const parts = field.split('.');
+                        let value = gc;
+                        for (const part of parts) {
+                            value = value?.[part];
+                        }
+                        console.log(`- Champ "${field}": ${value ? 'présent' : 'absent'}`);
+                        if (value && typeof value === 'object') {
+                            console.log(`  Sous-champs: ${Object.keys(value).join(', ')}`);
+                        }
+                    });
+                }
+                
+                console.log("Format des données reçues:", {
+                    multiSolverId: multiSolverId,
+                    nombreGéocaches: geocaches.length,
+                    structureCachePrincipales: geocaches.length > 0 ? Object.keys(geocaches[0]).join(', ') : 'aucune',
+                    formatCoordonnées: geocaches.length > 0 ? (
+                        geocaches[0].corrected_coordinates ? 
+                            'corrected_coordinates: ' + JSON.stringify(geocaches[0].corrected_coordinates) : 
+                            (geocaches[0].coordinates ? 
+                                'coordinates: ' + JSON.stringify(geocaches[0].coordinates) : 'pas de coordonnées')
+                    ) : 'aucune'
+                });
+                
+                // Vérifier si des données de débogage sont disponibles
+                const hasOriginalData = geocaches.some(gc => gc.original_data);
+                const hasCorrectedCoordinates = geocaches.some(gc => 
+                    gc.corrected_coordinates && 
+                    gc.corrected_coordinates.latitude && 
+                    gc.corrected_coordinates.longitude);
+                
+                console.log("Analyse des données:", {
+                    nombreGéocaches: geocaches.length,
+                    contientDonnéesOriginales: hasOriginalData,
+                    contientCoordonnéesCorrigées: hasCorrectedCoordinates
+                });
+                
+                // Si nous avons des données valides, effacer les marqueurs existants
+                if (geocaches.length > 0) {
+                this.clearMarkers();
+                    console.log("Marqueurs existants effacés pour intégrer les nouvelles données");
+                    
+                    // Paramètres pour l'auto-correction
+                    const autoCorrectEnabled = document.getElementById('auto-correct-coordinates')?.checked || false;
+                    console.log("Auto-correction activée:", autoCorrectEnabled);
+                    
+                    // Compteurs pour le suivi
+                    let markersAdded = 0; 
+                    let markersSkipped = 0;
+                    let coordinatesCorrected = 0;
+                    
+                    // Traiter chaque géocache
+                    for (let i = 0; i < geocaches.length; i++) {
+                        const geocache = geocaches[i];
+                        
+                        // Vérifier que nous avons un code GC valide
+                        if (!geocache || !geocache.gc_code) {
+                            console.warn(`Géocache ${i}: Données invalides, ignorée`);
+                            markersSkipped++;
+                            continue;
+                        }
+                        
+                        // IMPORTANT: Pour le débogage, analyser uniquement certaines géocaches
+                        const isDebugCache = ['GCAP99D'].includes(geocache.gc_code);
+                        
+                        // Initialiser les attributs
+                        let corrected = false;
+                        let saved = false;
+                        let latitude = null;
+                        let longitude = null;
+                        let originalCoordinates = null;
+                        
+                        // Tracer tous les détails pour le débogage pour géocaches spécifiques
+                        if (isDebugCache) {
+                            console.log(`DÉBOGAGE DÉTAILLÉ POUR ${geocache.gc_code}:`, JSON.stringify(geocache));
+                        }
+                        
+                        // Log d'analyse condensé
+                        console.log(`Analyse de la géocache ${geocache.gc_code}:`, {
+                            hasCoords: !!geocache.coordinates,
+                            coordFormat: geocache.coordinates ? 
+                                `lat: ${geocache.coordinates.latitude}, lon: ${geocache.coordinates.longitude}` : 'aucune',
+                            hasCorrectedCoords: !!geocache.corrected_coordinates,
+                            correctedFormat: geocache.corrected_coordinates ? 
+                                `lat: ${geocache.corrected_coordinates.latitude}, lon: ${geocache.corrected_coordinates.longitude}` : 'aucune',
+                            hasOriginalData: !!geocache.original_data,
+                            originalDataKeys: geocache.original_data ? Object.keys(geocache.original_data).join(', ') : 'aucune'
+                        });
+                        
+                        // 1. Priorité: Coordonnées corrigées déjà sauvegardées dans la géocache
+                        if (geocache.corrected_coordinates && 
+                            geocache.corrected_coordinates.latitude && 
+                            geocache.corrected_coordinates.longitude) {
+                            
+                            latitude = parseFloat(geocache.corrected_coordinates.latitude);
+                            longitude = parseFloat(geocache.corrected_coordinates.longitude);
+                            
+                            // Stocker les coordonnées originales si disponibles
+                            if (geocache.coordinates && 
+                                geocache.coordinates.latitude && 
+                                geocache.coordinates.longitude) {
+                                originalCoordinates = {
+                                    latitude: parseFloat(geocache.coordinates.latitude),
+                                    longitude: parseFloat(geocache.coordinates.longitude)
+                                };
+                            }
+                            
+                            // Marquer comme corrigées et sauvegardées
+                            corrected = true;
+                            saved = true;
+                            coordinatesCorrected++;
+                            
+                            console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées corrigées sauvegardées`);
+                        }
+                        // 2. Vérifier si les coordonnées sont dans un autre champ (résultats multi-solver)
+                        else if (geocache.results && geocache.results.coordinates) {
+                            const coords = geocache.results.coordinates;
+                            if (coords.latitude && coords.longitude) {
+                                latitude = parseFloat(coords.latitude);
+                                longitude = parseFloat(coords.longitude);
+                                
+                                // Stocker les coordonnées originales si disponibles
+                                if (geocache.coordinates && 
+                                    geocache.coordinates.latitude && 
+                                    geocache.coordinates.longitude) {
+                                    originalCoordinates = {
+                                        latitude: parseFloat(geocache.coordinates.latitude),
+                                        longitude: parseFloat(geocache.coordinates.longitude)
+                                    };
+                                }
+                                
+                                corrected = true;
+                                saved = false; // Ces coordonnées viennent du serveur mais ne sont pas sauvegardées
+                                coordinatesCorrected++;
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Coordonnées trouvées dans results.coordinates`);
+                            }
+                        }
+                        // 3. Coordonnées extraites des données brutes
+                        else if (geocache.original_data && geocache.original_data.combined_results) {
+                            if (isDebugCache) {
+                                console.log(`Tentative d'extraction de coordonnées pour ${geocache.gc_code}:`, 
+                                    JSON.stringify(geocache.original_data.combined_results));
+                            }
+                            
+                            const result = this.extractCoordinatesFromCombinedResults(
+                                geocache.original_data.combined_results,
+                                geocache.gc_code,
+                                i
+                            );
+                            
+                            if (result.success) {
+                                latitude = result.latitude;
+                                longitude = result.longitude;
+                                
+                                // Stocker les coordonnées originales si disponibles
+                                if (geocache.coordinates && 
+                                    geocache.coordinates.latitude && 
+                                    geocache.coordinates.longitude) {
+                                    originalCoordinates = {
+                                        latitude: parseFloat(geocache.coordinates.latitude),
+                                        longitude: parseFloat(geocache.coordinates.longitude)
+                                    };
+                                }
+                                
+                                // Marquer comme corrigées
+                                corrected = true;
+                                saved = autoCorrectEnabled; // Sauvegarder si l'auto-correction est activée
+                                coordinatesCorrected++;
+                                
+                                // Sauvegarder automatiquement si l'option est activée
+                                if (autoCorrectEnabled && geocache.id) {
+                                    this.saveCoordinates(geocache.id, latitude, longitude)
+                                        .then(success => console.log(`Auto-sauvegarde pour ${geocache.gc_code}: ${success ? 'réussie' : 'échouée'}`));
+                                }
+                            } else if (isDebugCache) {
+                                console.log(`Échec de l'extraction de coordonnées pour ${geocache.gc_code}`);
+                            }
+                        }
+                        
+                        // 4. Utiliser les coordonnées standards si aucune correction n'est disponible
+                        if (!latitude || !longitude) {
+                            // Essayer d'abord geocache.coordinates
+                            if (geocache.coordinates && 
+                                geocache.coordinates.latitude && 
+                                geocache.coordinates.longitude) {
+                                latitude = parseFloat(geocache.coordinates.latitude);
+                                longitude = parseFloat(geocache.coordinates.longitude);
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards`);
+                            }
+                            // Sinon, essayer les propriétés directes
+                            else if (geocache.latitude && geocache.longitude) {
+                                latitude = parseFloat(geocache.latitude);
+                                longitude = parseFloat(geocache.longitude);
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées directes`);
+                            }
+                        }
+                        
+                        // Ajouter le marqueur si nous avons des coordonnées valides
+                        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+                            // Préparer les données complètes pour le marqueur
+                            const markerData = {
+                                ...geocache,
+                                latitude,
+                                longitude,
+                                gc_code: geocache.gc_code,
+                                name: geocache.name || 'Sans nom',
+                                id: geocache.id || `temp-${geocache.gc_code}`,
+                                cache_type: geocache.cache_type || 'Unknown',
+                                difficulty: geocache.difficulty || '?',
+                                terrain: geocache.terrain || '?',
+                                corrected,
+                                saved,
+                                original_coordinates: originalCoordinates
+                            };
+                            
+                            // Ajouter le marqueur
+                            const marker = this.addMarkerWithGeocache(markerData);
+                            
+                            if (marker) {
+                                markersAdded++;
+                                
+                                // Loguer les détails si c'est un point corrigé
+                                if (corrected) {
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Marqueur ajouté comme ${corrected && saved ? 'losange' : 'carré'}`);
+                                }
+                            }
+                        } else {
+                            console.warn(`Géocache ${i} (${geocache.gc_code}): Pas de coordonnées valides, marqueur ignoré`);
+                            markersSkipped++;
+                        }
+                    }
+                    
+                    // Log des résultats finaux
+                    console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}, coordonnées corrigées: ${coordinatesCorrected}`);
+                    
+                    // Ajuster la vue de la carte
+                    if (markersAdded > 0) {
+                    this.fitMapToMarkers();
+                } else {
+                        console.warn("Aucun marqueur n'a pu être ajouté à la carte");
+                    }
+                } else {
+                    console.warn("Aucune géocache reçue dans l'événement multiSolverDataUpdated");
+                }
+            } catch (error) {
+                console.error("Erreur lors de la gestion de la mise à jour du Multi Solver:", error);
+                this.notifyError("Erreur lors de la mise à jour des géocaches");
             }
-            
-            // Vérifier si l'événement correspond à notre Multi Solver
-            if (this.multiSolverIdValue !== multiSolverId) {
-                // Ignorer silencieusement les événements qui ne nous concernent pas
-                return;
-            }
-            
-            // Log limité aux informations essentielles
-            console.log(`Mise à jour de la carte avec ${data?.length || 0} géocaches du Multi Solver ${multiSolverId}`);
-            
-            // Effacer les marqueurs existants avant de traiter les nouvelles données
-            this.clearMarkers();
-            
-            // Vérifier si nous avons des données valides
-            if (!Array.isArray(data) || data.length === 0) {
-                console.warn("Aucune donnée valide reçue dans l'événement multiSolverDataUpdated");
-                return;
-            }
+        }
+        
+        // Méthode utilitaire pour extraire les coordonnées des résultats combinés
+        extractCoordinatesFromCombinedResults(combinedResults, gcCode, index) {
+            const result = { success: false, latitude: null, longitude: null };
             
             try {
-                // Compteurs pour le reporting
-                let markersAdded = 0;
-                let markersSkipped = 0;
+                if (!combinedResults) return result;
                 
-                // Ajouter les marqueurs pour chaque géocache
-                data.forEach(geocache => {
-                    if (geocache && geocache.latitude && geocache.longitude) {
-                        this.addMarkerWithGeocache(geocache);
-                        markersAdded++;
+                console.log(`Tentative d'extraction des coordonnées pour ${gcCode}:`, {
+                    hasColorTextDetector: !!combinedResults.color_text_detector,
+                    hasFormulaParser: !!combinedResults.formula_parser
+                });
+                
+                // Vérifier d'abord le détecteur de texte coloré (prioritaire)
+                if (combinedResults.color_text_detector && 
+                    combinedResults.color_text_detector.coordinates &&
+                    combinedResults.color_text_detector.coordinates.exist) {
+                    
+                    let north, east;
+                    
+                    // Format DDM complet
+                    if (combinedResults.color_text_detector.coordinates.ddm) {
+                        const ddm = combinedResults.color_text_detector.coordinates.ddm;
+                        const parts = ddm.split(/\s+/);
+                        if (parts.length >= 4) {
+                            north = parts.slice(0, 2).join(' ');
+                            east = parts.slice(2, 4).join(' ');
+                            console.log(`Géocache ${index} (${gcCode}): Coordonnées DDM extraites:`, { north, east });
+                        }
+                    } 
+                    // Format DDM séparé (latitude/longitude)
+                    else if (combinedResults.color_text_detector.coordinates.ddm_lat && 
+                             combinedResults.color_text_detector.coordinates.ddm_lon) {
+                        north = combinedResults.color_text_detector.coordinates.ddm_lat;
+                        east = combinedResults.color_text_detector.coordinates.ddm_lon;
+                    }
+                    
+                    if (north && east) {
+                        const converted = this.convertDDMToDecimal(north, east);
+                        if (converted) {
+                            result.success = true;
+                            result.latitude = converted.lat;
+                            result.longitude = converted.lon;
+                            console.log(`Coordonnées extraites avec color_text_detector pour ${gcCode}`, result);
+                            return result;
+                        }
+                    }
+                }
+                
+                // Vérifier ensuite le parseur de formule
+                if (combinedResults.formula_parser && 
+                    combinedResults.formula_parser.coordinates && 
+                    combinedResults.formula_parser.coordinates.length > 0) {
+                    
+                    const firstCoord = combinedResults.formula_parser.coordinates[0];
+                    if (firstCoord.north && firstCoord.east) {
+                        const converted = this.convertDDMToDecimal(firstCoord.north, firstCoord.east);
+                        if (converted) {
+                            result.success = true;
+                            result.latitude = converted.lat;
+                            result.longitude = converted.lon;
+                            console.log(`Coordonnées extraites avec formula_parser pour ${gcCode}`, result);
+                            return result;
+                        }
+                    }
+                }
+                
+                // Vérifier les coordonnées décimales directes si disponibles
+                if (combinedResults.corrected_coordinates && 
+                    combinedResults.corrected_coordinates.latitude && 
+                    combinedResults.corrected_coordinates.longitude) {
+                    
+                    result.success = true;
+                    result.latitude = parseFloat(combinedResults.corrected_coordinates.latitude);
+                    result.longitude = parseFloat(combinedResults.corrected_coordinates.longitude);
+                    console.log(`Coordonnées décimales directes trouvées pour ${gcCode}`, result);
+                    return result;
+                }
+                
+                console.log(`Aucune coordonnée extraite pour ${gcCode}`);
+                return result;
+            } catch (error) {
+                console.error(`Erreur lors de l'extraction des coordonnées pour ${gcCode}:`, error);
+                return result;
+            }
+        }
+        
+        // Méthode utilitaire pour afficher une erreur sur la carte
+        notifyError(message) {
+            if (this.containerTarget) {
+                const errorElement = document.createElement('div');
+                errorElement.className = 'absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
+                errorElement.textContent = message;
+                this.containerTarget.appendChild(errorElement);
+                
+                // Supprimer le message d'erreur après 5 secondes
+                setTimeout(() => {
+                    if (errorElement.parentNode) {
+                        errorElement.parentNode.removeChild(errorElement);
+                    }
+                }, 5000);
+            }
+        }
+
+        // Configuration des écouteurs d'événements
+        setupEventListeners() {
+            try {
+                // Écouter les événements du Multi Solver si nécessaire
+                if (this.isMultiSolverValue) {
+                    console.log("Configuration de l'écouteur d'événements multiSolverDataUpdated");
+                    window.addEventListener('multiSolverDataUpdated', this.handleMultiSolverUpdate.bind(this));
+                }
+                
+                // Ajouter l'écouteur pour le clic droit (menu contextuel)
+                this.map.getViewport().addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    
+                    // Obtenir la position du clic et la feature correspondante
+                    const pixel = this.map.getEventPixel(event);
+                    const feature = this.map.forEachFeatureAtPixel(pixel, feature => feature);
+                    
+                    if (feature) {
+                        // Si un marqueur a été cliqué
+                        const id = feature.get('id');
+                        const gc_code = feature.get('gc_code');
+                        const coords = feature.getGeometry().getCoordinates();
+                        const lonLat = ol.proj.transform(coords, 'EPSG:3857', 'EPSG:4326');
+                        
+                        // Afficher le menu contextuel pour le marqueur
+                        this.showMarkerContextMenu(event, {
+                            id,
+                            gc_code,
+                            longitude: lonLat[0],
+                            latitude: lonLat[1],
+                            corrected: feature.get('corrected'),
+                            saved: feature.get('saved')
+                        });
                     } else {
-                        markersSkipped++;
+                        // Si un point vide de la carte a été cliqué
+                        const coords = this.map.getCoordinateFromPixel(pixel);
+                        const lonLat = ol.proj.transform(coords, 'EPSG:3857', 'EPSG:4326');
+                        
+                        // Afficher le menu contextuel pour le point de la carte
+                        this.showMapContextMenu(event, {
+                            longitude: lonLat[0],
+                            latitude: lonLat[1]
+                        });
                     }
                 });
                 
-                // Log des résultats
-                console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}`);
+                // Ajouter un écouteur pour les changements de taille de fenêtre
+                window.addEventListener('resize', () => {
+                    this.map.updateSize();
+                });
                 
-                // Ajuster la vue pour montrer tous les marqueurs
-                if (markersAdded > 0) {
-                    this.fitMapToMarkers();
+                console.log("Écouteurs d'événements configurés");
+            } catch (error) {
+                console.error("Erreur lors de la configuration des écouteurs d'événements:", error);
+            }
+        }
+        
+        // Ajout de l'interaction de sélection pour les marqueurs
+        addSelectInteraction() {
+            try {
+                // Vérifier que les classes nécessaires existent
+                if (!ol.interaction || !ol.interaction.Select) {
+                    console.warn("La classe ol.interaction.Select n'est pas disponible, l'interaction de sélection ne sera pas ajoutée");
+                    return;
+                }
+                
+                // Vérifier si les événements sont disponibles
+                const clickCondition = ol.events && ol.events.condition ? 
+                                       ol.events.condition.click : null;
+                
+                // Créer l'interaction de sélection avec un style personnalisé
+                this.selectInteraction = new ol.interaction.Select({
+                    condition: clickCondition || function(evt) {
+                        return evt.type === 'click' || evt.type === 'singleclick';
+                    },
+                    layers: [this.vectorLayer],
+                    style: (feature) => {
+                        // Récupérer les mêmes informations que pour le style normal
+                        const cacheType = feature.get('cache_type') || 'Unknown';
+                        const corrected = feature.get('corrected') || false;
+                        const saved = feature.get('saved') || false;
+                        
+                        // Obtenir la même couleur que pour le style normal
+                        const color = this.getColorForCacheType(cacheType);
+                        
+                        // Déterminer la forme du marqueur en fonction du statut
+                        let markerShape;
+                        if (corrected && saved) {
+                            markerShape = 'diamond';
+                        } else if (corrected) {
+                            markerShape = 'square';
+                        } else {
+                            markerShape = 'circle';
+                        }
+                        
+                        // Créer le style avec l'icône mais en plus grand pour indiquer la sélection
+                        return this.createMarkerStyleWithIcon(markerShape, color, cacheType, true);
+                    }
+                });
+                
+                // Ajouter l'interaction à la carte
+                this.map.addInteraction(this.selectInteraction);
+                
+                // Écouter les événements de sélection
+                this.selectInteraction.on('select', (event) => {
+                    // Vérifier que nous avons bien un événement avec des features sélectionnées
+                    if (!event || !event.selected) {
+                        return;
+                    }
+                    
+                    const selected = event.selected[0];
+                    
+                    if (selected) {
+                        // Un marqueur a été sélectionné
+                        const gc_code = selected.get('gc_code') || 'GC????';
+                        const name = selected.get('name') || 'Sans nom';
+                        const cacheType = selected.get('cache_type') || 'Unknown';
+                        const difficulty = selected.get('difficulty') || '?';
+                        const terrain = selected.get('terrain') || '?';
+                        const corrected = selected.get('corrected') || false;
+                        const saved = selected.get('saved') || false;
+                        const originalCoordinates = selected.get('original_coordinates');
+                        
+                        try {
+                            // Obtenir les coordonnées de la géométrie
+                            const coords = selected.getGeometry().getCoordinates();
+                            
+                            // Convertir en coordonnées géographiques si la projection est disponible
+                            let longitude = 0, latitude = 0;
+                            
+                            if (ol.proj && typeof ol.proj.transform === 'function') {
+                                const lonLat = ol.proj.transform(coords, 'EPSG:3857', 'EPSG:4326');
+                                longitude = lonLat[0];
+                                latitude = lonLat[1];
+                            }
+                            
+                            // Afficher les informations dans une popup
+                            this.showInfoPopup(coords, {
+                                gc_code,
+                                name,
+                                cache_type: cacheType,
+                                difficulty,
+                                terrain,
+                                longitude: longitude.toFixed(6),
+                                latitude: latitude.toFixed(6),
+                                corrected,
+                                saved,
+                                original_coordinates: originalCoordinates
+                            });
+                        } catch (error) {
+                            console.error("Erreur lors de la récupération des coordonnées:", error);
+                        }
+                    } else {
+                        // Cacher la popup si aucun marqueur n'est sélectionné
+                        this.hideInfoPopup();
+                    }
+                });
+                
+                console.log("Interaction de sélection ajoutée");
+            } catch (error) {
+                console.error("Erreur lors de l'ajout de l'interaction de sélection:", error);
+            }
+        }
+        
+        // Afficher une popup d'information pour un marqueur
+        showInfoPopup(coordinates, data) {
+            try {
+                // Vérifier si l'élément de popup existe déjà
+                let popupElement = document.getElementById('map-info-popup');
+                
+                // Créer l'élément s'il n'existe pas
+                if (!popupElement) {
+                    popupElement = document.createElement('div');
+                    popupElement.id = 'map-info-popup';
+                    popupElement.className = 'ol-popup';
+                    
+                    // Ajouter les styles CSS
+                    popupElement.style.position = 'absolute';
+                    popupElement.style.backgroundColor = 'white';
+                    popupElement.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
+                    popupElement.style.padding = '15px';
+                    popupElement.style.borderRadius = '10px';
+                    popupElement.style.border = '1px solid #cccccc';
+                    popupElement.style.bottom = '12px';
+                    popupElement.style.left = '-50px';
+                    popupElement.style.minWidth = '280px';
+                    popupElement.style.maxWidth = '350px';
+                    
+                    // Ajouter un bouton de fermeture
+                    const closeButton = document.createElement('a');
+                    closeButton.className = 'ol-popup-closer';
+                    closeButton.href = '#';
+                    closeButton.innerHTML = '&times;';
+                    closeButton.style.position = 'absolute';
+                    closeButton.style.top = '2px';
+                    closeButton.style.right = '8px';
+                    closeButton.style.textDecoration = 'none';
+                    closeButton.style.color = '#333';
+                    closeButton.style.fontSize = '20px';
+                    
+                    // Ajouter un contenu
+                    const contentElement = document.createElement('div');
+                    contentElement.className = 'ol-popup-content';
+                    
+                    // Ajouter les éléments à la popup
+                    popupElement.appendChild(closeButton);
+                    popupElement.appendChild(contentElement);
+                    
+                    // Obtenir l'élément cible pour ajouter la popup
+                    let targetElement = this.map.getTargetElement();
+                    if (!targetElement) {
+                        targetElement = this.element; // Fallback sur l'élément du contrôleur
+                    }
+                    
+                    // Ajouter la popup au DOM
+                    targetElement.appendChild(popupElement);
+                    
+                    // Ajouter un gestionnaire d'événements pour le bouton de fermeture
+                    closeButton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.hideInfoPopup();
+                        this.selectInteraction.getFeatures().clear();
+                        return false;
+                    });
+                }
+                
+                // Récupérer l'élément de contenu
+                const contentElement = popupElement.querySelector('.ol-popup-content');
+                
+                // Préparer les informations de coordonnées
+                let coordsHTML = '';
+                if (data.corrected) {
+                    coordsHTML = `
+                        <div style="color: #008800; font-weight: bold;">
+                            Coordonnées corrigées: ${data.latitude}, ${data.longitude}
+                        </div>
+                    `;
+                    
+                    if (data.original_coordinates) {
+                        coordsHTML += `
+                            <div style="color: #888888; font-size: 0.9em;">
+                                Coordonnées d'origine: ${data.original_coordinates.latitude}, ${data.original_coordinates.longitude}
+                            </div>
+                        `;
+                    }
+                } else {
+                    coordsHTML = `
+                        <div>
+                            Coordonnées: ${data.latitude}, ${data.longitude}
+                        </div>
+                    `;
+                }
+                
+                // Mettre à jour le contenu
+                contentElement.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0;">${data.gc_code} - ${data.name}</h3>
+                    <p style="margin: 0;">
+                        <b>Type:</b> ${data.cache_type}<br>
+                        <b>Difficulté:</b> ${data.difficulty}, <b>Terrain:</b> ${data.terrain}<br>
+                        ${coordsHTML}
+                    </p>
+                `;
+                
+                // Créer une superposition pour la popup
+                if (!this.popupOverlay) {
+                    this.popupOverlay = new ol.Overlay({
+                        element: popupElement,
+                        positioning: 'bottom-center',
+                        stopEvent: false,
+                        offset: [0, -10]
+                    });
+                    this.map.addOverlay(this.popupOverlay);
+                }
+                
+                // Positionner la popup
+                this.popupOverlay.setPosition(coordinates);
+                
+                // Afficher la popup
+                popupElement.style.display = 'block';
+                
+                // Enregistrer cette popup dans notre collection
+                this.popups.push({
+                    overlay: this.popupOverlay,
+                    element: popupElement
+                });
+            } catch (error) {
+                console.error("Erreur lors de l'affichage de la popup d'information:", error);
+            }
+        }
+        
+        // Cacher la popup d'information
+        hideInfoPopup() {
+            try {
+                const popupElement = document.getElementById('map-info-popup');
+                if (popupElement) {
+                    popupElement.style.display = 'none';
                 }
             } catch (error) {
-                console.error("Erreur lors du traitement des données du Multi Solver:", error);
+                console.error("Erreur lors de la fermeture de la popup d'information:", error);
+            }
+        }
+        
+        // Afficher un menu contextuel pour un marqueur
+        showMarkerContextMenu(event, data) {
+            try {
+                // Créer ou récupérer l'élément de menu contextuel
+                let contextMenu = document.getElementById('marker-context-menu');
+                
+                if (!contextMenu) {
+                    contextMenu = document.createElement('div');
+                    contextMenu.id = 'marker-context-menu';
+                    contextMenu.className = 'context-menu';
+                    
+                    // Styles de base pour le menu
+                    contextMenu.style.position = 'absolute';
+                    contextMenu.style.backgroundColor = 'white';
+                    contextMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                    contextMenu.style.padding = '5px 0';
+                    contextMenu.style.borderRadius = '4px';
+                    contextMenu.style.minWidth = '150px';
+                    contextMenu.style.zIndex = '1000';
+                    
+                    // Ajouter au DOM
+                    document.body.appendChild(contextMenu);
+                    
+                    // Fermer le menu au clic ailleurs
+                    document.addEventListener('click', (e) => {
+                        if (!contextMenu.contains(e.target)) {
+                            contextMenu.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Options disponibles selon le statut
+                let menuHTML = `
+                    <div class="menu-header" style="padding: 5px 10px; font-weight: bold; border-bottom: 1px solid #eee;">
+                        ${data.gc_code}
+                    </div>
+                `;
+                
+                // Option de copie de coordonnées
+                menuHTML += `
+                    <div class="menu-item" style="padding: 5px 10px; cursor: pointer;" 
+                         onclick="navigator.clipboard.writeText('${data.latitude}, ${data.longitude}'); document.getElementById('marker-context-menu').style.display = 'none';">
+                        Copier les coordonnées
+                    </div>
+                `;
+                
+                // Option de sauvegarde si corrigé mais pas sauvegardé
+                if (data.corrected && !data.saved) {
+                    menuHTML += `
+                        <div class="menu-item" style="padding: 5px 10px; cursor: pointer;" 
+                             onclick="document.dispatchEvent(new CustomEvent('saveMarkerCoordinates', {detail: {id: ${data.id}, lat: ${data.latitude}, lon: ${data.longitude}}})); document.getElementById('marker-context-menu').style.display = 'none';">
+                            Sauvegarder les coordonnées
+                        </div>
+                    `;
+                }
+                
+                // Option pour ouvrir la page de la géocache
+                menuHTML += `
+                    <div class="menu-item" style="padding: 5px 10px; cursor: pointer;" 
+                         onclick="window.open('/geocaches/${data.id}', '_blank'); document.getElementById('marker-context-menu').style.display = 'none';">
+                        Voir la géocache
+                    </div>
+                `;
+                
+                // Mettre à jour le contenu
+                contextMenu.innerHTML = menuHTML;
+                
+                // Positionner le menu
+                contextMenu.style.left = event.pageX + 'px';
+                contextMenu.style.top = event.pageY + 'px';
+                contextMenu.style.display = 'block';
+                
+                // Écouter l'événement de sauvegarde
+                document.addEventListener('saveMarkerCoordinates', this.handleSaveCoordinates.bind(this));
+            } catch (error) {
+                console.error("Erreur lors de l'affichage du menu contextuel de marqueur:", error);
+            }
+        }
+        
+        // Afficher un menu contextuel pour un point de la carte
+        showMapContextMenu(event, data) {
+            try {
+                // Créer ou récupérer l'élément de menu contextuel
+                let contextMenu = document.getElementById('map-context-menu');
+                
+                if (!contextMenu) {
+                    contextMenu = document.createElement('div');
+                    contextMenu.id = 'map-context-menu';
+                    contextMenu.className = 'context-menu';
+                    
+                    // Styles de base pour le menu
+                    contextMenu.style.position = 'absolute';
+                    contextMenu.style.backgroundColor = 'white';
+                    contextMenu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                    contextMenu.style.padding = '5px 0';
+                    contextMenu.style.borderRadius = '4px';
+                    contextMenu.style.minWidth = '150px';
+                    contextMenu.style.zIndex = '1000';
+                    
+                    // Ajouter au DOM
+                    document.body.appendChild(contextMenu);
+                    
+                    // Fermer le menu au clic ailleurs
+                    document.addEventListener('click', (e) => {
+                        if (!contextMenu.contains(e.target)) {
+                            contextMenu.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Options du menu
+                let menuHTML = `
+                    <div class="menu-header" style="padding: 5px 10px; font-weight: bold; border-bottom: 1px solid #eee;">
+                        Position sur la carte
+                    </div>
+                    <div class="menu-item" style="padding: 5px 10px; cursor: pointer;" 
+                         onclick="navigator.clipboard.writeText('${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}'); document.getElementById('map-context-menu').style.display = 'none';">
+                        Copier les coordonnées
+                    </div>
+                `;
+                
+                // Mettre à jour le contenu
+                contextMenu.innerHTML = menuHTML;
+                
+                // Positionner le menu
+                contextMenu.style.left = event.pageX + 'px';
+                contextMenu.style.top = event.pageY + 'px';
+                contextMenu.style.display = 'block';
+            } catch (error) {
+                console.error("Erreur lors de l'affichage du menu contextuel de carte:", error);
+            }
+        }
+        
+        // Gérer la sauvegarde des coordonnées
+        handleSaveCoordinates(event) {
+            try {
+                const { id, lat, lon } = event.detail;
+                
+                if (id && lat && lon) {
+                    this.saveCoordinates(id, lat, lon)
+                        .then(success => {
+                            if (success) {
+                                // Mettre à jour le statut du marqueur
+                                this.markers.forEach(marker => {
+                                    if (marker.geocache.id === id) {
+                                        marker.feature.set('saved', true);
+                                        
+                                        // Réappliquer le style
+                                        this.vectorLayer.changed();
+                                        
+                                        // Notification de succès
+                                        this.notifySuccess(`Coordonnées sauvegardées pour ${marker.geocache.gc_code}`);
+                                    }
+                                });
+                            }
+                        });
+                }
+            } catch (error) {
+                console.error("Erreur lors de la sauvegarde des coordonnées depuis le menu:", error);
+            }
+        }
+        
+        // Afficher une notification de succès
+        notifySuccess(message) {
+            try {
+                // Créer un élément de notification
+                const notification = document.createElement('div');
+                notification.className = 'map-notification success';
+                notification.textContent = message;
+                
+                // Styles pour la notification
+                notification.style.position = 'fixed';
+                notification.style.top = '20px';
+                notification.style.right = '20px';
+                notification.style.backgroundColor = '#4CAF50';
+                notification.style.color = 'white';
+                notification.style.padding = '10px 15px';
+                notification.style.borderRadius = '4px';
+                notification.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                notification.style.zIndex = '10000';
+                notification.style.transition = 'opacity 0.3s ease-in-out';
+                
+                // Ajouter au DOM
+                document.body.appendChild(notification);
+                
+                // Supprimer après un délai
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 3000);
+            } catch (error) {
+                console.error("Erreur lors de l'affichage de la notification de succès:", error);
+            }
+        }
+        
+        // Afficher une notification d'erreur
+        notifyError(message) {
+            try {
+                // Créer un élément de notification
+                const notification = document.createElement('div');
+                notification.className = 'map-notification error';
+                notification.textContent = message;
+                
+                // Styles pour la notification
+                notification.style.position = 'fixed';
+                notification.style.top = '20px';
+                notification.style.right = '20px';
+                notification.style.backgroundColor = '#F44336';
+                notification.style.color = 'white';
+                notification.style.padding = '10px 15px';
+                notification.style.borderRadius = '4px';
+                notification.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                notification.style.zIndex = '10000';
+                notification.style.transition = 'opacity 0.3s ease-in-out';
+                
+                // Ajouter au DOM
+                document.body.appendChild(notification);
+                
+                // Supprimer après un délai
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 5000);
+            } catch (error) {
+                console.error("Erreur lors de l'affichage de la notification d'erreur:", error);
+            }
+        }
+        
+        // Adapter la vue pour montrer tous les marqueurs
+        fitMapToMarkers() {
+            try {
+                if (this.markers.length === 0) {
+                    console.warn("Aucun marqueur à afficher");
+                    return;
+                }
+                
+                // Créer une étendue pour tous les marqueurs
+                const extent = this.vectorSource.getExtent();
+                
+                // Vérifier que l'étendue est valide
+                if (extent && extent.some(c => isFinite(c))) {
+                    // Adapter la vue avec une petite marge
+                    this.map.getView().fit(extent, {
+                        padding: [50, 50, 50, 50],
+                        maxZoom: 14
+                    });
+                    
+                    console.log("Vue adaptée aux marqueurs");
+                } else {
+                    console.warn("Impossible d'adapter la vue - étendue invalide");
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'adaptation de la vue aux marqueurs:", error);
+            }
+        }
+        
+        // Effacer tous les marqueurs de la carte
+        clearMarkers() {
+            try {
+                // Vider la source vectorielle
+                if (this.vectorSource) {
+                    this.vectorSource.clear();
+                }
+                
+                // Réinitialiser le tableau des marqueurs
+                this.markers = [];
+                
+                // Cacher les popups
+                this.hideInfoPopup();
+                
+                console.log("Tous les marqueurs ont été effacés");
+            } catch (error) {
+                console.error("Erreur lors de l'effacement des marqueurs:", error);
             }
         }
 
@@ -733,84 +2124,283 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
             this.clearMarkers();
             
             try {
+                // Stratégie de récupération des données par ordre de priorité
                 let geocaches = [];
                 let dataSource = '';
                 
-                // 1. Essayer de récupérer depuis Tabulator
-                if (window.multiSolverTableResults && window.multiSolverTableResults.length > 0) {
+                // Fonction pour vérifier si le tableau de géocaches est valide
+                const isValidGeocachesArray = (data) => {
+                    return Array.isArray(data) && data.length > 0 && data[0].gc_code;
+                };
+                
+                // 1. Essayer de récupérer depuis le tableau global
+                if (typeof window.multiSolverTableResults !== 'undefined' && 
+                    isValidGeocachesArray(window.multiSolverTableResults)) {
                     geocaches = window.multiSolverTableResults;
-                    dataSource = 'Tabulator';
+                    dataSource = 'window.multiSolverTableResults';
+                    console.log("Données récupérées depuis la variable globale multiSolverTableResults");
                 }
-                // 2. Essayer de récupérer depuis le stockage de session
-                else if (window.sessionStorage) {
+                
+                // 2. Essayer de récupérer depuis le localStorage ou sessionStorage
+                if (geocaches.length === 0) {
                     try {
-                        const stored = sessionStorage.getItem('multiSolverResults');
-                        if (stored) {
-                            const parsed = JSON.parse(stored);
-                            if (Array.isArray(parsed) && parsed.length > 0) {
-                                geocaches = parsed;
-                                dataSource = 'sessionStorage';
-                            }
+                        // Essayer d'abord sessionStorage puis localStorage
+                        let storedData = null;
+                        
+                        if (sessionStorage && sessionStorage.getItem('multiSolverResults')) {
+                            storedData = JSON.parse(sessionStorage.getItem('multiSolverResults'));
+                            dataSource = 'sessionStorage';
+                        } else if (localStorage && localStorage.getItem('multiSolverResults')) {
+                            storedData = JSON.parse(localStorage.getItem('multiSolverResults'));
+                            dataSource = 'localStorage';
+                        }
+                        
+                        if (isValidGeocachesArray(storedData)) {
+                            geocaches = storedData;
+                            console.log(`Données récupérées depuis ${dataSource}`);
                         }
                     } catch (storageError) {
-                        console.warn("Erreur lors de la récupération depuis sessionStorage:", storageError);
-                    }
-                }
-                // 3. Essayer de récupérer depuis le DOM
-                if (geocaches.length === 0) {
-                    const multiSolverTable = document.getElementById('multi-solver-results-table');
-                    if (multiSolverTable && multiSolverTable._tabulator) {
-                        geocaches = multiSolverTable._tabulator.getData();
-                        dataSource = 'DOM';
+                        console.warn("Erreur lors de la récupération depuis le stockage:", storageError);
                     }
                 }
                 
-                // Si nous avons trouvé des données, les traiter
+                // 3. Essayer de récupérer depuis le DOM via Tabulator
+                if (geocaches.length === 0) {
+                    const multiSolverTable = document.getElementById('multi-solver-results-table');
+                    if (multiSolverTable && typeof multiSolverTable._tabulator !== 'undefined') {
+                        try {
+                            const tabulatorData = multiSolverTable._tabulator.getData();
+                            if (isValidGeocachesArray(tabulatorData)) {
+                                geocaches = tabulatorData;
+                                dataSource = 'Tabulator';
+                                console.log("Données récupérées depuis Tabulator");
+                            }
+                        } catch (tabulatorError) {
+                            console.warn("Erreur lors de la récupération depuis Tabulator:", tabulatorError);
+                        }
+                    }
+                }
+                
+                // 4. Demander les données via l'API REST directement si nécessaire
+                if (geocaches.length === 0 && multiSolverId) {
+                    try {
+                        console.log("Tentative de récupération des données via API REST directe");
+                        const response = await fetch(`/api/multi-solvers/${multiSolverId}/geocaches`);
+                        if (response.ok) {
+                            const apiData = await response.json();
+                            if (isValidGeocachesArray(apiData)) {
+                                geocaches = apiData;
+                                dataSource = 'API REST';
+                                console.log("Données récupérées depuis l'API REST");
+                                
+                                // Afficher les 2 premiers éléments pour analyse
+                                console.log("Échantillon des données de l'API:");
+                                if (apiData.length > 0) {
+                                    console.log("Premier élément:", JSON.stringify(apiData[0], null, 2));
+                                    if (apiData.length > 1) {
+                                        console.log("Deuxième élément:", JSON.stringify(apiData[1], null, 2));
+                                    }
+                                    
+                                    // Vérifier spécifiquement les coordonnées corrigées
+                                    const withCorrectedCoords = apiData.filter(gc => 
+                                        gc.corrected_coordinates && 
+                                        gc.corrected_coordinates.latitude && 
+                                        gc.corrected_coordinates.longitude);
+                                    
+                                    console.log(`Géocaches avec coordonnées corrigées: ${withCorrectedCoords.length}/${apiData.length}`);
+                                    
+                                    if (withCorrectedCoords.length > 0) {
+                                        console.log("Exemple de géocache avec coordonnées corrigées:", 
+                                            JSON.stringify(withCorrectedCoords[0].corrected_coordinates, null, 2));
+                                    } else {
+                                        console.warn("Aucune géocache ne contient de coordonnées corrigées!");
+                                    }
+                                }
+                            } else {
+                                console.warn("Les données de l'API ne sont pas un tableau valide de géocaches", apiData);
+                            }
+                        } else {
+                            console.warn(`API a retourné une erreur: ${response.status} ${response.statusText}`);
+                            // Essayer de lire le corps de l'erreur si disponible
+                            try {
+                                const errorBody = await response.text();
+                                console.warn("Détails de l'erreur API:", errorBody);
+                            } catch (e) {
+                                console.warn("Impossible de lire les détails de l'erreur API");
+                            }
+                        }
+                    } catch (apiError) {
+                        console.warn("Erreur lors de la récupération via API:", apiError);
+                    }
+                }
+                
+                // Si nous avons trouvé des données valides, les traiter
                 if (geocaches.length > 0) {
                     console.log(`${geocaches.length} géocaches trouvées depuis ${dataSource}`);
+                    
+                    // Afficher un échantillon pour le débogage
+                    console.log("Échantillon des données:", {
+                        premier: geocaches[0],
+                        structureClés: Object.keys(geocaches[0]),
+                        hasCorrectCoordinates: geocaches.some(g => g.corrected_coordinates),
+                        hasOriginalData: geocaches.some(g => g.original_data)
+                    });
                     
                     // Compteurs pour le reporting
                     let markersAdded = 0;
                     let markersSkipped = 0;
+                    let coordinatesCorrected = 0;
+                    
+                    // Récupérer l'état de l'auto-correction
+                    const autoCorrectEnabled = document.getElementById('auto-correct-coordinates')?.checked || false;
+                    console.log("Auto-correction activée:", autoCorrectEnabled);
                     
                     // Traiter chaque géocache
-                    geocaches.forEach(geocache => {
-                        // Vérifier si nous avons des coordonnées directes ou dans un sous-objet coordinates
-                        if ((geocache.latitude && geocache.longitude) || 
-                            (geocache.coordinates && geocache.coordinates.latitude && geocache.coordinates.longitude)) {
+                    for (let i = 0; i < geocaches.length; i++) {
+                        const geocache = geocaches[i];
+                        
+                        // Skip les entrées invalides
+                        if (!geocache || !geocache.gc_code) {
+                            console.warn(`Géocache ${i}: Données invalides, ignorée`);
+                            markersSkipped++;
+                            continue;
+                        }
+                        
+                        // Initialiser les attributs
+                        let corrected = false;
+                        let saved = false;
+                        let latitude = null;
+                        let longitude = null;
+                        let originalCoordinates = null;
+                        
+                        // 1. Priorité: Coordonnées corrigées déjà sauvegardées
+                        if (geocache.corrected_coordinates && 
+                            geocache.corrected_coordinates.latitude && 
+                            geocache.corrected_coordinates.longitude) {
                             
-                            // Préparer l'objet pour l'ajout du marqueur
+                            // Utiliser les coordonnées corrigées
+                            latitude = parseFloat(geocache.corrected_coordinates.latitude);
+                            longitude = parseFloat(geocache.corrected_coordinates.longitude);
+                            
+                            // Stocker les coordonnées originales si disponibles
+                            if (geocache.coordinates && 
+                                geocache.coordinates.latitude && 
+                                geocache.coordinates.longitude) {
+                                originalCoordinates = {
+                                    latitude: parseFloat(geocache.coordinates.latitude),
+                                    longitude: parseFloat(geocache.coordinates.longitude)
+                                };
+                            }
+                            
+                            // Marquer comme corrigées et sauvegardées
+                            corrected = true;
+                            saved = true;
+                            coordinatesCorrected++;
+                            
+                            console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées corrigées sauvegardées`);
+                        }
+                        // 2. Coordonnées extraites des données brutes
+                        else if (geocache.original_data && geocache.original_data.combined_results) {
+                            const result = this.extractCoordinatesFromCombinedResults(
+                                geocache.original_data.combined_results,
+                                geocache.gc_code,
+                                i
+                            );
+                            
+                            if (result.success) {
+                                latitude = result.latitude;
+                                longitude = result.longitude;
+                                
+                                // Stocker les coordonnées originales
+                                if (geocache.coordinates && 
+                                    geocache.coordinates.latitude && 
+                                    geocache.coordinates.longitude) {
+                                    originalCoordinates = {
+                                        latitude: parseFloat(geocache.coordinates.latitude),
+                                        longitude: parseFloat(geocache.coordinates.longitude)
+                                    };
+                                }
+                                
+                                // Marquer comme corrigées
+                                corrected = true;
+                                saved = autoCorrectEnabled; // Sauvegarder si l'auto-correction est activée
+                                coordinatesCorrected++;
+                                
+                                // Sauvegarder automatiquement si l'option est activée
+                                if (autoCorrectEnabled && geocache.id) {
+                                    this.saveCoordinates(geocache.id, latitude, longitude)
+                                        .then(success => console.log(`Auto-sauvegarde pour ${geocache.gc_code}: ${success ? 'réussie' : 'échouée'}`));
+                                }
+                            }
+                        }
+                        
+                        // 3. Utiliser les coordonnées standards si aucune correction n'est disponible
+                        if (!latitude || !longitude) {
+                            // Essayer d'abord geocache.coordinates
+                            if (geocache.coordinates && 
+                                geocache.coordinates.latitude && 
+                                geocache.coordinates.longitude) {
+                                latitude = parseFloat(geocache.coordinates.latitude);
+                                longitude = parseFloat(geocache.coordinates.longitude);
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées standards`);
+                            }
+                            // Sinon, essayer les propriétés directes
+                            else if (geocache.latitude && geocache.longitude) {
+                                latitude = parseFloat(geocache.latitude);
+                                longitude = parseFloat(geocache.longitude);
+                                console.log(`Géocache ${i} (${geocache.gc_code}): Utilisation des coordonnées directes`);
+                            }
+                        }
+                        
+                        // Ajouter le marqueur si nous avons des coordonnées valides
+                        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+                            // Préparer les données complètes pour le marqueur
                             const markerData = {
                                 ...geocache,
-                                latitude: geocache.latitude || geocache.coordinates.latitude,
-                                longitude: geocache.longitude || geocache.coordinates.longitude,
+                                latitude,
+                                longitude,
                                 gc_code: geocache.gc_code,
-                                name: geocache.name,
-                                id: geocache.id,
+                                name: geocache.name || 'Sans nom',
+                                id: geocache.id || `temp-${geocache.gc_code}`,
                                 cache_type: geocache.cache_type || 'Unknown',
                                 difficulty: geocache.difficulty || '?',
                                 terrain: geocache.terrain || '?',
-                                solved: geocache.saved ? 'solved' : 'unsolved'
+                                corrected,
+                                saved,
+                                original_coordinates: originalCoordinates
                             };
                             
-                            this.addMarkerWithGeocache(markerData);
-                            markersAdded++;
+                            // Ajouter le marqueur
+                            const marker = this.addMarkerWithGeocache(markerData);
+                            
+                            if (marker) {
+                                markersAdded++;
+                                
+                                // Loguer les détails si c'est un point corrigé
+                                if (corrected) {
+                                    console.log(`Géocache ${i} (${geocache.gc_code}): Marqueur ajouté comme ${corrected && saved ? 'losange' : 'carré'}`);
+                                }
+                            }
                         } else {
+                            console.warn(`Géocache ${i} (${geocache.gc_code}): Pas de coordonnées valides, marqueur ignoré`);
                             markersSkipped++;
                         }
-                    });
+                    }
                     
-                    console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}`);
+                    // Log des résultats finaux
+                    console.log(`Marqueurs ajoutés: ${markersAdded}, ignorés: ${markersSkipped}, coordonnées corrigées: ${coordinatesCorrected}`);
                     
-                    // Ajuster la vue pour montrer tous les marqueurs si nous en avons ajouté
+                    // Ajuster la vue pour montrer tous les marqueurs
                     if (markersAdded > 0) {
                         this.fitMapToMarkers();
-                        return; // Sortir de la fonction si nous avons réussi
+                        return; // Sortir de la fonction si le traitement est réussi
                     }
+                } else {
+                    console.warn("Aucune géocache trouvée dans les sources disponibles");
                 }
                 
-                // Si nous n'avons pas pu trouver ou traiter des données, demander via un événement
-                console.log("Aucune donnée disponible localement, émission d'une demande de données");
+                // Si nous arrivons ici, c'est que nous n'avons pas pu charger de données - demander via un événement
+                console.log("Demande de données via événement multiSolverDataRequested");
                 window.dispatchEvent(new CustomEvent('multiSolverDataRequested', {
                     detail: {
                         multiSolverId: multiSolverId,
@@ -818,31 +2408,322 @@ console.log("=== DEBUG: Preparing Enhanced Zone Map Controller ===");
                     }
                 }));
                 
-                // Informer l'utilisateur via un message dans la console
-                console.log("En attente des données du Multi Solver via l'événement multiSolverDataUpdated");
+            console.log("En attente des données du Multi Solver via l'événement multiSolverDataUpdated");
             } catch (error) {
                 console.error("Erreur lors du chargement des géocaches du Multi Solver:", error);
-                
-                // Notifier l'erreur sur la carte si possible
                 this.notifyError("Erreur lors du chargement des géocaches");
             }
         }
         
-        // Méthode utilitaire pour afficher une erreur sur la carte
-        notifyError(message) {
-            if (this.containerTarget) {
-                const errorElement = document.createElement('div');
-                errorElement.className = 'absolute top-12 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
-                errorElement.textContent = message;
-                this.containerTarget.appendChild(errorElement);
+        // Fonction utilitaire pour convertir les coordonnées DDM en coordonnées décimales
+        convertDDMToDecimal(north, east) {
+            try {
+                // Extraire les parties des coordonnées
+                const northMatch = north.match(/([NS])\s*(\d+)°\s*([\d.]+)/i);
+                const eastMatch = east.match(/([EW])\s*(\d+)°\s*([\d.]+)/i);
                 
-                // Supprimer le message d'erreur après 5 secondes
-                setTimeout(() => {
-                    if (errorElement.parentNode) {
-                        errorElement.parentNode.removeChild(errorElement);
-                    }
-                }, 5000);
+                if (!northMatch || !eastMatch) {
+                    console.warn("Format de coordonnées DDM invalide:", north, east);
+                    return null;
+                }
+                
+                // Extraire les composants nord
+                const northHemi = northMatch[1].toUpperCase();
+                const northDeg = parseInt(northMatch[2], 10);
+                const northMin = parseFloat(northMatch[3]);
+                
+                // Extraire les composants est
+                const eastHemi = eastMatch[1].toUpperCase();
+                const eastDeg = parseInt(eastMatch[2], 10);
+                const eastMin = parseFloat(eastMatch[3]);
+                
+                // Convertir en décimal
+                let lat = northDeg + (northMin / 60);
+                if (northHemi === 'S') lat = -lat;
+                
+                let lon = eastDeg + (eastMin / 60);
+                if (eastHemi === 'W') lon = -lon;
+                
+                return { lat, lon };
+            } catch (error) {
+                console.error("Erreur lors de la conversion des coordonnées DDM:", error);
+                return null;
             }
+        }
+        
+        // Fonction pour sauvegarder les coordonnées sur le serveur
+        async saveCoordinates(geocacheId, lat, lon) {
+            try {
+                console.log("Sauvegarde automatique des coordonnées:", { geocacheId, lat, lon });
+                
+                const formData = new FormData();
+                formData.append('gc_lat', lat);
+                formData.append('gc_lon', lon);
+                
+                const response = await fetch(`/geocaches/${geocacheId}/coordinates`, {
+                    method: 'PUT',
+                    body: formData,
+                    headers: {
+                        'X-Layout-Component': 'true'
+                    }
+                });
+                
+                if (response.ok) {
+                    console.log("Coordonnées sauvegardées avec succès pour:", geocacheId);
+                    return true;
+                } else {
+                    console.error("Erreur lors de la sauvegarde des coordonnées:", response.statusText);
+                    return false;
+                }
+            } catch (error) {
+                console.error("Erreur lors de la sauvegarde des coordonnées:", error);
+                return false;
+            }
+        }
+        
+        // Méthode pour injecter manuellement des coordonnées corrigées (pour tests)
+        injectCorrectedCoordinates() {
+            console.group("💉 Injection manuelle de coordonnées corrigées");
+            
+            try {
+                // Vérifier si nous avons des marqueurs
+                if (!this.vectorSource || this.vectorSource.getFeatures().length === 0) {
+                    console.warn("Aucun marqueur disponible pour l'injection");
+                    return false;
+                }
+                
+                const features = this.vectorSource.getFeatures();
+                console.log(`Injection sur ${features.length} marqueurs existants`);
+                
+                let injectedCount = 0;
+                
+                // Pour chaque feature, injecter des coordonnées corrigées
+                features.forEach((feature, index) => {
+                    // Récupérer les coordonnées actuelles
+                    const geometry = feature.getGeometry();
+                    const coords = geometry.getCoordinates();
+                    const [longitude, latitude] = ol.proj.transform(coords, 'EPSG:3857', 'EPSG:4326');
+                    
+                    // Créer un léger décalage pour simuler des coordonnées corrigées
+                    // Varier le décalage en fonction de l'index pour différencier visuellement
+                    const offset = 0.001 * (1 + (index % 3));
+                    const correctedLat = latitude + offset;
+                    const correctedLon = longitude + offset;
+                    
+                    // Définir les attributs corrected et saved
+                    const isSaved = index % 2 === 0; // Alterner entre sauvegardé et non-sauvegardé
+                    feature.set('corrected', true);
+                    feature.set('saved', isSaved);
+                    
+                    // Stocker les coordonnées originales
+                    feature.set('original_coordinates', {
+                        latitude: latitude,
+                        longitude: longitude
+                    });
+                    
+                    // Modifier la géométrie pour utiliser les coordonnées corrigées
+                    // Note: Ne pas faire ça dans un cas réel, seulement pour le test
+                    if (index % 4 !== 0) { // Garder quelques marqueurs inchangés
+                        const newCoords = ol.proj.fromLonLat([correctedLon, correctedLat]);
+                        geometry.setCoordinates(newCoords);
+                    }
+                    
+                    console.log(`Marqueur ${index} (${feature.get('gc_code')}): Coordonnées ${isSaved ? 'corrigées et sauvegardées' : 'corrigées mais non sauvegardées'}`);
+                    injectedCount++;
+                });
+                
+                // Forcer un rafraîchissement de la couche
+                this.vectorLayer.changed();
+                
+                // Nettoyer le cache de style pour forcer sa reconstruction
+                this.styleCache.clear();
+                this.loggedStyles.clear();
+                
+                console.log(`${injectedCount} marqueurs ont été modifiés avec des coordonnées corrigées injectées`);
+                return true;
+            } catch (error) {
+                console.error("Erreur lors de l'injection des coordonnées:", error);
+                return false;
+            } finally {
+                console.groupEnd();
+            }
+        }
+        
+        // Méthode utilitaire pour effectuer des diagnostics
+        runDiagnostics() {
+            try {
+                console.group("== DIAGNOSTICS DU CONTRÔLEUR ENHANCED ZONE MAP ==");
+                
+                // 1. Vérifier l'état global
+                console.log("État du contrôleur:", {
+                    mapInitialized: !!this.map,
+                    markersCount: this.markers?.length || 0,
+                    vectorSourceFeatures: this.vectorSource?.getFeatures()?.length || 0,
+                    multiSolverId: this.multiSolverIdValue
+                });
+                
+                // 2. Vérifier la structure des données de géocaches
+                if (this.markers && this.markers.length > 0) {
+                    const sampleMarker = this.markers[0];
+                    console.log("Structure d'un marqueur:", sampleMarker);
+                    console.log("Structure d'une géocache:", sampleMarker.geocache);
+                    
+                    // Analyser les attributs importants
+                    const correctedMarkers = this.markers.filter(m => m.geocache.corrected === true);
+                    const savedMarkers = this.markers.filter(m => m.geocache.saved === true);
+                    
+                    console.log("Analyse des marqueurs:", {
+                        total: this.markers.length,
+                        corrected: correctedMarkers.length,
+                        saved: savedMarkers.length,
+                        exempleCorrected: correctedMarkers.length > 0 ? correctedMarkers[0].geocache.gc_code : 'aucun'
+                    });
+                    
+                    // Vérifier les attributs des features
+                    const correctedFeatures = this.vectorSource.getFeatures().filter(f => f.get('corrected') === true);
+                    const savedFeatures = this.vectorSource.getFeatures().filter(f => f.get('saved') === true);
+                    
+                    console.log("Analyse des features:", {
+                        total: this.vectorSource.getFeatures().length,
+                        corrected: correctedFeatures.length,
+                        saved: savedFeatures.length
+                    });
+                } else {
+                    console.warn("Aucun marqueur pour analyser la structure des données");
+                }
+                
+                // 3. Vérifier si les données session sont disponibles
+                if (window.sessionStorage) {
+                    try {
+                        const storedData = sessionStorage.getItem('multiSolverResults');
+                        if (storedData) {
+                            const parsedData = JSON.parse(storedData);
+                            console.log("Données dans sessionStorage:", {
+                                count: parsedData.length,
+                                hasCorrectedCoordinates: parsedData.some(g => 
+                                    g.corrected_coordinates && 
+                                    g.corrected_coordinates.latitude && 
+                                    g.corrected_coordinates.longitude
+                                ),
+                                hasOriginalData: parsedData.some(g => g.original_data)
+                            });
+                        } else {
+                            console.warn("Aucune donnée dans sessionStorage");
+                        }
+                    } catch (e) {
+                        console.error("Erreur lors de la lecture des données session:", e);
+                    }
+                }
+                
+                console.groupEnd();
+                
+                // Retourner un résumé des diagnostics
+                return {
+                    mapInitialized: !!this.map,
+                    markersCount: this.markers?.length || 0,
+                    hasMarkers: this.markers?.length > 0,
+                    styleCacheEntries: Object.keys(this.styleCache || {}).length
+                };
+            } catch (error) {
+                console.error("Erreur lors de l'exécution des diagnostics:", error);
+                return { error: error.message };
+            }
+        }
+
+        // Fonction de débogage pour analyser le contenu de sessionStorage
+        debugStorage() {
+            console.group("🔍 Diagnostic du stockage pour EnhancedZoneMapController");
+            
+            try {
+                // 1. Vérifier sessionStorage
+                console.log("=== Analyse de sessionStorage ===");
+                if (sessionStorage && sessionStorage.getItem('multiSolverResults')) {
+                    try {
+                        const storedData = JSON.parse(sessionStorage.getItem('multiSolverResults'));
+                        console.log(`multiSolverResults: ${storedData.length} géocaches trouvées`);
+                        
+                        // Rechercher les géocaches avec coordonnées corrigées
+                        const withCorrectedCoords = storedData.filter(gc => 
+                            gc.corrected_coordinates && 
+                            gc.corrected_coordinates.latitude && 
+                            gc.corrected_coordinates.longitude);
+                        
+                        if (withCorrectedCoords.length > 0) {
+                            console.log(`✅ ${withCorrectedCoords.length} géocaches avec coordonnées corrigées trouvées`);
+                            console.log("Exemple de géocache avec coordonnées corrigées:", withCorrectedCoords[0]);
+                        } else {
+                            console.warn("❌ Aucune géocache avec corrected_coordinates trouvée");
+                            
+                            // Chercher d'autres champs qui pourraient contenir des coordonnées corrigées
+                            const potentialFields = ['corrected', 'modified_coordinates', 'detected_coordinates'];
+                            
+                            for (const field of potentialFields) {
+                                const withField = storedData.filter(gc => gc[field]);
+                                if (withField.length > 0) {
+                                    console.log(`Champ potentiel trouvé: ${field} (${withField.length} géocaches)`);
+                                    console.log("Exemple:", withField[0]);
+                                }
+                            }
+                        }
+                        
+                        // Analyse de la première géocache
+                        if (storedData.length > 0) {
+                            console.log("Structure complète de la première géocache:", JSON.stringify(storedData[0], null, 2));
+                        }
+                    } catch (e) {
+                        console.error("Erreur lors de l'analyse de sessionStorage:", e);
+                    }
+                } else {
+                    console.warn("Aucune donnée multiSolverResults dans sessionStorage");
+                }
+                
+                // 2. Vérifier les marqueurs sur la carte
+                console.log("=== Analyse des marqueurs sur la carte ===");
+                if (this.markers && this.markers.length > 0) {
+                    console.log(`${this.markers.length} marqueurs sur la carte`);
+                    
+                    // Rechercher les marqueurs avec corrected=true
+                    const correctedMarkers = this.markers.filter(m => m.feature.get('corrected') === true);
+                    if (correctedMarkers.length > 0) {
+                        console.log(`✅ ${correctedMarkers.length} marqueurs avec corrected=true`);
+                        console.log("Exemple de marqueur avec coordonnées corrigées:", correctedMarkers[0]);
+                    } else {
+                        console.warn("❌ Aucun marqueur avec corrected=true");
+                    }
+                } else if (this.vectorSource) {
+                    const features = this.vectorSource.getFeatures();
+                    console.log(`${features.length} features dans la source vectorielle`);
+                    
+                    // Analyser les features
+                    if (features.length > 0) {
+                        const correctedFeatures = features.filter(f => f.get('corrected') === true);
+                        if (correctedFeatures.length > 0) {
+                            console.log(`✅ ${correctedFeatures.length} features avec corrected=true`);
+                            console.log("Exemple de feature avec coordonnées corrigées:", correctedFeatures[0]);
+                        } else {
+                            console.warn("❌ Aucune feature avec corrected=true");
+                        }
+                    }
+                } else {
+                    console.warn("Aucun marqueur ou source vectorielle disponible");
+                }
+                
+                // 3. Vérifier l'état actuel du contrôleur
+                console.log("=== État du contrôleur ===");
+                console.log("multiSolverIdValue:", this.multiSolverIdValue);
+                console.log("isMultiSolverValue:", this.isMultiSolverValue);
+                console.log("Carte initialisée:", !!this.map);
+                
+                // 4. Vérifier si l'API répond correctement
+                console.log("=== Test de l'API ===");
+                console.log("Pour tester l'API, exécutez cette commande en console:");
+                console.log(`fetch('/api/multi-solvers/${this.multiSolverIdValue}/geocaches').then(r => r.json()).then(console.log)`);
+                
+            } catch (error) {
+                console.error("Erreur lors du diagnostic:", error);
+            }
+            
+            console.groupEnd();
         }
     }
 
