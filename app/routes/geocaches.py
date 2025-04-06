@@ -90,7 +90,7 @@ def get_geocache(geocache_id):
         db.joinedload(Geocache.additional_waypoints),
         db.joinedload(Geocache.attributes),
         db.joinedload(Geocache.checkers),
-        db.joinedload(Geocache.zone),
+        db.joinedload(Geocache.zones),
         db.joinedload(Geocache.images)
     ).get_or_404(geocache_id)
 
@@ -132,9 +132,8 @@ def get_geocache(geocache_id):
             'longitude': wp.longitude,
             'gc_lat': wp.gc_lat,
             'gc_lon': wp.gc_lon,
-            'type': 'waypoint',
             'note': wp.note
-        } for wp in geocache.additional_waypoints if wp.latitude is not None and wp.longitude is not None],
+        } for wp in geocache.additional_waypoints],
         'attributes': [{
             'id': attr.id,
             'name': attr.name,
@@ -147,10 +146,10 @@ def get_geocache(geocache_id):
             'url': checker.url
         } for checker in (geocache.checkers or [])],
         'zone': {
-            'id': geocache.zone.id,
-            'name': geocache.zone.name,
-            'description': geocache.zone.description
-        } if geocache.zone else None,
+            'id': geocache.primary_zone.id,
+            'name': geocache.primary_zone.name,
+            'description': geocache.primary_zone.description
+        } if geocache.primary_zone else None,
         'images': [{
             'id': image.id,
             'url': image.url,
@@ -226,7 +225,7 @@ def get_geocache_details(geocache_id):
             db.joinedload(Geocache.additional_waypoints),
             db.joinedload(Geocache.attributes),
             db.joinedload(Geocache.checkers),
-            db.joinedload(Geocache.zone),
+            db.joinedload(Geocache.zones),
             db.joinedload(Geocache.images)
         ).get_or_404(geocache_id)
         
@@ -250,12 +249,6 @@ def get_geocache_details(geocache_id):
             'hidden_date': geocache.hidden_date.isoformat() if geocache.hidden_date else None,
             'created_at': geocache.created_at.isoformat() if geocache.created_at else None,
             'solved': geocache.solved,
-            'zone_id': geocache.zone_id,
-            'zone': {
-                'id': geocache.zone.id,
-                'name': geocache.zone.name,
-                'description': geocache.zone.description
-            } if geocache.zone else None,
             'additional_waypoints': [{
                 'id': wp.id,
                 'name': wp.name,
@@ -266,7 +259,7 @@ def get_geocache_details(geocache_id):
                 'gc_lat': wp.gc_lat,
                 'gc_lon': wp.gc_lon,
                 'note': wp.note
-            } for wp in (geocache.additional_waypoints or [])],
+            } for wp in geocache.additional_waypoints],
             'attributes': [{
                 'id': attr.id,
                 'name': attr.name,
@@ -278,6 +271,11 @@ def get_geocache_details(geocache_id):
                 'name': checker.name,
                 'url': checker.url
             } for checker in (geocache.checkers or [])],
+            'zone': {
+                'id': geocache.primary_zone.id,
+                'name': geocache.primary_zone.name,
+                'description': geocache.primary_zone.description
+            } if geocache.primary_zone else None,
             'images': [{
                 'id': image.id,
                 'url': image.url,

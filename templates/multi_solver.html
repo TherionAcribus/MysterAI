@@ -2568,18 +2568,7 @@
             return null;
         }
         
-        // Vérifier d'abord si les coordonnées corrigées sont directement disponibles
-        if (combined.corrected_coordinates && combined.corrected_coordinates.exist) {
-            return {
-                ddm: combined.corrected_coordinates.formatted,
-                latitude: combined.corrected_coordinates.latitude,
-                longitude: combined.corrected_coordinates.longitude,
-                source: combined.corrected_coordinates.source_plugin,
-                exist: true
-            };
-        }
-        
-        // Si pas dans le nouveau format, vérifier color_text_detector qui est souvent le plus fiable
+        // Vérifier d'abord color_text_detector qui est souvent le plus fiable
         if (combined.color_text_detector && 
             combined.color_text_detector.coordinates && 
             combined.color_text_detector.coordinates.exist && 
@@ -2591,8 +2580,7 @@
                 ddm: coords.ddm,
                 latitude: coords.ddm_lat,
                 longitude: coords.ddm_lon,
-                source: 'color_text_detector',
-                exist: true
+                source: 'color_text_detector'
             };
         }
         
@@ -2607,8 +2595,7 @@
                     ddm: `${coord.north} ${coord.east}`,
                     latitude: coord.north,
                     longitude: coord.east,
-                    source: 'formula_parser',
-                    exist: true
+                    source: 'formula_parser'
                 };
             }
         }
@@ -2624,8 +2611,7 @@
                     ddm: `${coord.lat} ${coord.lon}`,
                     latitude: coord.lat,
                     longitude: coord.lon,
-                    source: 'coordinates_finder',
-                    exist: true
+                    source: 'coordinates_finder'
                 };
             }
         }
@@ -3458,4 +3444,297 @@
             }
         }));
     }
+</script>
+
+<script type="text/javascript">
+    // Exécuter un plugin manuellement
+    window.executePluginManually = function(event) {
+        if (event && event.preventDefault) {
+            event.preventDefault();
+        }
+
+        console.log("%c[MultiSolver] Exécution manuelle du plugin", "background:orange; color:white; font-weight:bold");
+        
+        // Récupérer le nom du plugin
+        const execButton = document.getElementById('execute-plugin-button');
+        const pluginName = execButton?.dataset?.pluginName;
+        
+        if (!pluginName) {
+            console.error("%c[MultiSolver] ERREUR: Nom du plugin manquant", "background:red; color:white; font-weight:bold");
+            return;
+        }
+        
+        console.log("%c[MultiSolver] Exécution manuelle du plugin:", "background:orange; color:white", pluginName);
+        
+        // Appeler la fonction globale d'exécution du plugin
+        window.executePlugin(pluginName);
+        
+        // Pour le plugin analysis_web_page, forcer la mise à jour de la carte
+        if (pluginName === 'analysis_web_page') {
+            // Utiliser un délai plus long pour s'assurer que le plugin a terminé son exécution
+            setTimeout(function() {
+                prepareAndUpdateCoordinates();
+            }, 2000); // Augmenter à 2 secondes
+            
+            // Faire une deuxième mise à jour après un délai supplémentaire pour s'assurer que toutes les géocaches sont traitées
+            setTimeout(function() {
+                prepareAndUpdateCoordinates(true);
+            }, 3500); // Une mise à jour supplémentaire après 3.5 secondes
+        }
+        
+        // Fonction pour préparer et mettre à jour les coordonnées
+        function prepareAndUpdateCoordinates(isSecondUpdate) {
+            if (isSecondUpdate === undefined) isSecondUpdate = false;
+            
+            // Récupérer l'ID du Multi Solver
+            const multiSolverContainer = document.getElementById('multi-solver-container');
+            const multiSolverId = multiSolverContainer?.dataset?.multiSolverId || '';
+            
+            if (multiSolverId && multiSolverTableResults && multiSolverTableResults.length > 0) {
+                console.log("%c[MultiSolver] Préparation de la mise à jour des coordonnées "+(isSecondUpdate ? "(2e essai)" : "")+":", "background:purple; color:white", {
+                    multiSolverId,
+                    nombreGéocaches: multiSolverTableResults.length
+                });
+                
+                // Créer une copie profonde des résultats pour éviter des problèmes de référence
+                const updatedResults = JSON.parse(JSON.stringify(multiSolverTableResults));
+                let coordinatesUpdated = 0;
+                
+                // Afficher un résumé des géocaches pour diagnostic
+                console.group("%c[MultiSolver] Diagnostic complet des géocaches", "background:red; color:white; font-weight:bold");
+                updatedResults.forEach((result, idx) => {
+                    const hasOriginalData = !!(result.original_data);
+                    const hasCorrectedCoordinates = hasOriginalData && !!(result.original_data.corrected_coordinates);
+                    const existFlag = hasCorrectedCoordinates && result.original_data.corrected_coordinates.exist === true;
+                    const hasLatLon = hasCorrectedCoordinates && 
+                        !!(result.original_data.corrected_coordinates.latitude) && 
+                        !!(result.original_data.corrected_coordinates.longitude);
+                    
+                    console.log(`%c[MultiSolver] Cache ${idx+1}/${updatedResults.length}: ${result.gc_code}`, 
+                        existFlag ? "background:green; color:white" : "background:gray; color:white", {
+                            hasOriginalData,
+                            hasCorrectedCoordinates,
+                            existFlag,
+                            hasLatLon,
+                            originalDataKeys: hasOriginalData ? Object.keys(result.original_data) : [],
+                            correctedCoordinatesKeys: hasCorrectedCoordinates ? Object.keys(result.original_data.corrected_coordinates) : [],
+                            correctedCoordinates: hasCorrectedCoordinates ? result.original_data.corrected_coordinates : null,
+                            currentCoordinates: result.coordinates
+                        });
+                });
+                console.groupEnd();
+                
+                // Vérifier et améliorer les données avant de les envoyer
+                // S'assurer que toutes les entrées disposent des données correctes et qu'elles sont marquées comme 'corrected'
+                for (let i = 0; i < updatedResults.length; i++) {
+                    const result = updatedResults[i];
+                    
+                    console.log("%c[MultiSolver] Examen de la géocache "+(i+1)+"/"+updatedResults.length+": "+result.gc_code, "background:blue; color:white");
+                    
+                    // Vérifier si l'entrée a les données original_data nécessaires
+                    if (result.original_data && result.original_data.corrected_coordinates &&
+                        result.original_data.corrected_coordinates.exist) {
+                        
+                        console.log("%c[MultiSolver] Coordonnées trouvées pour", "background:green; color:white", 
+                            result.gc_code, ":", result.original_data.corrected_coordinates);
+                        
+                        // S'assurer que l'objet coordinates existe
+                        if (!result.coordinates) {
+                            result.coordinates = {};
+                        }
+                        
+                        // Copier les coordonnées corrigées vers l'objet coordinates
+                        if (result.original_data.corrected_coordinates.latitude && 
+                            result.original_data.corrected_coordinates.longitude) {
+                            
+                            // Mise à jour explicite des propriétés
+                            result.coordinates.latitude = result.original_data.corrected_coordinates.latitude;
+                            result.coordinates.longitude = result.original_data.corrected_coordinates.longitude;
+                            
+                            // S'assurer que les coordonnées sont correctement formatées
+                            if (result.original_data.corrected_coordinates.formatted) {
+                                result.coordinates.ddm = result.original_data.corrected_coordinates.formatted;
+                            }
+                            
+                            // Flag pour indiquer que ce sont des coordonnées corrigées
+                            result.corrected = true;
+                            result.saved = false; // Non sauvegardées
+                            
+                            // Ajouter des propriétés supplémentaires pour être sûr
+                            result.coordinates.exist = true;
+                            result.coordinates.source = result.original_data.corrected_coordinates.source_plugin || 'analysis_web_page';
+                            
+                            coordinatesUpdated++;
+                            
+                            console.log("%c[MultiSolver] Coordonnées mises à jour pour", "background:green; color:white", 
+                                result.gc_code, ":", result.coordinates);
+                        }
+                    } else {
+                        console.log("%c[MultiSolver] Pas de coordonnées corrigées pour", "background:orange; color:black", 
+                            result.gc_code, "-", 
+                            result.original_data ? 
+                                (result.original_data.corrected_coordinates ? 
+                                    "exist="+result.original_data.corrected_coordinates.exist : 
+                                    "pas de corrected_coordinates") : 
+                                "pas de original_data");
+                    }
+                }
+                
+                console.log("%c[MultiSolver] Mise à jour terminée "+(isSecondUpdate ? "(2e essai)" : "")+": "+coordinatesUpdated+" géocaches modifiées", 
+                    "background:purple; color:white");
+                
+                // Vérifier que TOUTES les géocaches avec coordonnées sont envoyées
+                // Même si la mise à jour en cours ne concerne que certaines d'entre elles
+                const allResults = JSON.parse(JSON.stringify(multiSolverTableResults));
+                const allResultsWithCoords = allResults.filter(result => 
+                    result.original_data && 
+                    result.original_data.corrected_coordinates && 
+                    result.original_data.corrected_coordinates.exist && 
+                    result.original_data.corrected_coordinates.latitude && 
+                    result.original_data.corrected_coordinates.longitude
+                );
+                
+                // Si nous avons plus de géocaches avec coordonnées que celles mises à jour dans le lot actuel
+                // ou si c'est explicitement un second essai, envoyons TOUTES les géocaches ensemble
+                if (allResultsWithCoords.length > coordinatesUpdated || isSecondUpdate) {
+                    console.log("%c[MultiSolver] Envoi de TOUTES les géocaches corrigées: "+allResultsWithCoords.length+" géocaches au total", 
+                        "background:red; color:white; font-weight:bold");
+                    
+                    // Mise à jour complète - pour s'assurer que toutes les géocaches ont des coordonnées correctes
+                    allResultsWithCoords.forEach(result => {
+                        if (!result.coordinates) {
+                            result.coordinates = {};
+                        }
+                        
+                        if (result.original_data.corrected_coordinates.latitude && 
+                            result.original_data.corrected_coordinates.longitude) {
+                            
+                            result.coordinates.latitude = result.original_data.corrected_coordinates.latitude;
+                            result.coordinates.longitude = result.original_data.corrected_coordinates.longitude;
+                            
+                            if (result.original_data.corrected_coordinates.formatted) {
+                                result.coordinates.ddm = result.original_data.corrected_coordinates.formatted;
+                            }
+                            
+                            result.corrected = true;
+                            result.coordinates.exist = true;
+                            result.coordinates.source = result.original_data.corrected_coordinates.source_plugin || 'analysis_web_page';
+                        }
+                    });
+                    
+                    // Tracer les géocaches mises à jour pour diagnostic
+                    console.group("%c[MultiSolver] Détail des géocaches envoyées (TOUTES)", "background:red; color:white");
+                    allResultsWithCoords.forEach((result, idx) => {
+                        console.log(`%c[MultiSolver] Cache ${idx+1}: ${result.gc_code}`, 
+                            result.corrected ? "background:green; color:white" : "background:gray; color:white", {
+                                corrected: result.corrected,
+                                saved: result.saved,
+                                coordinates: result.coordinates,
+                                hasLatLng: result.coordinates && result.coordinates.longitude
+                            });
+                    });
+                    console.groupEnd();
+                    
+                    // Émettre l'événement avec TOUTES les géocaches corrigées
+                    window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+                        detail: {
+                            multiSolverId: multiSolverId,
+                            data: allResultsWithCoords,
+                            forceUpdate: true,
+                            repairsApplied: true,
+                            fullUpdate: true
+                        }
+                    }));
+                    
+                } else if (coordinatesUpdated > 0 || isSecondUpdate) {
+                    // Émettre explicitement l'événement de mise à jour avec les données améliorées
+                    console.log("%c[MultiSolver] Émission de l'événement multiSolverDataUpdated avec "+updatedResults.length+" géocaches", 
+                        "background:red; color:white; font-weight:bold");
+                    
+                    // Tracer les géocaches mises à jour pour diagnostic
+                    console.group("%c[MultiSolver] Détail des géocaches envoyées", "background:red; color:white");
+                    updatedResults.forEach((result, idx) => {
+                        console.log(`%c[MultiSolver] Cache ${idx+1}: ${result.gc_code}`, 
+                            result.corrected ? "background:green; color:white" : "background:gray; color:white", {
+                                corrected: result.corrected,
+                                saved: result.saved,
+                                coordinates: result.coordinates,
+                                hasLatLng: result.coordinates && result.coordinates.latitude && result.coordinates.longitude
+                            });
+                    });
+                    console.groupEnd();
+                    
+                    // IMPORTANT: Dernière vérification pour s'assurer que tous les objets ont le format attendu
+                    console.log("%c[MultiSolver] Dernière vérification avant envoi", "background:purple; color:white; font-weight:bold");
+                    let repairsNeeded = 0;
+
+                    // Dans certains cas, la conversion JSON peut créer des problèmes
+                    // Assurons-nous que les objets ont le bon format et structure
+                    updatedResults.forEach((result, idx) => {
+                        // S'assurer que corrected et saved sont bien des booléens explicites et non des valeurs qui peuvent être interprétées comme falsy
+                        if (result.corrected === undefined || result.corrected === null) {
+                            result.corrected = false;
+                        } else {
+                            result.corrected = !!result.corrected; // Conversion explicite en booléen
+                        }
+                        
+                        if (result.saved === undefined || result.saved === null) {
+                            result.saved = false;
+                        } else {
+                            result.saved = !!result.saved; // Conversion explicite en booléen
+                        }
+                        
+                        // Si l'objet a des coordonnées dans original_data mais pas d'objet coordinates correct
+                        if (result.original_data && result.original_data.corrected_coordinates && 
+                            result.original_data.corrected_coordinates.exist === true &&
+                            result.original_data.corrected_coordinates.latitude && 
+                            result.original_data.corrected_coordinates.longitude) {
+                            
+                            // Vérifier si result.coordinates manque ou n'a pas de latitude/longitude
+                            if (!result.coordinates || 
+                                !result.coordinates.latitude || 
+                                !result.coordinates.longitude) {
+                                
+                                // Initialiser coordinates si nécessaire
+                                if (!result.coordinates) {
+                                    result.coordinates = {};
+                                }
+                                
+                                // Copier les valeurs
+                                result.coordinates.latitude = result.original_data.corrected_coordinates.latitude;
+                                result.coordinates.longitude = result.original_data.corrected_coordinates.longitude;
+                                result.corrected = true;
+                                
+                                // Ajouter des propriétés explicites
+                                result.coordinates.exist = true;
+                                result.coordinates.source = result.original_data.corrected_coordinates.source_plugin || 'analysis_web_page';
+                                
+                                repairsNeeded++;
+                                console.log(`%c[MultiSolver] Réparation de la géocache ${idx+1}/${updatedResults.length}: ${result.gc_code}`, 
+                                    "background:red; color:white", {
+                                        lat: result.coordinates.latitude,
+                                        lon: result.coordinates.longitude
+                                    });
+                            }
+                        }
+                    });
+
+                    if (repairsNeeded > 0) {
+                        console.log(`%c[MultiSolver] ${repairsNeeded} géocaches réparées avant envoi`, "background:purple; color:white");
+                    }
+
+                    window.dispatchEvent(new CustomEvent('multiSolverDataUpdated', {
+                        detail: {
+                            multiSolverId: multiSolverId,
+                            data: updatedResults,
+                            forceUpdate: true,
+                            repairsApplied: repairsNeeded > 0
+                        }
+                    }));
+                }
+            } else {
+                console.warn("%c[MultiSolver] Impossible de mettre à jour les coordonnées : données manquantes", "background:orange; color:black");
+            }
+        }
+    };
 </script>

@@ -344,8 +344,12 @@ class Geocache(db.Model):
         
         return text
 
+    # Relation SQLAlchemy pour la première zone (pour joinedload)
+    zone = db.relationship('Zone', secondary='geocache_zone', uselist=False, 
+                           viewonly=True, order_by='GeocacheZone.added_at')
+        
     @property
-    def zone(self):
+    def primary_zone(self):
         """Retourne la première zone associée à la géocache (pour compatibilité)"""
         return self.zones[0] if self.zones else None
         
