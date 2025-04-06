@@ -9,6 +9,72 @@
     <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
     <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
     
+    <!-- Styles pour les lignes détaillées -->
+    <style>
+        /* Styles pour Tabulator avec notre thème sombre */
+        .tabulator {
+            background-color: transparent;
+            border: none;
+        }
+        
+        .tabulator .tabulator-header {
+            background-color: #374151;
+            border-bottom: 2px solid #4B5563;
+        }
+        
+        .tabulator .tabulator-header .tabulator-col {
+            background-color: #374151;
+            border-right: 1px solid #4B5563;
+        }
+        
+        .tabulator .tabulator-header .tabulator-col-content {
+            padding: 8px;
+        }
+        
+        .tabulator .tabulator-tableHolder {
+            background-color: transparent;
+        }
+        
+        .tabulator .tabulator-row {
+            background-color: rgba(55, 65, 81, 0.3);
+            border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+        }
+        
+        .tabulator .tabulator-row:nth-child(even) {
+            background-color: rgba(55, 65, 81, 0.5);
+        }
+        
+        .tabulator .tabulator-row:hover {
+            background-color: rgba(75, 85, 99, 0.6);
+        }
+        
+        .tabulator .tabulator-row .tabulator-cell {
+            border-right: 1px solid rgba(75, 85, 99, 0.3);
+            padding: 8px;
+        }
+        
+        /* Styles pour les détails */
+        .details-row {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        .details-container {
+            padding: 0 !important;
+            border: none !important;
+        }
+        
+        .copy-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+        
+        /* Ajustement de l'espacement */
+        .tabulator .tabulator-row .tabulator-cell-content {
+            padding: 0;
+        }
+    </style>
+    
     <div class="max-w-6xl mx-auto">
         <!-- En-tête -->
         <div class="mb-6">

@@ -145,15 +145,86 @@
                 };
             }
             
-            // Appel à l'API
-            const response = await fetch('/api/plugins?context=solver');
+            // Essayer d'abord l'endpoint principal
+            console.log("%c[MultiSolver] Tentative avec l'endpoint principal: /api/plugins?context=solver", "background:blue; color:white");
+            let response;
+            let plugins = [];
             
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
+            try {
+                // Appel à l'API principale
+                response = await fetch('/api/plugins?context=solver');
+                
+                if (!response.ok) {
+                    console.warn("%c[MultiSolver] L'endpoint principal a échoué, code:", "background:orange; color:black", response.status);
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                
+                plugins = await response.json();
+                console.log("%c[MultiSolver] Données reçues de l'endpoint principal:", "background:blue; color:white", plugins);
+                
+            } catch (mainError) {
+                console.warn("%c[MultiSolver] Erreur avec l'endpoint principal:", "background:orange; color:black", mainError);
+                
+                // Si ça échoue, essayer l'endpoint alternatif
+                console.log("%c[MultiSolver] Tentative avec l'endpoint alternatif: /api/solver/plugins", "background:blue; color:white");
+                try {
+                    response = await fetch('/api/solver/plugins');
+                    
+                    if (!response.ok) {
+                        console.warn("%c[MultiSolver] L'endpoint alternatif a également échoué, code:", "background:orange; color:black", response.status);
+                        throw mainError; // Re-throw the original error
+                    }
+                    
+                    // Traiter la réponse HTML
+                    const html = await response.text();
+                    console.log("%c[MultiSolver] Réponse HTML reçue, longueur:", "background:blue; color:white", html.length);
+                    
+                    // Créer un div temporaire pour parser le HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    
+                    // Extraire les plugins des éléments avec des data attributes
+                    const pluginElements = tempDiv.querySelectorAll('[data-plugin-id]');
+                    plugins = Array.from(pluginElements).map(el => ({
+                        id: el.dataset.pluginId,
+                        name: el.dataset.pluginName,
+                        description: el.dataset.pluginDescription || 'Aucune description'
+                    }));
+                    
+                    console.log("%c[MultiSolver] Plugins extraits de l'HTML:", "background:blue; color:white", plugins);
+                    
+                } catch (altError) {
+                    console.error("%c[MultiSolver] Les deux endpoints ont échoué:", "background:red; color:white", {
+                        mainError,
+                        altError
+                    });
+                    throw mainError; // Réutiliser l'erreur principale
+                }
             }
             
-            const plugins = await response.json();
-            console.log(`%c[MultiSolver] ${plugins.length} plugins récupérés`, "background:orange; color:black");
+            console.log(`%c[MultiSolver] ${plugins.length} plugins récupérés`, "background:orange; color:black", plugins);
+            
+            // Si aucun plugin trouvé, proposer des plugins de test
+            if (!plugins || plugins.length === 0) {
+                console.warn("%c[MultiSolver] Aucun plugin trouvé, ajout de plugins de test pour debug", "background:orange; color:black");
+                plugins = [
+                    {
+                        id: 'test1',
+                        name: 'coordinates_finder',
+                        description: 'Détecteur de coordonnées GPS (DEBUG)'
+                    },
+                    {
+                        id: 'test2',
+                        name: 'formula_parser',
+                        description: 'Analyseur de formules mathématiques (DEBUG)'
+                    },
+                    {
+                        id: 'test3',
+                        name: 'analysis_web_page',
+                        description: 'Analyse complète de page (DEBUG)'
+                    }
+                ];
+            }
             
             // Fonction globale pour activer les plugins
             window.activatePluginManually = function(pluginName) {
@@ -205,6 +276,12 @@
             container.innerHTML = `
                 <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
                     Erreur lors du chargement des plugins: ${error.message}
+                    <p class="mt-2 text-xs">Essayez de rafraîchir la page ou vérifiez que le serveur est bien démarré.</p>
+                    <button 
+                        onclick="window.location.reload()"
+                        class="mt-3 px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded-md text-xs font-medium transition-colors">
+                        Rafraîchir la page
+                    </button>
                 </div>
             `;
         }
@@ -271,7 +348,7 @@
                 
                 // Exécuter le plugin pour cette géocache
                 try {
-                    const result = await executePlugin(pluginName, geocache);
+                    const normalizedResult = await executePlugin(pluginName, geocache);
                     
                     // Ajouter le résultat à notre tableau de résultats
                     const resultItem = {
@@ -282,18 +359,15 @@
                         error: '',
                         coordinates: 'Non détecté',
                         certitude: false,
-                        detection: 'Aucun résultat'
+                        detection: 'Aucun résultat',
+                        detailedResults: normalizedResult.detailedResults || []
                     };
                     
-                    // Traiter les coordonnées
-                    if (result.coordinates && result.coordinates.exist) {
-                        resultItem.coordinates = result.coordinates.ddm || 'Format inconnu';
-                        resultItem.certitude = result.coordinates.certitude || false;
-                    }
-                    
-                    // Traiter le texte détecté
-                    if (result.result && result.result.text && result.result.text.text_output) {
-                        resultItem.detection = result.result.text.text_output;
+                    // Traiter les coordonnées si elles existent dans le résultat principal
+                    if (normalizedResult.mainDetection && normalizedResult.mainDetection.coordinates && normalizedResult.mainDetection.coordinates.exist) {
+                        resultItem.coordinates = normalizedResult.mainDetection.coordinates.ddm || 'Format inconnu';
+                        resultItem.certitude = normalizedResult.mainDetection.coordinates.certitude || false;
+                        resultItem.detection = normalizedResult.mainDetection.text || 'Coordonnées détectées';
                     }
                     
                     // Ajouter au tableau
@@ -356,28 +430,389 @@
             geocache: geocache
         });
         
-        // Pour l'instant, un exemple de données d'entrée
-        const inputs = {
-            text: geocache.name || '', // On utilise le nom de la géocache comme texte d'entrée
-            geocache_id: geocache.id,
+        // Préparer les données d'entrée en fonction du plugin
+        let inputs = {
+            text: geocache.name || '', // On utilise le nom de la géocache comme texte d'entrée par défaut
+            geocache_id: geocache.id, // Toujours envoyer l'ID, certains plugins en ont besoin (comme analysis_web_page)
             gc_code: geocache.gc_code || '',
             enable_gps_detection: true
         };
         
-        // Appel à l'API pour exécuter le plugin
-        const response = await fetch(`/api/plugins/${pluginName}/execute`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(inputs)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Erreur HTTP: ${response.status}`);
+        // Pour le plugin analysis_web_page, s'assurer que l'ID de la géocache est correctement transmis
+        // et ajouter _format: 'json' pour s'assurer de recevoir une réponse JSON
+        if (pluginName === "analysis_web_page") {
+            console.log("%c[MultiSolver] Utilisation du plugin analysis_web_page avec l'ID de géocache", "background:orange; color:black", geocache.id);
+            inputs._format = 'json';
         }
         
-        return await response.json();
+        try {
+            console.log("%c[MultiSolver] Envoi des données:", "background:blue; color:white", inputs);
+            
+            // Pour le méta-plugin analysis_web_page, utiliser XMLHttpRequest au lieu de fetch
+            // car il semble y avoir un problème avec la réponse fetch
+            if (pluginName === "analysis_web_page") {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', `/api/plugins/${pluginName}/execute`);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                console.log("%c[MultiSolver] Réponse XHR reçue:", "background:blue; color:white", data);
+                                resolve(normalizePluginResults(pluginName, data));
+                            } catch (e) {
+                                console.error("%c[MultiSolver] Erreur de parsing JSON:", "background:red; color:white", e);
+                                console.error("%c[MultiSolver] Texte brut reçu:", "background:red; color:white", xhr.responseText.substring(0, 500) + (xhr.responseText.length > 500 ? '...' : ''));
+                                
+                                // Créer un résultat d'erreur standardisé
+                                resolve({
+                                    mainDetection: {
+                                        text: "Erreur: Impossible de parser la réponse JSON",
+                                        coordinates: { exist: false }
+                                    },
+                                    detailedResults: [{
+                                        source: `Erreur ${pluginName}`,
+                                        sourceId: pluginName,
+                                        details: {
+                                            error: e.message,
+                                            rawResponse: xhr.responseText.substring(0, 200) + (xhr.responseText.length > 200 ? '...' : '')
+                                        }
+                                    }]
+                                });
+                            }
+                        } else {
+                            console.error("%c[MultiSolver] Erreur HTTP:", "background:red; color:white", xhr.status, xhr.statusText);
+                            resolve({
+                                mainDetection: {
+                                    text: `Erreur: ${xhr.status} ${xhr.statusText}`,
+                                    coordinates: { exist: false }
+                                },
+                                detailedResults: [{
+                                    source: `Erreur ${pluginName}`,
+                                    sourceId: pluginName,
+                                    details: {
+                                        error: `Erreur HTTP: ${xhr.status}`,
+                                        statusText: xhr.statusText
+                                    }
+                                }]
+                            });
+                        }
+                    };
+                    
+                    xhr.onerror = (e) => {
+                        console.error("%c[MultiSolver] Erreur réseau:", "background:red; color:white", e);
+                        resolve({
+                            mainDetection: {
+                                text: "Erreur: Problème de connexion au serveur",
+                                coordinates: { exist: false }
+                            },
+                            detailedResults: [{
+                                source: `Erreur ${pluginName}`,
+                                sourceId: pluginName,
+                                details: {
+                                    error: "Erreur réseau"
+                                }
+                            }]
+                        });
+                    };
+                    
+                    xhr.send(JSON.stringify(inputs));
+                });
+            }
+            
+            // Pour les autres plugins, continuer à utiliser fetch
+            const response = await fetch(`/api/plugins/${pluginName}/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(inputs)
+            });
+            
+            if (!response.ok) {
+                // Récupérer le texte brut de la réponse pour le diagnostic
+                const responseText = await response.text();
+                console.error("%c[MultiSolver] Erreur HTTP:", "background:red; color:white", {
+                    status: response.status,
+                    statusText: response.statusText,
+                    responseText: responseText.substring(0, 500) + (responseText.length > 500 ? '...' : '')
+                });
+                
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            // Récupérer la réponse sous forme de texte d'abord pour vérification
+            const responseText = await response.text();
+            
+            // Vérifier si la réponse ressemble à du HTML au lieu du JSON
+            if (responseText.trim().startsWith('<')) {
+                console.error("%c[MultiSolver] Erreur: La réponse est du HTML au lieu du JSON attendu", "background:red; color:white");
+                console.error("%c[MultiSolver] Réponse HTML:", "background:red; color:white", responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+                
+                // Créer un résultat d'erreur standardisé
+                return {
+                    mainDetection: {
+                        text: "Erreur: Réponse HTML inattendue",
+                        coordinates: { exist: false }
+                    },
+                    detailedResults: [{
+                        source: `Erreur ${pluginName}`,
+                        sourceId: pluginName,
+                        details: {
+                            error: "Le serveur a renvoyé du HTML au lieu du JSON attendu",
+                            htmlResponse: responseText.substring(0, 200) + (responseText.length > 200 ? '...' : '')
+                        }
+                    }]
+                };
+            }
+            
+            // Convertir en JSON
+            let rawResult;
+            try {
+                rawResult = JSON.parse(responseText);
+            } catch (e) {
+                console.error("%c[MultiSolver] Erreur de parsing JSON:", "background:red; color:white", e);
+                console.error("%c[MultiSolver] Texte brut reçu:", "background:red; color:white", responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+                
+                // Créer un résultat d'erreur standardisé
+                return {
+                    mainDetection: {
+                        text: "Erreur: Impossible de parser la réponse JSON",
+                        coordinates: { exist: false }
+                    },
+                    detailedResults: [{
+                        source: `Erreur ${pluginName}`,
+                        sourceId: pluginName,
+                        details: {
+                            error: e.message,
+                            rawResponse: responseText.substring(0, 200) + (responseText.length > 200 ? '...' : '')
+                        }
+                    }]
+                };
+            }
+            
+            // Log du résultat brut pour debug
+            console.log("%c[MultiSolver] Résultat brut:", "background:blue; color:white", rawResult);
+            
+            // Normaliser le résultat pour un traitement uniforme
+            return normalizePluginResults(pluginName, rawResult);
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin:", "background:red; color:white", error);
+            
+            // Retourner un résultat d'erreur standardisé
+            return {
+                mainDetection: {
+                    text: `Erreur: ${error.message}`,
+                    coordinates: { exist: false }
+                },
+                detailedResults: [{
+                    source: `Erreur ${pluginName}`,
+                    sourceId: pluginName,
+                    details: {
+                        error: error.message
+                    }
+                }]
+            };
+        }
+    }
+    
+    // Fonction pour normaliser les résultats de plugins (simples ou méta)
+    function normalizePluginResults(pluginName, result) {
+        console.log("%c[MultiSolver] Normalisation des résultats:", "background:purple; color:white", { pluginName, result });
+        
+        // Structure standard pour tous les résultats
+        const standardResult = {
+            mainDetection: {
+                text: "Aucun résultat",
+                coordinates: { exist: false }
+            },
+            detailedResults: []
+        };
+        
+        // En cas de résultat vide ou invalide
+        if (!result || typeof result !== 'object') {
+            console.warn("%c[MultiSolver] Résultat invalide ou vide:", "background:orange; color:black", result);
+            return standardResult;
+        }
+        
+        // Cas des méta-plugins (comme analysis_web_page)
+        if (result.combined_results) {
+            console.log("%c[MultiSolver] Traitement des résultats combinés:", "background:purple; color:white", result.combined_results);
+            
+            // Vérifier que combined_results est un objet et non une chaîne
+            let combinedResults = result.combined_results;
+            if (typeof combinedResults === 'string') {
+                try {
+                    combinedResults = JSON.parse(combinedResults);
+                    console.log("%c[MultiSolver] combined_results parsé depuis string:", "background:purple; color:white", combinedResults);
+                } catch (e) {
+                    console.error("%c[MultiSolver] Erreur lors du parsing de combined_results en string:", "background:red; color:white", e);
+                    return standardResult;
+                }
+            }
+            
+            // Si combinedResults est toujours pas un objet, traitement impossible
+            if (typeof combinedResults !== 'object' || combinedResults === null) {
+                console.error("%c[MultiSolver] combined_results n'est pas un objet valide après traitement:", "background:red; color:white", combinedResults);
+                return standardResult;
+            }
+            
+            // Extraire les résultats principaux des sous-plugins et les ajouter comme détails
+            for (const [subPluginName, subResult] of Object.entries(combinedResults)) {
+                if (!subResult) continue;
+                
+                console.log("%c[MultiSolver] Résultat du sous-plugin:", "background:purple; color:white", { subPluginName, subResult });
+                
+                // Ajouter ce sous-résultat aux détails
+                standardResult.detailedResults.push({
+                    source: getPluginReadableName(subPluginName),
+                    sourceId: subPluginName,
+                    details: subResult
+                });
+                
+                // Extraire les coordonnées si présentes
+                const coordinates = extractCoordinates(subResult);
+                
+                // Si ce sous-plugin a détecté des coordonnées valides, les considérer
+                // comme résultat principal si on n'en a pas déjà ou si elles sont plus fiables
+                if (coordinates && coordinates.exist && 
+                    (!standardResult.mainDetection.coordinates.exist || 
+                     (coordinates.certitude && !standardResult.mainDetection.coordinates.certitude))) {
+                    
+                    standardResult.mainDetection = {
+                        text: `${getPluginReadableName(subPluginName)}: détection réussie`,
+                        coordinates: coordinates,
+                        source: subPluginName
+                    };
+                }
+            }
+            
+            // Si on a plusieurs sous-résultats, modifier légèrement le texte
+            if (standardResult.detailedResults.length > 1 && standardResult.mainDetection.coordinates.exist) {
+                standardResult.mainDetection.text = `${standardResult.mainDetection.text} (+ ${standardResult.detailedResults.length - 1} autres analyses)`;
+            }
+        } 
+        // Cas des plugins standards
+        else {
+            standardResult.mainDetection = {
+                text: result.result?.text?.text_output || "Aucun résultat",
+                coordinates: result.coordinates || { exist: false },
+                source: pluginName
+            };
+            
+            standardResult.detailedResults.push({
+                source: getPluginReadableName(pluginName),
+                sourceId: pluginName,
+                details: result
+            });
+        }
+        
+        console.log("%c[MultiSolver] Résultat normalisé:", "background:purple; color:white", standardResult);
+        return standardResult;
+    }
+    
+    // Fonction pour extraire les coordonnées d'un résultat de plugin
+    function extractCoordinates(result) {
+        // Cas direct: le résultat a un objet coordinates
+        if (result.coordinates) {
+            if (result.coordinates.exist) {
+                return result.coordinates;
+            }
+        }
+        
+        // Cas particulier: formula_parser a un format différent
+        if (result.coordinates && Array.isArray(result.coordinates) && result.coordinates.length > 0) {
+            const firstCoord = result.coordinates[0];
+            return {
+                exist: true,
+                ddm: `${firstCoord.north} ${firstCoord.east}`,
+                certitude: result.certitude || true,
+                source: 'formula_parser'
+            };
+        }
+        
+        // Cas particulier: color_text_detector ou text_detector avec findings contenant des coordonnées
+        if (result.findings && Array.isArray(result.findings) && result.findings.length > 0) {
+            // Cherchons dans les findings si des coordonnées sont présentes
+            for (const finding of result.findings) {
+                if (finding.content) {
+                    // Expression régulière pour les coordonnées au format N 12 34.567 E 089 12.345
+                    const coordRegex = /[NS]\s*\d{1,2}\s*\d{1,2}\.\d{3}\s*[EW]\s*\d{1,3}\s*\d{1,2}\.\d{3}/i;
+                    const match = finding.content.match(coordRegex);
+                    
+                    if (match) {
+                        console.log("%c[MultiSolver] Coordonnées trouvées dans les findings:", "background:green; color:white", match[0]);
+                        return {
+                            exist: true,
+                            ddm: match[0],
+                            certitude: finding.isInteresting || true,
+                            source: 'finding'
+                        };
+                    }
+                }
+            }
+        }
+        
+        // Cas particulier: html_comments_finder
+        if (result.findings && Array.isArray(result.findings)) {
+            for (const finding of result.findings) {
+                if (finding.content) {
+                    // Expression régulière pour les coordonnées au format N 12 34.567 E 089 12.345
+                    const coordRegex = /[NS]\s*\d{1,2}\s*\d{1,2}\.\d{3}\s*[EW]\s*\d{1,3}\s*\d{1,2}\.\d{3}/i;
+                    const match = finding.content.match(coordRegex);
+                    
+                    if (match) {
+                        console.log("%c[MultiSolver] Coordonnées trouvées dans les commentaires HTML:", "background:green; color:white", match[0]);
+                        return {
+                            exist: true,
+                            ddm: match[0],
+                            certitude: true,
+                            source: 'html_comment'
+                        };
+                    }
+                }
+            }
+        }
+        
+        return { exist: false };
+    }
+    
+    // Fonction pour extraire toutes les coordonnées des résultats détaillés
+    function extractAllCoordinates(detailedResults) {
+        const allCoordinates = [];
+        
+        detailedResults.forEach(result => {
+            const coords = extractCoordinates(result.details);
+            if (coords.exist) {
+                allCoordinates.push({
+                    ...coords,
+                    source: result.source
+                });
+            }
+            
+            // Cas particulier pour formula_parser
+            if (result.sourceId === 'formula_parser' && 
+                result.details.coordinates && 
+                Array.isArray(result.details.coordinates)) {
+                
+                result.details.coordinates.forEach((coord, index) => {
+                    if (index === 0) return; // Skip the first one, already added above
+                    
+                    allCoordinates.push({
+                        exist: true,
+                        ddm: `${coord.north} ${coord.east}`,
+                        certitude: result.details.certitude || true,
+                        source: `${result.source} (solution ${index + 1})`
+                    });
+                });
+            }
+        });
+        
+        return allCoordinates;
     }
     
     // Récupérer les géocaches depuis toutes les sources possibles
@@ -408,6 +843,100 @@
         }
         
         return [];
+    }
+    
+    // Fonction pour obtenir un nom lisible pour un plugin
+    function getPluginReadableName(pluginId) {
+        const pluginNames = {
+            'coordinates_finder': 'Détecteur de coordonnées',
+            'color_text_detector': 'Détecteur de texte invisible',
+            'formula_parser': 'Analyseur de formules',
+            'html_comments_finder': 'Détecteur de commentaires HTML',
+            'image_alt_text_extractor': 'Extracteur de texte alt d\'images',
+            'additional_waypoints_analyzer': 'Analyseur de waypoints',
+            'analysis_web_page': 'Analyse complète de page'
+        };
+        
+        return pluginNames[pluginId] || pluginId;
+    }
+    
+    // Fonction pour formater les détails d'un résultat de plugin
+    function formatPluginResultDetails(result) {
+        const details = result.details;
+        let html = '<div class="plugin-details">';
+        
+        // Afficher les coordonnées si présentes
+        const coords = extractCoordinates(details);
+        if (coords.exist) {
+            const iconClass = coords.certitude ? 'text-green-400 fas fa-check-circle' : 'text-yellow-400 fas fa-exclamation-circle';
+            html += `
+                <div class="flex items-center mb-2 p-1 bg-gray-700/50 rounded">
+                    <span class="mr-2"><i class="${iconClass}"></i></span>
+                    <span class="font-medium">${coords.ddm}</span>
+                    <button class="ml-auto text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded copy-btn" 
+                            data-coords="${coords.ddm}">
+                        Copier
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Afficher le texte détecté
+        if (details.result && details.result.text && details.result.text.text_output) {
+            html += `
+                <div class="mb-2">
+                    <div class="text-xs text-gray-400 mb-1">Texte détecté:</div>
+                    <div class="p-1 bg-gray-700/50 rounded text-sm">${details.result.text.text_output}</div>
+                </div>
+            `;
+        }
+        
+        // Cas particulier: html_comments_finder
+        if (result.sourceId === 'html_comments_finder' && details.comments && details.comments.length > 0) {
+            html += `
+                <div class="mb-2">
+                    <div class="text-xs text-gray-400 mb-1">Commentaires HTML (${details.comments.length}):</div>
+                    <div class="space-y-1">
+            `;
+            
+            details.comments.forEach(comment => {
+                html += `<div class="p-1 bg-gray-700/50 rounded text-sm">${comment}</div>`;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Cas particulier: formula_parser
+        if (result.sourceId === 'formula_parser' && details.coordinates && Array.isArray(details.coordinates) && details.coordinates.length > 0) {
+            html += `
+                <div class="mb-2">
+                    <div class="text-xs text-gray-400 mb-1">Formules détectées (${details.coordinates.length}):</div>
+                    <div class="space-y-1">
+            `;
+            
+            details.coordinates.forEach(coord => {
+                html += `
+                    <div class="p-1 bg-gray-700/50 rounded text-sm flex justify-between">
+                        <span>${coord.north} ${coord.east}</span>
+                        <button class="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded copy-btn" 
+                                data-coords="${coord.north} ${coord.east}">
+                            Copier
+                        </button>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        return html;
     }
     
     // Configurer la fonctionnalité de recherche
@@ -641,7 +1170,7 @@
     // Initialiser après un court délai pour s'assurer que le DOM est complètement chargé
     setTimeout(initialize, 200);
 
-    // Initialisation du tableau Tabulator
+    // Initialisation du tableau Tabulator avec vue détaillée
     function initializeResultsTable() {
         const tableContainer = document.getElementById('results-table');
         
@@ -655,7 +1184,7 @@
             { title: "GC Code", field: "gc_code", sorter: "string", headerSort: true, width: 120 },
             { title: "Nom", field: "name", sorter: "string", headerSort: true },
             { 
-                title: "Détections", 
+                title: "Détection", 
                 field: "detection", 
                 sorter: "string", 
                 headerSort: true,
@@ -667,13 +1196,23 @@
                         return `<div class="text-red-300">Erreur: ${row.error}</div>`;
                     }
                     
+                    // Si des détails sont disponibles avec des coordonnées, indiquer la détection
+                    if (row.detailedResults && row.detailedResults.length > 0) {
+                        for (const detail of row.detailedResults) {
+                            const coords = extractCoordinates(detail.details);
+                            if (coords.exist) {
+                                return `${detail.source}: détection réussie`;
+                            }
+                        }
+                    }
+                    
                     // Tronquer les textes trop longs
-                    const maxTextLength = 50;
+                    const maxTextLength = 40;
                     if (value && value.length > maxTextLength) {
                         return value.substring(0, maxTextLength) + '...';
                     }
                     
-                    return value;
+                    return value || "Aucun résultat";
                 }
             },
             { 
@@ -689,32 +1228,74 @@
                         return "";
                     }
                     
-                    const iconClass = row.certitude ? 'text-green-400 fas fa-check-circle' : 'text-yellow-400 fas fa-exclamation-circle';
+                    // Chercher des coordonnées dans les résultats détaillés
+                    let bestCoords = null;
                     
-                    return `
-                        <div class="flex items-center">
-                            <span class="mr-2"><i class="${iconClass}"></i></span>
-                            <span>${value}</span>
-                        </div>
-                    `;
+                    if (row.detailedResults && row.detailedResults.length > 0) {
+                        for (const detail of row.detailedResults) {
+                            const coords = extractCoordinates(detail.details);
+                            if (coords.exist && (!bestCoords || coords.certitude)) {
+                                bestCoords = coords;
+                            }
+                        }
+                    }
+                    
+                    if (bestCoords) {
+                        const iconClass = bestCoords.certitude ? 'text-green-400 fas fa-check-circle' : 'text-yellow-400 fas fa-exclamation-circle';
+                        return `
+                            <div class="flex items-center">
+                                <span class="mr-2"><i class="${iconClass}"></i></span>
+                                <span>${bestCoords.ddm || 'Format inconnu'}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    return value !== undefined && value !== "Non détecté" ? value : "Non détecté";
                 }
             },
             { 
                 title: "Actions", 
-                field: "id", 
-                headerSort: false, 
-                hozAlign: "right",
+                headerSort: false,
                 formatter: function(cell, formatterParams, onRendered) {
-                    const id = cell.getValue();
                     const row = cell.getRow().getData();
+                    const hasDetails = row.detailedResults && row.detailedResults.length > 0;
                     
                     return `
-                        <button 
-                            onclick="window.openGeocacheDetails(${id}, '${row.gc_code}', '${row.name}')"
-                            class="text-blue-400 hover:text-blue-300">
-                            Détails
-                        </button>
+                        <div class="flex space-x-2 justify-end">
+                            ${hasDetails ? `
+                                <button class="toggle-details-btn px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs">
+                                    <i class="fas fa-chevron-down"></i> Détails
+                                </button>
+                            ` : ''}
+                            <button class="open-details-btn px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs">
+                                <i class="fas fa-external-link-alt"></i> Geocache
+                            </button>
+                        </div>
                     `;
+                },
+                cellClick: function(e, cell) {
+                    const element = e.target;
+                    const row = cell.getRow();
+                    const rowData = row.getData();
+                    
+                    // Gérer le bouton de détails
+                    if (element.classList.contains('toggle-details-btn') || element.closest('.toggle-details-btn')) {
+                        const detailsRow = document.getElementById(`details-row-${rowData.id}`);
+                        
+                        if (detailsRow) {
+                            // Si les détails existent déjà, les basculer
+                            detailsRow.classList.toggle('hidden');
+                            toggleChevron(element.classList.contains('toggle-details-btn') ? element : element.closest('.toggle-details-btn'));
+                        } else {
+                            // Sinon, créer les détails
+                            createDetailsRow(row);
+                        }
+                    }
+                    
+                    // Gérer le bouton d'ouverture de géocache
+                    if (element.classList.contains('open-details-btn') || element.closest('.open-details-btn')) {
+                        window.openGeocacheDetails(rowData.id, rowData.gc_code, rowData.name);
+                    }
                 }
             }
         ];
@@ -736,11 +1317,140 @@
                     row.getElement().style.backgroundColor = "rgba(185, 28, 28, 0.2)";
                 }
             },
+            rowClick: function(e, row) {
+                // Si on clique sur la ligne (pas sur un bouton), basculer les détails
+                if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                    const rowData = row.getData();
+                    const detailsRow = document.getElementById(`details-row-${rowData.id}`);
+                    
+                    if (detailsRow) {
+                        detailsRow.classList.toggle('hidden');
+                        const btn = row.getElement().querySelector('.toggle-details-btn');
+                        if (btn) toggleChevron(btn);
+                    } else if (rowData.detailedResults && rowData.detailedResults.length > 0) {
+                        createDetailsRow(row);
+                    }
+                }
+            },
             placeholder: "Aucun résultat disponible"
         };
         
         // Créer l'instance Tabulator
         window.resultsTable = new Tabulator(tableContainer, options);
+        
+        // Après construction, ajouter l'event listener pour les boutons de copie
+        tableContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('copy-btn') || e.target.closest('.copy-btn')) {
+                const button = e.target.classList.contains('copy-btn') ? e.target : e.target.closest('.copy-btn');
+                const coords = button.dataset.coords;
+                if (coords) {
+                    copyToClipboard(coords);
+                    
+                    // Feedback visuel
+                    const originalText = button.textContent;
+                    button.textContent = 'Copié!';
+                    button.classList.add('bg-green-600');
+                    button.classList.remove('bg-blue-600');
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('bg-green-600');
+                        button.classList.add('bg-blue-600');
+                    }, 1500);
+                }
+            }
+        });
+    }
+    
+    // Fonction pour créer la ligne de détails
+    function createDetailsRow(row) {
+        const rowData = row.getData();
+        const rowElement = row.getElement();
+        const detailedResults = rowData.detailedResults;
+        
+        if (!detailedResults || detailedResults.length === 0) return;
+        
+        // Créer l'élément pour les détails
+        const detailsElement = document.createElement('tr');
+        detailsElement.id = `details-row-${rowData.id}`;
+        detailsElement.className = 'details-row';
+        detailsElement.innerHTML = `
+            <td colspan="5" class="details-container">
+                <div class="p-3 bg-gray-800/80 rounded">
+                    <div class="text-sm font-medium text-gray-300 mb-2">Résultats détaillés:</div>
+                    <div class="detailed-results space-y-3">
+                        ${detailedResults.map(result => `
+                            <div class="p-2 bg-gray-700/30 rounded">
+                                <div class="text-xs font-medium text-gray-200 mb-1">${result.source}</div>
+                                <div>${formatPluginResultDetails(result)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    ${createCoordinatesSection(detailedResults)}
+                </div>
+            </td>
+        `;
+        
+        // Insérer après la ligne
+        rowElement.insertAdjacentElement('afterend', detailsElement);
+        
+        // Basculer l'icône du bouton
+        const btn = rowElement.querySelector('.toggle-details-btn');
+        if (btn) toggleChevron(btn);
+    }
+    
+    // Fonction pour créer la section des coordonnées
+    function createCoordinatesSection(detailedResults) {
+        const allCoordinates = extractAllCoordinates(detailedResults);
+        
+        if (allCoordinates.length <= 1) return '';
+        
+        return `
+            <div class="mt-3 p-2 bg-blue-900/30 rounded">
+                <div class="text-sm font-medium text-gray-300 mb-2">Toutes les coordonnées détectées:</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    ${allCoordinates.map(coords => `
+                        <div class="p-2 border border-blue-700/50 rounded flex items-center">
+                            <span class="mr-2"><i class="fas ${coords.certitude ? 'fa-check-circle text-green-400' : 'fa-exclamation-circle text-yellow-400'}"></i></span>
+                            <div>
+                                <div class="text-sm text-gray-200">${coords.ddm}</div>
+                                <div class="text-xs text-gray-400">${coords.source}</div>
+                            </div>
+                            <button class="ml-auto text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded copy-btn" 
+                                    data-coords="${coords.ddm}">
+                                Copier
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Fonction pour basculer l'icône du chevron
+    function toggleChevron(button) {
+        const icon = button.querySelector('i');
+        if (icon) {
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+    }
+    
+    // Fonction pour copier du texte dans le presse-papier
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            console.log("%c[MultiSolver] Texte copié dans le presse-papier:", "background:green; color:white", text);
+            showMessage("Coordonnées copiées dans le presse-papier");
+        }).catch(err => {
+            console.error("%c[MultiSolver] Erreur lors de la copie:", "background:red; color:white", err);
+            showMessage("Erreur lors de la copie");
+        });
     }
     
     // Mise à jour du tableau des résultats
@@ -755,6 +1465,9 @@
         // Mettre à jour les données du tableau
         if (Array.isArray(results) && results.length > 0) {
             window.resultsTable.replaceData(results);
+            
+            // Supprimer toutes les lignes de détails
+            document.querySelectorAll('.details-row').forEach(row => row.remove());
         }
     }
 })();
