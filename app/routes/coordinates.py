@@ -12,6 +12,7 @@ def save_geocache_coordinates(geocache_id):
     """
     Sauvegarde les coordonnées corrigées d'une géocache.
     """
+    print(f"[DEBUG] Sauvegarde des coordonnées pour la géocache {geocache_id}")
     try:
         data = request.get_json()
         

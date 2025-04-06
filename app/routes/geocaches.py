@@ -171,7 +171,7 @@ def get_geocache_text(geocache_id):
     })
 
 
-@geocaches_bp.route('/api/geocaches/<int:geocache_id>/coordinates', methods=['GET'])
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/coordinates', methods=['GET', 'PUT'])
 def get_geocache_coordinates(geocache_id):
     """Recupere toutes les coordonnees associees a une geocache (point d'origine, point corrige, waypoints)"""
     logger.debug(f"Recuperation des coordonnees pour la geocache {geocache_id}")

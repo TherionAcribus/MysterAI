@@ -368,6 +368,24 @@
                         resultItem.coordinates = normalizedResult.mainDetection.coordinates.ddm || 'Format inconnu';
                         resultItem.certitude = normalizedResult.mainDetection.coordinates.certitude || false;
                         resultItem.detection = normalizedResult.mainDetection.text || 'Coordonnées détectées';
+                        
+                        // Vérifier si on doit sauvegarder automatiquement les coordonnées
+                        const autoSaveCoords = document.getElementById('plugin-auto-save-coords').checked;
+                        
+                        if (autoSaveCoords) {
+                            console.log("%c[MultiSolver] Sauvegarde automatique des coordonnées activée", "background:green; color:white");
+                            
+                            // Sauvegarder les coordonnées
+                            const saveResult = await saveDetectedCoordinates(geocache.id, normalizedResult.mainDetection.coordinates);
+                            
+                            // Marquer le statut de sauvegarde dans le résultat
+                            resultItem.coordsSaved = saveResult.success;
+                            resultItem.coordsSaveError = saveResult.success ? null : saveResult.error;
+                        } else {
+                            // Indiquer que les coordonnées n'ont pas été sauvegardées automatiquement
+                            resultItem.coordsSaved = false;
+                            resultItem.coordsSaveError = null;
+                        }
                     }
                     
                     // Ajouter au tableau
@@ -972,6 +990,9 @@
         // Charger les géocaches
         loadGeocaches();
         
+        // Charger la préférence pour l'enregistrement automatique des coordonnées
+        loadAutoCorrectCoordinatesPreference();
+        
         // Configurer les plugins
         const pluginContainer = document.getElementById('plugin-list-container');
         if (pluginContainer) {
@@ -1242,12 +1263,48 @@
                     
                     if (bestCoords) {
                         const iconClass = bestCoords.certitude ? 'text-green-400 fas fa-check-circle' : 'text-yellow-400 fas fa-exclamation-circle';
-                        return `
+                        let html = `
                             <div class="flex items-center">
                                 <span class="mr-2"><i class="${iconClass}"></i></span>
                                 <span>${bestCoords.ddm || 'Format inconnu'}</span>
                             </div>
                         `;
+                        
+                        // Ajouter le statut de sauvegarde s'il est disponible
+                        if (row.coordsSaved !== undefined) {
+                            if (row.coordsSaved) {
+                                html += `
+                                    <div class="mt-1 text-xs text-green-400">
+                                        <i class="fas fa-save mr-1"></i> Coordonnées sauvegardées
+                                    </div>
+                                `;
+                            } else {
+                                html += `
+                                    <div class="flex items-center mt-1">
+                                        <span class="text-xs text-gray-400 mr-2">
+                                            <i class="fas fa-save mr-1"></i> Non sauvegardées
+                                        </span>
+                                        <button 
+                                            class="save-coords-btn px-2 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded" 
+                                            data-geocache-id="${row.id}" 
+                                            data-coords="${bestCoords.ddm || ''}">
+                                            Sauvegarder
+                                        </button>
+                                    </div>
+                                `;
+                                
+                                // Si une erreur de sauvegarde s'est produite, l'afficher
+                                if (row.coordsSaveError) {
+                                    html += `
+                                        <div class="mt-1 text-xs text-red-400">
+                                            Erreur: ${row.coordsSaveError}
+                                        </div>
+                                    `;
+                                }
+                            }
+                        }
+                        
+                        return html;
                     }
                     
                     return value !== undefined && value !== "Non détecté" ? value : "Non détecté";
@@ -1347,16 +1404,72 @@
                     copyToClipboard(coords);
                     
                     // Feedback visuel
-                    const originalText = button.textContent;
-                    button.textContent = 'Copié!';
-                    button.classList.add('bg-green-600');
-                    button.classList.remove('bg-blue-600');
+                    button.classList.add('bg-green-700');
+                    button.innerHTML = '<i class="fas fa-check"></i> Copié !';
                     
                     setTimeout(() => {
-                        button.textContent = originalText;
-                        button.classList.remove('bg-green-600');
-                        button.classList.add('bg-blue-600');
-                    }, 1500);
+                        button.classList.remove('bg-green-700');
+                        button.innerHTML = '<i class="fas fa-copy"></i> Copier';
+                    }, 2000);
+                }
+            }
+            
+            // Gestionnaire pour le bouton de sauvegarde des coordonnées
+            if (e.target.classList.contains('save-coords-btn') || e.target.closest('.save-coords-btn')) {
+                const button = e.target.classList.contains('save-coords-btn') ? e.target : e.target.closest('.save-coords-btn');
+                const geocacheId = button.dataset.geocacheId;
+                const coordsText = button.dataset.coords;
+                
+                if (geocacheId && coordsText) {
+                    // Désactiver le bouton pendant la sauvegarde
+                    button.disabled = true;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sauvegarde...';
+                    
+                    // Sauvegarder les coordonnées
+                    saveDetectedCoordinates(geocacheId, { exist: true, ddm: coordsText })
+                        .then(result => {
+                            if (result.success) {
+                                // Remplacer le bouton par un message de succès
+                                const parentContainer = button.parentElement;
+                                parentContainer.innerHTML = `
+                                    <span class="text-xs text-green-400">
+                                        <i class="fas fa-check mr-1"></i> Coordonnées sauvegardées !
+                                    </span>
+                                `;
+                                
+                                // Mettre à jour le tableau
+                                const row = window.resultsTable.getRow(geocacheId);
+                                if (row) {
+                                    const rowData = row.getData();
+                                    rowData.coordsSaved = true;
+                                    rowData.coordsSaveError = null;
+                                    window.resultsTable.updateData([rowData]);
+                                }
+                            } else {
+                                // Rétablir le bouton et afficher l'erreur
+                                button.disabled = false;
+                                button.innerHTML = 'Réessayer';
+                                
+                                // Ajouter un message d'erreur
+                                const errorElement = document.createElement('div');
+                                errorElement.className = 'mt-1 text-xs text-red-400';
+                                errorElement.innerHTML = `Erreur: ${result.error}`;
+                                button.parentElement.appendChild(errorElement);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("%c[MultiSolver] Erreur lors de la sauvegarde manuelle:", "background:red; color:white", error);
+                            
+                            // Rétablir le bouton et afficher l'erreur
+                            button.disabled = false;
+                            button.innerHTML = 'Réessayer';
+                            
+                            // Ajouter un message d'erreur
+                            const errorElement = document.createElement('div');
+                            errorElement.className = 'mt-1 text-xs text-red-400';
+                            errorElement.innerHTML = `Erreur: ${error.message}`;
+                            button.parentElement.appendChild(errorElement);
+                        });
                 }
             }
         });
@@ -1468,6 +1581,94 @@
             
             // Supprimer toutes les lignes de détails
             document.querySelectorAll('.details-row').forEach(row => row.remove());
+        }
+    }
+    
+    // Fonction pour charger la préférence d'enregistrement automatique des coordonnées
+    async function loadAutoCorrectCoordinatesPreference() {
+        try {
+            console.log("%c[MultiSolver] Chargement de la préférence auto_correct_coordinates", "background:orange; color:black");
+            
+            // Appel à l'API des paramètres
+            const response = await fetch('/api/settings/param/auto_correct_coordinates');
+            
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.value !== undefined) {
+                console.log("%c[MultiSolver] Préférence auto_correct_coordinates chargée:", "background:green; color:white", data.value);
+                // Vérifier si l'élément existe et le mettre à jour
+                const autoSaveCheckbox = document.getElementById('plugin-auto-save-coords');
+                if (autoSaveCheckbox) {
+                    autoSaveCheckbox.checked = data.value;
+                }
+            } else {
+                console.warn("%c[MultiSolver] Impossible de charger la préférence auto_correct_coordinates", "background:orange; color:black");
+            }
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors du chargement de la préférence:", "background:red; color:white", error);
+        }
+    }
+
+    // Fonction pour sauvegarder automatiquement les coordonnées détectées
+    async function saveDetectedCoordinates(geocacheId, coordinates) {
+        try {
+            console.log("%c[MultiSolver] Sauvegarde des coordonnées pour la géocache:", "background:blue; color:white", {
+                geocacheId, coordinates
+            });
+            
+            if (!coordinates || !coordinates.exist || !coordinates.ddm) {
+                console.warn("%c[MultiSolver] Coordonnées invalides pour la sauvegarde", "background:orange; color:black");
+                return { success: false, error: "Coordonnées invalides" };
+            }
+            
+            // Extraire lat et lon du format DDM
+            const ddmCoords = coordinates.ddm;
+            let gc_lat, gc_lon;
+            
+            // Expression régulière améliorée pour extraire lat/lon
+            // Format: N 49° 45.558 E 005° 58.554 ou N 49° 45.204' E 5° 56.226'
+            const coordRegex = /([NS])\s*(\d{1,2})[°\s]+(\d{1,2}\.\d+)['"]?\s*([EW])\s*(\d{1,3})[°\s]+(\d{1,2}\.\d+)['"]?/i;
+            const match = ddmCoords.match(coordRegex);
+            
+            if (match) {
+                gc_lat = `${match[1]} ${match[2]}° ${match[3]}`;
+                gc_lon = `${match[4]} ${match[5]}° ${match[6]}`;
+                console.log("%c[MultiSolver] Coordonnées extraites:", "background:green; color:white", { gc_lat, gc_lon });
+            } else {
+                console.warn("%c[MultiSolver] Format de coordonnées non reconnu:", "background:orange; color:black", ddmCoords);
+                return { success: false, error: "Format de coordonnées non reconnu" };
+            }
+            
+            // Créer un objet FormData pour envoyer les données au format form
+            const formData = new FormData();
+            formData.append('gc_lat', gc_lat);
+            formData.append('gc_lon', gc_lon);
+            
+            // Envoyer les coordonnées à l'API - Utiliser l'URL correcte sans le préfixe 'api'
+            const response = await fetch(`/geocaches/${geocacheId}/coordinates`, {
+                method: 'PUT',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `Erreur HTTP: ${response.status}`);
+            }
+            
+            // La réponse est du HTML, pas du JSON
+            const result = await response.text();
+            console.log("%c[MultiSolver] Coordonnées sauvegardées avec succès", "background:green; color:white");
+            
+            return { success: true, result };
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de la sauvegarde des coordonnées:", "background:red; color:white", error);
+            return { success: false, error: error.message };
         }
     }
 })();
