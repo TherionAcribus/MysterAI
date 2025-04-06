@@ -220,25 +220,6 @@
         }
     }
     
-    // Configurer les écouteurs pour les caractères autorisés
-    function setupAllowedCharsListener() {
-        const allowedCharsSelect = document.getElementById('metasolver-allowed-chars');
-        const customCharsContainer = document.getElementById('metasolver-custom-chars-container');
-        
-        if (allowedCharsSelect && customCharsContainer) {
-            console.log("%c[MultiSolver] Configuration des écouteurs pour les caractères autorisés", "background:orange; color:black");
-            
-            allowedCharsSelect.addEventListener('change', function(event) {
-                console.log("%c[MultiSolver] Changement de type de caractères", "background:orange; color:black", event.target.value);
-                if (event.target.value === 'custom') {
-                    customCharsContainer.classList.remove('hidden');
-                } else {
-                    customCharsContainer.classList.add('hidden');
-                }
-            });
-        }
-    }
-    
     // Fonction principale d'initialisation
     function initialize() {
         console.log("%c[MultiSolver] Démarrage de l'initialisation", "background:orange; color:black");
@@ -249,9 +230,6 @@
         // Charger les géocaches
         loadGeocaches();
         
-        // Configurer les caractères autorisés
-        setupAllowedCharsListener();
-        
         // Configurer les plugins
         const pluginContainer = document.getElementById('plugin-list-container');
         if (pluginContainer) {
@@ -259,9 +237,6 @@
         } else {
             console.error("%c[MultiSolver] Container de plugins non trouvé", "background:red; color:white");
         }
-        
-        // Configurer les boutons du MetaSolver
-        setupMetaSolverButtons();
     }
     
     // Charger les géocaches depuis toutes les sources disponibles
@@ -336,49 +311,6 @@
             name: name
         }, '*');
     };
-    
-    // Configurer les boutons du MetaSolver
-    function setupMetaSolverButtons() {
-        const metaSolverButtons = document.querySelectorAll('[data-action="click->multi-solver#executeMetaSolver"]');
-        
-        metaSolverButtons.forEach(button => {
-            console.log("%c[MultiSolver] Configuration du bouton MetaSolver:", "background:orange; color:black", button.dataset.mode);
-            
-            button.addEventListener('click', function() {
-                const mode = this.dataset.mode;
-                console.log("%c[MultiSolver] Exécution du MetaSolver en mode:", "background:orange; color:black", mode);
-                executeMetaSolver(mode);
-            });
-        });
-    }
-    
-    // Exécuter le MetaSolver
-    function executeMetaSolver(mode) {
-        console.log("%c[MultiSolver] Préparation de l'exécution du MetaSolver", "background:orange; color:black");
-        
-        // Récupérer les paramètres du MetaSolver
-        const metasolverMode = document.getElementById('metasolver-mode').value;
-        const metasolverStrict = document.getElementById('metasolver-strict').value;
-        const metasolverAllowedChars = document.getElementById('metasolver-allowed-chars').value;
-        const metasolverCustomChars = document.getElementById('metasolver-custom-chars').value;
-        const metasolverEmbedded = document.getElementById('metasolver-embedded').checked;
-        const metasolverGpsDetection = document.getElementById('metasolver-gps-detection').checked;
-        const metasolverApplyToAll = document.getElementById('metasolver-apply-to-all').checked;
-        
-        // Afficher les paramètres dans la console
-        console.log("%c[MultiSolver] Paramètres du MetaSolver:", "background:orange; color:black", {
-            mode: metasolverMode,
-            strict: metasolverStrict,
-            allowedChars: metasolverAllowedChars,
-            customChars: metasolverCustomChars,
-            embedded: metasolverEmbedded,
-            gpsDetection: metasolverGpsDetection,
-            applyToAll: metasolverApplyToAll
-        });
-        
-        // TODO: Implémentation de l'API pour le MetaSolver
-        showMessage("Fonctionnalité MetaSolver en cours de développement.");
-    }
     
     // Afficher un message d'erreur
     function showError(message) {
