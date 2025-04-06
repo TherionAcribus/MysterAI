@@ -7,10 +7,28 @@
         console.log("%c[MultiSolver] Affichage de la liste des géocaches:", "background:orange; color:black", geocaches.length);
         
         const geocachesListElement = document.querySelector('[data-multi-solver-target="geocachesList"]');
+        const geocachesCountElement = document.querySelector('[data-multi-solver-target="geocachesCount"]');
+        const geocachesDropdownButton = document.querySelector('[data-multi-solver-target="geocachesDropdownButton"]');
         
         if (!geocachesListElement) {
             console.error("%c[MultiSolver] Élément liste des géocaches non trouvé", "background:red; color:white");
             return;
+        }
+        
+        // Mettre à jour le compteur de géocaches
+        if (geocachesCountElement) {
+            geocachesCountElement.textContent = geocaches && geocaches.length ? geocaches.length : 0;
+        }
+        
+        // Mettre à jour le texte du bouton
+        if (geocachesDropdownButton) {
+            const cacheText = geocaches && geocaches.length > 1 ? "géocaches" : "géocache";
+            geocachesDropdownButton.innerHTML = `
+                <span class="mr-1">${geocaches && geocaches.length ? geocaches.length : 0} ${cacheText}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform transform" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            `;
         }
         
         if (!geocaches || geocaches.length === 0) {
@@ -43,6 +61,34 @@
             errorElement.classList.add('hidden');
         }
     };
+    
+    // Configurer le bouton dropdown des géocaches
+    function setupGeocachesDropdown() {
+        const dropdownButton = document.querySelector('[data-multi-solver-target="geocachesDropdownButton"]');
+        const dropdownContent = document.querySelector('[data-multi-solver-target="geocachesList"]');
+        
+        if (dropdownButton && dropdownContent) {
+            console.log("%c[MultiSolver] Configuration du dropdown des géocaches", "background:orange; color:black");
+            
+            // Masquer le contenu par défaut
+            dropdownContent.classList.add('hidden');
+            
+            // Ajouter l'écouteur d'événement pour le basculement
+            dropdownButton.addEventListener('click', function() {
+                dropdownContent.classList.toggle('hidden');
+                
+                // Faire tourner la flèche
+                const arrow = this.querySelector('svg');
+                if (arrow) {
+                    if (dropdownContent.classList.contains('hidden')) {
+                        arrow.classList.remove('rotate-180');
+                    } else {
+                        arrow.classList.add('rotate-180');
+                    }
+                }
+            });
+        }
+    }
     
     // Écouter l'événement d'injection de géocaches
     document.addEventListener('geocachesInjected', function(event) {
@@ -196,6 +242,9 @@
     // Fonction principale d'initialisation
     function initialize() {
         console.log("%c[MultiSolver] Démarrage de l'initialisation", "background:orange; color:black");
+        
+        // Configurer le dropdown des géocaches
+        setupGeocachesDropdown();
         
         // Charger les géocaches
         loadGeocaches();
