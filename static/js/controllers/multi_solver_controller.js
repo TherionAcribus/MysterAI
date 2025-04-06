@@ -109,6 +109,9 @@
         }
     });
     
+    // Variable globale pour le tableau des résultats
+    window.resultsTable = null;
+    
     // Variable pour suivre l'état de traitement
     window.isPluginExecutionRunning = false;
     
@@ -231,40 +234,24 @@
         // Vérifier si on doit appliquer à toutes les géocaches
         const applyToAll = document.getElementById('plugin-apply-to-all').checked;
         
-        // Préparation du tableau de résultats
-        const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
+        // Préparation des géocaches à traiter
         const geocachesToProcess = applyToAll ? geocaches : [geocaches[0]];
         
-        if (resultsTable) {
-            // Créer la barre de progression et le bouton d'arrêt
-            let progressHTML = `
-                <tr class="bg-gray-900">
-                    <td colspan="5" class="px-6 py-3">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <div class="mr-4">
-                                    <span id="progress-count">0</span> / <span id="progress-total">${geocachesToProcess.length}</span>
-                                </div>
-                                <div class="w-64 bg-gray-700 rounded-full h-2.5">
-                                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-                                </div>
-                            </div>
-                            <button 
-                                id="stop-execution-button"
-                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs flex items-center"
-                                onclick="window.stopPluginExecution()">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                Arrêter
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-            
-            // Tableau vide pour les résultats
-            resultsTable.innerHTML = progressHTML;
+        // Afficher le conteneur de progression
+        const progressContainer = document.getElementById('progress-container');
+        if (progressContainer) {
+            progressContainer.classList.remove('hidden');
+            document.getElementById('progress-count').textContent = "0";
+            document.getElementById('progress-total').textContent = geocachesToProcess.length;
+            document.getElementById('progress-bar').style.width = "0%";
+        }
+        
+        // Initialiser le tableau Tabulator s'il n'existe pas déjà
+        if (!window.resultsTable) {
+            initializeResultsTable();
+        } else {
+            // Sinon, effacer les données existantes
+            window.resultsTable.clearData();
         }
         
         // Préparer le tableau de résultats
@@ -287,21 +274,33 @@
                     const result = await executePlugin(pluginName, geocache);
                     
                     // Ajouter le résultat à notre tableau de résultats
-                    results.push({
-                        geocache: geocache,
-                        result: result
-                    });
+                    const resultItem = {
+                        id: geocache.id,
+                        gc_code: geocache.gc_code || 'N/A',
+                        name: geocache.name || 'Sans nom',
+                        isError: false,
+                        error: '',
+                        coordinates: 'Non détecté',
+                        certitude: false,
+                        detection: 'Aucun résultat'
+                    };
                     
-                    // Mettre à jour le tableau progressivement
-                    updateResultsTable(results, true);
+                    // Traiter les coordonnées
+                    if (result.coordinates && result.coordinates.exist) {
+                        resultItem.coordinates = result.coordinates.ddm || 'Format inconnu';
+                        resultItem.certitude = result.coordinates.certitude || false;
+                    }
                     
-                    // Mettre à jour la progression
-                    processedCount++;
-                    document.getElementById('progress-count').textContent = processedCount;
+                    // Traiter le texte détecté
+                    if (result.result && result.result.text && result.result.text.text_output) {
+                        resultItem.detection = result.result.text.text_output;
+                    }
                     
-                    // Mettre à jour la barre de progression
-                    const progressPercent = (processedCount / geocachesToProcess.length) * 100;
-                    document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+                    // Ajouter au tableau
+                    results.push(resultItem);
+                    
+                    // Mettre à jour le tableau Tabulator progressivement
+                    updateResultsTable(results);
                     
                 } catch (error) {
                     console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin sur la géocache:", "background:red; color:white", {
@@ -312,23 +311,26 @@
                     
                     // Ajouter une entrée d'erreur au tableau
                     results.push({
-                        geocache: geocache,
-                        error: error.message
+                        id: geocache.id,
+                        gc_code: geocache.gc_code || 'N/A',
+                        name: geocache.name || 'Sans nom',
+                        isError: true,
+                        error: error.message,
+                        coordinates: '',
+                        certitude: false,
+                        detection: ''
                     });
                     
                     // Mettre à jour le tableau avec l'erreur
-                    updateResultsTable(results, true);
-                    
-                    // Mettre à jour la progression même en cas d'erreur
-                    processedCount++;
-                    document.getElementById('progress-count').textContent = processedCount;
-                    const progressPercent = (processedCount / geocachesToProcess.length) * 100;
-                    document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+                    updateResultsTable(results);
                 }
+                
+                // Mettre à jour la progression
+                processedCount++;
+                document.getElementById('progress-count').textContent = processedCount;
+                const progressPercent = (processedCount / geocachesToProcess.length) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercent}%`;
             }
-            
-            // Finaliser le tableau des résultats
-            updateResultsTable(results, false);
             
         } catch (error) {
             console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin:", "background:red; color:white", error);
@@ -376,123 +378,6 @@
         }
         
         return await response.json();
-    }
-    
-    // Mise à jour du tableau des résultats
-    function updateResultsTable(results, keepProgressBar = false) {
-        console.log("%c[MultiSolver] Mise à jour du tableau des résultats:", "background:orange; color:black", results);
-        
-        const resultsTable = document.querySelector('[data-multi-solver-target="resultsTable"]');
-        
-        if (!resultsTable) {
-            console.error("%c[MultiSolver] Tableau des résultats non trouvé", "background:red; color:white");
-            return;
-        }
-        
-        if (!results || results.length === 0) {
-            resultsTable.innerHTML = `
-                <tr>
-                    <td colspan="5" class="px-6 py-4">
-                        <div class="text-center text-gray-400">Aucun résultat disponible</div>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        let html = '';
-        
-        // Si on veut garder la barre de progression, l'extraire d'abord
-        if (keepProgressBar) {
-            const progressRow = resultsTable.querySelector('tr:first-child');
-            if (progressRow && progressRow.classList.contains('bg-gray-900')) {
-                html = progressRow.outerHTML;
-            }
-        }
-        
-        results.forEach(item => {
-            const geocache = item.geocache;
-            
-            // Vérifier si c'est une erreur
-            if (item.error) {
-                html += `
-                    <tr class="hover:bg-gray-700/50 bg-red-900/30">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            ${geocache.gc_code || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4">
-                            ${geocache.name || 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 text-red-300" colspan="2">
-                            <div class="text-sm">Erreur: ${item.error}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button 
-                                onclick="window.openGeocacheDetails(${geocache.id}, '${geocache.gc_code || ''}', '${geocache.name || ''}')"
-                                class="text-blue-400 hover:text-blue-300">
-                                Détails
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            const result = item.result;
-            
-            // Récupérer les coordonnées si disponibles
-            let coordsText = 'Non détecté';
-            let certitude = false;
-            
-            if (result.coordinates && result.coordinates.exist) {
-                coordsText = result.coordinates.ddm || 'Format inconnu';
-                certitude = result.coordinates.certitude || false;
-            }
-            
-            // Récupérer le texte de sortie
-            let detectionText = 'Aucun résultat';
-            
-            if (result.result && result.result.text && result.result.text.text_output) {
-                detectionText = result.result.text.text_output;
-            }
-            
-            // Tronquer les textes trop longs
-            const maxTextLength = 50;
-            if (detectionText.length > maxTextLength) {
-                detectionText = detectionText.substring(0, maxTextLength) + '...';
-            }
-            
-            html += `
-                <tr class="hover:bg-gray-700/50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${geocache.gc_code || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4">
-                        ${geocache.name || 'N/A'}
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-300">${detectionText}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center">
-                            <span class="mr-2 ${certitude ? 'text-green-400' : 'text-yellow-400'}">
-                                <i class="fas ${certitude ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
-                            </span>
-                            <span>${coordsText}</span>
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button 
-                            onclick="window.openGeocacheDetails(${geocache.id}, '${geocache.gc_code || ''}', '${geocache.name || ''}')"
-                            class="text-blue-400 hover:text-blue-300">
-                            Détails
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        resultsTable.innerHTML = html;
     }
     
     // Récupérer les géocaches depuis toutes les sources possibles
@@ -755,4 +640,121 @@
     
     // Initialiser après un court délai pour s'assurer que le DOM est complètement chargé
     setTimeout(initialize, 200);
+
+    // Initialisation du tableau Tabulator
+    function initializeResultsTable() {
+        const tableContainer = document.getElementById('results-table');
+        
+        if (!tableContainer) {
+            console.error("%c[MultiSolver] Conteneur du tableau non trouvé", "background:red; color:white");
+            return;
+        }
+        
+        // Configuration des colonnes pour Tabulator
+        const columns = [
+            { title: "GC Code", field: "gc_code", sorter: "string", headerSort: true, width: 120 },
+            { title: "Nom", field: "name", sorter: "string", headerSort: true },
+            { 
+                title: "Détections", 
+                field: "detection", 
+                sorter: "string", 
+                headerSort: true,
+                formatter: function(cell, formatterParams, onRendered) {
+                    const value = cell.getValue();
+                    const row = cell.getRow().getData();
+                    
+                    if (row.isError) {
+                        return `<div class="text-red-300">Erreur: ${row.error}</div>`;
+                    }
+                    
+                    // Tronquer les textes trop longs
+                    const maxTextLength = 50;
+                    if (value && value.length > maxTextLength) {
+                        return value.substring(0, maxTextLength) + '...';
+                    }
+                    
+                    return value;
+                }
+            },
+            { 
+                title: "Coordonnées", 
+                field: "coordinates", 
+                sorter: "string", 
+                headerSort: true,
+                formatter: function(cell, formatterParams, onRendered) {
+                    const value = cell.getValue();
+                    const row = cell.getRow().getData();
+                    
+                    if (row.isError) {
+                        return "";
+                    }
+                    
+                    const iconClass = row.certitude ? 'text-green-400 fas fa-check-circle' : 'text-yellow-400 fas fa-exclamation-circle';
+                    
+                    return `
+                        <div class="flex items-center">
+                            <span class="mr-2"><i class="${iconClass}"></i></span>
+                            <span>${value}</span>
+                        </div>
+                    `;
+                }
+            },
+            { 
+                title: "Actions", 
+                field: "id", 
+                headerSort: false, 
+                hozAlign: "right",
+                formatter: function(cell, formatterParams, onRendered) {
+                    const id = cell.getValue();
+                    const row = cell.getRow().getData();
+                    
+                    return `
+                        <button 
+                            onclick="window.openGeocacheDetails(${id}, '${row.gc_code}', '${row.name}')"
+                            class="text-blue-400 hover:text-blue-300">
+                            Détails
+                        </button>
+                    `;
+                }
+            }
+        ];
+        
+        // Options Tabulator
+        const options = {
+            data: [],
+            columns: columns,
+            layout: "fitDataFill",
+            height: "400px",
+            pagination: false,
+            movableColumns: true,
+            resizableRows: true,
+            resizableColumns: true,
+            rowFormatter: function(row) {
+                const data = row.getData();
+                
+                if (data.isError) {
+                    row.getElement().style.backgroundColor = "rgba(185, 28, 28, 0.2)";
+                }
+            },
+            placeholder: "Aucun résultat disponible"
+        };
+        
+        // Créer l'instance Tabulator
+        window.resultsTable = new Tabulator(tableContainer, options);
+    }
+    
+    // Mise à jour du tableau des résultats
+    function updateResultsTable(results) {
+        console.log("%c[MultiSolver] Mise à jour du tableau des résultats:", "background:orange; color:black", results);
+        
+        // S'assurer que le tableau existe
+        if (!window.resultsTable) {
+            initializeResultsTable();
+        }
+        
+        // Mettre à jour les données du tableau
+        if (Array.isArray(results) && results.length > 0) {
+            window.resultsTable.replaceData(results);
+        }
+    }
 })();
