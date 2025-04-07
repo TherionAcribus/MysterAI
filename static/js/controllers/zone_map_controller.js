@@ -11,13 +11,22 @@ console.log("=== DEBUG: Preparing Zone Map Controller ===");
     class ZoneMapController extends Stimulus.Controller {
         static targets = ["container"]
         static values = {
-            zoneId: String
+            zoneId: String,
+            geocachesList: Array
         }
 
         connect() {
             console.log('=== DEBUG: Zone Map Controller connecté ===');
             console.log('Container:', this.containerTarget);
-            console.log('Zone ID:', this.zoneIdValue);
+            
+            if (this.hasZoneIdValue) {
+                console.log('Zone ID:', this.zoneIdValue);
+            }
+            
+            if (this.hasGeocachesListValue) {
+                console.log('Nombre de géocaches:', this.geocachesListValue.length);
+            }
+            
             this.initializeMap();
             this.initializeContextMenu();
         }
@@ -353,35 +362,65 @@ console.log("=== DEBUG: Preparing Zone Map Controller ===");
 
         async loadZoneGeocaches() {
             try {
-                console.log('=== DEBUG: Chargement des géocaches de la zone', this.zoneIdValue);
-                const response = await fetch(`/api/zones/${this.zoneIdValue}/geocaches`);
-                const geocaches = await response.json();
-                console.log('Géocaches chargées:', geocaches);
-
-                const features = geocaches
-                    .filter(geocache => geocache.latitude && geocache.longitude)
-                    .map(geocache => {
-                        const feature = new ol.Feature({
-                            geometry: new ol.geom.Point(
-                                ol.proj.fromLonLat([geocache.longitude, geocache.latitude])
-                            )
-                        });
-                        feature.set('geocache', geocache);
-                        return feature;
+                // Si on a une liste de géocaches directement
+                if (this.hasGeocachesListValue && this.geocachesListValue.length > 0) {
+                    console.log('=== DEBUG: Utilisation de la liste de géocaches fournie ===', this.geocachesListValue.length);
+                    
+                    // Récupérer les coordonnées pour ces géocaches
+                    const response = await fetch('/api/geocaches/coordinates', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            geocache_ids: this.geocachesListValue
+                        })
                     });
-
-                this.vectorSource.addFeatures(features);
-
-                // Ajuster la vue pour voir tous les points
-                if (features.length > 0) {
-                    const extent = this.vectorSource.getExtent();
-                    this.map.getView().fit(extent, {
-                        padding: [50, 50, 50, 50],
-                        duration: 1000
-                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    
+                    const geocaches = await response.json();
+                    this.displayGeocaches(geocaches);
+                    return;
+                }
+                
+                // Sinon, charger les géocaches par zone ID (comportement original)
+                if (this.hasZoneIdValue) {
+                    console.log('=== DEBUG: Chargement des géocaches de la zone', this.zoneIdValue);
+                    const response = await fetch(`/api/zones/${this.zoneIdValue}/geocaches`);
+                    const geocaches = await response.json();
+                    console.log('Géocaches chargées:', geocaches);
+                    this.displayGeocaches(geocaches);
                 }
             } catch (error) {
                 console.error('Erreur lors du chargement des géocaches:', error);
+            }
+        }
+        
+        displayGeocaches(geocaches) {
+            const features = geocaches
+                .filter(geocache => geocache.latitude && geocache.longitude)
+                .map(geocache => {
+                    const feature = new ol.Feature({
+                        geometry: new ol.geom.Point(
+                            ol.proj.fromLonLat([geocache.longitude, geocache.latitude])
+                        )
+                    });
+                    feature.set('geocache', geocache);
+                    return feature;
+                });
+
+            this.vectorSource.addFeatures(features);
+
+            // Ajuster la vue pour voir tous les points
+            if (features.length > 0) {
+                const extent = this.vectorSource.getExtent();
+                this.map.getView().fit(extent, {
+                    padding: [50, 50, 50, 50],
+                    duration: 1000
+                });
             }
         }
 

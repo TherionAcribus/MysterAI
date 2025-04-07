@@ -1833,3 +1833,69 @@ def multi_solver_panel():
     Affiche le panneau du multi-solver pour plusieurs géocaches
     """
     return render_template('multi_solver.html')
+
+@geocaches_bp.route('/api/geocaches/coordinates', methods=['POST'])
+def get_geocaches_coordinates():
+    """
+    Récupère les coordonnées d'une liste de géocaches à partir de leurs IDs.
+    Utilisé principalement par le Multi Solver pour afficher la carte.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'geocache_ids' not in data:
+            return jsonify({'error': 'Liste des IDs de géocaches manquante'}), 400
+            
+        geocache_ids = data['geocache_ids']
+        if not isinstance(geocache_ids, list):
+            return jsonify({'error': 'Le format attendu est une liste d\'IDs'}), 400
+            
+        # Récupérer les géocaches correspondantes
+        geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+        
+        # Préparer les données
+        geocaches_data = []
+        for gc in geocaches:
+            # Utiliser les coordonnées corrigées si disponibles, sinon les originales
+            lat = gc.latitude_corrected if gc.latitude_corrected else gc.latitude
+            lon = gc.longitude_corrected if gc.longitude_corrected else gc.longitude
+            
+            if lat and lon:  # Ne renvoyer que les géocaches avec des coordonnées valides
+                geocaches_data.append({
+                    'id': gc.id,
+                    'gc_code': gc.gc_code,
+                    'name': gc.name,
+                    'latitude': lat,
+                    'longitude': lon,
+                    'cache_type': gc.cache_type,
+                    'difficulty': gc.difficulty,
+                    'terrain': gc.terrain,
+                    'solved': gc.solved
+                })
+                
+        return jsonify(geocaches_data)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des coordonnées: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/map_panel', methods=['POST'])
+def get_geocaches_map_panel():
+    """
+    Génère un panneau de carte pour plusieurs géocaches.
+    Reçoit une liste d'IDs de géocaches et renvoie un template map_panel adapté.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'geocache_ids' not in data:
+            return jsonify({'error': 'Liste des IDs de géocaches manquante'}), 400
+            
+        geocache_ids = data['geocache_ids']
+        if not isinstance(geocache_ids, list):
+            return jsonify({'error': 'Le format attendu est une liste d\'IDs'}), 400
+        
+        # Juste passer les IDs au template - les coordonnées seront récupérées côté client
+        return render_template('map_panel_multi.html', geocache_ids=geocache_ids)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la génération du panneau de carte: {str(e)}")
+        return jsonify({'error': str(e)}), 500

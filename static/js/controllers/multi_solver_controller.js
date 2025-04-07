@@ -1671,4 +1671,138 @@
             return { success: false, error: error.message };
         }
     }
+
+    // Ajouter cette fonction dans la portée globale pour qu'elle soit accessible depuis le onClick
+    window.showGeocachesMap = function() {
+        console.log("%c[MultiSolver] Affichage de la carte des géocaches", "background:blue; color:white");
+        
+        // Récupérer les géocaches
+        const geocaches = getGeocaches();
+        
+        if (!geocaches || geocaches.length === 0) {
+            showError("Aucune géocache sélectionnée pour afficher sur la carte.");
+            return;
+        }
+        
+        // Récupérer uniquement les IDs
+        const geocacheIds = geocaches.map(gc => gc.id);
+        
+        // Créer le composant de carte dans GoldenLayout
+        const newItemConfig = {
+            type: 'component',
+            componentName: 'geocaches-map',
+            title: `Carte (${geocaches.length} géocaches)`,
+            componentState: { 
+                geocacheIds: geocacheIds
+            }
+        };
+        
+        // Ajouter à la première ligne si elle existe, sinon créer une nouvelle ligne
+        if (window.mainLayout && window.mainLayout.root) {
+            if (window.mainLayout.root.contentItems[0].type === 'row') {
+                window.mainLayout.root.contentItems[0].addChild(newItemConfig);
+            } else {
+                window.mainLayout.root.contentItems[0].addChild({
+                    type: 'row',
+                    content: [newItemConfig]
+                });
+            }
+        } else {
+            console.error("%c[MultiSolver] Layout principal non trouvé", "background:red; color:white");
+            showError("Impossible d'ouvrir la carte: le layout principal n'est pas accessible.");
+        }
+    };
+
+    window.showGeocachesMapPanel = function() {
+        console.log("%c[MultiSolver] Affichage de la mini carte des géocaches", "background:blue; color:white");
+        
+        // Récupérer les géocaches
+        const geocaches = getGeocaches();
+        
+        if (!geocaches || geocaches.length === 0) {
+            showError("Aucune géocache sélectionnée pour afficher sur la carte.");
+            return;
+        }
+        
+        // Récupérer uniquement les IDs
+        const geocacheIds = geocaches.map(gc => gc.id);
+        
+        // Ouvrir la carte dans le panneau inférieur
+        const bottomPanelContainer = document.querySelector('.bottom-panel-container');
+        if (!bottomPanelContainer) {
+            showError("Le panneau inférieur n'est pas disponible.");
+            return;
+        }
+        
+        // S'assurer que le panneau inférieur est visible
+        bottomPanelContainer.classList.add('expanded');
+        
+        // Activer l'onglet "Map" dans le panneau inférieur
+        const mapTab = document.querySelector('.bottom-panel-tab[data-panel="map-panel"]');
+        if (mapTab) {
+            // Simuler un clic sur l'onglet Map pour l'activer
+            if (typeof switchTab === 'function') {
+                switchTab(mapTab, 'map-panel');
+            } else {
+                // Fallback si la fonction switchTab n'est pas disponible
+                document.querySelectorAll('.bottom-panel-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                mapTab.classList.add('active');
+                
+                document.querySelectorAll('.bottom-panel-container .panel-content').forEach(panel => {
+                    panel.classList.remove('active');
+                });
+                const mapPanel = document.getElementById('map-panel');
+                if (mapPanel) {
+                    mapPanel.classList.add('active');
+                }
+                
+                // Déclencher l'événement tab-activated
+                window.dispatchEvent(new CustomEvent('tab-activated', {
+                    detail: { panelId: 'map-panel' }
+                }));
+            }
+            
+            // Charger les données des géocaches dans le panneau de carte
+            fetch('/geocaches/map_panel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_ids: geocacheIds
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                // Injecter le HTML dans le panneau Map
+                const mapPanel = document.getElementById('map-panel');
+                if (mapPanel) {
+                    mapPanel.innerHTML = html;
+                    
+                    // Initialiser le contrôleur Stimulus
+                    if (window.StimulusApp) {
+                        window.StimulusApp.start();
+                    }
+                    
+                    // Notification de succès
+                    showMessage(`Carte chargée avec ${geocaches.length} géocaches`);
+                } else {
+                    showError("Panneau Map non trouvé.");
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement de la carte:', error);
+                showError(`Erreur lors du chargement de la carte: ${error.message}`);
+            });
+        } else {
+            showError("Onglet Map non trouvé dans le panneau inférieur.");
+        }
+    };
 })();

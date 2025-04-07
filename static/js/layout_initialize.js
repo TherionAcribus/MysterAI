@@ -518,7 +518,7 @@ function initializeLayout() {
                 });
         });
 
-        // Enregistrer le composant geocachesMap
+        // Enregistrer le composant geocachesMap (pour une zone)
         mainLayout.registerComponent('geocachesMap', function(container, componentState) {
             const { zoneId, title } = componentState;
             
@@ -542,6 +542,107 @@ function initializeLayout() {
                         </div>
                     `);
                 });
+        });
+        
+        // Enregistrer le composant geocaches-map (pour une liste de géocaches)
+        mainLayout.registerComponent('geocaches-map', function(container, componentState) {
+            const { geocacheIds } = componentState;
+            
+            if (!geocacheIds || !Array.isArray(geocacheIds) || geocacheIds.length === 0) {
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 p-4">
+                        <div class="text-red-500 mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Aucune géocache à afficher
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+            
+            // Créer le HTML de base pour la carte
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 relative">
+                    <div class="absolute inset-0" 
+                         data-controller="zone-map" 
+                         data-zone-map-geocaches-list-value='${JSON.stringify(geocacheIds)}'
+                         data-zone-map-target="container"></div>
+                </div>
+            `);
+            
+            // Initialiser le contrôleur Stimulus
+            if (window.StimulusApp) {
+                window.StimulusApp.start();
+            }
+        });
+
+        // Enregistrer le composant geocaches-map-panel (avec le format map_panel)
+        mainLayout.registerComponent('geocaches-map-panel', function(container, componentState) {
+            const { geocacheIds } = componentState;
+            
+            if (!geocacheIds || !Array.isArray(geocacheIds) || geocacheIds.length === 0) {
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 p-4">
+                        <div class="text-red-500 mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Aucune géocache à afficher
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+            
+            console.log('Chargement de la mini carte pour', geocacheIds.length, 'géocaches');
+            
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement de la carte...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Charger le template du panneau de carte
+            fetch('/geocaches/map_panel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_ids: geocacheIds
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                // Injecter le HTML dans le conteneur
+                container.getElement().html(html);
+                
+                // Initialiser le contrôleur Stimulus
+                if (window.StimulusApp) {
+                    window.StimulusApp.start();
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement de la carte:', error);
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 p-4">
+                        <div class="text-red-500 mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Erreur lors du chargement de la carte
+                        </div>
+                        <div class="text-gray-400 text-sm">
+                            ${error.message}
+                        </div>
+                    </div>
+                `);
+            });
         });
 
         // Enregistrer le composant geocache-solver

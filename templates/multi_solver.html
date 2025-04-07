@@ -79,8 +79,24 @@
         <!-- En-tête -->
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-100 mb-2">Multi-Solver</h1>
-            <div class="text-gray-400">
-                Outil de résolution pour plusieurs énigmes simultanément
+            <div class="flex justify-between items-center">
+                <div class="text-gray-400">
+                    Outil de résolution pour plusieurs énigmes simultanément
+                </div>
+                <div class="flex space-x-2">
+                    <button 
+                        id="show-map-button" 
+                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center"
+                        onclick="showGeocachesMap()">
+                        <i class="fas fa-map-marker-alt mr-1"></i> Carte
+                    </button>
+                    <button 
+                        id="show-map-panel-button" 
+                        class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center"
+                        onclick="showGeocachesMapPanel()">
+                        <i class="fas fa-map mr-1"></i> Mini carte
+                    </button>
+                </div>
             </div>
         </div>
 
