@@ -560,20 +560,55 @@ function initializeLayout() {
                 return;
             }
             
-            // Créer le HTML de base pour la carte
+            // Afficher un état de chargement
             container.getElement().html(`
-                <div class="w-full h-full bg-gray-900 relative">
-                    <div class="absolute inset-0" 
-                         data-controller="zone-map" 
-                         data-zone-map-geocaches-list-value='${JSON.stringify(geocacheIds)}'
-                         data-zone-map-target="container"></div>
+                <div class="w-full h-full bg-gray-900 p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement de la carte...</span>
+                    </div>
                 </div>
             `);
             
-            // Initialiser le contrôleur Stimulus
-            if (window.StimulusApp) {
-                window.StimulusApp.start();
-            }
+            // Charger le template du panneau de carte (identique à geocaches-map-panel)
+            fetch('/geocaches/map_panel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_ids: geocacheIds
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                // Injecter le HTML dans le conteneur
+                container.getElement().html(html);
+                
+                // Initialiser le contrôleur Stimulus
+                if (window.StimulusApp) {
+                    window.StimulusApp.start();
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement de la carte:', error);
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 p-4">
+                        <div class="text-red-500 mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Erreur lors du chargement de la carte
+                        </div>
+                        <div class="text-gray-400 text-sm">
+                            ${error.message}
+                        </div>
+                    </div>
+                `);
+            });
         });
 
         // Enregistrer le composant geocaches-map-panel (avec le format map_panel)
