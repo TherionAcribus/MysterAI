@@ -67,31 +67,144 @@
                     style: (feature) => {
                         // Définir le style en fonction du type de cache ou de son statut
                         const geocache = feature.get('geocache');
-                        let color = 'rgba(51, 136, 255, 0.8)'; // Couleur par défaut
                         
-                        if (geocache) {
-                            // Si c'est une géocache résolue, utiliser une couleur verte
-                            if (geocache.solved === 'solved') {
-                                color = 'rgba(0, 200, 0, 0.8)';
-                            }
-                            // Pour les Mystery caches, utiliser une couleur spécifique
-                            else if (geocache.cache_type === 'Mystery') {
-                                color = 'rgba(255, 165, 0, 0.8)'; // Orange
-                            }
+                        if (!geocache) {
+                            return new ol.style.Style({
+                                image: new ol.style.Circle({
+                                    radius: 6,
+                                    fill: new ol.style.Fill({
+                                        color: 'rgba(51, 136, 255, 0.8)'
+                                    }),
+                                    stroke: new ol.style.Stroke({
+                                        color: '#ffffff',
+                                        width: 1
+                                    })
+                                })
+                            });
                         }
                         
-                        return new ol.style.Style({
-                            image: new ol.style.Circle({
-                                radius: 6,
-                                fill: new ol.style.Fill({
-                                    color: color
-                                }),
-                                stroke: new ol.style.Stroke({
-                                    color: '#ffffff',
-                                    width: 1
+                        // Si c'est une géocache résolue, on utilise un style spécial
+                        if (geocache.solved === 'solved') {
+                            return new ol.style.Style({
+                                image: new ol.style.Circle({
+                                    radius: 6,
+                                    fill: new ol.style.Fill({
+                                        color: 'rgba(0, 200, 0, 0.8)'
+                                    }),
+                                    stroke: new ol.style.Stroke({
+                                        color: '#ffffff',
+                                        width: 1
+                                    })
                                 })
-                            })
-                        });
+                            });
+                        }
+                        
+                        // Styles spécifiques en fonction du type de cache
+                        switch(geocache.cache_type) {
+                            case 'Traditional Cache':
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 6,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(0, 160, 0, 0.8)' // vert
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    })
+                                });
+                                
+                            case 'Unknown Cache':
+                            case 'Mystery':
+                                // Point d'interrogation blanc sur rond bleu
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 8,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(0, 60, 200, 0.8)' // bleu
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    }),
+                                    text: new ol.style.Text({
+                                        text: '?',
+                                        font: 'bold 12px sans-serif',
+                                        fill: new ol.style.Fill({
+                                            color: '#ffffff'
+                                        }),
+                                        offsetY: -1
+                                    })
+                                });
+                                
+                            case 'Letterbox Hybrid':
+                                // Enveloppe sur rond bleu
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 8,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(0, 60, 200, 0.8)' // bleu
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    }),
+                                    text: new ol.style.Text({
+                                        text: '✉', // Icône d'enveloppe Unicode
+                                        font: 'bold 12px sans-serif',
+                                        fill: new ol.style.Fill({
+                                            color: '#ffffff'
+                                        }),
+                                        offsetY: -1
+                                    })
+                                });
+                                
+                            case 'Multi-cache':
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 6,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(255, 165, 0, 0.8)' // orange
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    })
+                                });
+                                
+                            case 'Wherigo':
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 6,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(0, 120, 255, 0.8)' // bleu
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    })
+                                });
+                                
+                            default:
+                                // Style par défaut pour les autres types
+                                return new ol.style.Style({
+                                    image: new ol.style.Circle({
+                                        radius: 6,
+                                        fill: new ol.style.Fill({
+                                            color: 'rgba(150, 150, 150, 0.8)' // gris
+                                        }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#ffffff',
+                                            width: 1
+                                        })
+                                    })
+                                });
+                        }
                     }
                 });
 
