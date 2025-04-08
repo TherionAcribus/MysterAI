@@ -190,6 +190,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
                         <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
                     </button>
+                    <button id="reset-coords-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
+                        <i class="fas fa-undo mr-1"></i> Réinitialiser les coordonnées
+                    </button>
                 </div>
             </div>
         </div>
@@ -291,6 +294,30 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 <button class="confirm-copy-to-zone bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <span>Copier</span>
                     <div class="copy-loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de réinitialisation des coordonnées -->
+    <div id="resetCoordsModal-{{ zone_id }}" class="reset-coords-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-yellow-500">Réinitialiser les coordonnées</h3>
+                <button class="close-reset-coords-modal text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="text-gray-300 mb-6">Êtes-vous sûr de vouloir réinitialiser les coordonnées de <span class="geocaches-count-to-reset font-semibold">0</span> géocaches correspondant aux filtres actuels ? Cette action effacera les coordonnées corrigées et remettra les géocaches au statut "Non résolue".</p>
+            <div class="flex justify-end gap-2">
+                <button class="cancel-reset-coords bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Annuler
+                </button>
+                <button class="confirm-reset-coords bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Réinitialiser</span>
+                    <div class="reset-loading-indicator hidden ml-2">
                         <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                     </div>
                 </button>
@@ -489,6 +516,26 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     // Supprimer la modale originale
                     importGpxModal.remove();
                 }
+                
+                // Modale de réinitialisation des coordonnées
+                const resetCoordsModal = document.getElementById('resetCoordsModal-{{ zone_id }}');
+                if (resetCoordsModal) {
+                    console.log('Déplacement de la modale de réinitialisation des coordonnées vers le conteneur global');
+                    // Vérifier si la modale existe déjà dans le conteneur global
+                    const existingResetModal = modalContainer.querySelector('#resetCoordsModal-{{ zone_id }}');
+                    if (existingResetModal) {
+                        existingResetModal.remove();
+                    }
+                    
+                    // Cloner et ajouter au conteneur global
+                    const clonedResetModal = resetCoordsModal.cloneNode(true);
+                    modalContainer.appendChild(clonedResetModal);
+                    
+                    // Supprimer la modale originale
+                    resetCoordsModal.remove();
+                } else {
+                    console.error('Modale de réinitialisation des coordonnées non trouvée');
+                }
             }
         }
         
@@ -604,7 +651,16 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 cancelCopyToZone: modalContainer.querySelector('#copyToZoneModal-{{ zone_id }} .cancel-copy-to-zone'),
                 confirmCopyToZone: modalContainer.querySelector('#copyToZoneModal-{{ zone_id }} .confirm-copy-to-zone'),
                 copyLoadingIndicator: modalContainer.querySelector('#copyToZoneModal-{{ zone_id }} .copy-loading-indicator'),
-                geocachesCountToCopy: modalContainer.querySelector('#copyToZoneModal-{{ zone_id }} .geocaches-count-to-copy')
+                geocachesCountToCopy: modalContainer.querySelector('#copyToZoneModal-{{ zone_id }} .geocaches-count-to-copy'),
+                
+                // Éléments pour la réinitialisation des coordonnées
+                resetCoordsButton: document.getElementById('reset-coords-btn-{{ zone_id }}'),
+                resetCoordsModal: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }}'),
+                geocachesCountToReset: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .geocaches-count-to-reset'),
+                closeResetCoordsModal: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .close-reset-coords-modal'),
+                cancelResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .cancel-reset-coords'),
+                confirmResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .confirm-reset-coords'),
+                resetLoadingIndicator: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .reset-loading-indicator')
             };
         }
 
@@ -1598,8 +1654,39 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 confirmDeleteMultiple, deleteMultipleModal, importGpxButton,
                 importGpxModal, closeImportModal, cancelImport, importGpxForm,
                 copyToZoneModal, targetZoneSelect, cancelCopyToZone, confirmCopyToZone,
-                geocachesCountToCopy
+                geocachesCountToCopy, resetCoordsButton, resetCoordsModal,
+                closeResetCoordsModal, cancelResetCoords, confirmResetCoords
             } = elements;
+
+            // Gestionnaire pour le bouton "Réinitialiser les coordonnées"
+            if (resetCoordsButton) {
+                resetCoordsButton.addEventListener('click', openResetCoordsModal);
+            }
+            
+            // Gestionnaires pour la modale de réinitialisation des coordonnées
+            if (closeResetCoordsModal) {
+                closeResetCoordsModal.addEventListener('click', function() {
+                    closeResetCoordsModalFunc();
+                });
+            }
+            
+            if (cancelResetCoords) {
+                cancelResetCoords.addEventListener('click', function() {
+                    closeResetCoordsModalFunc();
+                });
+            }
+            
+            if (confirmResetCoords) {
+                confirmResetCoords.addEventListener('click', resetFilteredCoordinates);
+            }
+            
+            if (resetCoordsModal) {
+                resetCoordsModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeResetCoordsModalFunc();
+                    }
+                });
+            }
 
             // Gestionnaire pour le bouton "Copier vers une zone"
             const copyToZoneBtn = document.getElementById('copy-to-zone-btn-{{ zone_id }}');
@@ -2558,6 +2645,211 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     }
                 }
             }, '*');
+        }
+
+        // Ajouter la fonction pour ouvrir la modale de réinitialisation des coordonnées
+        function openResetCoordsModal() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { resetCoordsModal, geocachesCountToReset } = elements;
+            
+            // Obtenir les géocaches filtrées
+            const geocacheIds = getFilteredGeocacheIds();
+            
+            // Mettre à jour le nombre de géocaches qui seront réinitialisées
+            if (geocachesCountToReset) {
+                geocachesCountToReset.textContent = geocacheIds.length;
+            }
+            
+            // Afficher la modale
+            if (resetCoordsModal) {
+                resetCoordsModal.classList.remove('hidden');
+            }
+        }
+        
+        // Fonction pour fermer la modale de réinitialisation des coordonnées
+        function closeResetCoordsModalFunc() {
+            const elements = getModalElements();
+            if (!elements || !elements.resetCoordsModal) return;
+            
+            elements.resetCoordsModal.classList.add('hidden');
+        }
+        
+        // Fonction pour réinitialiser les coordonnées des géocaches filtrées
+        async function resetFilteredCoordinates() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { resetLoadingIndicator } = elements;
+            
+            // Afficher l'indicateur de chargement
+            if (resetLoadingIndicator) {
+                resetLoadingIndicator.classList.remove('hidden');
+            }
+            
+            try {
+                // Obtenir les IDs des géocaches filtrées
+                const geocacheIds = getFilteredGeocacheIds();
+                
+                const response = await fetch('/api/geocaches/reset-coordinates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        geocache_ids: geocacheIds
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showSuccess(data.message);
+                } else {
+                    throw new Error(data.message || 'Une erreur est survenue lors de la réinitialisation des coordonnées');
+                }
+                
+                // Recharger le tableau
+                await reloadTable();
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError(error.message || 'Une erreur est survenue lors de la réinitialisation des coordonnées');
+            } finally {
+                // Cacher l'indicateur de chargement
+                if (resetLoadingIndicator) {
+                    resetLoadingIndicator.classList.add('hidden');
+                }
+                
+                // Fermer la modale
+                closeResetCoordsModalFunc();
+            }
+        }
+
+        // Dans la section de code d'initialisation, après la création du tableau
+        
+        // Vérification de l'existence des éléments
+        console.log('Éléments pour la réinitialisation des coordonnées :');
+        console.log('Bouton :', document.getElementById('reset-coords-btn-{{ zone_id }}'));
+        console.log('Modal :', document.getElementById('resetCoordsModal-{{ zone_id }}'));
+        
+        // Attacher explicitement l'événement au bouton de réinitialisation
+        const resetButton = document.getElementById('reset-coords-btn-{{ zone_id }}');
+        if (resetButton) {
+            resetButton.addEventListener('click', function() {
+                console.log('Bouton de réinitialisation cliqué');
+                // Vérifier si la fonction existe
+                if (typeof openResetCoordsModal === 'function') {
+                    openResetCoordsModal();
+                } else {
+                    console.error('La fonction openResetCoordsModal n\'existe pas');
+                    
+                    // Implémentation directe si la fonction n'existe pas
+                    const modal = document.getElementById('resetCoordsModal-{{ zone_id }}');
+                    if (modal) {
+                        const geocacheIds = getFilteredGeocacheIds();
+                        const countElement = modal.querySelector('.geocaches-count-to-reset');
+                        if (countElement) countElement.textContent = geocacheIds.length;
+                        modal.classList.remove('hidden');
+                    } else {
+                        console.error('Modal non trouvé');
+                    }
+                }
+            });
+            
+            // Mettre à jour le texte du bouton pour confirmer qu'il est actif
+            resetButton.title = 'Réinitialiser les coordonnées corrigées de toutes les géocaches filtrées';
+            console.log('Gestionnaire d\'événement ajouté au bouton de réinitialisation');
+        } else {
+            console.error('Bouton de réinitialisation non trouvé');
+        }
+
+        // Dans la section de code d'initialisation, après le code du bouton
+        
+        // Initialisation des gestionnaires d'événements pour la modale
+        const resetModal = document.getElementById('resetCoordsModal-{{ zone_id }}');
+        if (resetModal) {
+            console.log('Modal trouvé, initialisation des gestionnaires');
+            
+            // Fermeture lors du clic sur le bouton "×"
+            const closeButton = resetModal.querySelector('.close-reset-coords-modal');
+            if (closeButton) {
+                closeButton.addEventListener('click', function() {
+                    console.log('Fermeture de la modale (×)');
+                    resetModal.classList.add('hidden');
+                });
+            }
+            
+            // Fermeture lors du clic sur "Annuler"
+            const cancelButton = resetModal.querySelector('.cancel-reset-coords');
+            if (cancelButton) {
+                cancelButton.addEventListener('click', function() {
+                    console.log('Fermeture de la modale (Annuler)');
+                    resetModal.classList.add('hidden');
+                });
+            }
+            
+            // Action lors du clic sur "Réinitialiser"
+            const confirmButton = resetModal.querySelector('.confirm-reset-coords');
+            if (confirmButton) {
+                confirmButton.addEventListener('click', function() {
+                    console.log('Réinitialisation des coordonnées confirmée');
+                    
+                    // Vérifier si la fonction existe
+                    if (typeof resetFilteredCoordinates === 'function') {
+                        resetFilteredCoordinates();
+                    } else {
+                        console.error('La fonction resetFilteredCoordinates n\'existe pas');
+                        
+                        // Implémentation directe
+                        const resetLoadingIndicator = resetModal.querySelector('.reset-loading-indicator');
+                        if (resetLoadingIndicator) resetLoadingIndicator.classList.remove('hidden');
+                        
+                        // Obtenir les IDs des géocaches filtrées
+                        const geocacheIds = getFilteredGeocacheIds();
+                        
+                        fetch('/api/geocaches/reset-coordinates', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                geocache_ids: geocacheIds
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                showSuccess(data.message);
+                            } else {
+                                throw new Error(data.message || 'Une erreur est survenue lors de la réinitialisation des coordonnées');
+                            }
+                            
+                            // Recharger le tableau
+                            return reloadTable();
+                        })
+                        .catch(error => {
+                            console.error('Erreur:', error);
+                            showError(error.message || 'Une erreur est survenue lors de la réinitialisation des coordonnées');
+                        })
+                        .finally(() => {
+                            // Cacher l'indicateur de chargement
+                            if (resetLoadingIndicator) resetLoadingIndicator.classList.add('hidden');
+                            
+                            // Fermer la modale
+                            resetModal.classList.add('hidden');
+                        });
+                    }
+                });
+            }
+            
+            // Fermeture lors du clic en dehors de la modale
+            resetModal.addEventListener('click', function(e) {
+                if (e.target === resetModal) {
+                    console.log('Fermeture de la modale (clic extérieur)');
+                    resetModal.classList.add('hidden');
+                }
+            });
         }
     })();
 </script>

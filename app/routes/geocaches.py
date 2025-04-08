@@ -24,6 +24,7 @@ import io
 import tempfile
 import os.path
 from app.routes.settings import get_specific_param
+from flask_login import login_required, current_user
 
 logger = setup_logger()
 
@@ -1937,3 +1938,59 @@ def get_geocaches_map_panel():
     except Exception as e:
         logger.error(f"Erreur lors de la génération du panneau de carte: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/api/geocaches/reset-coordinates', methods=['POST'])
+def reset_coordinates():
+    """Réinitialise les coordonnées corrigées d'une liste de géocaches."""
+    logger.debug(f"Réinitialisation des coordonnées demandée")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    
+    try:
+        data = request.get_json()
+        geocache_ids = data.get('geocache_ids', [])
+        
+        logger.debug(f"Réinitialisation des coordonnées pour {len(geocache_ids)} géocaches")
+        
+        # Compteurs pour le suivi
+        success_count = 0
+        error_count = 0
+        
+        for geocache_id in geocache_ids:
+            try:
+                geocache = Geocache.query.get(geocache_id)
+                if geocache:
+                    # Réinitialisation des coordonnées corrigées
+                    geocache.gc_lat_corrected = None
+                    geocache.gc_lon_corrected = None
+                    geocache.location_corrected = None
+                    
+                    # Réinitialisation du statut et de la date de résolution
+                    geocache.solved = 'not_solved'
+                    geocache.solved_date = None
+                    
+                    success_count += 1
+                else:
+                    logger.warning(f"Géocache {geocache_id} non trouvée")
+                    error_count += 1
+            except Exception as e:
+                logger.error(f"Erreur lors de la réinitialisation des coordonnées pour la géocache {geocache_id}: {str(e)}")
+                error_count += 1
+        
+        # Commit des changements
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"{success_count} géocache(s) réinitialisée(s) avec succès.",
+            'success_count': success_count,
+            'error_count': error_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors de la réinitialisation des coordonnées: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Erreur lors de la réinitialisation des coordonnées: {str(e)}",
+            'error': str(e)
+        }), 500
