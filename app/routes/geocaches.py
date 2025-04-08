@@ -186,7 +186,8 @@ def get_geocache_coordinates(geocache_id):
             'longitude': geocache.longitude,
             'gc_lat': geocache.gc_lat,
             'gc_lon': geocache.gc_lon,
-            'type': 'original'
+            'type': 'original',
+            'is_corrected': False
         }
     }
 
@@ -197,7 +198,8 @@ def get_geocache_coordinates(geocache_id):
             'longitude': geocache.longitude_corrected,
             'gc_lat': geocache.gc_lat_corrected,
             'gc_lon': geocache.gc_lon_corrected,
-            'type': 'corrected'
+            'type': 'corrected',
+            'is_corrected': True
         }
 
     # Ajout des waypoints additionnels
@@ -210,7 +212,8 @@ def get_geocache_coordinates(geocache_id):
         'longitude': wp.longitude,
         'gc_lat': wp.gc_lat,
         'gc_lon': wp.gc_lon,
-        'type': 'waypoint'
+        'type': 'waypoint',
+        'is_corrected': False
     } for wp in geocache.additional_waypoints if wp.latitude is not None and wp.longitude is not None]
 
     logger.debug(f"Coordonnees recuperees pour la geocache {geocache.gc_code}")
@@ -736,9 +739,23 @@ def update_coordinates(geocache_id):
     
     logger.debug(f"Updating coordinates to: {gc_lat}, {gc_lon}")
     
-    # Mise à jour des coordonnées
+    # Mise à jour des coordonnées au format GC
     geocache.gc_lat_corrected = gc_lat
     geocache.gc_lon_corrected = gc_lon
+    
+    # Conversion des coordonnées GC en décimales
+    try:
+        from app.models.geocache import gc_coords_to_decimal
+        lat_decimal, lon_decimal = gc_coords_to_decimal(gc_lat, gc_lon)
+        
+        if lat_decimal is not None and lon_decimal is not None:
+            # Utilisation de la méthode set_location_corrected pour mettre à jour location_corrected
+            geocache.set_location_corrected(lat_decimal, lon_decimal, gc_lat, gc_lon)
+            logger.debug(f"Coordonnées converties et mises à jour: {lat_decimal}, {lon_decimal}")
+        else:
+            logger.error(f"Échec de conversion des coordonnées: {gc_lat}, {gc_lon}")
+    except Exception as e:
+        logger.error(f"Erreur lors de la conversion des coordonnées: {str(e)}")
     
     # Récupération du paramètre auto_mark_solved
     try:
@@ -755,9 +772,6 @@ def update_coordinates(geocache_id):
         logger.debug(f"Updated solved status to {new_status} based on auto_mark_solved={auto_mark_solved}")
     except Exception as e:
         logger.error(f"Error while updating solved status: {str(e)}")
-    
-    # TODO: Implémenter la conversion des coordonnées GC en décimales
-    # Pour l'instant, on ne met à jour que le format GC
     
     db.session.commit()
     logger.debug("Database updated successfully")
@@ -1852,26 +1866,50 @@ def get_geocaches_coordinates():
         # Récupérer les géocaches correspondantes
         geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
         
+        logger.debug(f"API coordinates: Récupération de {len(geocaches)} géocaches sur {len(geocache_ids)} IDs demandés")
+        
         # Préparer les données
         geocaches_data = []
         for gc in geocaches:
-            # Utiliser les coordonnées corrigées si disponibles, sinon les originales
-            lat = gc.latitude_corrected if gc.latitude_corrected else gc.latitude
-            lon = gc.longitude_corrected if gc.longitude_corrected else gc.longitude
-            
-            if lat and lon:  # Ne renvoyer que les géocaches avec des coordonnées valides
-                geocaches_data.append({
-                    'id': gc.id,
-                    'gc_code': gc.gc_code,
-                    'name': gc.name,
-                    'latitude': lat,
-                    'longitude': lon,
-                    'cache_type': gc.cache_type,
-                    'difficulty': gc.difficulty,
-                    'terrain': gc.terrain,
-                    'solved': gc.solved
-                })
+            if gc.latitude is None and gc.longitude is None:
+                logger.debug(f"API coordinates: Géocache {gc.gc_code} (ID={gc.id}) ignorée - pas de coordonnées")
+                continue  # Ne pas inclure les géocaches sans coordonnées
                 
+            # Coordonnées de base
+            geocache_data = {
+                'id': gc.id,
+                'gc_code': gc.gc_code,
+                'name': gc.name,
+                'cache_type': gc.cache_type,
+                'difficulty': gc.difficulty,
+                'terrain': gc.terrain,
+                'solved': gc.solved,
+                'has_corrected': gc.location_corrected is not None
+            }
+            
+            # Toujours inclure les coordonnées d'origine
+            geocache_data['latitude'] = gc.latitude
+            geocache_data['longitude'] = gc.longitude
+            geocache_data['is_corrected'] = False
+            
+            # Si des coordonnées corrigées existent, les utiliser comme position principale
+            if gc.location_corrected is not None:
+                # On utilise les propriétés latitude_corrected et longitude_corrected qui sont calculées à partir de location_corrected
+                geocache_data['latitude'] = gc.latitude_corrected
+                geocache_data['longitude'] = gc.longitude_corrected
+                geocache_data['is_corrected'] = True
+                
+                # Ajouter les coordonnées originales dans un champ séparé
+                geocache_data['original_latitude'] = gc.latitude
+                geocache_data['original_longitude'] = gc.longitude
+                
+                logger.debug(f"API coordinates: Géocache {gc.gc_code} (ID={gc.id}) - utilisation coordonnées corrigées ({gc.latitude_corrected}, {gc.longitude_corrected})")
+            else:
+                logger.debug(f"API coordinates: Géocache {gc.gc_code} (ID={gc.id}) - coordonnées originales ({gc.latitude}, {gc.longitude})")
+            
+            geocaches_data.append(geocache_data)
+        
+        logger.debug(f"API coordinates: Envoi de {len(geocaches_data)} géocaches avec coordonnées valides")
         return jsonify(geocaches_data)
         
     except Exception as e:
