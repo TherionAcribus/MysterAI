@@ -69,18 +69,18 @@
                         const geocache = feature.get('geocache');
                         
                         if (!geocache) {
-                            return new ol.style.Style({
-                                image: new ol.style.Circle({
-                                    radius: 6,
-                                    fill: new ol.style.Fill({
+                        return new ol.style.Style({
+                            image: new ol.style.Circle({
+                                radius: 6,
+                                fill: new ol.style.Fill({
                                         color: 'rgba(51, 136, 255, 0.8)'
-                                    }),
-                                    stroke: new ol.style.Stroke({
-                                        color: '#ffffff',
-                                        width: 1
-                                    })
+                                }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#ffffff',
+                                    width: 1
                                 })
-                            });
+                            })
+                        });
                         }
                         
                         // Déterminer la couleur et l'icône en fonction du type de cache
@@ -316,7 +316,7 @@
                     // Si on a des coordonnées originales, les ajouter à la carte
                     if (originalPoint.latitude && originalPoint.longitude) {
                         const originalFeature = new ol.Feature({
-                            geometry: new ol.geom.Point(
+                        geometry: new ol.geom.Point(
                                 ol.proj.fromLonLat([originalPoint.longitude, originalPoint.latitude])
                             )
                         });
@@ -390,7 +390,7 @@
                     
                     if (centerLat && centerLon) {
                         this.map.getView().setCenter(ol.proj.fromLonLat([centerLon, centerLat]));
-                        this.map.getView().setZoom(14);
+                    this.map.getView().setZoom(14);
                     } else {
                         // Fallback: utiliser l'étendue de tous les points
                         const extent = this.vectorSource.getExtent();
