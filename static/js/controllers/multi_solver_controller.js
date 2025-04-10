@@ -2,6 +2,58 @@
 (function() {
     console.log("%c[MultiSolver] Initialisation du script pour GoldenLayout", "background:purple; color:white");
     
+    // Initialiser le pont d'événements global pour la communication cross-iframe
+    (function initializeGlobalEventBridge() {
+        // Créer un pont d'événements global
+        window.MysteryAIEventBridge = window.MysteryAIEventBridge || {
+            dispatchGlobalEvent: function(eventName, detail) {
+                console.log(`%c[EventBridge] Envoi événement global ${eventName}:`, "color:purple", detail);
+                
+                // 1. Dispatcher dans la fenêtre actuelle
+                window.dispatchEvent(new CustomEvent(eventName, { detail }));
+                
+                // 2. Dispatcher vers le parent si nous sommes dans une iframe
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'mystery-event-bridge',
+                        eventName: eventName,
+                        detail: detail
+                    }, '*');
+                }
+                
+                // 3. Dispatcher vers toutes les iframes dans cette fenêtre
+                try {
+                    if (window.frames && window.frames.length > 0) {
+                        for (let i = 0; i < window.frames.length; i++) {
+                            window.frames[i].postMessage({
+                                type: 'mystery-event-bridge',
+                                eventName: eventName,
+                                detail: detail
+                            }, '*');
+                        }
+                    }
+                } catch (e) {
+                    console.error("[EventBridge] Erreur lors de l'envoi aux iframes:", e);
+                }
+            }
+        };
+        
+        // Écouter les messages pour le pont d'événements
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'mystery-event-bridge') {
+                console.log(`%c[EventBridge] Réception message ${event.data.eventName}:`, "color:purple", event.data.detail);
+                window.dispatchEvent(new CustomEvent(event.data.eventName, { 
+                    detail: event.data.detail 
+                }));
+            }
+        });
+        
+        console.log("%c[EventBridge] Pont d'événements global initialisé", "color:green");
+    })();
+
+    // Définir window.results s'il n'existe pas encore
+    window.results = window.results || [];
+    
     // Définir la fonction displayGeocachesList utilisée par les scripts
     window.displayGeocachesList = function(geocaches) {
         console.log("%c[MultiSolver] Affichage de la liste des géocaches:", "background:orange; color:black", geocaches.length);
@@ -679,6 +731,59 @@
                 return standardResult;
             }
             
+            // Récupérer les coordonnées principales si disponibles
+            if (result.primary_coordinates) {
+                console.log("%c[MultiSolver] Coordonnées principales trouvées:", "background:green; color:white", result.primary_coordinates);
+                
+                // Chercher les coordonnées DDM dans les sous-plugins
+                let ddmCoordinates = null;
+                for (const [subPluginName, subResult] of Object.entries(combinedResults)) {
+                    if (subResult && subResult.coordinates && subResult.coordinates.exist) {
+                        if (subResult.coordinates.ddm) {
+                            ddmCoordinates = {
+                                ddm: subResult.coordinates.ddm,
+                                source: subPluginName
+                            };
+                            break;
+                        } else if (subResult.coordinates.ddm_lat && subResult.coordinates.ddm_lon) {
+                            ddmCoordinates = {
+                                ddm: `${subResult.coordinates.ddm_lat} ${subResult.coordinates.ddm_lon}`,
+                                source: subPluginName
+                            };
+                            break;
+                        }
+                    }
+                }
+                
+                // Si on a des coordonnées DDM et des coordonnées décimales, les combiner
+                if (ddmCoordinates) {
+                    standardResult.mainDetection = {
+                        text: `Coordonnées détectées par ${ddmCoordinates.source}`,
+                        coordinates: {
+                            exist: true,
+                            ddm: ddmCoordinates.ddm,
+                            decimal: result.primary_coordinates,
+                            certitude: true,
+                            source: ddmCoordinates.source
+                        }
+                    };
+                    console.log("%c[MultiSolver] Coordonnées combinées:", "background:green; color:white", standardResult.mainDetection.coordinates);
+                } else {
+                    // Sinon, utiliser uniquement les coordonnées décimales
+                    standardResult.mainDetection = {
+                        text: "Coordonnées décimales détectées",
+                        coordinates: {
+                            exist: true,
+                            ddm: "Format décimal uniquement",
+                            decimal: result.primary_coordinates,
+                            certitude: true,
+                            source: "analysis_web_page"
+                        }
+                    };
+                    console.log("%c[MultiSolver] Utilisation des coordonnées décimales uniquement:", "background:green; color:white", standardResult.mainDetection.coordinates);
+                }
+            }
+            
             // Extraire les résultats principaux des sous-plugins et les ajouter comme détails
             for (const [subPluginName, subResult] of Object.entries(combinedResults)) {
                 if (!subResult) continue;
@@ -691,6 +796,9 @@
                     sourceId: subPluginName,
                     details: subResult
                 });
+                
+                // Si on a déjà des coordonnées principales, ne pas les remplacer
+                if (standardResult.mainDetection.coordinates.exist) continue;
                 
                 // Extraire les coordonnées si présentes
                 const coordinates = extractCoordinates(subResult);
@@ -735,9 +843,22 @@
     
     // Fonction pour extraire les coordonnées d'un résultat de plugin
     function extractCoordinates(result) {
+        console.log("%c[MultiSolver] Extraction des coordonnées du résultat:", "background:blue; color:white", result);
+        
         // Cas direct: le résultat a un objet coordinates
         if (result.coordinates) {
             if (result.coordinates.exist) {
+                console.log("%c[MultiSolver] Coordonnées trouvées directement dans result.coordinates:", "background:green; color:white", result.coordinates);
+                
+                // Vérifier si les coordonnées décimales sont manquantes, mais que nous avons des coordonnées DDM
+                if (!result.coordinates.decimal && result.coordinates.ddm) {
+                    console.log("%c[MultiSolver] Conversion DDM vers décimal pour:", "background:orange; color:black", result.coordinates.ddm);
+                    const decimal = convertDDMToDecimal(result.coordinates.ddm);
+                    if (decimal) {
+                        result.coordinates.decimal = decimal;
+                        console.log("%c[MultiSolver] Coordonnées converties en décimal:", "background:green; color:white", decimal);
+                    }
+                }
                 return result.coordinates;
             }
         }
@@ -745,9 +866,18 @@
         // Cas particulier: formula_parser a un format différent
         if (result.coordinates && Array.isArray(result.coordinates) && result.coordinates.length > 0) {
             const firstCoord = result.coordinates[0];
+            console.log("%c[MultiSolver] Coordonnées trouvées dans formula_parser format:", "background:green; color:white", firstCoord);
+            
+            // Construire le format DDM
+            const ddm = `${firstCoord.north} ${firstCoord.east}`;
+            
+            // Convertir en décimal si possible
+            const decimal = convertDDMToDecimal(ddm);
+            
             return {
                 exist: true,
-                ddm: `${firstCoord.north} ${firstCoord.east}`,
+                ddm: ddm,
+                decimal: decimal,
                 certitude: result.certitude || true,
                 source: 'formula_parser'
             };
@@ -764,9 +894,14 @@
                     
                     if (match) {
                         console.log("%c[MultiSolver] Coordonnées trouvées dans les findings:", "background:green; color:white", match[0]);
+                        
+                        // Convertir en décimal
+                        const decimal = convertDDMToDecimal(match[0]);
+                        
                         return {
                             exist: true,
                             ddm: match[0],
+                            decimal: decimal,
                             certitude: finding.isInteresting || true,
                             source: 'finding'
                         };
@@ -785,9 +920,14 @@
                     
                     if (match) {
                         console.log("%c[MultiSolver] Coordonnées trouvées dans les commentaires HTML:", "background:green; color:white", match[0]);
+                        
+                        // Convertir en décimal
+                        const decimal = convertDDMToDecimal(match[0]);
+                        
                         return {
                             exist: true,
                             ddm: match[0],
+                            decimal: decimal,
                             certitude: true,
                             source: 'html_comment'
                         };
@@ -796,7 +936,90 @@
             }
         }
         
+        // Cas spécial: résultat du méta-plugin analysis_web_page
+        if (result.combined_results && result.primary_coordinates) {
+            console.log("%c[MultiSolver] Coordonnées principales trouvées dans analysis_web_page:", "background:green; color:white", result.primary_coordinates);
+            
+            // Recherche des coordonnées complètes dans les sous-résultats
+            for (const [pluginName, pluginResult] of Object.entries(result.combined_results)) {
+                if (pluginResult && pluginResult.coordinates && pluginResult.coordinates.exist &&
+                    pluginResult.coordinates.ddm_lat && pluginResult.coordinates.ddm_lon) {
+                    
+                    const ddm = `${pluginResult.coordinates.ddm_lat} ${pluginResult.coordinates.ddm_lon}`;
+                    console.log("%c[MultiSolver] Coordonnées complètes trouvées dans sous-plugin:", "background:green; color:white", {
+                        pluginName,
+                        coordinates: pluginResult.coordinates
+                    });
+                    
+                    return {
+                        exist: true,
+                        ddm: ddm,
+                        certitude: true,
+                        source: pluginName,
+                        decimal: result.primary_coordinates
+                    };
+                }
+            }
+            
+            // Si on n'a pas trouvé de coordonnées complètes mais qu'on a des coordonnées décimales,
+            // on les utilise quand même
+            return {
+                exist: true,
+                ddm: "Coordonnées décimales uniquement",
+                certitude: true,
+                source: 'analysis_web_page',
+                decimal: result.primary_coordinates
+            };
+        }
+        
+        console.log("%c[MultiSolver] Aucune coordonnée trouvée dans le résultat", "background:orange; color:black");
         return { exist: false };
+    }
+    
+    // Fonction pour convertir les coordonnées du format DDM au format décimal
+    function convertDDMToDecimal(ddmString) {
+        if (!ddmString) return null;
+        
+        // Amélioration de l'expression régulière pour capturer les coordonnées DDM
+        // Format: N 49° 45.558 E 005° 58.554 ou N 49° 45.204' E 5° 56.226'
+        const coordRegex = /([NS])\s*(\d{1,2})[°\s]+(\d{1,2}\.\d+)['"]?\s*([EW])\s*(\d{1,3})[°\s]+(\d{1,2}\.\d+)['"]?/i;
+        const match = ddmString.match(coordRegex);
+        
+        if (!match) {
+            console.warn("%c[MultiSolver] Impossible de parser les coordonnées DDM:", "background:orange; color:black", ddmString);
+            return null;
+        }
+        
+        try {
+            // Extraire les parties des coordonnées
+            const latDir = match[1].toUpperCase(); // N ou S
+            const latDeg = parseInt(match[2], 10);
+            const latMin = parseFloat(match[3]);
+            
+            const lonDir = match[4].toUpperCase(); // E ou W
+            const lonDeg = parseInt(match[5], 10);
+            const lonMin = parseFloat(match[6]);
+            
+            // Convertir en décimal
+            let latitude = latDeg + (latMin / 60);
+            if (latDir === 'S') latitude = -latitude;
+            
+            let longitude = lonDeg + (lonMin / 60);
+            if (lonDir === 'W') longitude = -longitude;
+            
+            console.log("%c[MultiSolver] Conversion de coordonnées réussie:", "background:green; color:white", {
+                ddm: ddmString,
+                decimal: { latitude, longitude }
+            });
+            
+            return { latitude, longitude };
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de la conversion des coordonnées:", "background:red; color:white", {
+                ddmString,
+                error
+            });
+            return null;
+        }
     }
     
     // Fonction pour extraire toutes les coordonnées des résultats détaillés
@@ -982,24 +1205,67 @@
     
     // Fonction principale d'initialisation
     function initialize() {
-        console.log("%c[MultiSolver] Démarrage de l'initialisation", "background:orange; color:black");
-        
-        // Configurer le dropdown des géocaches
-        setupGeocachesDropdown();
+        console.log("%c[MultiSolver] Initialisation...", "background:blue; color:white");
         
         // Charger les géocaches
         loadGeocaches();
         
-        // Charger la préférence pour l'enregistrement automatique des coordonnées
-        loadAutoCorrectCoordinatesPreference();
+        // Configurer la dropown des géocaches
+        setupGeocachesDropdown();
         
-        // Configurer les plugins
+        // Charger les plugins
         const pluginContainer = document.getElementById('plugin-list-container');
-        if (pluginContainer) {
-            fetchPlugins(pluginContainer);
-        } else {
-            console.error("%c[MultiSolver] Container de plugins non trouvé", "background:red; color:white");
+        fetchPlugins(pluginContainer);
+        
+        // Vérifier la présence de l'interface de la carte
+        checkMapInterface();
+        
+        // Charger les préférences utilisateur
+        loadAutoCorrectCoordinatesPreference();
+    }
+    
+    // Fonction pour vérifier l'interface avec la carte
+    function checkMapInterface() {
+        console.log("%c[MultiSolver] Vérification de l'interface avec la carte...", "background:blue; color:white");
+        
+        // Vérifier si nous avons accès à la carte directement
+        let mapControllerFound = false;
+        
+        // 1. Vérifier si un élément avec le contrôleur map est présent dans la page
+        const mapElements = document.querySelectorAll('[data-controller="map"]');
+        if (mapElements.length > 0) {
+            console.log("%c[MultiSolver] Contrôleur de carte trouvé dans la page :", "background:green; color:white", mapElements);
+            mapControllerFound = true;
         }
+        
+        // 2. Essayer de tester la communication avec un événement test
+        try {
+            const testEvent = new CustomEvent('map-test-connection', {
+                detail: { test: true, timestamp: Date.now() }
+            });
+            console.log("%c[MultiSolver] Envoi d'un événement test à la carte", "background:orange; color:black");
+            window.dispatchEvent(testEvent);
+            
+            // Si nous sommes dans une iframe, propager l'événement au parent
+            if (window.parent && window.parent !== window) {
+                console.log("%c[MultiSolver] Envoi d'un message test au parent", "background:orange; color:black");
+                window.parent.postMessage({
+                    type: 'map-test-connection',
+                    detail: { test: true, timestamp: Date.now() }
+                }, '*');
+            }
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors du test de communication avec la carte:", "background:red; color:white", error);
+        }
+        
+        if (!mapControllerFound) {
+            console.warn("%c[MultiSolver] Aucun contrôleur de carte trouvé dans la page courante. La communication se fera via des événements.", "background:orange; color:black");
+        }
+        
+        // Ajouter un écouteur d'événement pour détecter les mises à jour de la structure de la page (pour GoldenLayout)
+        document.addEventListener('map-panel-added', () => {
+            console.log("%c[MultiSolver] Panneau de carte ajouté à la page", "background:green; color:white");
+        });
     }
     
     // Charger les géocaches depuis toutes les sources disponibles
@@ -1444,6 +1710,13 @@
                                     rowData.coordsSaved = true;
                                     rowData.coordsSaveError = null;
                                     window.resultsTable.updateData([rowData]);
+                                    
+                                    // Mettre à jour la carte avec les coordonnées sauvegardées
+                                    // Récupérer les coordonnées détaillées si disponibles
+                                    const bestCoords = extractBestCoordinates(rowData);
+                                    if (bestCoords && bestCoords.coordinates && bestCoords.coordinates.decimal) {
+                                        updateMapCoordinates(geocacheId, bestCoords.coordinates, true);
+                                    }
                                 }
                             } else {
                                 // Rétablir le bouton et afficher l'erreur
@@ -1664,6 +1937,15 @@
             const result = await response.text();
             console.log("%c[MultiSolver] Coordonnées sauvegardées avec succès", "background:green; color:white");
             
+            // Mettre à jour la carte avec les nouvelles coordonnées
+            updateMapCoordinates(geocacheId, {
+                ddm: ddmCoords,
+                decimal: {
+                    latitude: parseFloat(gc_lat.match(/(\d{1,2})[°\s]+(\d{1,2}\.\d+)/)[1]) + parseFloat(gc_lat.match(/(\d{1,2})[°\s]+(\d{1,2}\.\d+)/)[2])/60 * (gc_lat.startsWith('S') ? -1 : 1),
+                    longitude: parseFloat(gc_lon.match(/(\d{1,3})[°\s]+(\d{1,2}\.\d+)/)[1]) + parseFloat(gc_lon.match(/(\d{1,3})[°\s]+(\d{1,2}\.\d+)/)[2])/60 * (gc_lon.startsWith('W') ? -1 : 1)
+                }
+            }, true);
+            
             return { success: true, result };
             
         } catch (error) {
@@ -1707,6 +1989,23 @@
                     content: [newItemConfig]
                 });
             }
+            
+            // Attendre que le DOM soit mis à jour et s'assurer que le containerTarget existe
+            setTimeout(() => {
+                console.log("%c[MultiSolver] Vérification de l'initialisation de la carte...", "background:blue; color:white");
+                const mapElements = document.querySelectorAll('[data-controller="map"]');
+                console.log(`%c[MultiSolver] ${mapElements.length} contrôleurs map trouvés:`, "background:blue; color:white", mapElements);
+                
+                // Vérifier que les cibles sont bien définies
+                mapElements.forEach((mapEl, index) => {
+                    const containerTarget = mapEl.querySelector('[data-map-target="container"]');
+                    if (!containerTarget) {
+                        console.error(`%c[MultiSolver] Cible 'container' manquante pour le contrôleur map #${index+1}`, "background:red; color:white");
+                    } else {
+                        console.log(`%c[MultiSolver] Cible 'container' trouvée pour le contrôleur map #${index+1}`, "background:green; color:white");
+                    }
+                });
+            }, 500);
         } else {
             console.error("%c[MultiSolver] Layout principal non trouvé", "background:red; color:white");
             showError("Impossible d'ouvrir la carte: le layout principal n'est pas accessible.");
@@ -1803,6 +2102,445 @@
             });
         } else {
             showError("Onglet Map non trouvé dans le panneau inférieur.");
+        }
+    };
+
+    // Fonction pour mettre à jour les coordonnées sur la carte
+    function updateMapCoordinates(geocacheId, coordinates, isSaved = false) {
+        console.log("%c[MultiSolver] Mise à jour des coordonnées sur la carte:", "background:green; color:white", {
+            geocacheId,
+            coordinates,
+            isSaved
+        });
+        
+        // Validation de l'ID de géocache
+        if (!geocacheId) {
+            console.error("%c[MultiSolver] ID de géocache manquant pour la mise à jour de carte", "background:red; color:white");
+            return false;
+        }
+        
+        // Variable pour stocker les coordonnées décimales
+        let decimalCoords = null;
+        
+        // Vérifier si les coordonnées décimales sont déjà disponibles
+        if (coordinates && coordinates.decimal && 
+            coordinates.decimal.latitude && coordinates.decimal.longitude) {
+            console.log("%c[MultiSolver] Coordonnées décimales trouvées directement:", "background:green; color:white", coordinates.decimal);
+            decimalCoords = coordinates.decimal;
+        }
+        // Sinon, essayer d'extraire à partir des coordonnées DDM
+        else if (coordinates && coordinates.ddm) {
+            console.log("%c[MultiSolver] Tentative de conversion DDM en décimal:", "background:orange; color:black", coordinates.ddm);
+            
+            // Fonction pour convertir DDM en décimal
+            try {
+                const ddm = coordinates.ddm;
+                // Expression régulière améliorée pour capturer différents formats DDM
+                const regex = /([NS])\s*(\d{1,2})[°\s]*(\d{1,2}\.\d+)['"]?\s*([EW])\s*(\d{1,3})[°\s]*(\d{1,2}\.\d+)['"]?/i;
+                const match = ddm.match(regex);
+                
+                if (match) {
+                    const latDir = match[1].toUpperCase();
+                    const latDeg = parseInt(match[2], 10);
+                    const latMin = parseFloat(match[3]);
+                    
+                    const lonDir = match[4].toUpperCase();
+                    const lonDeg = parseInt(match[5], 10);
+                    const lonMin = parseFloat(match[6]);
+                    
+                    let latitude = latDeg + (latMin / 60);
+                    if (latDir === 'S') latitude = -latitude;
+                    
+                    let longitude = lonDeg + (lonMin / 60);
+                    if (lonDir === 'W') longitude = -longitude;
+                    
+                    console.log("%c[MultiSolver] Conversion réussie:", "background:green; color:white", {
+                        latitude, 
+                        longitude
+                    });
+                    
+                    decimalCoords = { latitude, longitude };
+                } else {
+                    console.warn("%c[MultiSolver] Format DDM non reconnu:", "background:orange; color:black", ddm);
+                    // Essayer de convertir avec la fonction existante
+                    try {
+                        const converted = convertDDMToDecimal(ddm);
+                        if (converted && converted.latitude && converted.longitude) {
+                            console.log("%c[MultiSolver] Conversion secondaire réussie:", "background:green; color:white", converted);
+                            decimalCoords = converted;
+                        }
+                    } catch (convErr) {
+                        console.warn("%c[MultiSolver] Échec de la conversion secondaire:", "background:orange; color:black", convErr);
+                    }
+                }
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de la conversion DDM:", "background:red; color:white", error);
+            }
+        }
+        // Vérifier s'il s'agit directement d'un objet avec latitude/longitude
+        else if (coordinates && typeof coordinates.latitude === 'number' && typeof coordinates.longitude === 'number') {
+            console.log("%c[MultiSolver] Coordonnées décimales trouvées directement dans l'objet:", "background:green; color:white", coordinates);
+            decimalCoords = {
+                latitude: coordinates.latitude,
+                longitude: coordinates.longitude
+            };
+        }
+        // Vérifier s'il y a un ddm_lat et ddm_lon séparés
+        else if (coordinates && coordinates.ddm_lat && coordinates.ddm_lon) {
+            console.log("%c[MultiSolver] Tentative de conversion DDM séparés:", "background:orange; color:black", {
+                ddm_lat: coordinates.ddm_lat,
+                ddm_lon: coordinates.ddm_lon
+            });
+            
+            try {
+                // Combiner en un seul DDM et essayer de convertir
+                const combinedDDM = `${coordinates.ddm_lat} ${coordinates.ddm_lon}`;
+                const converted = convertDDMToDecimal(combinedDDM);
+                if (converted && converted.latitude && converted.longitude) {
+                    console.log("%c[MultiSolver] Conversion DDM séparés réussie:", "background:green; color:white", converted);
+                    decimalCoords = converted;
+                }
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de la conversion DDM séparés:", "background:red; color:white", error);
+            }
+        }
+        
+        // Si aucune coordonnée décimale n'a pu être extraite, impossible de continuer
+        if (!decimalCoords) {
+            console.error("%c[MultiSolver] Impossible d'extraire des coordonnées décimales valides", "background:red; color:white", coordinates);
+            return false;
+        }
+        
+        // Préparer les détails de l'événement
+        const eventDetail = {
+            geocacheId: geocacheId,
+            latitude: decimalCoords.latitude,
+            longitude: decimalCoords.longitude,
+            isSaved: isSaved,
+            raw: coordinates
+        };
+        
+        console.log("%c[MultiSolver] Détails de l'événement prêts:", "background:blue; color:white", JSON.stringify(eventDetail));
+        
+        // Tester toutes les méthodes de communication disponibles
+        // 1. Utiliser le pont d'événements global
+        if (window.MysteryAIEventBridge && typeof window.MysteryAIEventBridge.dispatchGlobalEvent === 'function') {
+            console.log("%c[MultiSolver] 1. Utilisation du pont d'événements global", "background:purple; color:white");
+            window.MysteryAIEventBridge.dispatchGlobalEvent('map-coordinates-updated', eventDetail);
+            console.log("%c[MultiSolver] Événement envoyé via MysteryAIEventBridge", "background:green; color:white");
+        } else {
+            console.warn("%c[MultiSolver] MysteryAIEventBridge non disponible ou méthode manquante", "background:orange; color:black");
+        }
+        
+        // 2. Utiliser l'événement personnalisé standard
+        console.log("%c[MultiSolver] 2. Envoi direct de l'événement", "background:orange; color:black");
+        const mapUpdateEvent = new CustomEvent('map-coordinates-updated', {
+            detail: eventDetail
+        });
+        window.dispatchEvent(mapUpdateEvent);
+        console.log("%c[MultiSolver] CustomEvent dispatché directement sur window", "background:green; color:white");
+        
+        // 3. Envoyer un message au parent
+        if (window.parent && window.parent !== window) {
+            console.log("%c[MultiSolver] 3. Envoi du message au parent", "background:blue; color:white");
+            window.parent.postMessage({
+                type: 'map-coordinates-updated',
+                detail: eventDetail
+            }, '*');
+            console.log("%c[MultiSolver] Message envoyé au parent", "background:green; color:white");
+            
+            // Test de connexion
+            window.parent.postMessage({
+                type: 'mystery-event-bridge',
+                eventName: 'map-test-connection',
+                detail: { timestamp: Date.now() }
+            }, '*');
+        } else {
+            console.log("%c[MultiSolver] Pas de fenêtre parent distincte", "background:orange; color:black");
+        }
+        
+        // 4. Rechercher et utiliser le contrôleur map directement (si dans la même fenêtre)
+        console.log("%c[MultiSolver] 4. Recherche d'un contrôleur map dans le DOM", "background:blue; color:white");
+        try {
+            // Chercher tous les éléments contrôlés par le contrôleur map
+            const mapControllers = document.querySelectorAll('[data-controller~="map"]');
+            console.log(`%c[MultiSolver] ${mapControllers.length} contrôleurs map trouvés dans le DOM`, 
+                         mapControllers.length > 0 ? "background:green; color:white" : "background:orange; color:black");
+            
+            let directAccessSuccessful = false;
+            
+            mapControllers.forEach((el, i) => {
+                console.log(`%c[MultiSolver] Tentative d'accès au contrôleur map #${i+1}`, "background:purple; color:white");
+                
+                // Si l'API Stimulus est disponible, essayer d'accéder au contrôleur
+                if (window.StimulusApp && window.StimulusApp.getControllerForElementAndIdentifier) {
+                    const mapController = window.StimulusApp.getControllerForElementAndIdentifier(el, 'map');
+                    if (mapController && typeof mapController.updateGeocacheCoordinates === 'function') {
+                        console.log(`%c[MultiSolver] Appel direct de updateGeocacheCoordinates sur le contrôleur #${i+1}`, 
+                                     "background:green; color:white");
+                        try {
+                            mapController.updateGeocacheCoordinates(
+                                geocacheId, 
+                                decimalCoords.latitude, 
+                                decimalCoords.longitude, 
+                                isSaved,
+                                coordinates
+                            );
+                            directAccessSuccessful = true;
+                            console.log(`%c[MultiSolver] Appel direct réussi sur le contrôleur #${i+1}`, "background:green; color:white");
+                        } catch (callError) {
+                            console.error(`%c[MultiSolver] Erreur lors de l'appel direct sur le contrôleur #${i+1}:`, "background:red; color:white", callError);
+                        }
+                    } else {
+                        console.log(`%c[MultiSolver] Contrôleur map #${i+1} trouvé mais méthode updateGeocacheCoordinates non disponible`, 
+                                     "background:orange; color:black", mapController);
+                    }
+                } else {
+                    console.warn("%c[MultiSolver] API Stimulus non disponible pour accès direct", "background:orange; color:black");
+                }
+            });
+            
+            if (!directAccessSuccessful) {
+                console.warn("%c[MultiSolver] Aucun accès direct au contrôleur map n'a réussi", "background:orange; color:black");
+            }
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'accès direct au contrôleur map:", "background:red; color:white", error);
+        }
+        
+        // 5. Chercher dans les iframes
+        console.log("%c[MultiSolver] 5. Recherche de contrôleurs map dans les iframes", "background:blue; color:white");
+        try {
+            if (window.frames && window.frames.length > 0) {
+                for (let i = 0; i < window.frames.length; i++) {
+                    try {
+                        console.log(`%c[MultiSolver] Envoi du message à l'iframe #${i+1}`, "background:purple; color:white");
+                        window.frames[i].postMessage({
+                            type: 'map-coordinates-updated',
+                            detail: eventDetail
+                        }, '*');
+                        console.log(`%c[MultiSolver] Message envoyé à l'iframe #${i+1}`, "background:green; color:white");
+                    } catch (frameErr) {
+                        console.warn(`%c[MultiSolver] Impossible d'envoyer à l'iframe #${i+1}:`, "background:orange; color:black", frameErr);
+                    }
+                }
+            } else {
+                console.log("%c[MultiSolver] Aucune iframe trouvée", "background:orange; color:black");
+            }
+        } catch (iframeErr) {
+            console.error("%c[MultiSolver] Erreur lors de l'accès aux iframes:", "background:red; color:white", iframeErr);
+        }
+        
+        console.log("%c[MultiSolver] Toutes les méthodes de communication testées pour les coordonnées", "background:green; color:white");
+        return true;
+    }
+
+    // Fonction pour extraire les meilleures coordonnées d'un résultat
+    function extractBestCoordinates(rowData) {
+        if (!rowData || !rowData.detailedResults || rowData.detailedResults.length === 0) {
+            return null;
+        }
+        
+        // Chercher des coordonnées dans les résultats détaillés
+        let bestResult = null;
+        
+        for (const detail of rowData.detailedResults) {
+            const coords = extractCoordinates(detail.details);
+            if (coords.exist && (!bestResult || coords.certitude)) {
+                bestResult = { source: detail.source, coordinates: coords };
+            }
+        }
+        
+        return bestResult;
+    }
+
+    // Ajouter un appel dans la fonction qui traite les résultats de plugin
+    async function executePluginOnGeocache(plugin, geocache) {
+        try {
+            console.log("%c[MultiSolver] Traitement de", "background:blue; color:white", geocache.gc_code);
+            
+            // Vérifier que l'ID de la géocache est disponible
+            if (!geocache.id) {
+                console.error("%c[MultiSolver] ID de géocache manquant", "background:red; color:white", geocache);
+                throw new Error("ID de géocache manquant");
+            }
+            
+            // Exécuter le plugin sur la géocache
+            const result = await executePlugin(plugin, geocache);
+            console.log("%c[MultiSolver] Résultat:", "background:blue; color:white", result);
+            
+            if (result) {
+                // Vérifier s'il y a des coordonnées principales 
+                if (result.mainDetection && result.mainDetection.coordinates && 
+                    result.mainDetection.coordinates.exist) {
+                    
+                    console.log("%c[MultiSolver] Coordonnées détectées:", "background:green; color:white", result.mainDetection.coordinates);
+                    
+                    // Enregistrement automatique des coordonnées si l'option est activée
+                    const autoSaveCoords = document.getElementById('plugin-auto-save-coords').checked;
+                    let coordsSaved = false;
+                    let coordsSaveError = null;
+                    
+                    if (autoSaveCoords) {
+                        try {
+                            console.log("%c[MultiSolver] Enregistrement automatique des coordonnées...", "background:orange; color:black");
+                            const saveResult = await saveDetectedCoordinates(geocache.id, result.mainDetection.coordinates);
+                            coordsSaved = saveResult.success;
+                            if (!saveResult.success) {
+                                coordsSaveError = saveResult.error;
+                            }
+                        } catch (saveError) {
+                            console.error("%c[MultiSolver] Erreur lors de l'enregistrement auto:", "background:red; color:white", saveError);
+                            coordsSaved = false;
+                            coordsSaveError = saveError.message;
+                        }
+                    }
+                    
+                    // Mise à jour de la carte avec les coordonnées détectées
+                    console.log("%c[MultiSolver] Tentative de mise à jour de la carte avec les coordonnées:", "background:green; color:white", result.mainDetection.coordinates);
+                    const mapUpdated = updateMapCoordinates(geocache.id, result.mainDetection.coordinates, coordsSaved);
+                    console.log("%c[MultiSolver] Résultat de la mise à jour de la carte:", "background:green; color:white", mapUpdated ? "Réussie" : "Échouée");
+                    
+                    // Créer les données de résultat
+                    window.results = window.results || [];
+                    window.results.push({
+                        id: geocache.id,
+                        gc_code: geocache.gc_code || 'N/A',
+                        name: geocache.name || 'Sans nom',
+                        detection: result.mainDetection.text || 'Détection réussie',
+                        coordinates: result.mainDetection.coordinates.ddm || 'Format inconnu',
+                        certitude: result.mainDetection.coordinates.certitude || false,
+                        detailedResults: result.detailedResults || [],
+                        coordsSaved: coordsSaved,
+                        coordsSaveError: coordsSaveError
+                    });
+                } else {
+                    console.warn("%c[MultiSolver] Pas de coordonnées détectées", "background:orange; color:black");
+                    
+                    // Pas de coordonnées détectées, mais peut-être des résultats partiels
+                    window.results = window.results || [];
+                    window.results.push({
+                        id: geocache.id,
+                        gc_code: geocache.gc_code || 'N/A',
+                        name: geocache.name || 'Sans nom',
+                        detection: result.mainDetection?.text || 'Détection sans coordonnées',
+                        coordinates: 'Non détecté',
+                        certitude: false,
+                        detailedResults: result.detailedResults || []
+                    });
+                }
+                
+                // Mettre à jour le tableau avec le nouveau résultat
+                updateResultsTable(window.results);
+            }
+        } catch (error) {
+            // Gérer les erreurs
+            console.error("%c[MultiSolver] Erreur lors du traitement:", "background:red; color:white", {
+                geocache: geocache,
+                error: error
+            });
+            
+            // Ajouter une entrée d'erreur au tableau
+            window.results = window.results || [];
+            window.results.push({
+                id: geocache.id,
+                gc_code: geocache.gc_code || 'N/A',
+                name: geocache.name || 'Sans nom',
+                isError: true,
+                error: error.message,
+                coordinates: '',
+                certitude: false,
+                detection: ''
+            });
+            
+            // Mettre à jour le tableau avec l'erreur
+            updateResultsTable(window.results);
+        }
+    }
+
+    // Variable globale pour stocker les résultats
+    window.results = [];
+
+    // Fonction pour exécuter le plugin sélectionné sur toutes les géocaches
+    window.executePluginForAll = async function(pluginName) {
+        if (window.isPluginExecutionRunning) {
+            console.warn("%c[MultiSolver] Une exécution est déjà en cours", "background:orange; color:black");
+            return;
+        }
+        
+        console.log("%c[MultiSolver] Exécution du plugin pour toutes les géocaches:", "background:blue; color:white", pluginName);
+        
+        try {
+            // Marquer le début du traitement
+            window.isPluginExecutionRunning = true;
+            
+            // Afficher la barre de progression
+            document.getElementById('progress-container').classList.remove('hidden');
+            
+            // Récupérer les géocaches
+            const geocaches = getGeocaches();
+            
+            if (!geocaches || geocaches.length === 0) {
+                showError("Aucune géocache à traiter");
+                window.isPluginExecutionRunning = false;
+                return;
+            }
+            
+            console.log("%c[MultiSolver] Nombre de géocaches à traiter:", "background:orange; color:black", geocaches.length);
+            
+            // Initialiser la progression
+            const progressTotal = document.getElementById('progress-total');
+            const progressCount = document.getElementById('progress-count');
+            const progressBar = document.getElementById('progress-bar');
+            
+            progressTotal.textContent = geocaches.length;
+            progressCount.textContent = 0;
+            progressBar.style.width = '0%';
+            
+            // Réinitialiser le tableau des résultats
+            window.results = [];
+            
+            // Initialiser le tableau si nécessaire
+            const resultsTableContainer = document.querySelector('[data-multi-solver-target="resultsTableContainer"]');
+            if (resultsTableContainer && !window.resultsTable) {
+                initializeResultsTable();
+            } else if (window.resultsTable) {
+                // Effacer les données existantes
+                window.resultsTable.clearData();
+            }
+            
+            // Vérifier si on traite toutes les géocaches ou seulement une sélection
+            const applyToAll = document.getElementById('plugin-apply-to-all');
+            const geocachesToProcess = applyToAll && applyToAll.checked ? geocaches : [geocaches[0]];
+            
+            console.log("%c[MultiSolver] Géocaches sélectionnées pour le traitement:", "background:orange; color:black", geocachesToProcess.length);
+            
+            // Variables pour suivre la progression
+            let processedCount = 0;
+            
+            // Traiter chaque géocache
+            for (const geocache of geocachesToProcess) {
+                // Vérifier si l'arrêt a été demandé
+                if (!window.isPluginExecutionRunning) {
+                    console.log("%c[MultiSolver] Arrêt du traitement demandé", "background:orange; color:black");
+                    break;
+                }
+                
+                // Utiliser notre nouvelle fonction d'exécution de plugin
+                await executePluginOnGeocache(pluginName, geocache);
+                
+                // Mettre à jour la progression
+                processedCount++;
+                document.getElementById('progress-count').textContent = processedCount;
+                const progressPercent = (processedCount / geocachesToProcess.length) * 100;
+                document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+            }
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin:", "background:red; color:white", error);
+            showError(`Erreur lors de l'exécution du plugin: ${error.message}`);
+        } finally {
+            // Marquer la fin du traitement
+            window.isPluginExecutionRunning = false;
         }
     };
 })();

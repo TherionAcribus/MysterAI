@@ -98,8 +98,33 @@ class AnalysisWebPagePlugin:
                     # Mettre à jour les coordonnées dans formula_parser
                     combined_results['formula_parser']['coordinates'] = new_coords
         
+        # Ajouter les coordonnées décimales pour tous les résultats
+        from app.routes.coordinates import convert_ddm_to_decimal
+        primary_coordinates = None
+        
+        # Parcourir les résultats pour trouver les coordonnées principales
+        for plugin_name, plugin_result in combined_results.items():
+            if (plugin_result and isinstance(plugin_result, dict) and 'coordinates' in plugin_result):
+                coords = plugin_result['coordinates']
+                if isinstance(coords, dict) and coords.get('exist', False):
+                    # Vérifier si les coordonnées ont déjà des décimales
+                    if 'decimal' not in coords and coords.get('ddm_lat') and coords.get('ddm_lon'):
+                        coords['decimal'] = convert_ddm_to_decimal(coords['ddm_lat'], coords['ddm_lon'])
+                        print(f"Coordonnées décimales ajoutées pour {plugin_name}: {coords['decimal']}")
+                    
+                    # Stocker les coordonnées principales si elles ont des décimales
+                    if 'decimal' in coords and coords['decimal'].get('latitude') is not None:
+                        primary_coordinates = coords['decimal']
+                        break
+        
+        # Ajouter les coordonnées principales au résultat global
+        if primary_coordinates:
+            print(f"Coordonnées principales détectées: {primary_coordinates}")
+            combined_results['primary_coordinates'] = primary_coordinates
+        
         print("combined_results", combined_results)
         # On retourne tous les résultats
         return {
-            "combined_results": combined_results
+            "combined_results": combined_results,
+            "primary_coordinates": primary_coordinates
         }

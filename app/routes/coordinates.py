@@ -626,3 +626,45 @@ def detect_gps_coordinates(text: str) -> Dict[str, Optional[str]]:
         "ddm_lon": None,
         "ddm": None
     }
+
+# ------------------------------------------------------------------------------
+# Conversion DDM vers coordonnées décimales pour OpenLayers
+# ------------------------------------------------------------------------------
+
+def convert_ddm_to_decimal(ddm_lat: str, ddm_lon: str) -> Dict[str, float]:
+    """
+    Convertit des coordonnées au format DDM (N 48° 33.787' E 006° 38.803') 
+    en coordonnées décimales utilisables par OpenLayers.
+    
+    :param ddm_lat: Latitude au format DDM (ex: "N 48° 33.787'")
+    :param ddm_lon: Longitude au format DDM (ex: "E 006° 38.803'")
+    :return: Dictionnaire avec les clés 'latitude' et 'longitude' en décimal
+    """
+    print(f"[DEBUG] convert_ddm_to_decimal: Conversion de {ddm_lat}, {ddm_lon}")
+    
+    result = {'latitude': None, 'longitude': None}
+    
+    try:
+        # Extraction des composants de la latitude
+        lat_match = re.search(r'([NS])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)', ddm_lat)
+        if lat_match:
+            lat_dir, lat_deg, lat_min = lat_match.groups()
+            lat_decimal = float(lat_deg) + float(lat_min) / 60
+            if lat_dir == 'S':
+                lat_decimal = -lat_decimal
+            result['latitude'] = lat_decimal
+        
+        # Extraction des composants de la longitude
+        lon_match = re.search(r'([EW])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)', ddm_lon)
+        if lon_match:
+            lon_dir, lon_deg, lon_min = lon_match.groups()
+            lon_decimal = float(lon_deg) + float(lon_min) / 60
+            if lon_dir == 'W':
+                lon_decimal = -lon_decimal
+            result['longitude'] = lon_decimal
+            
+        print(f"[DEBUG] convert_ddm_to_decimal: Résultat de la conversion: {result}")
+    except Exception as e:
+        print(f"[DEBUG] convert_ddm_to_decimal: Erreur lors de la conversion: {str(e)}")
+    
+    return result

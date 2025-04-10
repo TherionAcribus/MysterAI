@@ -570,45 +570,35 @@ function initializeLayout() {
                 </div>
             `);
             
-            // Charger le template du panneau de carte (identique à geocaches-map-panel)
-            fetch('/geocaches/map_panel', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    geocache_ids: geocacheIds
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.text();
-            })
-            .then(html => {
-                // Injecter le HTML dans le conteneur
-                container.getElement().html(html);
-                
-                // Initialiser le contrôleur Stimulus
-                if (window.StimulusApp) {
-                    window.StimulusApp.start();
-                }
-            })
-            .catch(error => {
-                console.error('Erreur lors du chargement de la carte:', error);
-                container.getElement().html(`
-                    <div class="w-full h-full bg-gray-900 p-4">
-                        <div class="text-red-500 mb-4">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>
-                            Erreur lors du chargement de la carte
-                        </div>
-                        <div class="text-gray-400 text-sm">
-                            ${error.message}
+            // Utiliser directement le template map_panel_multi.html au lieu de l'API
+            container.getElement().html(`
+                <div id="map-panel" 
+                     data-controller="map"
+                     data-map-geocache-ids-value='${JSON.stringify(geocacheIds)}'
+                     data-map-is-multi-view-value="true"
+                     class="h-full">
+                    <div class="map-container h-full relative" data-map-target="container">
+                        <div id="base-layer-selector"></div>
+                    </div>
+                    <div id="popup" 
+                         data-map-target="popup"
+                         class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
+                         style="display: none; pointer-events: none; background-color: white; color: black;">
+                        <div data-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+                        <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+                            <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
                         </div>
                     </div>
-                `);
-            });
+                </div>
+            `);
+            
+            // Démarrer Stimulus pour initialiser le contrôleur
+            if (window.StimulusApp) {
+                setTimeout(() => {
+                    console.log("%c[MapController] Démarrage de Stimulus pour initialiser le contrôleur map", "background:blue; color:white");
+                    window.StimulusApp.start();
+                }, 100);
+            }
         });
 
         // Enregistrer le composant geocaches-map-panel (avec le format map_panel)

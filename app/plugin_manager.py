@@ -398,9 +398,16 @@ class PluginManager:
         if enable_gps and decoded_text:
             print(f"[DEBUG] execute_plugin: Lancement de la détection GPS sur le texte décodé")
             # Importer ici pour éviter l'importation circulaire
-            from app.routes.coordinates import detect_gps_coordinates
+            from app.routes.coordinates import detect_gps_coordinates, convert_ddm_to_decimal
             gps_coordinates = detect_gps_coordinates(decoded_text)
             print(f"[DEBUG] execute_plugin: Résultat de la détection GPS: {gps_coordinates}")
+            
+            # Ajout des coordonnées décimales pour OpenLayers
+            if gps_coordinates.get("exist") and gps_coordinates.get("ddm_lat") and gps_coordinates.get("ddm_lon"):
+                decimal_coords = convert_ddm_to_decimal(gps_coordinates["ddm_lat"], gps_coordinates["ddm_lon"])
+                gps_coordinates["decimal"] = decimal_coords
+                print(f"[DEBUG] execute_plugin: Coordonnées décimales ajoutées: {decimal_coords}")
+            
             result["coordinates"] = gps_coordinates
 
         return result
