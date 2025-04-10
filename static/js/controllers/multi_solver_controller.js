@@ -341,148 +341,10 @@
     
     // Exécution d'un plugin sur toutes les géocaches
     window.executePluginOnAllGeocaches = async function(pluginName) {
-        console.log("%c[MultiSolver] Exécution du plugin sur toutes les géocaches:", "background:green; color:white", pluginName);
+        console.log("%c[MultiSolver] Redirection vers la nouvelle implémentation pour l'exécution du plugin:", "background:green; color:white", pluginName);
         
-        // Si un traitement est déjà en cours, éviter de le relancer
-        if (window.isPluginExecutionRunning) {
-            showMessage("Un traitement est déjà en cours. Veuillez patienter ou l'arrêter.");
-            return;
-        }
-        
-        // Récupérer les géocaches
-        const geocaches = getGeocaches();
-        
-        if (!geocaches || geocaches.length === 0) {
-            showError("Aucune géocache sélectionnée pour l'exécution du plugin.");
-            return;
-        }
-        
-        // Marquer le début du traitement
-        window.isPluginExecutionRunning = true;
-        
-        // Vérifier si on doit appliquer à toutes les géocaches
-        const applyToAll = document.getElementById('plugin-apply-to-all').checked;
-        
-        // Préparation des géocaches à traiter
-        const geocachesToProcess = applyToAll ? geocaches : [geocaches[0]];
-        
-        // Afficher le conteneur de progression
-        const progressContainer = document.getElementById('progress-container');
-        if (progressContainer) {
-            progressContainer.classList.remove('hidden');
-            document.getElementById('progress-count').textContent = "0";
-            document.getElementById('progress-total').textContent = geocachesToProcess.length;
-            document.getElementById('progress-bar').style.width = "0%";
-        }
-        
-        // Initialiser le tableau Tabulator s'il n'existe pas déjà
-        if (!window.resultsTable) {
-            initializeResultsTable();
-        } else {
-            // Sinon, effacer les données existantes
-            window.resultsTable.clearData();
-        }
-        
-        // Préparer le tableau de résultats
-        let results = [];
-        
-        try {
-            let processedCount = 0;
-            
-            // Traitement des géocaches
-            for (const geocache of geocachesToProcess) {
-                // Vérifier si le traitement a été arrêté
-                if (!window.isPluginExecutionRunning) {
-                    console.log("%c[MultiSolver] Traitement arrêté par l'utilisateur", "background:orange; color:black");
-                    showMessage("Traitement arrêté");
-                    break;
-                }
-                
-                // Exécuter le plugin pour cette géocache
-                try {
-                    const normalizedResult = await executePlugin(pluginName, geocache);
-                    
-                    // Ajouter le résultat à notre tableau de résultats
-                    const resultItem = {
-                        id: geocache.id,
-                        gc_code: geocache.gc_code || 'N/A',
-                        name: geocache.name || 'Sans nom',
-                        isError: false,
-                        error: '',
-                        coordinates: 'Non détecté',
-                        certitude: false,
-                        detection: 'Aucun résultat',
-                        detailedResults: normalizedResult.detailedResults || []
-                    };
-                    
-                    // Traiter les coordonnées si elles existent dans le résultat principal
-                    if (normalizedResult.mainDetection && normalizedResult.mainDetection.coordinates && normalizedResult.mainDetection.coordinates.exist) {
-                        resultItem.coordinates = normalizedResult.mainDetection.coordinates.ddm || 'Format inconnu';
-                        resultItem.certitude = normalizedResult.mainDetection.coordinates.certitude || false;
-                        resultItem.detection = normalizedResult.mainDetection.text || 'Coordonnées détectées';
-                        
-                        // Vérifier si on doit sauvegarder automatiquement les coordonnées
-                        const autoSaveCoords = document.getElementById('plugin-auto-save-coords').checked;
-                        
-                        if (autoSaveCoords) {
-                            console.log("%c[MultiSolver] Sauvegarde automatique des coordonnées activée", "background:green; color:white");
-                            
-                            // Sauvegarder les coordonnées
-                            const saveResult = await saveDetectedCoordinates(geocache.id, normalizedResult.mainDetection.coordinates);
-                            
-                            // Marquer le statut de sauvegarde dans le résultat
-                            resultItem.coordsSaved = saveResult.success;
-                            resultItem.coordsSaveError = saveResult.success ? null : saveResult.error;
-                        } else {
-                            // Indiquer que les coordonnées n'ont pas été sauvegardées automatiquement
-                            resultItem.coordsSaved = false;
-                            resultItem.coordsSaveError = null;
-                        }
-                    }
-                    
-                    // Ajouter au tableau
-                    results.push(resultItem);
-                    
-                    // Mettre à jour le tableau Tabulator progressivement
-                    updateResultsTable(results);
-                    
-                } catch (error) {
-                    console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin sur la géocache:", "background:red; color:white", {
-                        plugin: pluginName,
-                        geocache: geocache,
-                        error: error
-                    });
-                    
-                    // Ajouter une entrée d'erreur au tableau
-                    results.push({
-                        id: geocache.id,
-                        gc_code: geocache.gc_code || 'N/A',
-                        name: geocache.name || 'Sans nom',
-                        isError: true,
-                        error: error.message,
-                        coordinates: '',
-                        certitude: false,
-                        detection: ''
-                    });
-                    
-                    // Mettre à jour le tableau avec l'erreur
-                    updateResultsTable(results);
-                }
-                
-                // Mettre à jour la progression
-                processedCount++;
-                document.getElementById('progress-count').textContent = processedCount;
-                const progressPercent = (processedCount / geocachesToProcess.length) * 100;
-                document.getElementById('progress-bar').style.width = `${progressPercent}%`;
-            }
-            
-        } catch (error) {
-            console.error("%c[MultiSolver] Erreur lors de l'exécution du plugin:", "background:red; color:white", error);
-            showError(`Erreur lors de l'exécution du plugin: ${error.message}`);
-        } finally {
-            // Marquer la fin du traitement
-            window.isPluginExecutionRunning = false;
-        }
+        // Appeler directement la nouvelle implémentation qui utilise executePluginOnGeocache
+        return await window.executePluginForAll(pluginName);
     };
     
     // Fonction pour arrêter l'exécution en cours
@@ -2110,7 +1972,7 @@
         console.log("%c[MultiSolver] Mise à jour des coordonnées sur la carte:", "background:green; color:white", {
             geocacheId,
             coordinates,
-            isSaved
+            isSaved: isSaved ? "Sauvegardées" : "Non sauvegardées"
         });
         
         // Validation de l'ID de géocache
@@ -2381,6 +2243,7 @@
                     let coordsSaveError = null;
                     
                     if (autoSaveCoords) {
+                        console.log("%c[MultiSolver] Enregistrement automatique des coordonnées activée", "background:orange; color:black");
                         try {
                             console.log("%c[MultiSolver] Enregistrement automatique des coordonnées...", "background:orange; color:black");
                             const saveResult = await saveDetectedCoordinates(geocache.id, result.mainDetection.coordinates);
@@ -2393,9 +2256,12 @@
                             coordsSaved = false;
                             coordsSaveError = saveError.message;
                         }
+                    } else {
+                        console.log("%c[MultiSolver] Enregistrement automatique des coordonnées désactivée, mais mise à jour de la carte quand même", "background:orange; color:black");
                     }
                     
-                    // Mise à jour de la carte avec les coordonnées détectées
+                    // Mise à jour de la carte avec les coordonnées détectées dans tous les cas
+                    // que les coordonnées soient sauvegardées ou non
                     console.log("%c[MultiSolver] Tentative de mise à jour de la carte avec les coordonnées:", "background:green; color:white", result.mainDetection.coordinates);
                     const mapUpdated = updateMapCoordinates(geocache.id, result.mainDetection.coordinates, coordsSaved);
                     console.log("%c[MultiSolver] Résultat de la mise à jour de la carte:", "background:green; color:white", mapUpdated ? "Réussie" : "Échouée");
@@ -2447,9 +2313,7 @@
                 name: geocache.name || 'Sans nom',
                 isError: true,
                 error: error.message,
-                coordinates: '',
-                certitude: false,
-                detection: ''
+                stack: error.stack
             });
             
             // Mettre à jour le tableau avec l'erreur

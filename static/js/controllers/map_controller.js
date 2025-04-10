@@ -218,6 +218,10 @@
                             if (geocache.is_saved === false) {
                                 points = 4;
                                 angle = 0; // 0 degré pour losange
+                                strokeColor = '#ffcc00'; // Bordure dorée comme pour les points sauvegardés
+                                strokeWidth = 2;
+                                // Garder la même couleur de remplissage bleue mais légèrement différente
+                                cacheColor = 'rgba(51, 136, 255, 0.8)';
                                 console.log(`Style: Losange pour coordonnées corrigées non sauvegardées (${geocache.id})`);
                             } else {
                                 // Coordonnées corrigées et sauvegardées, utiliser un carré avec bordure spéciale
