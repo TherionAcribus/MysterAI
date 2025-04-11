@@ -910,17 +910,85 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             // Vider la liste des filtres actifs
             activeFiltersList = [];
             
-            // Supprimer tous les éléments visuels
-            activeFilters.innerHTML = '';
+            // Mettre à jour l'affichage des filtres
+            renderActiveFilters();
             
-            // Masquer le bouton de suppression totale
-            clearAllFiltersBtn.classList.add('hidden');
-            
-            // Appliquer les filtres (ou plutôt, les supprimer tous)
+            // Appliquer les filtres mis à jour (ou plutôt, les supprimer tous)
             applyFilters();
         }
         
-        // Fonction pour ajouter un filtre actif
+        // Fonction pour supprimer un filtre actif
+        function removeFilter(filterId) {
+            // Supprimer de la liste des filtres actifs
+            activeFiltersList = activeFiltersList.filter(f => f.id.toString() !== filterId.toString());
+            
+            // Mettre à jour l'affichage des filtres
+            renderActiveFilters();
+            
+            // Appliquer les filtres mis à jour
+            applyFilters();
+        }
+        
+        // Fonction pour nettoyer les filtres existants (pour éviter les doublons)
+        function cleanupActiveFilters() {
+            // Créer un objet pour suivre les filtres uniques basés sur leur combinaison de champ + opérateur + valeur
+            const uniqueFilters = {};
+            const newFiltersList = [];
+            
+            activeFiltersList.forEach(filter => {
+                // Créer une clé unique pour chaque filtre basée sur ses propriétés
+                const filterKey = `${filter.field}|${filter.operator}|${Array.isArray(filter.value) ? filter.value.join(',') : filter.value}`;
+                
+                // Si ce filtre n'a pas déjà été vu, l'ajouter à la nouvelle liste
+                if (!uniqueFilters[filterKey]) {
+                    uniqueFilters[filterKey] = true;
+                    newFiltersList.push(filter);
+                }
+            });
+            
+            // Remplacer la liste des filtres par la liste sans doublons
+            activeFiltersList = newFiltersList;
+            
+            // Ne pas appeler applyFilters() ici car cela créerait une boucle récursive
+            return newFiltersList;
+        }
+        
+        // Appeler cette fonction au chargement initial pour nettoyer tout doublon possible
+        document.addEventListener('DOMContentLoaded', function() {
+            // Nettoyage initial des filtres
+            activeFiltersList = cleanupActiveFilters();
+            // Appliquer les filtres une seule fois après le nettoyage
+            renderActiveFilters();
+        });
+        
+        // Nouvelle fonction pour juste afficher les filtres actifs sans recourir à applyFilters
+        function renderActiveFilters() {
+            // Vider l'affichage des filtres actifs
+            activeFilters.innerHTML = '';
+            
+            // Recréer l'affichage à partir de la liste des filtres actifs
+            activeFiltersList.forEach(filter => {
+                const filterElement = document.createElement('div');
+                filterElement.className = 'inline-flex items-center bg-blue-600 text-white text-xs rounded-full px-3 py-1';
+                filterElement.dataset.filterId = filter.id;
+                filterElement.innerHTML = `
+                    <span class="mr-1">${filter.displayText}</span>
+                    <button class="remove-filter text-white hover:text-red-200" data-filter-id="${filter.id}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                activeFilters.appendChild(filterElement);
+            });
+            
+            // Afficher ou masquer le bouton de suppression totale selon s'il y a des filtres actifs
+            if (activeFiltersList.length > 0) {
+                clearAllFiltersBtn.classList.remove('hidden');
+            } else {
+                clearAllFiltersBtn.classList.add('hidden');
+            }
+        }
+        
+        // Modifier la fonction addActiveFilter pour vérifier les doublons avant d'ajouter
         function addActiveFilter() {
             const fieldName = filterField.value;
             const operatorValue = filterOperator.value;
@@ -963,60 +1031,41 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 displayText: `${fieldDef.label} ${operatorLabel} ${filterValueDisplay}`
             };
             
+            // Vérifier si un filtre identique existe déjà
+            const filterKey = `${fieldName}|${operatorValue}|${Array.isArray(filterValueData) ? filterValueData.join(',') : filterValueData}`;
+            const existingFilterIndex = activeFiltersList.findIndex(f => 
+                `${f.field}|${f.operator}|${Array.isArray(f.value) ? f.value.join(',') : f.value}` === filterKey
+            );
+            
+            if (existingFilterIndex !== -1) {
+                console.log("Filtre identique déjà présent, pas d'ajout en doublon");
+                filterForm.classList.add('hidden');
+                return;
+            }
+            
             console.log("Nouveau filtre créé:", filter);
             
             // Ajouter à la liste des filtres actifs
             activeFiltersList.push(filter);
             
-            // Créer l'élément visuel du filtre
-            const filterElement = document.createElement('div');
-            filterElement.className = 'inline-flex items-center bg-blue-600 text-white text-xs rounded-full px-3 py-1';
-            filterElement.dataset.filterId = filter.id;
-            filterElement.innerHTML = `
-                <span class="mr-1">${filter.displayText}</span>
-                <button class="remove-filter text-white hover:text-red-200" data-filter-id="${filter.id}">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            
-            // Ajouter l'élément à la liste des filtres actifs
-            activeFilters.appendChild(filterElement);
-            
             // Cacher le formulaire d'ajout de filtre
             filterForm.classList.add('hidden');
-            
-            // Afficher le bouton de suppression totale s'il y a au moins un filtre
-            clearAllFiltersBtn.classList.remove('hidden');
             
             // Appliquer les filtres
             applyFilters();
         }
         
-        // Fonction pour supprimer un filtre actif
-        function removeFilter(filterId) {
-            // Supprimer de la liste des filtres actifs
-            activeFiltersList = activeFiltersList.filter(f => f.id.toString() !== filterId.toString());
-            
-            // Supprimer l'élément visuel
-            const filterElement = activeFilters.querySelector(`[data-filter-id="${filterId}"]`);
-            if (filterElement) {
-                filterElement.remove();
-            }
-            
-            // Masquer le bouton de suppression totale s'il n'y a plus de filtres
-            if (activeFiltersList.length === 0) {
-                clearAllFiltersBtn.classList.add('hidden');
-            }
-            
-            // Appliquer les filtres mis à jour
-            applyFilters();
-        }
-        
-        // Fonction pour appliquer tous les filtres actifs
+        // Modifier la fonction applyFilters pour vérifier les doublons avant d'appliquer
         function applyFilters() {
             const tableId = `geocaches-table-{{ zone_id }}`;
             const table = window[`tabulator_${tableId}`];
             if (!table) return;
+            
+            // Nettoyer les filtres dupliqués avant d'appliquer
+            activeFiltersList = cleanupActiveFilters();
+            
+            // Mettre à jour l'affichage des filtres
+            renderActiveFilters();
             
             // Obtenir les valeurs des filtres simples (recherche, statut, type)
             const textFilter = tableFilter.value.toLowerCase();
@@ -1189,17 +1238,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             }
                             
                             // Pour les filtres d'égalité, qui sont les plus courants
-                            if (filter.operator === "eq" && dataValue != comparisonValue) {
+                            if (filter.operator === "eq" && dataValue !== comparisonValue) {
                                 return false;
                             }
                         }
                         return true;
                     });
                     
-                    console.log(`Vérification manuelle: ${matches.length} correspondances trouvées.`);
-                    if (matches.length > 0) {
-                        console.log("Exemples de correspondances:", matches.slice(0, 3));
-                    }
+                    console.log(`Vérification manuelle: ${matches.length} correspondances trouvées`);
                 }
             }, 100);
         }
@@ -2044,7 +2090,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
                 // Ajouter les zones comme options
                 zones.forEach(zone => {
-                    if (zone.id != {{ zone_id }}) { // Exclure la zone actuelle
+                    if (zone.id != "{{ zone_id }}") { // Exclure la zone actuelle
                         const option = document.createElement('option');
                         option.value = zone.id;
                         option.textContent = zone.name;
@@ -2851,5 +2897,57 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
             });
         }
+
+        // Gestion des filtres prédéfinis (boutons rapides)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Rechercher tous les boutons de filtre rapide
+            const quickFilterButtons = document.querySelectorAll('[id^="quick-filter-"]');
+            
+            // Supprimer les gestionnaires d'événements existants pour éviter les doublons
+            quickFilterButtons.forEach(button => {
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
+            });
+            
+            // Réattacher les gestionnaires d'événements
+            document.querySelectorAll('[id^="quick-filter-"]').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    // Extraire les informations du filtre depuis l'ID du bouton
+                    const filterId = this.id;
+                    const parts = filterId.split('-');
+                    if (parts.length >= 4) {
+                        const field = parts[2];
+                        const value = parts[3];
+                        
+                        // Vérifier si ce filtre existe déjà
+                        const filterExists = activeFiltersList.some(filter => 
+                            filter.field === field && 
+                            filter.operator === 'eq' && 
+                            filter.value === value
+                        );
+                        
+                        if (!filterExists) {
+                            // Créer et ajouter le filtre
+                            const fieldDef = fieldDefinitions[field];
+                            if (fieldDef) {
+                                const filter = {
+                                    id: Date.now(),
+                                    field: field,
+                                    operator: 'eq',
+                                    value: value,
+                                    displayText: `${fieldDef.label} Égal à ${value}`
+                                };
+                                
+                                // Ajouter à la liste des filtres actifs
+                                activeFiltersList.push(filter);
+                                
+                                // Appliquer les filtres
+                                applyFilters();
+                            }
+                        }
+                    }
+                });
+            });
+        });
     })();
 </script>
