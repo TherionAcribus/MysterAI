@@ -1077,7 +1077,7 @@
         
         // Charger les plugins
         const pluginContainer = document.getElementById('plugin-list-container');
-        fetchPlugins(pluginContainer);
+            fetchPlugins(pluginContainer);
         
         // Vérifier la présence de l'interface de la carte
         checkMapInterface();
