@@ -1235,6 +1235,8 @@ def import_gpx():
                 total_errors = 0
                 
                 # Vérifier le type de fichier
+                current_app.logger.info(f"Traitement du fichier: {uploaded_file.filename}, type: {uploaded_file.content_type}")
+                
                 if uploaded_file.filename.lower().endswith('.zip'):
                     yield json.dumps({'message': 'Extraction du fichier ZIP...'}) + '\n'
                     
@@ -1250,6 +1252,7 @@ def import_gpx():
                         # Extraire les fichiers GPX du ZIP
                         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                             file_list = zip_ref.namelist()
+                            current_app.logger.info(f"Contenu du ZIP: {file_list}")
                             
                             # Identifier les fichiers GPX et les fichiers de waypoints
                             for filename in file_list:
@@ -1261,11 +1264,14 @@ def import_gpx():
                                     
                                     # Déterminer si c'est un fichier de waypoints
                                     if '-wpts' in filename.lower():
+                                        current_app.logger.info(f"Fichier de waypoints détecté: {filename}")
                                         waypoints_files.append(extracted_path)
                                     else:
+                                        current_app.logger.info(f"Fichier GPX principal détecté: {filename}")
                                         gpx_files.append(extracted_path)
                         
                         if not gpx_files and not waypoints_files:
+                            current_app.logger.warning("Aucun fichier GPX trouvé dans l'archive ZIP")
                             yield json.dumps({'error': True, 'message': 'Aucun fichier GPX trouvé dans l\'archive ZIP'}) + '\n'
                             return
                             
@@ -1300,9 +1306,12 @@ def import_gpx():
                         for wp_file_path in waypoints_files:
                             try:
                                 yield json.dumps({'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...'}) + '\n'
+                                current_app.logger.info(f"Début du traitement du fichier de waypoints: {wp_file_path}")
                                 
                                 # Traiter le fichier de waypoints
                                 file_stats = process_waypoints_file(wp_file_path, zone_id)
+                                
+                                current_app.logger.info(f"Résultat du traitement: {file_stats}")
                                 
                                 # Mettre à jour les statistiques globales
                                 total_waypoints_added += file_stats['waypoints']
@@ -1316,6 +1325,8 @@ def import_gpx():
                                 
                             except Exception as e:
                                 current_app.logger.error(f"Erreur lors du traitement du fichier de waypoints {wp_file_path}: {str(e)}")
+                                import traceback
+                                current_app.logger.error(traceback.format_exc())
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(wp_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
                 
@@ -1331,8 +1342,10 @@ def import_gpx():
                         
                         # Déterminer si c'est un fichier de waypoints
                         if '-wpts' in uploaded_file.filename.lower():
+                            current_app.logger.info(f"Fichier GPX de waypoints détecté: {uploaded_file.filename}")
                             waypoints_files.append(gpx_path)
                         else:
+                            current_app.logger.info(f"Fichier GPX principal détecté: {uploaded_file.filename}")
                             gpx_files.append(gpx_path)
                             
                         # Traiter d'abord les fichiers GPX principaux
@@ -1364,9 +1377,12 @@ def import_gpx():
                         for wp_file_path in waypoints_files:
                             try:
                                 yield json.dumps({'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...'}) + '\n'
+                                current_app.logger.info(f"Début du traitement du fichier de waypoints: {wp_file_path}")
                                 
                                 # Traiter le fichier de waypoints
                                 file_stats = process_waypoints_file(wp_file_path, zone_id)
+                                
+                                current_app.logger.info(f"Résultat du traitement: {file_stats}")
                                 
                                 # Mettre à jour les statistiques globales
                                 total_waypoints_added += file_stats['waypoints']
@@ -1380,13 +1396,17 @@ def import_gpx():
                                 
                             except Exception as e:
                                 current_app.logger.error(f"Erreur lors du traitement du fichier de waypoints {wp_file_path}: {str(e)}")
+                                import traceback
+                                current_app.logger.error(traceback.format_exc())
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(wp_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
                 else:
+                    current_app.logger.warning(f"Format de fichier non pris en charge: {uploaded_file.filename}")
                     yield json.dumps({'error': True, 'message': 'Format de fichier non pris en charge. Utilisez .gpx ou .zip'}) + '\n'
                     return
                 
                 # Envoyer un résumé final
+                current_app.logger.info(f"Importation terminée: {total_geocaches_added} géocaches ajoutées, {total_waypoints_added} waypoints additionnels")
                 yield json.dumps({
                     'progress': 100,
                     'message': f'Importation terminée: {total_geocaches_added} géocaches ajoutées, {total_waypoints_added} waypoints additionnels, {total_geocaches_skipped} géocaches ignorées, {total_errors} erreurs'
@@ -1394,6 +1414,8 @@ def import_gpx():
                 
             except Exception as e:
                 current_app.logger.error(f"Erreur lors de l'importation: {str(e)}")
+                import traceback
+                current_app.logger.error(traceback.format_exc())
                 yield json.dumps({'error': True, 'message': f'Erreur: {str(e)}'}) + '\n'
         
         # Retourner la réponse en streaming
@@ -1402,6 +1424,8 @@ def import_gpx():
         
     except Exception as e:
         current_app.logger.error(f"Erreur lors de l'importation: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 
@@ -1684,18 +1708,27 @@ def process_waypoints_file(wp_file_path, zone_id):
                     continue
                     
                 waypoint_code = name_elem.text.strip()
+                current_app.logger.debug(f"Analyse du waypoint: {waypoint_code}")
                 
-                # Vérifier si c'est un waypoint additionnel
-                if re.match(r'[A-Z0-9]+', waypoint_code):
-                    # Pour les waypoints additionnels, le format peut varier
-                    # Essayer d'extraire le code GC à partir du nom ou d'autres attributs
+                # Vérifier si le code a le bon format (au moins 2 caractères)
+                if len(waypoint_code) >= 2:
                     gc_code = None
                     
-                    # Méthode 1: Extraire du code (format GC12345-PARKING)
-                    if '-' in waypoint_code and waypoint_code.split('-')[0].startswith('GC'):
-                        gc_code = waypoint_code.split('-')[0]
+                    # Méthode 1: Convertir les codes au format Pxxxx ou autres en GCxxxx
+                    # En remplaçant simplement les deux premiers caractères par "GC"
+                    if not waypoint_code.startswith('GC'):
+                        gc_code = "GC" + waypoint_code[2:]
+                        current_app.logger.debug(f"Conversion du code {waypoint_code} en {gc_code}")
                     
-                    # Méthode 2: Chercher dans la description ou les commentaires
+                    # Méthode 2: Les codes qui commencent déjà par GC sont gardés tels quels
+                    elif waypoint_code.startswith('GC'):
+                        gc_code = waypoint_code
+                        
+                        # Si c'est un waypoint additionnel (format GC12345-suffix), extraire le code GC principal
+                        if '-' in gc_code:
+                            gc_code = gc_code.split('-')[0]
+                    
+                    # Méthode 3 (fallback): Chercher dans la description ou les commentaires
                     if not gc_code:
                         desc_elem = waypoint.find('default:desc', ns)
                         if desc_elem is not None and desc_elem.text:
@@ -1704,7 +1737,7 @@ def process_waypoints_file(wp_file_path, zone_id):
                             if match:
                                 gc_code = match.group(0)
                     
-                    # Méthode 3: Chercher dans les commentaires
+                    # Méthode 4 (fallback): Chercher dans les commentaires
                     if not gc_code:
                         cmt_elem = waypoint.find('default:cmt', ns)
                         if cmt_elem is not None and cmt_elem.text:
@@ -1714,21 +1747,60 @@ def process_waypoints_file(wp_file_path, zone_id):
                     
                     # Si on a trouvé un code GC, ajouter le waypoint au dictionnaire
                     if gc_code:
+                        current_app.logger.debug(f"Waypoint {waypoint_code} associé à la géocache {gc_code}")
                         if gc_code not in waypoints_by_gc:
                             waypoints_by_gc[gc_code] = []
                         waypoints_by_gc[gc_code].append(waypoint)
+                    else:
+                        current_app.logger.warning(f"Impossible de trouver le code GC pour le waypoint {waypoint_code}")
             except Exception as e:
-                current_app.logger.error(f"Erreur lors de l'analyse du waypoint {waypoint_code}: {str(e)}")
+                current_app.logger.error(f"Erreur lors de l'analyse du waypoint {waypoint_code if 'waypoint_code' in locals() else 'inconnu'}: {str(e)}")
                 stats['errors'] += 1
+        
+        current_app.logger.info(f"Waypoints regroupés: {len(waypoints_by_gc)} codes GC différents")
+        for gc, wps in waypoints_by_gc.items():
+            current_app.logger.info(f"  - {gc}: {len(wps)} waypoints")
+        
+        # Récupérer la zone
+        zone = Zone.query.get(zone_id)
+        if not zone:
+            current_app.logger.error(f"Zone {zone_id} non trouvée")
+            return stats
         
         # Traiter les waypoints pour chaque géocache
         for gc_code, wpts in waypoints_by_gc.items():
             try:
-                # Vérifier si la géocache existe dans la zone spécifiée
-                geocache = Geocache.query.filter_by(gc_code=gc_code, zone_id=zone_id).first()
+                # Debug: Vérifier si la géocache existe dans la base de données
+                existing_geocache_check = Geocache.query.filter_by(gc_code=gc_code).first()
+                if existing_geocache_check:
+                    current_app.logger.info(f"Géocache {gc_code} existe dans la base de données (ID: {existing_geocache_check.id})")
+                    
+                    # Debug: Vérifier les zones associées
+                    associated_zones = [z.id for z in existing_geocache_check.zones]
+                    current_app.logger.info(f"Zones associées à {gc_code}: {associated_zones}")
+                else:
+                    current_app.logger.warning(f"Géocache {gc_code} n'existe pas dans la base de données")
+                
+                # Vérifier si la géocache existe et est associée à la zone spécifiée
+                geocache = Geocache.query.filter_by(gc_code=gc_code).filter(
+                    Geocache.zones.any(id=zone_id)
+                ).first()
+                
                 if not geocache:
-                    current_app.logger.info(f'Géocache {gc_code} non trouvée dans la zone {zone_id}, waypoints ignorés')
-                    continue
+                    current_app.logger.warning(f'Géocache {gc_code} non trouvée dans la zone {zone_id}, waypoints ignorés')
+                    
+                    # Option de fallback: vérifier si la géocache existe même sans être associée à cette zone
+                    geocache_anywhere = Geocache.query.filter_by(gc_code=gc_code).first()
+                    if geocache_anywhere:
+                        current_app.logger.info(f'Géocache {gc_code} trouvée mais pas associée à la zone {zone_id}, ajout de la relation...')
+                        # Associer la géocache à la zone actuelle
+                        geocache_anywhere.zones.append(zone)
+                        db.session.commit()
+                        geocache = geocache_anywhere
+                    else:
+                        continue
+                
+                current_app.logger.info(f"Traitement de {len(wpts)} waypoints pour {gc_code}")
                 
                 # Traiter les waypoints pour cette géocache
                 waypoints_added = process_additional_waypoints(geocache, wpts, ns)
@@ -1753,6 +1825,8 @@ def process_additional_waypoints(geocache, waypoints, ns):
     waypoints_added = 0
     
     try:
+        current_app.logger.info(f"Traitement de {len(waypoints)} waypoints additionnels pour {geocache.gc_code}")
+        
         for wp in waypoints:
             try:
                 wp_lat = float(wp.attrib.get('lat', 0))
@@ -1763,8 +1837,16 @@ def process_additional_waypoints(geocache, waypoints, ns):
                 wp_desc = wp.find('default:desc', ns)
                 wp_name = wp_desc.text if wp_desc is not None else wp_code
                 
-                # Extraire le préfixe (partie après le tiret)
-                prefix = wp_code.split('-')[1] if '-' in wp_code else ""
+                current_app.logger.debug(f"Waypoint: {wp_code}, Nom: {wp_name}, Coords: {wp_lat},{wp_lon}")
+                
+                # Extraire le préfixe (les deux premiers caractères du code)
+                prefix = wp_code[:2] if len(wp_code) >= 2 else ""
+                
+                # Si c'est au format GCxxxx-SUFFIX, extraire le suffixe après le tiret
+                if wp_code.startswith('GC') and '-' in wp_code:
+                    prefix = wp_code.split('-')[1]
+                
+                current_app.logger.debug(f"Préfixe extrait: {prefix}")
                 
                 # Extraire la note (commentaire)
                 wp_cmt = wp.find('default:cmt', ns)
@@ -1777,9 +1859,11 @@ def process_additional_waypoints(geocache, waypoints, ns):
                 ).first()
                 
                 if existing_wp:
+                    current_app.logger.debug(f"Mise à jour du waypoint existant {wp_code}")
                     # Mettre à jour le waypoint existant
                     existing_wp.name = wp_name
                     existing_wp.note = note
+                    existing_wp.prefix = prefix
                     
                     # Convertir les coordonnées en format GC
                     wp_lat_deg = int(wp_lat)
@@ -1793,6 +1877,7 @@ def process_additional_waypoints(geocache, waypoints, ns):
                     # Mettre à jour la position
                     existing_wp.set_location(wp_lat, wp_lon, gc_lat=wp_gc_lat, gc_lon=wp_gc_lon)
                 else:
+                    current_app.logger.debug(f"Création d'un nouveau waypoint {wp_code}")
                     # Convertir les coordonnées en format GC
                     wp_lat_deg = int(wp_lat)
                     wp_lat_min = abs(wp_lat - wp_lat_deg) * 60
@@ -1816,19 +1901,30 @@ def process_additional_waypoints(geocache, waypoints, ns):
                     
                     # Ajouter le waypoint à la base de données
                     db.session.add(waypoint)
+                    current_app.logger.debug(f"Waypoint {wp_code} ajouté à la base de données")
                 
                 waypoints_added += 1
                 
             except Exception as e:
-                current_app.logger.error(f"Erreur lors du traitement du waypoint additionnel: {str(e)}")
+                current_app.logger.error(f"Erreur lors du traitement du waypoint additionnel {wp_code if 'wp_code' in locals() else 'inconnu'}: {str(e)}")
+                # Ajouter la traceback complète pour un meilleur diagnostic
+                import traceback
+                current_app.logger.error(traceback.format_exc())
         
         # Commit après avoir ajouté tous les waypoints
-        db.session.commit()
+        if waypoints_added > 0:
+            current_app.logger.info(f"Commit de {waypoints_added} waypoints pour {geocache.gc_code}")
+            db.session.commit()
+        else:
+            current_app.logger.warning(f"Aucun waypoint ajouté pour {geocache.gc_code}")
         
         return waypoints_added
         
     except Exception as e:
         current_app.logger.error(f"Erreur lors du traitement des waypoints additionnels: {str(e)}")
+        # Ajouter la traceback complète pour un meilleur diagnostic
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         db.session.rollback()
         raise
 
