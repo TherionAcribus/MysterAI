@@ -703,7 +703,29 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     return response;
                 },
                 columns: [
-                    { title: "GC Code", field: "gc_code", headerSort: true },
+                    { title: "GC Code", field: "gc_code", headerSort: true, 
+                      formatter: function(cell) {
+                          const row = cell.getRow();
+                          const data = row.getData();
+                          const geocacheId = data.id;
+                          const gcCode = data.gc_code;
+                          const name = data.name;
+                          
+                          // Échapper les caractères spéciaux pour JavaScript
+                          const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
+                          const escapedName = name.replace(/['\\]/g, '\\$&');
+                          
+                          return `<a href="javascript:void(0)" 
+                                    class="text-blue-500 hover:text-blue-300 hover:underline"
+                                    onclick="window.parent.postMessage({ 
+                                      type: 'openGeocacheDetails', 
+                                      geocacheId: ${geocacheId},
+                                      gcCode: '${escapedGcCode}',
+                                      name: '${escapedName}'
+                                    }, '*')"
+                                 >${gcCode}</a>`;
+                      }
+                    },
                     { title: "Nom", field: "name", headerSort: true },
                     { title: "Type", field: "cache_type", headerSort: true },
                     { title: "Difficulté", field: "difficulty", headerSort: true },
