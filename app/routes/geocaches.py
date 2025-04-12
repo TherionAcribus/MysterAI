@@ -1233,12 +1233,14 @@ def import_gpx():
                 total_geocaches_skipped = 0
                 total_waypoints_added = 0
                 total_errors = 0
+                total_files = 0
+                processed_files = 0
                 
                 # Vérifier le type de fichier
                 current_app.logger.info(f"Traitement du fichier: {uploaded_file.filename}, type: {uploaded_file.content_type}")
                 
                 if uploaded_file.filename.lower().endswith('.zip'):
-                    yield json.dumps({'message': 'Extraction du fichier ZIP...'}) + '\n'
+                    yield json.dumps({'message': 'Extraction du fichier ZIP...', 'progress': 5}) + '\n'
                     
                     # Créer un fichier temporaire pour le ZIP
                     with tempfile.TemporaryDirectory() as temp_dir:
@@ -1270,20 +1272,32 @@ def import_gpx():
                                         current_app.logger.info(f"Fichier GPX principal détecté: {filename}")
                                         gpx_files.append(extracted_path)
                         
+                        total_files = len(gpx_files) + len(waypoints_files)
+                        
                         if not gpx_files and not waypoints_files:
                             current_app.logger.warning("Aucun fichier GPX trouvé dans l'archive ZIP")
                             yield json.dumps({'error': True, 'message': 'Aucun fichier GPX trouvé dans l\'archive ZIP'}) + '\n'
                             return
                             
-                        yield json.dumps({'message': f'Fichiers trouvés: {len(gpx_files)} fichiers GPX, {len(waypoints_files)} fichiers de waypoints'}) + '\n'
+                        yield json.dumps({
+                            'message': f'Fichiers trouvés: {len(gpx_files)} fichiers GPX, {len(waypoints_files)} fichiers de waypoints',
+                            'progress': 10
+                        }) + '\n'
                         
                         # Traiter d'abord les fichiers GPX principaux
-                        for gpx_file_path in gpx_files:
+                        for i, gpx_file_path in enumerate(gpx_files):
                             try:
-                                yield json.dumps({'message': f'Traitement du fichier {os.path.basename(gpx_file_path)}...'}) + '\n'
+                                # Calculer la progression en fonction du nombre total de fichiers
+                                progress = 10 + int((i / total_files) * 85) if total_files > 0 else 10
+                                
+                                yield json.dumps({
+                                    'message': f'Traitement du fichier {os.path.basename(gpx_file_path)}...',
+                                    'progress': progress
+                                }) + '\n'
                                 
                                 # Traiter le fichier GPX
                                 file_stats = process_gpx_file(gpx_file_path, zone_id, update_existing)
+                                processed_files += 1
                                 
                                 # Mettre à jour les statistiques globales
                                 total_geocaches_added += file_stats['added']
@@ -1291,9 +1305,12 @@ def import_gpx():
                                 total_waypoints_added += file_stats['waypoints']
                                 total_errors += file_stats['errors']
                                 
+                                # Calculer la progression mise à jour
+                                progress = 10 + int((processed_files / total_files) * 85) if total_files > 0 else 50
+                                
                                 # Envoyer un message de progression
                                 yield json.dumps({
-                                    'progress': 50,  # Progression approximative
+                                    'progress': progress,
                                     'message': f"Fichier {os.path.basename(gpx_file_path)} traité: {file_stats['added']} géocaches ajoutées, {file_stats['waypoints']} waypoints"
                                 }) + '\n'
                                 
@@ -1301,15 +1318,24 @@ def import_gpx():
                                 current_app.logger.error(f"Erreur lors du traitement du fichier GPX {gpx_file_path}: {str(e)}")
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(gpx_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
+                                processed_files += 1
                         
                         # Traiter ensuite les fichiers de waypoints additionnels
-                        for wp_file_path in waypoints_files:
+                        for i, wp_file_path in enumerate(waypoints_files):
                             try:
-                                yield json.dumps({'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...'}) + '\n'
+                                # Calculer la progression en fonction du nombre total de fichiers
+                                progress = 10 + int(((len(gpx_files) + i) / total_files) * 85) if total_files > 0 else 75
+                                
+                                yield json.dumps({
+                                    'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...',
+                                    'progress': progress
+                                }) + '\n'
+                                
                                 current_app.logger.info(f"Début du traitement du fichier de waypoints: {wp_file_path}")
                                 
                                 # Traiter le fichier de waypoints
                                 file_stats = process_waypoints_file(wp_file_path, zone_id)
+                                processed_files += 1
                                 
                                 current_app.logger.info(f"Résultat du traitement: {file_stats}")
                                 
@@ -1317,9 +1343,12 @@ def import_gpx():
                                 total_waypoints_added += file_stats['waypoints']
                                 total_errors += file_stats['errors']
                                 
+                                # Calculer la progression mise à jour
+                                progress = 10 + int((processed_files / total_files) * 85) if total_files > 0 else 85
+                                
                                 # Envoyer un message de progression
                                 yield json.dumps({
-                                    'progress': 75,  # Progression approximative
+                                    'progress': progress,
                                     'message': f"Fichier {os.path.basename(wp_file_path)} traité: {file_stats['waypoints']} waypoints ajoutés"
                                 }) + '\n'
                                 
@@ -1329,6 +1358,7 @@ def import_gpx():
                                 current_app.logger.error(traceback.format_exc())
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(wp_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
+                                processed_files += 1
                 
                 elif uploaded_file.filename.lower().endswith('.gpx'):
                     # Variables pour stocker les fichiers GPX
@@ -1347,14 +1377,23 @@ def import_gpx():
                         else:
                             current_app.logger.info(f"Fichier GPX principal détecté: {uploaded_file.filename}")
                             gpx_files.append(gpx_path)
+                        
+                        total_files = len(gpx_files) + len(waypoints_files)
                             
                         # Traiter d'abord les fichiers GPX principaux
-                        for gpx_file_path in gpx_files:
+                        for i, gpx_file_path in enumerate(gpx_files):
                             try:
-                                yield json.dumps({'message': f'Traitement du fichier {os.path.basename(gpx_file_path)}...'}) + '\n'
+                                # Calculer la progression en fonction du nombre total de fichiers
+                                progress = 10 + int((i / total_files) * 85) if total_files > 0 else 25
+                                
+                                yield json.dumps({
+                                    'message': f'Traitement du fichier {os.path.basename(gpx_file_path)}...',
+                                    'progress': progress
+                                }) + '\n'
                                 
                                 # Traiter le fichier GPX
                                 file_stats = process_gpx_file(gpx_file_path, zone_id, update_existing)
+                                processed_files += 1
                                 
                                 # Mettre à jour les statistiques globales
                                 total_geocaches_added += file_stats['added']
@@ -1362,9 +1401,12 @@ def import_gpx():
                                 total_waypoints_added += file_stats['waypoints']
                                 total_errors += file_stats['errors']
                                 
+                                # Calculer la progression mise à jour
+                                progress = 10 + int((processed_files / total_files) * 85) if total_files > 0 else 60
+                                
                                 # Envoyer un message de progression
                                 yield json.dumps({
-                                    'progress': 50,  # Progression approximative
+                                    'progress': progress,
                                     'message': f"Fichier {os.path.basename(gpx_file_path)} traité: {file_stats['added']} géocaches ajoutées, {file_stats['waypoints']} waypoints"
                                 }) + '\n'
                                 
@@ -1372,15 +1414,24 @@ def import_gpx():
                                 current_app.logger.error(f"Erreur lors du traitement du fichier GPX {gpx_file_path}: {str(e)}")
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(gpx_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
+                                processed_files += 1
                         
                         # Traiter ensuite les fichiers de waypoints additionnels
-                        for wp_file_path in waypoints_files:
+                        for i, wp_file_path in enumerate(waypoints_files):
                             try:
-                                yield json.dumps({'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...'}) + '\n'
+                                # Calculer la progression en fonction du nombre total de fichiers
+                                progress = 10 + int(((len(gpx_files) + i) / total_files) * 85) if total_files > 0 else 75
+                                
+                                yield json.dumps({
+                                    'message': f'Traitement du fichier de waypoints {os.path.basename(wp_file_path)}...',
+                                    'progress': progress
+                                }) + '\n'
+                                
                                 current_app.logger.info(f"Début du traitement du fichier de waypoints: {wp_file_path}")
                                 
                                 # Traiter le fichier de waypoints
                                 file_stats = process_waypoints_file(wp_file_path, zone_id)
+                                processed_files += 1
                                 
                                 current_app.logger.info(f"Résultat du traitement: {file_stats}")
                                 
@@ -1388,9 +1439,12 @@ def import_gpx():
                                 total_waypoints_added += file_stats['waypoints']
                                 total_errors += file_stats['errors']
                                 
+                                # Calculer la progression mise à jour
+                                progress = 10 + int((processed_files / total_files) * 85) if total_files > 0 else 85
+                                
                                 # Envoyer un message de progression
                                 yield json.dumps({
-                                    'progress': 75,  # Progression approximative
+                                    'progress': progress,
                                     'message': f"Fichier {os.path.basename(wp_file_path)} traité: {file_stats['waypoints']} waypoints ajoutés"
                                 }) + '\n'
                                 
@@ -1400,16 +1454,31 @@ def import_gpx():
                                 current_app.logger.error(traceback.format_exc())
                                 yield json.dumps({'error': True, 'message': f'Erreur lors du traitement du fichier {os.path.basename(wp_file_path)}: {str(e)}'}) + '\n'
                                 total_errors += 1
+                                processed_files += 1
                 else:
                     current_app.logger.warning(f"Format de fichier non pris en charge: {uploaded_file.filename}")
                     yield json.dumps({'error': True, 'message': 'Format de fichier non pris en charge. Utilisez .gpx ou .zip'}) + '\n'
                     return
                 
-                # Envoyer un résumé final
+                # Construire le message de résumé
+                summary_message = f'Importation terminée: {total_geocaches_added} géocaches ajoutées, {total_waypoints_added} waypoints additionnels'
+                if total_geocaches_skipped > 0:
+                    summary_message += f', {total_geocaches_skipped} géocaches ignorées'
+                if total_errors > 0:
+                    summary_message += f', {total_errors} erreurs'
+                
+                # Envoyer un résumé final avec un flag spécial pour indiquer que c'est le dernier message
                 current_app.logger.info(f"Importation terminée: {total_geocaches_added} géocaches ajoutées, {total_waypoints_added} waypoints additionnels")
                 yield json.dumps({
                     'progress': 100,
-                    'message': f'Importation terminée: {total_geocaches_added} géocaches ajoutées, {total_waypoints_added} waypoints additionnels, {total_geocaches_skipped} géocaches ignorées, {total_errors} erreurs'
+                    'message': summary_message,
+                    'final_summary': True,  # Ce flag permet au frontend de savoir que c'est le résumé final à conserver
+                    'stats': {
+                        'geocaches_added': total_geocaches_added,
+                        'geocaches_skipped': total_geocaches_skipped,
+                        'waypoints_added': total_waypoints_added,
+                        'errors': total_errors
+                    }
                 }) + '\n'
                 
             except Exception as e:

@@ -1931,7 +1931,16 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         importGpxForm.addEventListener('submit', async function(event) {
             event.preventDefault();
             
+            // Référencer le bouton de soumission du formulaire
+            const submitButton = importGpxForm.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.textContent || "Importer";
+            
             try {
+                // Désactiver le bouton et changer son apparence
+                submitButton.disabled = true;
+                submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                submitButton.textContent = "Importation en cours...";
+                
                 // Afficher l'indicateur de chargement
                 importLoadingIndicator.classList.remove('hidden');
                 importProgress.classList.remove('hidden');
@@ -1985,6 +1994,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                     if (data.message) {
                                         importMessage.textContent = data.message;
                                         importMessage.className = data.error ? 'text-red-500' : 'text-green-500';
+                                        
+                                        // Sauvegarder le résumé final s'il est présent
+                                        if (data.final_summary) {
+                                            // Stocker le résumé final dans une variable ou un attribut data
+                                            importMessage.dataset.finalSummary = data.message;
+                                        }
                                     }
                                 } catch (e) {
                                     console.error('Erreur de parsing JSON:', e, line);
@@ -2000,13 +2015,47 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 await reloadTable();
                 
                 // Afficher le message final
-                importMessage.textContent = 'Importation terminée avec succès !';
+                // Si nous avons un résumé final sauvegardé, l'utiliser
+                if (importMessage.dataset.finalSummary) {
+                    importMessage.textContent = importMessage.dataset.finalSummary;
+                } else {
+                    importMessage.textContent = 'Importation terminée avec succès !';
+                }
                 importMessage.className = 'text-green-500';
+                
+                // Transformer le bouton en bouton "Fermer"
+                submitButton.textContent = "Fermer";
+                submitButton.disabled = false;
+                submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitButton.classList.add('bg-gray-500', 'hover:bg-gray-700');
+                
+                // Changer l'action du bouton pour fermer la modale au lieu de soumettre le formulaire
+                submitButton.type = "button";
+                submitButton.addEventListener('click', function closeModalHandler() {
+                    const elements = getModalElements();
+                    if (elements && elements.importGpxModal) {
+                        elements.importGpxModal.classList.add('hidden');
+                    }
+                    
+                    // Réinitialiser le bouton après la fermeture
+                    setTimeout(() => {
+                        submitButton.textContent = originalButtonText;
+                        submitButton.type = "submit";
+                        submitButton.classList.remove('bg-gray-500', 'hover:bg-gray-700');
+                        // Supprimer ce gestionnaire d'événement unique
+                        submitButton.removeEventListener('click', closeModalHandler);
+                    }, 100);
+                }, { once: true });
                 
             } catch (error) {
                 console.error('Erreur:', error);
                 importMessage.textContent = 'Une erreur est survenue lors de l\'importation';
                 importMessage.className = 'text-red-500';
+                
+                // Réactiver le bouton en cas d'erreur
+                submitButton.disabled = false;
+                submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitButton.textContent = originalButtonText;
             } finally {
                 // Cacher l'indicateur de chargement
                 importLoadingIndicator.classList.add('hidden');
