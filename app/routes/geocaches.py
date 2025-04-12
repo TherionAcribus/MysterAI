@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
 import json
-from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner
+from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner, Log
 from app.database import db
 from app.utils.geocache_scraper import scrape_geocache
 from shapely.geometry import Point
@@ -1518,6 +1518,7 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
         'added': 0,
         'skipped': 0,
         'waypoints': 0,
+        'logs': 0,
         'errors': 0
     }
     
@@ -1612,12 +1613,18 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                         stats['added'] += 1
                         current_app.logger.info(f'Zone {zone_id} ajoutée à la géocache {gc_code}')
                     
-                    # Si update_existing est True, on traite les waypoints même si la géocache existe déjà
+                    # Si update_existing est True, on traite les waypoints et les logs même si la géocache existe déjà
                     if update_existing:
                         # Traiter les waypoints additionnels pour cette géocache
                         if gc_code in additional_waypoints:
                             waypoints_added = process_additional_waypoints(existing_geocache, additional_waypoints[gc_code], ns)
                             stats['waypoints'] += waypoints_added
+                        
+                        # Traiter les logs de cette géocache
+                        cache_data = waypoint.find('groundspeak:cache', ns)
+                        if cache_data is not None:
+                            logs_added = process_logs(existing_geocache, cache_data, ns)
+                            stats['logs'] += logs_added
                     
                     continue
                 
@@ -1686,7 +1693,7 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                     logs = logs_elem.findall('groundspeak:log', ns)
                     logs_count = len(logs)
                     
-                    # Compter les favoris (logs de type "Favorite")
+                    # Compter les favoris (logs de type "Found it")
                     for log in logs:
                         log_type = log.find('groundspeak:type', ns)
                         if log_type is not None and log_type.text == 'Found it':
@@ -1746,6 +1753,10 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                 if gc_code in additional_waypoints:
                     waypoints_added = process_additional_waypoints(geocache, additional_waypoints[gc_code], ns)
                     stats['waypoints'] += waypoints_added
+                
+                # Traiter les logs pour cette géocache
+                logs_added = process_logs(geocache, cache_data, ns)
+                stats['logs'] += logs_added
                     
             except Exception as e:
                 current_app.logger.error(f"Erreur lors du traitement de la géocache {index}: {str(e)}")
@@ -1758,6 +1769,94 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
     except Exception as e:
         current_app.logger.error(f"Erreur lors du traitement du fichier GPX: {str(e)}")
         raise
+
+def process_logs(geocache, cache_data, ns):
+    """Traite les logs pour une géocache à partir des données GPX."""
+    logs_added = 0
+    
+    try:
+        # Récupérer les logs existants pour cette géocache
+        existing_log_dates = {log.date.strftime('%Y-%m-%d'): log for log in geocache.logs}
+        
+        # Rechercher les logs dans les données de la cache
+        logs_elem = cache_data.find('groundspeak:logs', ns)
+        if logs_elem is None:
+            return logs_added
+            
+        logs = logs_elem.findall('groundspeak:log', ns)
+        
+        for log in logs:
+            try:
+                # Extraire la date du log
+                date_elem = log.find('groundspeak:date', ns)
+                if date_elem is None or not date_elem.text:
+                    continue
+                    
+                # Format de date ISO: 2025-03-08T20:00:00Z
+                log_date_str = date_elem.text
+                log_date = datetime.fromisoformat(log_date_str.replace('Z', '+00:00'))
+                log_date_key = log_date.strftime('%Y-%m-%d')
+                
+                # Extraire le type de log (Found it, DNF, etc.)
+                type_elem = log.find('groundspeak:type', ns)
+                log_type = type_elem.text if type_elem is not None else "Unknown"
+                
+                # Extraire l'auteur du log
+                finder_elem = log.find('groundspeak:finder', ns)
+                if finder_elem is None:
+                    continue
+                    
+                author_name = finder_elem.text
+                
+                # Extraire le texte du log
+                text_elem = log.find('groundspeak:text', ns)
+                log_text = text_elem.text if text_elem is not None else ""
+                
+                # Vérifier si ce log a un favori
+                is_favorite = False
+                if 'favorite_points' in log.attrib and int(log.attrib.get('favorite_points', '0')) > 0:
+                    is_favorite = True
+                
+                # Vérifier si ce log existe déjà (même date et auteur)
+                if log_date_key in existing_log_dates:
+                    # Le log existe déjà, on ne fait rien
+                    continue
+                
+                # Trouver ou créer l'auteur
+                author = Owner.query.filter_by(name=author_name).first()
+                if not author:
+                    author = Owner(name=author_name)
+                    db.session.add(author)
+                    db.session.flush()
+                
+                # Créer le nouveau log
+                new_log = Log(
+                    geocache_id=geocache.id,
+                    author_id=author.id,
+                    text=log_text,
+                    date=log_date,
+                    log_type=log_type,
+                    favorite=is_favorite
+                )
+                
+                # Ajouter le log à la base de données
+                db.session.add(new_log)
+                logs_added += 1
+                
+            except Exception as e:
+                current_app.logger.error(f"Erreur lors du traitement d'un log: {str(e)}")
+        
+        # Committer tous les logs ajoutés
+        if logs_added > 0:
+            db.session.commit()
+            current_app.logger.info(f"{logs_added} logs ajoutés pour la géocache {geocache.gc_code}")
+        
+        return logs_added
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erreur lors du traitement des logs pour la géocache {geocache.gc_code}: {str(e)}")
+        return 0
 
 
 def process_waypoints_file(wp_file_path, zone_id):

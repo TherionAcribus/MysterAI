@@ -18,6 +18,20 @@ def get_notes_panel():
                             geocache_name=geocache.name)
     return render_template('notes_panel.html', notes=[], geocache_id=None)
 
+@logs_bp.route('/logs_panel')
+def get_logs_panel():
+    """Renvoie le template du panneau des logs."""
+    geocache_id = request.args.get('geocacheId')
+    if geocache_id:
+        geocache = Geocache.query.get_or_404(geocache_id)
+        # Pour l'instant, utilisons les logs de la géocache directement
+        logs = geocache.logs if hasattr(geocache, 'logs') else []
+        return render_template('logs_panel.html', 
+                            logs=logs,
+                            geocache_id=geocache_id,
+                            geocache_name=geocache.name)
+    return render_template('logs_panel.html', logs=[], geocache_id=None)
+
 @logs_bp.route('/map_panel')
 def get_map_panel():
     """Render the map panel template"""

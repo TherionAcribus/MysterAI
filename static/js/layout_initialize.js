@@ -92,6 +92,19 @@ function initializeLayout() {
                             });
                         }
                     }
+                    
+                    // Mettre à jour les logs si le panneau est actif
+                    const logsPanel = document.getElementById('logs-panel');
+                    if (logsPanel && logsPanel.classList.contains('active') && state.geocacheId) {
+                        const logsContent = document.getElementById('logs-content');
+                        if (logsContent) {
+                            // Charger le template logs_panel.html
+                            htmx.ajax('GET', `/api/logs/logs_panel?geocacheId=${state.geocacheId}`, {
+                                target: '#logs-content',
+                                swap: 'innerHTML'
+                            });
+                        }
+                    }
                 }
             }
         }

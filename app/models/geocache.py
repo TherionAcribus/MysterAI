@@ -209,10 +209,29 @@ class Owner(db.Model):
     
     # Relation avec les geocaches
     geocaches = db.relationship('Geocache', back_populates='owner')
+    # Relation avec les logs
+    logs = db.relationship('Log', back_populates='author')
     
     def __repr__(self):
         return f"<Owner {self.name}>"    
 
+class Log(db.Model):
+    __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
+    geocache_id = db.Column(db.Integer, db.ForeignKey('geocache.id'), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey('owner.id'), nullable=False)
+    text = db.Column(db.Text)
+    date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    log_type = db.Column(db.String(50))  # Found it, Write Note, Didn't Find it, etc.
+    favorite = db.Column(db.Boolean, default=False)  # Remplace favorites_count
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Relations
+    geocache = db.relationship('Geocache', back_populates='logs')
+    author = db.relationship('Owner', back_populates='logs')
+    
+    def __repr__(self):
+        return f"<Log {self.id}: {self.log_type} by {self.author.name}>"
 
 class Geocache(db.Model):
     __table_args__ = {'extend_existing': True}
@@ -252,6 +271,7 @@ class Geocache(db.Model):
     checkers = db.relationship('Checker', back_populates='geocache', cascade='all, delete-orphan')
     notes = db.relationship('Note', secondary='geocache_note', back_populates='geocaches')
     images = db.relationship('GeocacheImage', back_populates='geocache', cascade='all, delete-orphan')
+    logs = db.relationship('Log', back_populates='geocache', cascade='all, delete-orphan')
     
     @property
     def latitude(self):
