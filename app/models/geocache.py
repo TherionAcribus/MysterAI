@@ -202,12 +202,24 @@ class GeocacheImage(db.Model):
         # Enlever l'extension
         return os.path.splitext(clean_name)[0]
 
+class Owner(db.Model):
+    __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    
+    # Relation avec les geocaches
+    geocaches = db.relationship('Geocache', back_populates='owner')
+    
+    def __repr__(self):
+        return f"<Owner {self.name}>"    
+
+
 class Geocache(db.Model):
     __table_args__ = {'extend_existing': True}
     id = db.Column(db.Integer, primary_key=True)
     gc_code = db.Column(db.String(10), nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    owner = db.Column(db.String(100))
+    owner_id = db.Column(db.Integer, db.ForeignKey('owner.id'))
     cache_type = db.Column(db.String(50))
     location = db.Column(Geometry('POINT', srid=4326), nullable=False)
     location_corrected = db.Column(Geometry('POINT', srid=4326))
@@ -233,7 +245,7 @@ class Geocache(db.Model):
     last_found_date = db.Column(db.DateTime)
     gc_personnal_note = db.Column(db.Text)
 
-
+    owner = db.relationship('Owner', back_populates='geocaches')
     zones = db.relationship('Zone', secondary='geocache_zone', back_populates='geocaches')
     additional_waypoints = db.relationship('AdditionalWaypoint', back_populates='geocache', cascade='all, delete-orphan')
     attributes = db.relationship('Attribute', secondary='geocache_attribute', back_populates='geocaches')

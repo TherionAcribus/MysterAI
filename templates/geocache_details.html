@@ -12,7 +12,7 @@
                 <span>•</span>
                 <span>{{ geocache.cache_type }}</span>
                 <span>•</span>
-                <span>Par {{ geocache.owner }}</span>
+                <span>Par {{ geocache.owner.name if geocache.owner else "Inconnu" }}</span>
             </div>
         </div>
 

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
 import json
-from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone
+from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner
 from app.database import db
 from app.utils.geocache_scraper import scrape_geocache
 from shapely.geometry import Point
@@ -49,7 +49,7 @@ def get_geocaches(zone_id):
         'id': cache.id,
         'gc_code': cache.gc_code,
         'name': cache.name,
-        'owner': cache.owner,
+        'owner': cache.owner.name if cache.owner else None,
         'cache_type': cache.cache_type,
         'latitude': cache.latitude,
         'longitude': cache.longitude,
@@ -92,7 +92,8 @@ def get_geocache(geocache_id):
         db.joinedload(Geocache.attributes),
         db.joinedload(Geocache.checkers),
         db.joinedload(Geocache.zone),
-        db.joinedload(Geocache.images)
+        db.joinedload(Geocache.images),
+        db.joinedload(Geocache.owner)
     ).get_or_404(geocache_id)
 
     logger.debug(f"Waypoints for geocache {geocache.gc_code}:", [
@@ -104,7 +105,7 @@ def get_geocache(geocache_id):
         'id': geocache.id,
         'gc_code': geocache.gc_code,
         'name': geocache.name,
-        'owner': geocache.owner,
+        'owner': geocache.owner.name if geocache.owner else None,
         'cache_type': geocache.cache_type,
         'latitude': geocache.latitude,
         'longitude': geocache.longitude,
@@ -231,14 +232,15 @@ def get_geocache_details(geocache_id):
             db.joinedload(Geocache.attributes),
             db.joinedload(Geocache.checkers),
             db.joinedload(Geocache.zone),
-            db.joinedload(Geocache.images)
+            db.joinedload(Geocache.images),
+            db.joinedload(Geocache.owner)
         ).get_or_404(geocache_id)
         
         return jsonify({
             'id': geocache.id,
             'gc_code': geocache.gc_code,
             'name': geocache.name,
-            'owner': geocache.owner,
+            'owner': geocache.owner.name if geocache.owner else None,
             'cache_type': geocache.cache_type,
             'latitude': geocache.latitude,
             'longitude': geocache.longitude,
@@ -378,11 +380,21 @@ def add_geocache():
             except ValueError as e:
                 logger.warning(f"Impossible de parser la date: {geocache_data['hidden_date']} - {str(e)}")
 
+        # Gérer l'owner
+        owner_name = geocache_data.get('owner', '')
+        owner = None
+        if owner_name:
+            # Rechercher l'owner existant ou en créer un nouveau
+            owner = Owner.query.filter_by(name=owner_name).first()
+            if not owner:
+                owner = Owner(name=owner_name)
+                db.session.add(owner)
+                
         # Creer la nouvelle geocache
         geocache = Geocache(
             gc_code=code,
             name=geocache_data.get('name', ''),
-            owner=geocache_data.get('owner', ''),
+            owner=owner,
             cache_type=geocache_data.get('cache_type', ''),
             description=geocache_data.get('description', ''),
             difficulty=float(geocache_data.get('difficulty', 1.0)),
@@ -652,7 +664,8 @@ def get_geocache_details_panel(geocache_id):
         db.joinedload(Geocache.attributes),
         db.joinedload(Geocache.checkers),
         db.joinedload(Geocache.zones),
-        db.joinedload(Geocache.images)
+        db.joinedload(Geocache.images),
+        db.joinedload(Geocache.owner)
     ).get_or_404(geocache_id)
     return render_template('geocache_details.html', geocache=geocache)
 
@@ -1104,7 +1117,7 @@ def get_nearby_geocaches(geocache_id):
                     'id': cache.id,
                     'gc_code': cache.gc_code,
                     'name': cache.name,
-                    'owner': cache.owner,
+                    'owner': cache.owner.name if cache.owner else None,
                     'cache_type': cache.cache_type,
                     'latitude': cache.latitude,
                     'longitude': cache.longitude,
@@ -1690,11 +1703,22 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                 gc_lat = f"N {abs(lat_deg)}° {lat_min:.3f}" if lat >= 0 else f"S {abs(lat_deg)}° {lat_min:.3f}"
                 gc_lon = f"E {abs(lon_deg)}° {lon_min:.3f}" if lon >= 0 else f"W {abs(lon_deg)}° {lon_min:.3f}"
                 
-                # Créer la nouvelle géocache
+                # Gérer l'owner
+                owner_obj = None
+                if owner_name:
+                    # Rechercher l'owner existant ou en créer un nouveau
+                    owner_obj = Owner.query.filter_by(name=owner_name).first()
+                    if not owner_obj:
+                        owner_obj = Owner(name=owner_name)
+                        db.session.add(owner_obj)
+                        # On doit faire un flush pour obtenir l'ID avant de l'utiliser
+                        db.session.flush()
+                
+                # Créer la nouvelle géocache avec l'objet owner (peut être None)
                 geocache = Geocache(
                     gc_code=gc_code,
                     name=name,
-                    owner=owner_name,
+                    owner=owner_obj,  # Utilisation de l'objet Owner, pas de la chaîne
                     cache_type=type_name,
                     description=description,
                     difficulty=difficulty_value,
