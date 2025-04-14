@@ -175,7 +175,7 @@ function initializeLayout() {
                 const containerId = event.source.frameElement?.closest('.lm_content')?.parentElement?.id;
                 
                 // Charger les détails de la géocache
-                fetch(`http://127.0.0.1:3000/geocaches/${geocacheId}/details-panel`)
+                fetch(`/geocaches/${geocacheId}/details-panel`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
@@ -480,7 +480,7 @@ function initializeLayout() {
             `);
             
             // Charger les détails de la géocache
-            fetch(`http://127.0.0.1:3000/geocaches/${geocacheId}/details-panel`)
+            fetch(`/geocaches/${geocacheId}/details-panel`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);

@@ -2283,6 +2283,7 @@ def reset_coordinates():
             'error': str(e)
         }), 500
 
+
 @geocaches_bp.route('/api/geocaches/<int:geocache_id>', methods=['GET'])
 def get_geocache_map_data(geocache_id):
     """
@@ -2292,7 +2293,8 @@ def get_geocache_map_data(geocache_id):
     logger.debug(f"Récupération des données de la géocache {geocache_id} pour la carte")
     
     geocache = Geocache.query.options(
-        db.joinedload(Geocache.additional_waypoints)
+        db.joinedload(Geocache.additional_waypoints),
+        db.joinedload(Geocache.owner) # Ajouter le chargement de l'owner
     ).get_or_404(geocache_id)
     
     # Préparer les données de base de la géocache

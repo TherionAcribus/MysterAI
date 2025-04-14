@@ -1,12 +1,30 @@
 {% if geocache %}
-<div id="map-panel" 
-     data-controller="map"
-     data-map-geocache-id-value="{{ geocache_id }}"
-     data-map-geocache-code-value="{{ geocache.gc_code }}"
+<div id="map-panel-content"
+     data-controller="detail-geocache-map"
+     data-detail-geocache-map-geocache-id-value="{{ geocache_id }}"
+     data-detail-geocache-map-geocache-code-value="{{ geocache.gc_code }}"
      class="h-full">
-    <div class="map-container h-full relative" data-map-target="container">
+    <div class="map-container h-full relative" data-detail-geocache-map-target="container">
         <div id="base-layer-selector"></div>
     </div>
+    <div id="popup" 
+         data-detail-geocache-map-target="popup"
+         class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
+         style="display: none; pointer-events: none; background-color: white; color: black;">
+        <div data-detail-geocache-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+        <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+            <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
+        </div>
+    </div>
+</div>
+{% elif zone %}
+<div id="zone-map-content" 
+     data-controller="map"
+     data-map-zone-id-value="{{ zone.id }}"
+     data-map-is-multi-view-value="true"
+     data-map-show-all-points-value="true"
+     class="h-full">
+    <div class="map-container h-full relative" data-map-target="container"></div>
     <div id="popup" 
          data-map-target="popup"
          class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
@@ -18,7 +36,8 @@
     </div>
 </div>
 {% else %}
-<div class="flex items-center justify-center h-full text-gray-500">
+<div class="flex items-center justify-center h-full text-gray-500"
+     data-controller="map">
     <p>Sélectionnez une géocache pour voir sa carte</p>
 </div>
 {% endif %}

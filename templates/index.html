@@ -189,6 +189,21 @@
     <style>
     </style>
     
+    <!-- Charger les scripts des contrôleurs -->
+    <script src="/js/controllers/index.js"></script> <!-- Charge et enregistre certains contrôleurs -->
+    <script src="/js/controllers/map_controller.js"></script> <!-- S'enregistre lui-même -->
+    <script src="/js/controllers/detail_geocache_map_controller.js"></script> <!-- S'enregistre lui-même -->
+    <script src="/js/controllers/chat_controller.js"></script> 
+    <script src="/js/controllers/settings_controller.js"></script> 
+    <script src="/js/controllers/ai_settings_controller.js"></script> 
+    <script src="/js/controllers/general_settings_controller.js"></script> 
+    <script src="/js/controllers/status_bar_controller.js"></script>
+    
+    <!-- Autres scripts -->
+    <script src="/js/layout_initialize.js"></script>
+    <script src="/js/zone_manager.js"></script>
+
+    <!-- Contrôleurs chargés comme des scripts normaux (pour l'instant) -->
     <script src="/js/controllers/alphabet_viewer_controller.js" defer></script>
 </head>
 <body class="bg-gray-900 text-gray-300 h-screen flex flex-col overflow-hidden">
