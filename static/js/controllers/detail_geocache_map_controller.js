@@ -70,6 +70,24 @@
 
             // Nettoyer les écouteurs d'événements lors de la déconnexion
             document.removeEventListener('waypointSaved', this.waypointSavedHandler);
+            
+            // Nettoyer l'écouteur d'événement pour le menu contextuel
+            if (this.contextMenuClickHandler) {
+                document.removeEventListener('click', this.contextMenuClickHandler);
+            }
+            
+            // Supprimer le menu contextuel du DOM si nécessaire
+            if (this.contextMenu && document.body.contains(this.contextMenu)) {
+                document.body.removeChild(this.contextMenu);
+            }
+            
+            // Remettre les autres propriétés à null
+            this.popup = null;
+            this.vectorSource = null;
+            this.vectorLayer = null;
+            this.circleSource = null;
+            this.circleLayer = null;
+            this.baseLayerSelector = null;
         }
 
         async initializeMap() {
@@ -183,23 +201,40 @@
 
         // Initialiser le menu contextuel
         initContextMenu() {
-            this.contextMenu = document.createElement('div');
-            this.contextMenu.className = 'absolute bg-white shadow-lg rounded-lg p-2 z-[1002]';
-            this.contextMenu.style.cssText = 'display: none; background-color: white; color: black; min-width: 200px; border: 1px solid #ccc;';
-            document.body.appendChild(this.contextMenu);
-            
-            // Fermer le menu contextuel lors d'un clic ailleurs
-            document.addEventListener('click', () => {
-                this.contextMenu.style.display = 'none';
-            });
+            // Créer l'élément de menu contextuel s'il n'existe pas déjà
+            if (!this.contextMenu) {
+                this.contextMenu = document.createElement('div');
+                this.contextMenu.className = 'absolute bg-white shadow-lg rounded-lg p-2 z-[1002]';
+                this.contextMenu.style.cssText = 'display: none; background-color: white; color: black; min-width: 200px; border: 1px solid #ccc;';
+                document.body.appendChild(this.contextMenu);
+                
+                // Définir le gestionnaire d'événement pour fermer le menu contextuel lors d'un clic ailleurs
+                this.contextMenuClickHandler = () => {
+                    if (this.contextMenu) {
+                        this.contextMenu.style.display = 'none';
+                    }
+                };
+                
+                // Ajouter l'écouteur d'événement de manière propre pour pouvoir le supprimer lors de la déconnexion
+                document.addEventListener('click', this.contextMenuClickHandler);
+            }
             
             // Rendre la couche de cercles visible par défaut
-            this.circleLayer.setVisible(true);
+            if (this.circleLayer) {
+                this.circleLayer.setVisible(true);
+            }
         }
         
         // Gérer le clic droit sur la carte
         handleRightClick(evt) {
             evt.preventDefault(); // Empêcher le menu contextuel du navigateur
+            
+            // S'assurer que le menu contextuel existe
+            if (!this.contextMenu) {
+                console.error('%c[DetailMapCtrl] Menu contextuel non initialisé', "background:red; color:white");
+                this.initContextMenu(); // Essayer de le réinitialiser
+                if (!this.contextMenu) return; // Si toujours pas disponible, abandonner
+            }
             
             // Obtenir les coordonnées du clic
             const pixel = this.map.getEventPixel(evt);

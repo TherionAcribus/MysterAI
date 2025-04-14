@@ -142,37 +142,68 @@
           throw new Error(errorData.error || 'Une erreur est survenue');
         }
 
-        // Tenter de récupérer l'ID du waypoint créé/modifié
+        // La réponse à l'ajout/modification peut être du HTML ou du JSON
+        let responseText;
+        try {
+          responseText = await response.text();
+        } catch (error) {
+          console.error('Erreur lors de la lecture de la réponse:', error);
+          throw new Error('Erreur lors de la lecture de la réponse');
+        }
+
+        // D'abord, essayer d'analyser comme JSON
         let updatedWaypoint = null;
         try {
-          const responseData = await response.json();
-          if (responseData && responseData.waypoint) {
-            updatedWaypoint = responseData.waypoint;
-            waypointId = responseData.waypoint.id;
+          if (responseText.trim().startsWith('{')) {
+            const responseData = JSON.parse(responseText);
+            if (responseData && responseData.waypoint) {
+              updatedWaypoint = responseData.waypoint;
+              waypointId = responseData.waypoint.id;
+            }
           }
         } catch (parseError) {
-          // Si la réponse n'est pas du JSON, on continue avec le HTML
-          console.log("Réponse non-JSON, utilisation du HTML pour mettre à jour la liste");
-        }
-
-        // Si la réponse n'était pas du JSON ou n'a pas fourni de waypoint, récupérer le HTML
-        if (!updatedWaypoint) {
-          // Mettre à jour la liste des waypoints avec le HTML
-          const htmlResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
-          if (htmlResponse.ok) {
-            const html = await htmlResponse.text();
-            this.waypointsListTarget.innerHTML = html;
-          }
-        } else {
-          // Mettre à jour la liste des waypoints avec le HTML
-          const htmlResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
-          if (htmlResponse.ok) {
-            const html = await htmlResponse.text();
-            this.waypointsListTarget.innerHTML = html;
+          console.log("Réponse non-JSON:", parseError);
+          // Si ce n'est pas du JSON valide, c'est probablement du HTML
+          if (responseText.trim().startsWith('<')) {
+            // C'est probablement le HTML de la liste des waypoints
+            this.waypointsListTarget.innerHTML = responseText;
           }
         }
 
-        // Émettre un événement pour notifier la carte du nouveau waypoint
+        // Si nous avons pas pu mettre à jour la liste des waypoints, essayer de la récupérer explicitement
+        if (!this.waypointsListTarget.innerHTML.includes('waypoint-item')) {
+          try {
+            console.log("Récupération de la liste des waypoints...");
+            const listResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
+            
+            if (listResponse.ok) {
+              const listHtml = await listResponse.text();
+              this.waypointsListTarget.innerHTML = listHtml;
+              console.log("Liste des waypoints mise à jour avec succès");
+            } else {
+              console.warn(`Échec de la récupération de la liste des waypoints: ${listResponse.status} ${listResponse.statusText}`);
+              
+              // Dernier recours: recharger la section complète de waypoints
+              const fullListResponse = await fetch(`/geocaches/${geocacheId}/details-panel`);
+              if (fullListResponse.ok) {
+                const fullHtml = await fullListResponse.text();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = fullHtml;
+                
+                const newWaypointList = tempDiv.querySelector('#waypoints-list-container');
+                if (newWaypointList) {
+                  this.waypointsListTarget.innerHTML = newWaypointList.innerHTML;
+                  console.log("Liste des waypoints récupérée à partir des détails complets");
+                }
+              }
+            }
+          } catch (listError) {
+            console.error("Erreur lors de la récupération de la liste des waypoints:", listError);
+          }
+        }
+
+        // Si nous n'avons pas d'informations sur le waypoint à partir de la réponse,
+        // nous utilisons les données du formulaire pour l'événement
         const waypoint = updatedWaypoint || {
           id: waypointId,
           gc_lat: formData.gc_lat,

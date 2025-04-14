@@ -2379,3 +2379,19 @@ def get_geocache_map_data(geocache_id):
     
     logger.debug(f"Données récupérées pour la géocache {geocache.gc_code}")
     return jsonify(geocache_data)
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/waypoints/list', methods=['GET'])
+def get_waypoints_list(geocache_id):
+    """Récupère le HTML pour la liste des waypoints d'une géocache."""
+    logger.info(f"Route GET /api/geocaches/{geocache_id}/waypoints/list appelée")
+    
+    try:
+        # Vérifier si la géocache existe
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Renvoyer le HTML mis à jour pour la section des waypoints
+        return render_template('partials/waypoints_list.html', geocache=geocache)
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération de la liste des waypoints: {e}")
+        return jsonify({'error': str(e)}), 500
