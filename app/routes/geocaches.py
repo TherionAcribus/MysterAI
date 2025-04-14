@@ -1112,6 +1112,9 @@ def get_nearby_geocaches(geocache_id):
             
             # Ne garder que les géocaches dans le rayon spécifié
             if distance <= distance_km:
+                # Vérifier si la cache a des coordonnées corrigées
+                has_corrected_coords = cache.location_corrected is not None
+                
                 # Ajouter la distance au dictionnaire de la géocache
                 cache_dict = {
                     'id': cache.id,
@@ -1125,12 +1128,30 @@ def get_nearby_geocaches(geocache_id):
                     'gc_lon': cache.gc_lon,
                     'difficulty': cache.difficulty,
                     'terrain': cache.terrain,
-                    'distance': round(distance, 2)  # Distance en km, arrondie à 2 décimales
+                    'distance': round(distance, 2),  # Distance en km, arrondie à 2 décimales
+                    'is_corrected': has_corrected_coords
                 }
+                
+                # Ajouter les coordonnées corrigées si elles existent
+                if has_corrected_coords:
+                    cache_dict.update({
+                        'corrected_latitude': cache.latitude_corrected,
+                        'corrected_longitude': cache.longitude_corrected,
+                        'gc_lat_corrected': cache.gc_lat_corrected,
+                        'gc_lon_corrected': cache.gc_lon_corrected
+                    })
+                    
+                    # Si on a des coordonnées corrigées, recalculer la distance sur la base de ces coordonnées
+                    if cache.latitude_corrected and cache.longitude_corrected:
+                        lat_diff_corrected = cache.latitude_corrected - geocache.latitude
+                        lon_diff_corrected = (cache.longitude_corrected - geocache.longitude) * lon_correction
+                        distance_corrected = math.sqrt(lat_diff_corrected**2 + lon_diff_corrected**2) * 111.0
+                        cache_dict['distance_corrected'] = round(distance_corrected, 2)
+                
                 nearby_geocaches.append(cache_dict)
     
-    # Trier par distance
-    nearby_geocaches.sort(key=lambda x: x['distance'])
+    # Trier par distance (utiliser distance_corrected si disponible, sinon distance)
+    nearby_geocaches.sort(key=lambda x: x.get('distance_corrected', x['distance']))
     
     logger.debug(f"Nombre de géocaches proches trouvées: {len(nearby_geocaches)}")
     

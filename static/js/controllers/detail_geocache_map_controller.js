@@ -88,6 +88,23 @@
                     style: (feature) => this.styleNearbyFeature(feature),
                     visible: false // Couche cachée par défaut
                 });
+                
+                // Créer la source et la couche pour les cercles de 161m
+                this.circleSource = new ol.source.Vector();
+                this.circleLayer = new ol.layer.Vector({
+                    source: this.circleSource,
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'rgba(255, 0, 0, 0.7)',
+                            width: 2,
+                            lineDash: [5, 5] // Ligne pointillée
+                        }),
+                        fill: new ol.style.Fill({
+                            color: 'rgba(255, 0, 0, 0.1)'
+                        })
+                    }),
+                    visible: false // Couche cachée par défaut
+                });
 
                 // Initialiser la carte OpenLayers
                 this.map = new ol.Map({
@@ -96,6 +113,7 @@
                         new ol.layer.Tile({
                             source: this.tileSources['OSM Standard']
                         }),
+                        this.circleLayer, // Ajouter la couche de cercles avant les points
                         this.vectorLayer,
                         this.nearbyLayer // Ajouter la couche des géocaches proches
                     ],
@@ -402,15 +420,53 @@
             nearbyLabel.className = 'text-sm text-gray-700';
             nearbyLabel.textContent = 'Géocaches proches';
             
+            // Ajouter une case à cocher pour les cercles de 161m
+            const circlesCheckboxContainer = document.createElement('div');
+            circlesCheckboxContainer.className = 'flex items-center ml-5';
+            
+            const circlesCheckbox = document.createElement('input');
+            circlesCheckbox.type = 'checkbox';
+            circlesCheckbox.id = 'show-circles-161m';
+            circlesCheckbox.className = 'mr-2 form-checkbox h-4 w-4 text-blue-600';
+            circlesCheckbox.disabled = true; // Désactivé par défaut
+            circlesCheckbox.style.opacity = '0.5'; // Grisé par défaut
+            
+            const circlesLabel = document.createElement('label');
+            circlesLabel.htmlFor = 'show-circles-161m';
+            circlesLabel.className = 'text-sm text-gray-500'; // Texte grisé par défaut
+            circlesLabel.textContent = 'Cercles 161m';
+            
+            // Gestionnaire pour les géocaches proches
             nearbyCheckbox.addEventListener('change', () => {
                 const showNearby = nearbyCheckbox.checked;
                 this.toggleNearbyGeocaches(showNearby);
+                
+                // Activer/désactiver l'option des cercles en fonction de l'état des géocaches proches
+                circlesCheckbox.disabled = !showNearby;
+                circlesCheckbox.style.opacity = showNearby ? '1' : '0.5';
+                circlesLabel.className = showNearby ? 'text-sm text-gray-700' : 'text-sm text-gray-500';
+                
+                // Si on désactive les géocaches proches, on désactive aussi les cercles
+                if (!showNearby && circlesCheckbox.checked) {
+                    circlesCheckbox.checked = false;
+                    this.toggleCircles161m(false);
+                }
+            });
+            
+            // Gestionnaire pour les cercles de 161m
+            circlesCheckbox.addEventListener('change', () => {
+                const showCircles = circlesCheckbox.checked;
+                this.toggleCircles161m(showCircles);
             });
             
             nearbyCheckboxContainer.appendChild(nearbyCheckbox);
             nearbyCheckboxContainer.appendChild(nearbyLabel);
             
+            circlesCheckboxContainer.appendChild(circlesCheckbox);
+            circlesCheckboxContainer.appendChild(circlesLabel);
+            
             selectorContainer.appendChild(nearbyCheckboxContainer);
+            selectorContainer.appendChild(circlesCheckboxContainer);
             
             // Ajouter le sélecteur directement au body
             document.body.appendChild(selectorContainer);
@@ -483,27 +539,47 @@
                 
                 // Ajouter les features pour chaque géocache proche
                 nearbyGeocaches.forEach(geocache => {
-                    if (geocache.latitude && geocache.longitude) {
+                    // Vérifier si on a des coordonnées corrigées et les utiliser si disponibles
+                    let latitude = geocache.latitude;
+                    let longitude = geocache.longitude;
+                    let isCorrected = false;
+                    
+                    // Si des coordonnées corrigées sont disponibles, les utiliser
+                    if (geocache.corrected_latitude && geocache.corrected_longitude) {
+                        latitude = geocache.corrected_latitude;
+                        longitude = geocache.corrected_longitude;
+                        isCorrected = true;
+                        console.log(`%c[DetailMapCtrl] Utilisation des coordonnées corrigées pour ${geocache.gc_code}`, "color:green");
+                    }
+                    
+                    if (latitude && longitude) {
                         // Calculer la distance si on a des coordonnées de référence
                         if (referenceCoords) {
                             geocache.distance = this.calculateDistance(
                                 referenceCoords.latitude, 
                                 referenceCoords.longitude,
-                                geocache.latitude,
-                                geocache.longitude
+                                latitude,
+                                longitude
                             );
                         }
                         
                         const feature = new ol.Feature({
                             geometry: new ol.geom.Point(
-                                ol.proj.fromLonLat([geocache.longitude, geocache.latitude])
+                                ol.proj.fromLonLat([longitude, latitude])
                             )
                         });
                         
                         // Définir les propriétés de la feature
                         feature.setProperties({
                             ...geocache,
-                            type: 'nearby' // Marquer cette feature comme une "géocache proche"
+                            type: 'nearby', // Marquer cette feature comme une "géocache proche"
+                            is_corrected: isCorrected, // Indiquer si des coordonnées corrigées sont utilisées
+                            // Stocker les coordonnées réellement utilisées pour l'affichage
+                            latitude: latitude,
+                            longitude: longitude,
+                            // Conserver les coordonnées originales si des coordonnées corrigées sont utilisées
+                            original_latitude: isCorrected ? geocache.latitude : undefined,
+                            original_longitude: isCorrected ? geocache.longitude : undefined
                         });
                         
                         this.nearbySource.addFeature(feature);
@@ -563,10 +639,11 @@
             let cacheRadius = 6;
             let strokeColor = '#ffffff'; // Bordure blanche pour les géocaches proches
             let strokeWidth = 2;
-            let shapePoints = null; // null pour cercle par défaut
+            let shapePoints = null; // null pour cercle par défaut (par défaut)
             let shapeAngle = 0;
 
             const cacheType = properties.cache_type;
+            const isCorrected = properties.is_corrected === true;
             
             // Appliquer les mêmes styles que les géocaches normales basés sur le type
             switch(cacheType) {
@@ -598,6 +675,13 @@
                     break;
                 default:
                     cacheColor = 'rgba(128, 0, 128, 0.8)'; // violet par défaut
+            }
+            
+            // Si la géocache a des coordonnées corrigées, la représenter comme un carré
+            if (isCorrected) {
+                shapePoints = 4; // Carré
+                shapeAngle = Math.PI / 4; // Rotation de 45 degrés (losange)
+                cacheRadius = 8; // Légèrement plus grand
             }
             
             // Créer le style approprié
@@ -970,6 +1054,117 @@
                     }
                 }
             }
+        }
+
+        // Afficher ou masquer les cercles de 161m
+        toggleCircles161m(show) {
+            console.log(`%c[DetailMapCtrl] ${show ? 'Affichage' : 'Masquage'} des cercles de 161m`, "color:teal");
+            
+            if (show && this.circleSource.getFeatures().length === 0) {
+                // Générer les cercles si ce n'est pas encore fait
+                this.generateCircles161m();
+            }
+            
+            // Afficher ou masquer la couche
+            this.circleLayer.setVisible(show);
+        }
+        
+        // Générer les cercles de 161m autour des caches traditionnelles et des caches résolues
+        generateCircles161m() {
+            console.log(`%c[DetailMapCtrl] Génération des cercles de 161m...`, "color:teal");
+            
+            // Vider la source existante
+            this.circleSource.clear();
+            
+            // Ne générer les cercles que pour les géocaches proches (si elles sont visibles)
+            if (this.nearbyLayer.getVisible()) {
+                const nearbyFeatures = this.nearbySource.getFeatures();
+                for (const feature of nearbyFeatures) {
+                    const props = feature.getProperties();
+                    
+                    // Vérifier si c'est une cache traditionnelle, une cache corrigée ou si elle est marquée comme résolue
+                    if (props.cache_type === 'Traditional Cache' || props.solved === true || props.is_corrected === true) {
+                        const geometry = feature.getGeometry();
+                        const center = geometry.getCoordinates();
+                        
+                        // Créer un cercle de 161m autour du point
+                        this.addCircle161m(center, props);
+                    }
+                }
+                
+                console.log(`%c[DetailMapCtrl] ${this.circleSource.getFeatures().length} cercles de 161m générés pour les géocaches proches`, "color:green");
+            } else {
+                console.log(`%c[DetailMapCtrl] Aucun cercle généré - les géocaches proches ne sont pas visibles`, "color:orange");
+            }
+        }
+        
+        // Ajouter un cercle de 161m autour d'un point
+        addCircle161m(center, properties) {
+            // Convertir les coordonnées en EPSG:4326 (WGS84, lat/lon) pour le calcul
+            const centerLonLat = ol.proj.transform(center, 'EPSG:3857', 'EPSG:4326');
+            
+            // Utiliser la fonction de création d'un cercle géodésique
+            const circle = this.createGeodesicCircle(centerLonLat[0], centerLonLat[1], 0.161); // 161m = 0.161km
+            
+            // Créer une feature avec le cercle
+            const circleFeature = new ol.Feature({
+                geometry: circle
+            });
+            
+            // Ajouter des propriétés à la feature
+            circleFeature.setProperties({
+                type: '161m_circle',
+                related_cache: properties.gc_code || 'Unknown',
+                cache_type: properties.cache_type
+            });
+            
+            // Ajouter la feature à la source
+            this.circleSource.addFeature(circleFeature);
+            
+            console.log(`%c[DetailMapCtrl] Cercle de 161m ajouté pour ${properties.gc_code || 'Unknown'}`, "color:green");
+        }
+        
+        // Créer un cercle géodésique (qui respecte la courbure de la Terre)
+        createGeodesicCircle(lon, lat, radiusKm, sides = 64) {
+            // Convertir le rayon en radians
+            const earthRadiusKm = 6371;
+            const radiusRad = radiusKm / earthRadiusKm;
+            
+            // Calculer les points du cercle
+            const points = [];
+            for (let i = 0; i <= sides; i++) {
+                const angle = 2 * Math.PI * i / sides;
+                
+                // Formule pour calculer un point à une distance donnée sur une sphère
+                const latPoint = Math.asin(
+                    Math.sin(this.deg2rad(lat)) * Math.cos(radiusRad) +
+                    Math.cos(this.deg2rad(lat)) * Math.sin(radiusRad) * Math.cos(angle)
+                );
+                
+                const lonPoint = this.deg2rad(lon) + Math.atan2(
+                    Math.sin(angle) * Math.sin(radiusRad) * Math.cos(this.deg2rad(lat)),
+                    Math.cos(radiusRad) - Math.sin(this.deg2rad(lat)) * Math.sin(latPoint)
+                );
+                
+                // Convertir en degrés et ajouter au tableau de points
+                const pointLonLat = [this.rad2deg(lonPoint), this.rad2deg(latPoint)];
+                // Convertir en coordonnées de la projection de la carte
+                const pointCoords = ol.proj.fromLonLat(pointLonLat);
+                points.push(pointCoords);
+            }
+            
+            // Créer un polygone avec les points calculés
+            return new ol.geom.Polygon([points]);
+        }
+        
+        // Convertir des degrés en radians
+        deg2rad(deg) {
+            return deg * (Math.PI/180);
+        }
+        
+        // Convertir des radians en degrés
+        rad2deg(rad) {
+            return rad * (180/Math.PI);
         }
     }
 
