@@ -557,18 +557,82 @@
         
         // Style pour les géocaches proches
         styleNearbyFeature(feature) {
-            return new ol.style.Style({
-                image: new ol.style.Circle({
-                    radius: 6,
-                    fill: new ol.style.Fill({
-                        color: 'rgba(128, 0, 128, 0.8)' // Violet
-                    }),
-                    stroke: new ol.style.Stroke({
-                        color: '#ffffff',
-                        width: 2
-                    })
-                })
+            const properties = feature.getProperties();
+            let cacheColor = 'rgba(150, 150, 150, 0.8)'; // gris par défaut
+            let cacheIcon = null;
+            let cacheRadius = 6;
+            let strokeColor = '#ffffff'; // Bordure blanche pour les géocaches proches
+            let strokeWidth = 2;
+            let shapePoints = null; // null pour cercle par défaut
+            let shapeAngle = 0;
+
+            const cacheType = properties.cache_type;
+            
+            // Appliquer les mêmes styles que les géocaches normales basés sur le type
+            switch(cacheType) {
+                case 'Traditional Cache': 
+                    cacheColor = 'rgba(0, 160, 0, 0.8)'; // vert
+                    break;
+                case 'Unknown Cache': 
+                case 'Mystery': 
+                    cacheColor = 'rgba(0, 60, 200, 0.8)'; // bleu
+                    cacheIcon = '?';
+                    cacheRadius = 8;
+                    break;
+                case 'Letterbox Hybrid': 
+                    cacheColor = 'rgba(0, 60, 200, 0.8)'; // bleu
+                    cacheIcon = '✉'; // enveloppe
+                    cacheRadius = 8;
+                    break;
+                case 'Multi-cache': 
+                    cacheColor = 'rgba(255, 165, 0, 0.8)'; // orange
+                    break;
+                case 'Wherigo': 
+                    cacheColor = 'rgba(0, 120, 255, 0.8)'; // bleu
+                    break;
+                case 'Earth Cache':
+                    cacheColor = 'rgba(139, 69, 19, 0.8)'; // marron
+                    break;
+                case 'Virtual Cache':
+                    cacheColor = 'rgba(255, 0, 255, 0.8)'; // magenta
+                    break;
+                default:
+                    cacheColor = 'rgba(128, 0, 128, 0.8)'; // violet par défaut
+            }
+            
+            // Créer le style approprié
+            let imageStyle;
+            if (shapePoints) {
+                imageStyle = new ol.style.RegularShape({
+                    points: shapePoints,
+                    radius: cacheRadius,
+                    angle: shapeAngle,
+                    fill: new ol.style.Fill({ color: cacheColor }),
+                    stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth })
+                });
+            } else {
+                imageStyle = new ol.style.Circle({
+                    radius: cacheRadius,
+                    fill: new ol.style.Fill({ color: cacheColor }),
+                    stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth })
+                });
+            }
+
+            const style = new ol.style.Style({
+                image: imageStyle
             });
+
+            // Ajouter le texte (icône) si défini
+            if (cacheIcon) {
+                style.setText(new ol.style.Text({
+                    text: cacheIcon,
+                    font: 'bold 12px sans-serif',
+                    fill: new ol.style.Fill({ color: '#ffffff' }),
+                    offsetY: -1
+                }));
+            }
+
+            return style;
         }
 
         // Gérer le clic sur la carte
@@ -654,7 +718,7 @@
             let cacheColor = 'rgba(150, 150, 150, 0.8)'; // gris par défaut
             let cacheIcon = null;
             let cacheRadius = 6;
-            let strokeColor = '#ffffff';
+            let strokeColor = '#000000'; // Bordure noire pour les points de la géocache principale
             let strokeWidth = 1.5;
             let shapePoints = null; // null pour cercle par défaut
             let shapeAngle = 0;
@@ -667,7 +731,7 @@
             if (isTempMarker) {
                 // Style spécifique pour les marqueurs temporaires
                 cacheColor = 'rgba(255, 0, 0, 0.8)'; // Rouge vif
-                strokeColor = '#ffffff';
+                strokeColor = '#000000'; // Bordure noire pour les marqueurs temporaires
                 strokeWidth = 2;
                 cacheRadius = 8;
                 shapePoints = 4; // Carré
@@ -690,7 +754,7 @@
 
             // Style spécifique pour les coordonnées corrigées
             if (isCorrected === true) {
-                strokeColor = '#ffcc00'; // Bordure dorée
+                strokeColor = '#000000'; // Bordure noire pour les coordonnées corrigées
                 strokeWidth = 2;
                 // Utiliser un carré si les coordonnées sont sauvegardées (si l'info est disponible),
                 // sinon un losange (carré non rotaté).
