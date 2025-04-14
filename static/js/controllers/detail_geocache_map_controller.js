@@ -25,14 +25,34 @@
 
         disconnect() {
             console.log('%c[DetailMapCtrl] Contrôleur déconnecté', "color:teal");
+            
+            // Nettoyer l'intervalle de vérification du sélecteur
+            if (this.selectorCheckInterval) {
+                clearInterval(this.selectorCheckInterval);
+                this.selectorCheckInterval = null;
+            }
+            
+            // Supprimer le gestionnaire d'événements de redimensionnement
+            if (this.resizeHandler) {
+                window.removeEventListener('resize', this.resizeHandler);
+                this.resizeHandler = null;
+            }
+            
             if (this.map) {
                 this.map.setTarget(null);
                 this.map = null;
             }
+            
             // Nettoyer les écouteurs si nécessaire
             if (this.contextMenu) {
                 document.body.removeChild(this.contextMenu);
                 this.contextMenu = null;
+            }
+            
+            // Nettoyer le sélecteur de fond de carte
+            if (this.baseLayerSelector && this.baseLayerSelector.parentNode) {
+                this.baseLayerSelector.parentNode.removeChild(this.baseLayerSelector);
+                this.baseLayerSelector = null;
             }
         }
 
@@ -53,9 +73,6 @@
                         url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png'
                     })
                 };
-
-                // Créer le menu de sélection des fonds de carte
-                this.createBaseLayerSelector();
 
                 // Créer la source et la couche vectorielle pour les points
                 this.vectorSource = new ol.source.Vector();
@@ -108,6 +125,13 @@
 
                 // Charger les données spécifiques à cette géocache
                 await this.loadGeocacheData();
+                
+                // Créer le menu de sélection des fonds de carte APRÈS le chargement des données
+                // pour s'assurer qu'il reste au-dessus
+                this.createBaseLayerSelector();
+                
+                // Configurer une vérification périodique pour s'assurer que le sélecteur reste visible
+                this.ensureBaseLayerSelectorVisibility();
 
             } catch (error) {
                 console.error('%c[DetailMapCtrl] Erreur lors de l\'initialisation de la carte:', "background:red; color:white", error);
@@ -291,24 +315,106 @@
         // Créer le sélecteur de fond de carte
         createBaseLayerSelector() {
             if (!this.hasContainerTarget) return;
+            
+            // Supprimer l'ancien sélecteur s'il existe
+            if (this.baseLayerSelector) {
+                try {
+                    if (this.baseLayerSelector.parentNode) {
+                        this.baseLayerSelector.parentNode.removeChild(this.baseLayerSelector);
+                    }
+                } catch(e) {
+                    console.warn('%c[DetailMapCtrl] Impossible de supprimer l\'ancien sélecteur:', "color:orange", e);
+                }
+            }
 
+            // Créer un conteneur compact
             const selectorContainer = document.createElement('div');
-            selectorContainer.className = 'absolute top-2 right-2 bg-white shadow-lg rounded-lg p-2 z-[1001]'; // Assurer un z-index élevé
-            selectorContainer.style.cssText = 'background-color: white; color: black;';
-
+            
+            // Positionner par rapport à la fenêtre mais calculer l'emplacement basé sur le conteneur
+            const containerRect = this.containerTarget.getBoundingClientRect();
+            const topOffset = containerRect.top + 10; // 10px de marge du haut
+            const rightOffset = window.innerWidth - containerRect.right + 10; // 10px de marge de la droite
+            
+            selectorContainer.className = 'fixed bg-white shadow-lg rounded-lg p-1';
+            selectorContainer.style.cssText = `
+                background-color: white; 
+                color: black; 
+                top: ${topOffset}px; 
+                right: ${rightOffset}px; 
+                z-index: 9999; 
+                pointer-events: auto;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            `;
+            
+            // Stocker une référence au sélecteur pour pouvoir le gérer plus tard
+            this.baseLayerSelector = selectorContainer;
+            
+            // Créer un simple élément select
             const select = document.createElement('select');
-            select.className = 'block w-full p-1 border border-gray-300 rounded-md text-sm';
-            select.addEventListener('change', (e) => this.changeBaseLayer(e.target.value));
-
-            Object.keys(this.tileSources).forEach(sourceName => {
-                const option = document.createElement('option');
-                option.value = sourceName;
-                option.textContent = sourceName;
-                select.appendChild(option);
+            select.className = 'block p-1 text-sm rounded border border-gray-300 focus:border-blue-500 focus:outline-none';
+            select.style.cssText = 'background-color: white; min-width: 120px;';
+            
+            // Définir les options de carte
+            const mapOptions = [
+                { id: 'OSM Standard', name: 'Standard (OSM)' },
+                { id: 'OSM Cyclo', name: 'Cycliste' },
+                { id: 'OSM Topo', name: 'Topographique' }
+            ];
+            
+            // Ajouter les options au select
+            mapOptions.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option.id;
+                optionElement.textContent = option.name;
+                select.appendChild(optionElement);
             });
-
+            
+            // Ajouter l'événement de changement
+            select.addEventListener('change', (e) => {
+                this.changeBaseLayer(e.target.value);
+            });
+            
             selectorContainer.appendChild(select);
-            this.containerTarget.appendChild(selectorContainer);
+            
+            // Ajouter le sélecteur directement au body
+            document.body.appendChild(selectorContainer);
+            
+            // Ajouter un gestionnaire d'événements pour adapter la position lors du redimensionnement
+            this.resizeHandler = () => {
+                if (this.baseLayerSelector) {
+                    const newRect = this.containerTarget.getBoundingClientRect();
+                    this.baseLayerSelector.style.top = (newRect.top + 10) + 'px';
+                    this.baseLayerSelector.style.right = (window.innerWidth - newRect.right + 10) + 'px';
+                }
+            };
+            
+            window.addEventListener('resize', this.resizeHandler);
+            
+            console.log('%c[DetailMapCtrl] Sélecteur compact de fond de carte créé', "color:green");
+        }
+        
+        // S'assurer que le sélecteur de fond de carte reste visible
+        ensureBaseLayerSelectorVisibility() {
+            // Vérifier si le sélecteur est toujours attaché au DOM
+            const checkSelector = () => {
+                if (!this.baseLayerSelector || !document.body.contains(this.baseLayerSelector)) {
+                    console.warn('%c[DetailMapCtrl] Sélecteur détecté comme manquant, recréation...', "color:orange");
+                    this.createBaseLayerSelector();
+                }
+                
+                // Mettre à jour la position en cas de changement dans la page
+                if (this.baseLayerSelector && this.containerTarget) {
+                    const containerRect = this.containerTarget.getBoundingClientRect();
+                    this.baseLayerSelector.style.top = (containerRect.top + 10) + 'px';
+                    this.baseLayerSelector.style.right = (window.innerWidth - containerRect.right + 10) + 'px';
+                }
+            };
+            
+            // Vérifier immédiatement
+            setTimeout(checkSelector, 500);
+            
+            // Puis vérifier périodiquement 
+            this.selectorCheckInterval = setInterval(checkSelector, 2000);
         }
 
         // Changer le fond de carte
@@ -316,6 +422,7 @@
             const tileLayer = this.map.getLayers().getArray().find(layer => layer instanceof ol.layer.Tile);
             if (tileLayer) {
                 tileLayer.setSource(this.tileSources[sourceName]);
+                console.log(`%c[DetailMapCtrl] Fond de carte changé pour: ${sourceName}`, "color:teal");
             }
         }
 
