@@ -176,6 +176,9 @@
             document.addEventListener('click', () => {
                 this.contextMenu.style.display = 'none';
             });
+            
+            // Rendre la couche de cercles visible par défaut
+            this.circleLayer.setVisible(true);
         }
         
         // Gérer le clic droit sur la carte
@@ -193,6 +196,14 @@
                 lonLat: lonLat
             };
             
+            // Vérifier si on a cliqué sur une feature
+            let clickedFeature = null;
+            this.map.forEachFeatureAtPixel(pixel, (feature) => {
+                if (!clickedFeature) {
+                    clickedFeature = feature;
+                }
+            }, { hitTolerance: 5 });
+            
             // Vérifier si un marqueur temporaire existe
             const hasTempMarker = this.vectorSource.getFeatures().some(feature => 
                 feature.get('temp_marker') === true);
@@ -204,34 +215,74 @@
                 longitude: lonLat[0].toFixed(6)
             };
             
-            // Contenu du menu
-            this.contextMenu.innerHTML = `
-                <div class="p-2 font-bold border-b border-gray-200">Coordonnées</div>
-                <div class="p-2">
-                    <div class="font-bold text-sm mb-1">Format DMS:</div>
-                    <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-dms">
-                        ${formattedCoords.latitude} ${formattedCoords.longitude}
-                        <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+            // Contenu du menu - varie selon si on a cliqué sur une feature ou non
+            if (clickedFeature) {
+                const props = clickedFeature.getProperties();
+                
+                // Vérifier si on a déjà un cercle pour cette feature
+                const hasCircle = this.circleSource.getFeatures().some(feature => {
+                    const circleProps = feature.getProperties();
+                    return circleProps.related_cache === props.gc_code;
+                });
+                
+                this.contextMenu.innerHTML = `
+                    <div class="p-2 font-bold border-b border-gray-200">Point: ${props.gc_code || 'Point'}</div>
+                    <div class="p-2">
+                        <div class="font-bold text-sm mb-1">Coordonnées:</div>
+                        <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-dms">
+                            ${formattedCoords.latitude} ${formattedCoords.longitude}
+                            <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                        </div>
                     </div>
-                </div>
-                <div class="p-2 border-t border-gray-200">
-                    <div class="font-bold text-sm mb-1">Format décimal:</div>
-                    <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-decimal">
-                        ${decimalCoords.latitude}, ${decimalCoords.longitude}
-                        <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                    <div class="p-2 border-t border-gray-200">
+                        <div class="font-bold text-sm mb-1">Format décimal:</div>
+                        <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-decimal">
+                            ${decimalCoords.latitude}, ${decimalCoords.longitude}
+                            <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                        </div>
                     </div>
-                </div>
-                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-marker">
-                    <i class="fas fa-map-marker-alt mr-2"></i> Ajouter un marqueur temporaire
-                </div>
-                ${hasTempMarker ? `
-                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="clear-temp-markers">
-                    <i class="fas fa-trash mr-2"></i> Supprimer tous les marqueurs temporaires
-                </div>` : ''}
-                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="close">
-                    Fermer
-                </div>
-            `;
+                    ${hasCircle ? 
+                        `<div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="remove-circle" data-gc-code="${props.gc_code}">
+                            <i class="fas fa-circle-minus mr-2"></i> Supprimer le cercle de 161m
+                        </div>` : 
+                        `<div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-circle" data-gc-code="${props.gc_code}">
+                            <i class="fas fa-circle-plus mr-2"></i> Ajouter un cercle de 161m
+                        </div>`
+                    }
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="close">
+                        Fermer
+                    </div>
+                `;
+            } else {
+                // Menu standard pour un clic sur la carte (sans feature)
+                this.contextMenu.innerHTML = `
+                    <div class="p-2 font-bold border-b border-gray-200">Coordonnées</div>
+                    <div class="p-2">
+                        <div class="font-bold text-sm mb-1">Format DMS:</div>
+                        <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-dms">
+                            ${formattedCoords.latitude} ${formattedCoords.longitude}
+                            <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                        </div>
+                    </div>
+                    <div class="p-2 border-t border-gray-200">
+                        <div class="font-bold text-sm mb-1">Format décimal:</div>
+                        <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-decimal">
+                            ${decimalCoords.latitude}, ${decimalCoords.longitude}
+                            <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                        </div>
+                    </div>
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-marker">
+                        <i class="fas fa-map-marker-alt mr-2"></i> Ajouter un marqueur temporaire
+                    </div>
+                    ${hasTempMarker ? `
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="clear-temp-markers">
+                        <i class="fas fa-trash mr-2"></i> Supprimer tous les marqueurs temporaires
+                    </div>` : ''}
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="close">
+                        Fermer
+                    </div>
+                `;
+            }
             
             // Positionner le menu à l'emplacement du clic
             this.contextMenu.style.left = `${evt.clientX}px`;
@@ -249,16 +300,37 @@
                 this.copyToClipboard(coordText, this.contextMenu.querySelector('[data-action="copy-decimal"]'));
             });
             
-            this.contextMenu.querySelector('[data-action="add-marker"]').addEventListener('click', () => {
-                this.addTemporaryMarker(this.rightClickCoords.lonLat[0], this.rightClickCoords.lonLat[1]);
-                this.contextMenu.style.display = 'none';
-            });
-            
-            if (hasTempMarker) {
-                this.contextMenu.querySelector('[data-action="clear-temp-markers"]').addEventListener('click', () => {
-                    this.clearTemporaryMarkers();
+            // Actions spécifiques selon le type de menu
+            if (clickedFeature) {
+                // Gestionnaires pour le menu sur un point existant
+                if (this.contextMenu.querySelector('[data-action="add-circle"]')) {
+                    this.contextMenu.querySelector('[data-action="add-circle"]').addEventListener('click', () => {
+                        const gcCode = this.contextMenu.querySelector('[data-action="add-circle"]').getAttribute('data-gc-code');
+                        this.addCircle161mToFeature(clickedFeature);
+                        this.contextMenu.style.display = 'none';
+                    });
+                }
+                
+                if (this.contextMenu.querySelector('[data-action="remove-circle"]')) {
+                    this.contextMenu.querySelector('[data-action="remove-circle"]').addEventListener('click', () => {
+                        const gcCode = this.contextMenu.querySelector('[data-action="remove-circle"]').getAttribute('data-gc-code');
+                        this.removeCircle161mFromFeature(gcCode);
+                        this.contextMenu.style.display = 'none';
+                    });
+                }
+            } else {
+                // Gestionnaires pour le menu standard (sans point)
+                this.contextMenu.querySelector('[data-action="add-marker"]').addEventListener('click', () => {
+                    this.addTemporaryMarker(this.rightClickCoords.lonLat[0], this.rightClickCoords.lonLat[1]);
                     this.contextMenu.style.display = 'none';
                 });
+                
+                if (hasTempMarker) {
+                    this.contextMenu.querySelector('[data-action="clear-temp-markers"]').addEventListener('click', () => {
+                        this.clearTemporaryMarkers();
+                        this.contextMenu.style.display = 'none';
+                    });
+                }
             }
             
             this.contextMenu.querySelector('[data-action="close"]').addEventListener('click', () => {
@@ -342,7 +414,7 @@
         // Créer le sélecteur de fond de carte avec option pour afficher les géocaches proches
         createBaseLayerSelector() {
             if (!this.hasContainerTarget) return;
-            
+
             // Supprimer l'ancien sélecteur s'il existe
             if (this.baseLayerSelector) {
                 try {
@@ -403,7 +475,7 @@
             select.addEventListener('change', (e) => {
                 this.changeBaseLayer(e.target.value);
             });
-            
+
             selectorContainer.appendChild(select);
             
             // Ajouter une case à cocher pour les géocaches proches
@@ -428,12 +500,25 @@
             circlesCheckbox.type = 'checkbox';
             circlesCheckbox.id = 'show-circles-161m';
             circlesCheckbox.className = 'mr-2 form-checkbox h-4 w-4 text-blue-600';
-            circlesCheckbox.disabled = true; // Désactivé par défaut
-            circlesCheckbox.style.opacity = '0.5'; // Grisé par défaut
+            
+            // Définir l'état initial en fonction de la visibilité de la couche de cercles
+            const hasManualCircles = this.circleSource.getFeatures().length > 0;
+            const isCircleLayerVisible = this.circleLayer.getVisible();
+            
+            // Si on a déjà des cercles et que la couche est visible, la case doit être cochée
+            if (hasManualCircles && isCircleLayerVisible) {
+                circlesCheckbox.checked = true;
+            }
+            
+            // Désactiver la case à cocher si les géocaches proches ne sont pas visibles
+            // et qu'il n'y a pas de cercles manuels
+            const isNearbyLayerVisible = this.nearbyLayer.getVisible();
+            circlesCheckbox.disabled = !isNearbyLayerVisible && !hasManualCircles;
+            circlesCheckbox.style.opacity = (isNearbyLayerVisible || hasManualCircles) ? '1' : '0.5';
             
             const circlesLabel = document.createElement('label');
             circlesLabel.htmlFor = 'show-circles-161m';
-            circlesLabel.className = 'text-sm text-gray-500'; // Texte grisé par défaut
+            circlesLabel.className = (isNearbyLayerVisible || hasManualCircles) ? 'text-sm text-gray-700' : 'text-sm text-gray-500';
             circlesLabel.textContent = 'Cercles 161m';
             
             // Gestionnaire pour les géocaches proches
@@ -441,13 +526,18 @@
                 const showNearby = nearbyCheckbox.checked;
                 this.toggleNearbyGeocaches(showNearby);
                 
-                // Activer/désactiver l'option des cercles en fonction de l'état des géocaches proches
-                circlesCheckbox.disabled = !showNearby;
-                circlesCheckbox.style.opacity = showNearby ? '1' : '0.5';
-                circlesLabel.className = showNearby ? 'text-sm text-gray-700' : 'text-sm text-gray-500';
+                // Vérifier s'il y a des cercles ajoutés manuellement
+                const hasManualCircles = this.circleSource.getFeatures().length > 0;
                 
-                // Si on désactive les géocaches proches, on désactive aussi les cercles
-                if (!showNearby && circlesCheckbox.checked) {
+                // Activer/désactiver l'option des cercles en fonction de l'état des géocaches proches
+                // et des cercles manuels existants
+                circlesCheckbox.disabled = !showNearby && !hasManualCircles;
+                circlesCheckbox.style.opacity = (showNearby || hasManualCircles) ? '1' : '0.5';
+                circlesLabel.className = (showNearby || hasManualCircles) ? 'text-sm text-gray-700' : 'text-sm text-gray-500';
+                
+                // Si on désactive les géocaches proches et qu'il n'y a pas de cercles manuels,
+                // on désactive aussi les cercles
+                if (!showNearby && circlesCheckbox.checked && !hasManualCircles) {
                     circlesCheckbox.checked = false;
                     this.toggleCircles161m(false);
                 }
@@ -501,7 +591,7 @@
         // Charger les géocaches proches depuis l'API
         async loadNearbyGeocaches() {
             if (!this.hasGeocacheIdValue) return;
-            
+
             try {
                 console.log(`%c[DetailMapCtrl] Chargement des géocaches proches pour ${this.geocacheIdValue}...`, "color:teal");
                 
@@ -607,7 +697,7 @@
                         });
                     }
                 }
-                
+
             } catch (error) {
                 console.error('%c[DetailMapCtrl] Erreur lors du chargement des géocaches proches:', "background:red; color:white", error);
             }
@@ -755,33 +845,33 @@
                     `;
                 } else {
                     // Affichage pour une géocache normale (existant)
-                    const coordInfo = properties.is_corrected
-                        ? `<div style="color: #ff5555; font-weight: bold; margin-top: 4px;">⚠️ Coordonnées corrigées</div>`
-                        : (properties.cache_type === 'Waypoint' ? '<div style="color: #4444ff; font-weight: bold; margin-top: 4px;">📍 Waypoint</div>' : '<div style="color: #55aa55; font-weight: bold; margin-top: 4px;">🎯 Coordonnées Originales</div>');
+                const coordInfo = properties.is_corrected
+                    ? `<div style="color: #ff5555; font-weight: bold; margin-top: 4px;">⚠️ Coordonnées corrigées</div>`
+                    : (properties.cache_type === 'Waypoint' ? '<div style="color: #4444ff; font-weight: bold; margin-top: 4px;">📍 Waypoint</div>' : '<div style="color: #55aa55; font-weight: bold; margin-top: 4px;">🎯 Coordonnées Originales</div>');
 
-                    const originalCoordInfo = (properties.is_corrected && properties.original_latitude && properties.original_longitude)
-                        ? `<div style="color: #999; margin-top: 4px; font-size: 0.9em;">Original: ${properties.original_latitude.toFixed(6)}, ${properties.original_longitude.toFixed(6)}</div>`
-                        : '';
+                const originalCoordInfo = (properties.is_corrected && properties.original_latitude && properties.original_longitude)
+                    ? `<div style="color: #999; margin-top: 4px; font-size: 0.9em;">Original: ${properties.original_latitude.toFixed(6)}, ${properties.original_longitude.toFixed(6)}</div>`
+                    : '';
 
-                    popupHtml = `
-                        <div>
-                            <div style="font-weight: bold; margin-bottom: 4px;">${properties.gc_code || 'Waypoint'}</div>
-                            <div style="margin-bottom: 4px;">${properties.name}</div>
-                            ${properties.cache_type !== 'Waypoint' ? `<div style="color: #666;">${properties.cache_type}</div>` : ''}
-                            ${properties.cache_type !== 'Waypoint' ? `
-                            <div style="margin-top: 8px;">
-                                <span style="font-weight: bold;">D:</span> ${properties.difficulty || '?'}
-                                <span style="font-weight: bold; margin-left: 8px;">T:</span> ${properties.terrain || '?'}
-                            </div>` : ''}
-                            <div style="margin-top: 4px; font-family: monospace; font-size: 0.9em;">
-                                ${properties.gc_lat || properties.latitude?.toFixed(6) || 'N/A'}<br>
-                                ${properties.gc_lon || properties.longitude?.toFixed(6) || 'N/A'}
-                            </div>
-                            ${coordInfo}
-                            ${originalCoordInfo}
-                            ${properties.note ? `<div style="color: #888; margin-top: 4px; font-size: 0.9em; max-height: 50px; overflow-y: auto;">Note: ${properties.note}</div>` : ''}
+                popupHtml = `
+                    <div>
+                        <div style="font-weight: bold; margin-bottom: 4px;">${properties.gc_code || 'Waypoint'}</div>
+                        <div style="margin-bottom: 4px;">${properties.name}</div>
+                        ${properties.cache_type !== 'Waypoint' ? `<div style="color: #666;">${properties.cache_type}</div>` : ''}
+                        ${properties.cache_type !== 'Waypoint' ? `
+                        <div style="margin-top: 8px;">
+                            <span style="font-weight: bold;">D:</span> ${properties.difficulty || '?'}
+                            <span style="font-weight: bold; margin-left: 8px;">T:</span> ${properties.terrain || '?'}
+                        </div>` : ''}
+                        <div style="margin-top: 4px; font-family: monospace; font-size: 0.9em;">
+                            ${properties.gc_lat || properties.latitude?.toFixed(6) || 'N/A'}<br>
+                            ${properties.gc_lon || properties.longitude?.toFixed(6) || 'N/A'}
                         </div>
-                    `;
+                        ${coordInfo}
+                        ${originalCoordInfo}
+                        ${properties.note ? `<div style="color: #888; margin-top: 4px; font-size: 0.9em; max-height: 50px; overflow-y: auto;">Note: ${properties.note}</div>` : ''}
+                    </div>
+                `;
                 }
 
                 this.popupContentTarget.innerHTML = popupHtml;
@@ -1060,8 +1150,9 @@
         toggleCircles161m(show) {
             console.log(`%c[DetailMapCtrl] ${show ? 'Affichage' : 'Masquage'} des cercles de 161m`, "color:teal");
             
-            if (show && this.circleSource.getFeatures().length === 0) {
-                // Générer les cercles si ce n'est pas encore fait
+            if (show) {
+                // Générer les cercles si ce n'est pas encore fait ou si la source n'a que des cercles ajoutés manuellement
+                // On regénère tous les cercles même s'il y a déjà des cercles manuels dans la source
                 this.generateCircles161m();
             }
             
@@ -1073,14 +1164,30 @@
         generateCircles161m() {
             console.log(`%c[DetailMapCtrl] Génération des cercles de 161m...`, "color:teal");
             
-            // Vider la source existante
-            this.circleSource.clear();
+            // Ne pas vider la source existante pour conserver les cercles ajoutés manuellement
+            // Créer un Set des codes de géocaches qui ont déjà un cercle
+            const existingCircleCodes = new Set();
+            this.circleSource.getFeatures().forEach(feature => {
+                const relatedCache = feature.get('related_cache');
+                if (relatedCache) {
+                    existingCircleCodes.add(relatedCache);
+                }
+            });
             
             // Ne générer les cercles que pour les géocaches proches (si elles sont visibles)
             if (this.nearbyLayer.getVisible()) {
                 const nearbyFeatures = this.nearbySource.getFeatures();
+                let newCirclesCount = 0;
+                
                 for (const feature of nearbyFeatures) {
                     const props = feature.getProperties();
+                    const gcCode = props.gc_code || 'Unknown';
+                    
+                    // Vérifier si ce code a déjà un cercle
+                    if (existingCircleCodes.has(gcCode)) {
+                        console.log(`%c[DetailMapCtrl] Cercle déjà existant pour ${gcCode}, ignoré`, "color:orange");
+                        continue;
+                    }
                     
                     // Vérifier si c'est une cache traditionnelle, une cache corrigée ou si elle est marquée comme résolue
                     if (props.cache_type === 'Traditional Cache' || props.solved === true || props.is_corrected === true) {
@@ -1089,12 +1196,57 @@
                         
                         // Créer un cercle de 161m autour du point
                         this.addCircle161m(center, props);
+                        newCirclesCount++;
                     }
                 }
                 
-                console.log(`%c[DetailMapCtrl] ${this.circleSource.getFeatures().length} cercles de 161m générés pour les géocaches proches`, "color:green");
+                console.log(`%c[DetailMapCtrl] ${newCirclesCount} nouveaux cercles de 161m générés pour les géocaches proches`, "color:green");
+                console.log(`%c[DetailMapCtrl] Total: ${this.circleSource.getFeatures().length} cercles de 161m`, "color:green");
             } else {
                 console.log(`%c[DetailMapCtrl] Aucun cercle généré - les géocaches proches ne sont pas visibles`, "color:orange");
+            }
+        }
+        
+        // Ajouter un cercle de 161m à une feature spécifique
+        addCircle161mToFeature(feature) {
+            const props = feature.getProperties();
+            const gcCode = props.gc_code || 'Unknown';
+            const geometry = feature.getGeometry();
+            const center = geometry.getCoordinates();
+            
+            console.log(`%c[DetailMapCtrl] Ajout manuel d'un cercle de 161m pour ${gcCode}`, "color:green");
+            
+            // S'assurer que la couche de cercles est visible
+            this.circleLayer.setVisible(true);
+            
+            // Mettre à jour l'état de la case à cocher si elle existe
+            if (this.baseLayerSelector) {
+                const circlesCheckbox = this.baseLayerSelector.querySelector('#show-circles-161m');
+                if (circlesCheckbox) {
+                    // Si nous sommes en train d'ajouter un cercle manuellement, la couche est visible
+                    circlesCheckbox.checked = true;
+                }
+            }
+            
+            // Ajouter le cercle
+            this.addCircle161m(center, props);
+        }
+        
+        // Supprimer le cercle de 161m associé à une géocache spécifique
+        removeCircle161mFromFeature(gcCode) {
+            console.log(`%c[DetailMapCtrl] Suppression du cercle de 161m pour ${gcCode}`, "color:orange");
+            
+            // Trouver et supprimer le cercle correspondant
+            const features = this.circleSource.getFeatures();
+            const circleFeature = features.find(feature => 
+                feature.get('related_cache') === gcCode
+            );
+            
+            if (circleFeature) {
+                this.circleSource.removeFeature(circleFeature);
+                console.log(`%c[DetailMapCtrl] Cercle supprimé pour ${gcCode}`, "color:orange");
+            } else {
+                console.warn(`%c[DetailMapCtrl] Aucun cercle trouvé pour ${gcCode}`, "color:orange");
             }
         }
         
