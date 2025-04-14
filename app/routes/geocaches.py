@@ -1748,6 +1748,93 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                             waypoints_added = process_additional_waypoints(existing_geocache, additional_waypoints[gc_code], ns)
                             stats['waypoints'] += waypoints_added
                         
+                        # Traiter les attributs de la géocache existante
+                        attributes_elem = cache_data.find('groundspeak:attributes', ns)
+                        if attributes_elem is not None:
+                            current_app.logger.debug(f"Mise à jour des attributs pour la géocache existante {gc_code}")
+                            # Commencer par effacer les attributs existants si demandé
+                            # existing_geocache.attributes.clear()
+                            
+                            attr_elements = attributes_elem.findall('groundspeak:attribute', ns)
+                            for attr_elem in attr_elements:
+                                try:
+                                    attr_id = attr_elem.get('id', '')
+                                    attr_inc = attr_elem.get('inc', '1')  # '1' = attribut positif, '0' = attribut négatif
+                                    is_negative = attr_inc == '0'
+                                    attr_text = attr_elem.text.strip() if attr_elem.text else ''
+                                    
+                                    current_app.logger.debug(f"Attribut trouvé: id={attr_id}, inc={attr_inc}, text={attr_text}")
+                                    
+                                    # Vérifier si cet attribut existe déjà pour cette géocache
+                                    existing_attr = False
+                                    for existing_attribute in existing_geocache.attributes:
+                                        # Simplifier les noms pour la comparaison
+                                        existing_name = existing_attribute.name.lower()
+                                        current_name = attr_text.lower()
+                                        
+                                        # Comparer les noms simplifiés
+                                        if (existing_name in current_name or current_name in existing_name or
+                                            (existing_attribute.base_name and 
+                                             existing_attribute.base_name.lower() in current_name)):
+                                            existing_attr = True
+                                            current_app.logger.debug(f"Attribut déjà présent: {existing_attribute.name}")
+                                            break
+                                    
+                                    if existing_attr:
+                                        continue
+                                    
+                                    # Chercher l'attribut dans la base de données
+                                    attribute = None
+                                    
+                                    # 1. Rechercher par nom
+                                    if attr_text:
+                                        # Essayer plusieurs variantes de noms
+                                        potential_names = [
+                                            attr_text,  # Nom complet
+                                            attr_text.split(' ')[0],  # Premier mot
+                                            attr_text.replace(' allowed', ''),  # Sans "allowed"
+                                            attr_text.replace(' nearby', ''),   # Sans "nearby"
+                                            attr_text.replace('No ', '')        # Sans "No "
+                                        ]
+                                        
+                                        for potential_name in potential_names:
+                                            attribute = Attribute.query.filter(
+                                                Attribute.name.like(f"%{potential_name}%")
+                                            ).first()
+                                            
+                                            if attribute:
+                                                # Vérifier si c'est le bon état (positif/négatif)
+                                                if Attribute.has_new_columns() and attribute.is_negative != is_negative:
+                                                    # Chercher l'attribut opposé
+                                                    opposite = attribute.opposite_attribute
+                                                    if opposite:
+                                                        attribute = opposite
+                                                break
+                                    
+                                    # 2. Si non trouvé, rechercher par icon_url
+                                    if not attribute and attr_id:
+                                        # Construire un nom de fichier probable
+                                        base_name = attr_text.lower().replace(' ', '_')
+                                        suffix = 'no' if is_negative else 'yes'
+                                        filename_pattern = f"{base_name}-{suffix}"
+                                        
+                                        # Rechercher tous les attributs et filtrer par icon_url
+                                        all_attributes = Attribute.query.all()
+                                        for attr in all_attributes:
+                                            if attr.icon_url and filename_pattern in attr.icon_url.lower():
+                                                attribute = attr
+                                                break
+                                    
+                                    # Si l'attribut existe, l'associer à la géocache
+                                    if attribute:
+                                        current_app.logger.debug(f"Ajout de l'attribut à la géocache existante: {attribute.name}")
+                                        existing_geocache.attributes.append(attribute)
+                                    else:
+                                        current_app.logger.warning(f"Attribut non trouvé dans la base: {attr_text}")
+                                        
+                                except Exception as e:
+                                    current_app.logger.error(f"Erreur lors du traitement de l'attribut existant: {str(e)}")
+                        
                         # Traiter les logs de cette géocache
                         cache_data = waypoint.find('groundspeak:cache', ns)
                         if cache_data is not None:
@@ -1870,6 +1957,73 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                 
                 # Associer la géocache à la zone
                 geocache.zones.append(zone)
+                
+                # Traiter les attributs de la géocache
+                attributes_elem = cache_data.find('groundspeak:attributes', ns)
+                if attributes_elem is not None:
+                    current_app.logger.debug(f"Traitement des attributs pour {gc_code}")
+                    attr_elements = attributes_elem.findall('groundspeak:attribute', ns)
+                    
+                    for attr_elem in attr_elements:
+                        try:
+                            attr_id = attr_elem.get('id', '')
+                            attr_inc = attr_elem.get('inc', '1')  # '1' = attribut positif, '0' = attribut négatif
+                            is_negative = attr_inc == '0'
+                            attr_text = attr_elem.text.strip() if attr_elem.text else ''
+                            
+                            current_app.logger.debug(f"Attribut trouvé: id={attr_id}, inc={attr_inc}, text={attr_text}")
+                            
+                            # Chercher l'attribut dans la base de données
+                            attribute = None
+                            
+                            # 1. Rechercher par nom
+                            if attr_text:
+                                # Essayer plusieurs variantes de noms
+                                potential_names = [
+                                    attr_text,  # Nom complet
+                                    attr_text.split(' ')[0],  # Premier mot
+                                    attr_text.replace(' allowed', ''),  # Sans "allowed"
+                                    attr_text.replace(' nearby', ''),   # Sans "nearby"
+                                    attr_text.replace('No ', '')        # Sans "No "
+                                ]
+                                
+                                for potential_name in potential_names:
+                                    attribute = Attribute.query.filter(
+                                        Attribute.name.like(f"%{potential_name}%")
+                                    ).first()
+                                    
+                                    if attribute:
+                                        # Vérifier si c'est le bon état (positif/négatif)
+                                        if Attribute.has_new_columns() and attribute.is_negative != is_negative:
+                                            # Chercher l'attribut opposé
+                                            opposite = attribute.opposite_attribute
+                                            if opposite:
+                                                attribute = opposite
+                                        break
+                            
+                            # 2. Si non trouvé, rechercher par icon_url
+                            if not attribute and attr_id:
+                                # Construire un nom de fichier probable
+                                base_name = attr_text.lower().replace(' ', '_')
+                                suffix = 'no' if is_negative else 'yes'
+                                filename_pattern = f"{base_name}-{suffix}"
+                                
+                                # Rechercher tous les attributs et filtrer par icon_url
+                                all_attributes = Attribute.query.all()
+                                for attr in all_attributes:
+                                    if attr.icon_url and filename_pattern in attr.icon_url.lower():
+                                        attribute = attr
+                                        break
+                            
+                            # Si l'attribut existe, l'associer à la géocache
+                            if attribute:
+                                current_app.logger.debug(f"Attribut trouvé dans la base: {attribute.name}")
+                                geocache.attributes.append(attribute)
+                            else:
+                                current_app.logger.warning(f"Attribut non trouvé dans la base: {attr_text}")
+                                
+                        except Exception as e:
+                            current_app.logger.error(f"Erreur lors du traitement de l'attribut: {str(e)}")
                 
                 # Ajouter la géocache à la base de données
                 db.session.add(geocache)
