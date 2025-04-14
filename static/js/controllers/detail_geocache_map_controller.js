@@ -30,6 +30,10 @@
                 this.map = null;
             }
             // Nettoyer les écouteurs si nécessaire
+            if (this.contextMenu) {
+                document.body.removeChild(this.contextMenu);
+                this.contextMenu = null;
+            }
         }
 
         async initializeMap() {
@@ -95,6 +99,12 @@
 
                 // Gérer les clics sur la carte pour afficher/masquer les popups
                 this.map.on('click', (evt) => this.handleMapClick(evt));
+                
+                // Initialiser le menu contextuel pour le clic droit
+                this.initContextMenu();
+                
+                // Ajouter un gestionnaire pour le clic droit
+                this.map.getViewport().addEventListener('contextmenu', (evt) => this.handleRightClick(evt));
 
                 // Charger les données spécifiques à cette géocache
                 await this.loadGeocacheData();
@@ -102,6 +112,180 @@
             } catch (error) {
                 console.error('%c[DetailMapCtrl] Erreur lors de l\'initialisation de la carte:', "background:red; color:white", error);
             }
+        }
+
+        // Initialiser le menu contextuel
+        initContextMenu() {
+            this.contextMenu = document.createElement('div');
+            this.contextMenu.className = 'absolute bg-white shadow-lg rounded-lg p-2 z-[1002]';
+            this.contextMenu.style.cssText = 'display: none; background-color: white; color: black; min-width: 200px; border: 1px solid #ccc;';
+            document.body.appendChild(this.contextMenu);
+            
+            // Fermer le menu contextuel lors d'un clic ailleurs
+            document.addEventListener('click', () => {
+                this.contextMenu.style.display = 'none';
+            });
+        }
+        
+        // Gérer le clic droit sur la carte
+        handleRightClick(evt) {
+            evt.preventDefault(); // Empêcher le menu contextuel du navigateur
+            
+            // Obtenir les coordonnées du clic
+            const pixel = this.map.getEventPixel(evt);
+            const coordinate = this.map.getCoordinateFromPixel(pixel);
+            const lonLat = ol.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
+            
+            // Stocker les coordonnées pour utilisation ultérieure
+            this.rightClickCoords = {
+                coordinate: coordinate,
+                lonLat: lonLat
+            };
+            
+            // Vérifier si un marqueur temporaire existe
+            const hasTempMarker = this.vectorSource.getFeatures().some(feature => 
+                feature.get('temp_marker') === true);
+            
+            // Formater les coordonnées au format geocaching (degrés, minutes, secondes)
+            const formattedCoords = this.formatGeoCoords(lonLat[1], lonLat[0]);
+            const decimalCoords = {
+                latitude: lonLat[1].toFixed(6),
+                longitude: lonLat[0].toFixed(6)
+            };
+            
+            // Contenu du menu
+            this.contextMenu.innerHTML = `
+                <div class="p-2 font-bold border-b border-gray-200">Coordonnées</div>
+                <div class="p-2">
+                    <div class="font-bold text-sm mb-1">Format DMS:</div>
+                    <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-dms">
+                        ${formattedCoords.latitude} ${formattedCoords.longitude}
+                        <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                    </div>
+                </div>
+                <div class="p-2 border-t border-gray-200">
+                    <div class="font-bold text-sm mb-1">Format décimal:</div>
+                    <div class="select-all cursor-pointer hover:bg-gray-100 p-1 rounded" data-action="copy-decimal">
+                        ${decimalCoords.latitude}, ${decimalCoords.longitude}
+                        <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
+                    </div>
+                </div>
+                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-marker">
+                    <i class="fas fa-map-marker-alt mr-2"></i> Ajouter un marqueur temporaire
+                </div>
+                ${hasTempMarker ? `
+                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="clear-temp-markers">
+                    <i class="fas fa-trash mr-2"></i> Supprimer tous les marqueurs temporaires
+                </div>` : ''}
+                <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="close">
+                    Fermer
+                </div>
+            `;
+            
+            // Positionner le menu à l'emplacement du clic
+            this.contextMenu.style.left = `${evt.clientX}px`;
+            this.contextMenu.style.top = `${evt.clientY}px`;
+            this.contextMenu.style.display = 'block';
+            
+            // Ajouter des gestionnaires d'événements pour les actions du menu
+            this.contextMenu.querySelector('[data-action="copy-dms"]').addEventListener('click', () => {
+                const coordText = `${formattedCoords.latitude} ${formattedCoords.longitude}`;
+                this.copyToClipboard(coordText, this.contextMenu.querySelector('[data-action="copy-dms"]'));
+            });
+            
+            this.contextMenu.querySelector('[data-action="copy-decimal"]').addEventListener('click', () => {
+                const coordText = `${decimalCoords.latitude}, ${decimalCoords.longitude}`;
+                this.copyToClipboard(coordText, this.contextMenu.querySelector('[data-action="copy-decimal"]'));
+            });
+            
+            this.contextMenu.querySelector('[data-action="add-marker"]').addEventListener('click', () => {
+                this.addTemporaryMarker(this.rightClickCoords.lonLat[0], this.rightClickCoords.lonLat[1]);
+                this.contextMenu.style.display = 'none';
+            });
+            
+            if (hasTempMarker) {
+                this.contextMenu.querySelector('[data-action="clear-temp-markers"]').addEventListener('click', () => {
+                    this.clearTemporaryMarkers();
+                    this.contextMenu.style.display = 'none';
+                });
+            }
+            
+            this.contextMenu.querySelector('[data-action="close"]').addEventListener('click', () => {
+                this.contextMenu.style.display = 'none';
+            });
+        }
+        
+        // Fonction utilitaire pour copier dans le presse-papier
+        copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    // Feedback visuel temporaire
+                    const originalText = element.innerHTML;
+                    element.innerHTML = '<div class="text-green-600 font-bold">Copié !</div>';
+                    setTimeout(() => {
+                        element.innerHTML = originalText;
+                    }, 1000);
+                })
+                .catch(err => {
+                    console.error('Erreur lors de la copie: ', err);
+                });
+        }
+        
+        // Ajouter un marqueur temporaire sur la carte
+        addTemporaryMarker(lon, lat) {
+            // Créer un ID unique pour ce marqueur temporaire
+            const tempMarkerId = `temp-marker-${Date.now()}`;
+            
+            // Vérifier s'il y a déjà un marqueur temporaire et le supprimer
+            const existingFeatures = this.vectorSource.getFeatures();
+            existingFeatures.forEach(feature => {
+                if (feature.get('temp_marker') === true) {
+                    this.vectorSource.removeFeature(feature);
+                }
+            });
+            
+            // Créer une nouvelle feature pour le marqueur temporaire
+            const tempFeature = new ol.Feature({
+                geometry: new ol.geom.Point(ol.proj.fromLonLat([lon, lat])),
+                name: 'Point temporaire',
+                temp_marker: true, // Marquer comme temporaire
+                id: tempMarkerId,
+                gc_code: 'TEMP',
+                cache_type: 'TempPoint',
+                latitude: lat,
+                longitude: lon
+            });
+            
+            // Ajouter la feature à la source vectorielle
+            this.vectorSource.addFeature(tempFeature);
+            
+            console.log(`%c[DetailMapCtrl] Marqueur temporaire ajouté (${lat.toFixed(6)}, ${lon.toFixed(6)})`, "color:green");
+            
+            return tempMarkerId;
+        }
+
+        // Formater les coordonnées au format géocaching
+        formatGeoCoords(lat, lon) {
+            // Formatter la latitude
+            const latDir = lat >= 0 ? 'N' : 'S';
+            lat = Math.abs(lat);
+            const latDeg = Math.floor(lat);
+            const latMinDec = (lat - latDeg) * 60;
+            const latMin = Math.floor(latMinDec);
+            const latSec = ((latMinDec - latMin) * 60).toFixed(3);
+            
+            // Formatter la longitude
+            const lonDir = lon >= 0 ? 'E' : 'W';
+            lon = Math.abs(lon);
+            const lonDeg = Math.floor(lon);
+            const lonMinDec = (lon - lonDeg) * 60;
+            const lonMin = Math.floor(lonMinDec);
+            const lonSec = ((lonMinDec - lonMin) * 60).toFixed(3);
+            
+            return {
+                latitude: `${latDir} ${latDeg}° ${latMin}' ${latSec}"`,
+                longitude: `${lonDir} ${lonDeg}° ${lonMin}' ${lonSec}"`
+            };
         }
 
         // Créer le sélecteur de fond de carte
@@ -328,8 +512,18 @@
             const cacheType = properties.cache_type;
             const isCorrected = properties.is_corrected;
             const isSaved = properties.is_saved; // is_saved n'est pas directement dans les données API, peut-être à ajouter ?
+            const isTempMarker = properties.temp_marker === true;
 
-            if (cacheType === 'Waypoint') {
+            if (isTempMarker) {
+                // Style spécifique pour les marqueurs temporaires
+                cacheColor = 'rgba(255, 0, 0, 0.8)'; // Rouge vif
+                strokeColor = '#ffffff';
+                strokeWidth = 2;
+                cacheRadius = 8;
+                shapePoints = 4; // Carré
+                shapeAngle = Math.PI / 4; // Rotation de 45 degrés (losange)
+                cacheIcon = '✖'; // Icône X
+            } else if (cacheType === 'Waypoint') {
                 cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu pour waypoint
                 cacheIcon = '📍';
                 cacheRadius = 7;
@@ -389,6 +583,19 @@
             }
 
             return style;
+        }
+
+        // Supprimer tous les marqueurs temporaires
+        clearTemporaryMarkers() {
+            const features = this.vectorSource.getFeatures();
+            const tempFeatures = features.filter(feature => feature.get('temp_marker') === true);
+            
+            if (tempFeatures.length > 0) {
+                tempFeatures.forEach(feature => {
+                    this.vectorSource.removeFeature(feature);
+                });
+                console.log(`%c[DetailMapCtrl] ${tempFeatures.length} marqueur(s) temporaire(s) supprimé(s)`, "color:orange");
+            }
         }
 
         // --- Futures méthodes pour interactions spécifiques --- 
