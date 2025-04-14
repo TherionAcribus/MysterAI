@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
 import json
-from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner, Log
+from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner, Log, Attribute
 from app.database import db
 from app.utils.geocache_scraper import scrape_geocache
 from shapely.geometry import Point
@@ -479,6 +479,113 @@ def add_geocache():
                         url=checker_data.get('url', '')
                     )
                     geocache.checkers.append(checker)
+
+        # Debug: afficher tous les attributs disponibles dans la base
+        logger.debug("Liste des attributs disponibles en base de données:")
+        Attribute.debug_all_attributes()
+
+        # Ajouter les attributes
+        if geocache_data.get('attributes'):
+            logger.debug(f"Données d'attributs reçues: {geocache_data.get('attributes')}")
+            logger.debug(f"Nombre d'attributs trouvés dans les données: {len(geocache_data.get('attributes', []))}")
+            
+            for attr_data in geocache_data['attributes']:
+                if isinstance(attr_data, dict):
+                    base_name = attr_data.get('name', '')
+                    is_negative = attr_data.get('is_negative', False)
+                    base_filename = attr_data.get('base_filename', '')
+                    
+                    logger.debug(f"Traitement de l'attribut: '{base_name}' (négatif: {is_negative}, fichier: {base_filename})")
+                    
+                    # Rechercher l'attribut dans la base de données
+                    attribute = None
+                    
+                    # Étape 1: Essayer de trouver par base_filename si disponible
+                    if base_filename:
+                        # Extraire la partie principale du nom de fichier (avant le -yes/-no)
+                        main_filename = base_filename
+                        if '-yes' in base_filename:
+                            main_filename = base_filename.replace('-yes', '')
+                            is_negative = False
+                        elif '-no' in base_filename:
+                            main_filename = base_filename.replace('-no', '')
+                            is_negative = True
+                            
+                        logger.debug(f"Recherche par nom de fichier principal: '{main_filename}', négatif: {is_negative}")
+                        
+                        # Rechercher tous les attributs et filtrer par icon_url
+                        attributes = Attribute.query.all()
+                        for attr in attributes:
+                            # Extraire le nom de fichier de l'icône
+                            if attr.icon_url and main_filename in attr.icon_url:
+                                # Vérifier aussi la correspondance positif/négatif
+                                if (is_negative and '-no' in attr.icon_url) or (not is_negative and '-yes' in attr.icon_url):
+                                    attribute = attr
+                                    logger.debug(f"Attribut trouvé par nom de fichier: {attr.name} (ID: {attr.id}, icon: {attr.icon_url})")
+                                    break
+                    
+                    # Étape 2: Si non trouvé, essayer par nom de base avec les nouvelles colonnes
+                    if not attribute and Attribute.has_new_columns():
+                        logger.debug("Recherche par nom de base et statut positif/négatif")
+                        
+                        # Essayons plusieurs variantes de noms
+                        potential_names = [
+                            base_name,  # Nom complet
+                            base_name.split(' ')[0],  # Premier mot
+                            base_name.replace(' allowed', ''),  # Sans "allowed"
+                            base_name.replace(' nearby', ''),   # Sans "nearby"
+                            base_name.replace('No ', '')        # Sans "No "
+                        ]
+                        
+                        for potential_name in potential_names:
+                            attribute = Attribute.query.filter(
+                                Attribute.base_name.like(f"%{potential_name}%"),
+                                Attribute.is_negative == is_negative
+                            ).first()
+                            
+                            if attribute:
+                                logger.debug(f"Attribut trouvé par nom de base partiel '{potential_name}': {attribute.name}")
+                                break
+                    
+                    # Étape 3: Si toujours non trouvé, essayer par nom simple
+                    if not attribute:
+                        logger.debug("Recherche par nom")
+                        
+                        # Essayons avec une recherche partielle
+                        attribute = Attribute.query.filter(
+                            Attribute.name.like(f"%{base_name}%")
+                        ).first()
+                        
+                        if attribute:
+                            logger.debug(f"Attribut trouvé par nom partiel: {attribute.name}")
+                    
+                    # Si l'attribut existe, l'associer à la géocache
+                    if attribute:
+                        logger.debug(f"Association de l'attribut '{attribute.name}' à la géocache {code}")
+                        geocache.attributes.append(attribute)
+                    else:
+                        logger.warning(f"Attribut '{base_name}' (négatif: {is_negative}, fichier: {base_filename}) non trouvé dans la base de données")
+                elif isinstance(attr_data, str):
+                    # Si l'attribut est une simple chaîne, essayer de le trouver par nom
+                    logger.debug(f"Attribut sous forme de chaîne: '{attr_data}'")
+                    attribute = Attribute.query.filter_by(name=attr_data).first()
+                    if attribute:
+                        logger.debug(f"Attribut trouvé par nom exact: {attribute.name} (ID: {attribute.id})")
+                        geocache.attributes.append(attribute)
+                    else:
+                        # Essayons de le trouver par nom partiel
+                        attribute = Attribute.query.filter(Attribute.name.like(f"%{attr_data}%")).first()
+                        if attribute:
+                            logger.debug(f"Attribut trouvé par nom partiel: {attribute.name} (ID: {attribute.id})")
+                            geocache.attributes.append(attribute)
+                        else:
+                            logger.warning(f"Attribut '{attr_data}' non trouvé dans la base de données")
+                else:
+                    logger.warning(f"Format d'attribut non reconnu: {type(attr_data)}")
+            
+            logger.debug(f"Nombre d'attributs associés à la géocache: {len(geocache.attributes)}")
+        else:
+            logger.debug("Aucun attribut reçu du scraper pour cette géocache")
 
         # Ajouter les images
         if geocache_data.get('images'):

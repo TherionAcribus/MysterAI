@@ -11,7 +11,7 @@ def setup_logger():
     # Créer le dossier logs s'il n'existe pas
     if not os.path.exists('logs'):
         os.makedirs('logs')
-    
+        
     # Configuration pour la sortie fichier
     logger.add(
         'logs/mystery_flask.log',
@@ -19,7 +19,7 @@ def setup_logger():
         retention="10 days",
         format=log_format,
         encoding='utf-8',
-        level="DEBUG",
+        level="DEBUG",  # Assurer que le niveau est DEBUG pour voir tous les messages
         enqueue=True,  # Rend le logging thread-safe
         mode="w",      # Mode d'écriture du fichier
         backtrace=True,
@@ -30,7 +30,7 @@ def setup_logger():
     logger.add(
         lambda msg: print(msg, flush=True),
         format=log_format,
-        level="DEBUG"
+        level="DEBUG"  # Assurer que le niveau est DEBUG pour voir tous les messages
     )
     
     return logger

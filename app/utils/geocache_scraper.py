@@ -107,21 +107,90 @@ def extract_owner(soup: BeautifulSoup) -> str:
         raise Exception("Impossible de trouver le propriétaire. Êtes-vous connecté sur geocaching.com ?")
     return owner_link.text.strip()
 
-def extract_attributes(soup: BeautifulSoup) -> List[str]:
+def extract_attributes(soup: BeautifulSoup) -> List[Dict]:
     """Extrait la liste des attributs de la géocache"""
+    logger.debug("Début de l'extraction des attributs")
+    
+    # Rechercher le div conteneur des attributs
     attributes_div = soup.find('div', {'class': 'WidgetBody'})
     if not attributes_div:
+        logger.debug("Div WidgetBody non trouvé, on cherche une autre div")
+        # Essayons de trouver une autre div qui pourrait contenir les attributs
+        attributes_div = soup.find('div', {'id': 'ctl00_ContentBody_detailWidget'})
+        if not attributes_div:
+            attributes_div = soup.find('div', {'id': 'ctl00_ContentBody_AttributesDiv'})
+        
+    if not attributes_div:
+        logger.debug("Aucun conteneur d'attributs trouvé")
         return []
     
     # Récupère toutes les images d'attributs et leurs titres
     attributes = []
-    for img in attributes_div.find_all('img'):
-        title = img.get('title', '').strip()
-        # Ne pas inclure les attributs vides (blank)
-        if title and title.lower() != 'blank':
-            attributes.append(title)
     
-    logger.debug(f"Attributs trouvés: {attributes}")
+    # Trouver toutes les images
+    img_tags = attributes_div.find_all('img')
+    logger.debug(f"Nombre d'images trouvées: {len(img_tags)}")
+    
+    for img in img_tags:
+        title = img.get('title', '').strip()
+        alt = img.get('alt', '').strip()
+        src = img.get('src', '').strip()
+        
+        # Les attributs ont généralement un titre et ne sont pas 'blank'
+        if (title or alt) and title.lower() != 'blank' and alt.lower() != 'blank':
+            attr_text = title or alt
+            logger.debug(f"Attribut trouvé: {attr_text}, source: {src}")
+            
+            # Pour les attributs au format "Attribute Name: Yes/No", extraire nom et statut
+            is_negative = False
+            attr_name = attr_text
+            
+            if ':' in attr_text:
+                parts = attr_text.split(':', 1)
+                attr_name = parts[0].strip()
+                attr_value = parts[1].strip().lower()
+                is_negative = 'no' in attr_value
+                logger.debug(f"Attribut formaté: nom='{attr_name}', valeur='{attr_value}', négatif={is_negative}")
+            else:
+                # Vérifier si le nom de l'attribut contient "yes" ou "no"
+                lower_text = attr_text.lower()
+                if ' - no' in lower_text or ' - non' in lower_text:
+                    is_negative = True
+                    # Extraire le nom sans le suffixe
+                    attr_name = attr_text.split(' - ')[0].strip()
+                
+                logger.debug(f"Attribut simple: nom='{attr_name}', négatif={is_negative}")
+            
+            # Essayer d'extraire le nom de base du fichier depuis l'URL de l'image
+            base_filename = None
+            if src:
+                try:
+                    # Exemple: .../attributes/boat-yes.png
+                    filename = src.split('/')[-1]
+                    base_filename = filename.split('.')[0]  # Enlever l'extension
+                    logger.debug(f"Nom de fichier extrait: {filename}, nom de base: {base_filename}")
+                except:
+                    logger.debug(f"Impossible d'extraire le nom de fichier de {src}")
+            
+            # Ajouter l'attribut formaté à la liste
+            attribute = {
+                'name': attr_name,
+                'is_negative': is_negative
+            }
+            if base_filename:
+                attribute['base_filename'] = base_filename
+            
+            attributes.append(attribute)
+    
+    logger.debug(f"Total des attributs trouvés: {len(attributes)}")
+    
+    # Dump les attributs en JSON pour les logs
+    try:
+        import json
+        logger.debug(f"Liste des attributs JSON: {json.dumps(attributes)}")
+    except:
+        logger.debug("Impossible de convertir les attributs en JSON")
+    
     return attributes
 
 def extract_cache_type(soup: BeautifulSoup) -> str:

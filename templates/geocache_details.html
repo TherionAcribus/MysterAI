@@ -44,7 +44,37 @@
                         <span class="text-gray-400">Favoris</span>
                         <div class="text-purple-400">{{ geocache.favorites_count }}</div>
                     </div>
-                    <div class="col-span-2">
+                </div>
+                
+                <!-- Attributs de la géocache, maintenant hors de la grille pour utiliser toute la largeur -->
+                {% if geocache.attributes %}
+                <div class="mt-4">
+                    <span class="text-gray-400 block mb-2">Attributs</span>
+                    <div class="flex flex-wrap gap-2">
+                        {% for attribute in geocache.attributes %}
+                        <div class="inline-block" title="{{ attribute.name }}">
+                            <img src="{{ attribute.icon_full_url }}" alt="{{ attribute.name }}" 
+                                 class="w-8 h-8 rounded bg-gray-700 p-1" 
+                                 onerror="this.onerror=null; this.src='/static/images/attributes/{{ attribute.icon_url }}';">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Coordonnées -->
+            <div class="bg-gray-800 rounded-lg p-4" id="geocache-coordinates">
+                <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
+                <div data-controller="geocache-coordinates" 
+                     data-geocache-coordinates-geocache-id-value="{{ geocache.id }}">
+                    <div id="geocache-coordinates-container" 
+                         data-geocache-coordinates-target="container">
+                        {% include 'partials/coordinates_display.html' %}
+                    </div>
+                    
+                    <!-- Statut de résolution -->
+                    <div class="mt-4 mb-4">
                         <span class="text-gray-400">Statut</span>
                         <select class="mt-1 bg-gray-700 text-white rounded px-2 py-1 w-full"
                                 data-action="change->geocache-coordinates#updateSolvedStatus"
@@ -60,18 +90,6 @@
                                 Résolu
                             </option>
                         </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Coordonnées -->
-            <div class="bg-gray-800 rounded-lg p-4" id="geocache-coordinates">
-                <h2 class="text-lg font-semibold text-gray-100 mb-4">Coordonnées</h2>
-                <div data-controller="geocache-coordinates" 
-                     data-geocache-coordinates-geocache-id-value="{{ geocache.id }}">
-                    <div id="geocache-coordinates-container" 
-                         data-geocache-coordinates-target="container">
-                        {% include 'partials/coordinates_display.html' %}
                     </div>
                     
                     <!-- Boutons d'action pour les coordonnées -->

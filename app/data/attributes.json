@@ -1,0 +1,492 @@
+[
+  {
+    "id": 1,
+    "group_id": 1,
+    "attribute_name": "Dogs",
+    "base_filename": "dogs",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 2,
+    "group_id": 2,
+    "attribute_name": "Access or parking fee",
+    "base_filename": "fee",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 3,
+    "group_id": 2,
+    "attribute_name": "Climbing gear",
+    "base_filename": "rappelling",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 4,
+    "group_id": 2,
+    "attribute_name": "Boat",
+    "base_filename": "boat",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 5,
+    "group_id": 2,
+    "attribute_name": "Scuba gear",
+    "base_filename": "scuba",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 6,
+    "group_id": 3,
+    "attribute_name": "Recommended for kids",
+    "base_filename": "kids",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 7,
+    "group_id": 3,
+    "attribute_name": "Takes less than an hour",
+    "base_filename": "onehour",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 8,
+    "group_id": 3,
+    "attribute_name": "Scenic view",
+    "base_filename": "scenic",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 9,
+    "group_id": 3,
+    "attribute_name": "Significant Hike",
+    "base_filename": "hiking",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 10,
+    "group_id": 3,
+    "attribute_name": "Difficult climbing",
+    "base_filename": "climbing",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 11,
+    "group_id": 3,
+    "attribute_name": "May require wading",
+    "base_filename": "wading",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 12,
+    "group_id": 3,
+    "attribute_name": "May require swimming",
+    "base_filename": "swimming",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 13,
+    "group_id": 3,
+    "attribute_name": "Available at all times",
+    "base_filename": "available",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 14,
+    "group_id": 3,
+    "attribute_name": "Recommended at night",
+    "base_filename": "night",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 15,
+    "group_id": 3,
+    "attribute_name": "Available during winter",
+    "base_filename": "winter",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 17,
+    "group_id": 4,
+    "attribute_name": "Poisonous plants",
+    "base_filename": "poisonoak",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 18,
+    "group_id": 4,
+    "attribute_name": "Dangerous Animals",
+    "base_filename": "dangerousanimals",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 19,
+    "group_id": 4,
+    "attribute_name": "Ticks",
+    "base_filename": "ticks",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 20,
+    "group_id": 4,
+    "attribute_name": "Abandoned mines",
+    "base_filename": "mine",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 21,
+    "group_id": 4,
+    "attribute_name": "Cliff / falling rocks",
+    "base_filename": "cliff",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 22,
+    "group_id": 4,
+    "attribute_name": "Hunting",
+    "base_filename": "hunting",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 23,
+    "group_id": 4,
+    "attribute_name": "Dangerous area",
+    "base_filename": "danger",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 24,
+    "group_id": 5,
+    "attribute_name": "Wheelchair accessible",
+    "base_filename": "wheelchair",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 25,
+    "group_id": 5,
+    "attribute_name": "Parking available",
+    "base_filename": "parking",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 26,
+    "group_id": 5,
+    "attribute_name": "Public transportation",
+    "base_filename": "public",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 27,
+    "group_id": 5,
+    "attribute_name": "Drinking water nearby",
+    "base_filename": "water",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 28,
+    "group_id": 5,
+    "attribute_name": "Public restrooms nearby",
+    "base_filename": "restrooms",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 29,
+    "group_id": 5,
+    "attribute_name": "Telephone nearby",
+    "base_filename": "phone",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 30,
+    "group_id": 5,
+    "attribute_name": "Picnic tables nearby",
+    "base_filename": "picnic",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 31,
+    "group_id": 5,
+    "attribute_name": "Camping available",
+    "base_filename": "camping",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 32,
+    "group_id": 1,
+    "attribute_name": "Bicycles",
+    "base_filename": "bicycles",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 33,
+    "group_id": 1,
+    "attribute_name": "Motorcycles",
+    "base_filename": "motorcycles",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 34,
+    "group_id": 1,
+    "attribute_name": "Quads",
+    "base_filename": "quads",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 35,
+    "group_id": 1,
+    "attribute_name": "Off-road vehicles",
+    "base_filename": "jeeps",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 36,
+    "group_id": 1,
+    "attribute_name": "Snowmobiles",
+    "base_filename": "snowmobiles",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 37,
+    "group_id": 1,
+    "attribute_name": "Horses",
+    "base_filename": "horses",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 38,
+    "group_id": 1,
+    "attribute_name": "Campfires",
+    "base_filename": "campfires",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 39,
+    "group_id": 4,
+    "attribute_name": "Thorns",
+    "base_filename": "thorn",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 40,
+    "group_id": 3,
+    "attribute_name": "Stealth required",
+    "base_filename": "stealth",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 41,
+    "group_id": 5,
+    "attribute_name": "Stroller accessible",
+    "base_filename": "stroller",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 42,
+    "group_id": 3,
+    "attribute_name": "Needs Maintenance",
+    "base_filename": "firstaid",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 43,
+    "group_id": 3,
+    "attribute_name": "Watch for livestock",
+    "base_filename": "cow",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 44,
+    "group_id": 2,
+    "attribute_name": "Flashlight required",
+    "base_filename": "flashlight",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 45,
+    "group_id": 6,
+    "attribute_name": "Lost And Found Tour",
+    "base_filename": "landf",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 46,
+    "group_id": 1,
+    "attribute_name": "Truck Driver/RV",
+    "base_filename": "rv",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 47,
+    "group_id": 3,
+    "attribute_name": "Field Puzzle",
+    "base_filename": "field_puzzle",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 48,
+    "group_id": 2,
+    "attribute_name": "UV Light Required",
+    "base_filename": "UV",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 49,
+    "group_id": 2,
+    "attribute_name": "Snowshoes",
+    "base_filename": "snowshoes",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 50,
+    "group_id": 2,
+    "attribute_name": "Cross Country Skis",
+    "base_filename": "skiis",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 51,
+    "group_id": 2,
+    "attribute_name": "Special Tool Required",
+    "base_filename": "s-tool",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 52,
+    "group_id": 3,
+    "attribute_name": "Night Cache",
+    "base_filename": "nightcache",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 53,
+    "group_id": 3,
+    "attribute_name": "Park and Grab",
+    "base_filename": "parkngrab",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 54,
+    "group_id": 3,
+    "attribute_name": "Abandoned Structure",
+    "base_filename": "AbandonedBuilding",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 55,
+    "group_id": 3,
+    "attribute_name": "Short hike (less than 1km)",
+    "base_filename": "hike_short",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 56,
+    "group_id": 3,
+    "attribute_name": "Medium hike (1km-10km)",
+    "base_filename": "hike_med",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 57,
+    "group_id": 3,
+    "attribute_name": "Long Hike (+10km)",
+    "base_filename": "hike_long",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 58,
+    "group_id": 5,
+    "attribute_name": "Fuel Nearby",
+    "base_filename": "fuel",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 59,
+    "group_id": 5,
+    "attribute_name": "Food Nearby",
+    "base_filename": "food",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 60,
+    "group_id": 2,
+    "attribute_name": "Wireless Beacon",
+    "base_filename": "wirelessbeacon",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 61,
+    "group_id": 6,
+    "attribute_name": "Partnership Cache",
+    "base_filename": "partnership",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 62,
+    "group_id": 3,
+    "attribute_name": "Seasonal Access",
+    "base_filename": "seasonal",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 63,
+    "group_id": 3,
+    "attribute_name": "Tourist Friendly",
+    "base_filename": "touristOK",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 64,
+    "group_id": 2,
+    "attribute_name": "Tree Climbing",
+    "base_filename": "treeclimbing",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 65,
+    "group_id": 3,
+    "attribute_name": "Front Yard (Private Residence)",
+    "base_filename": "frontyard",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 66,
+    "group_id": 3,
+    "attribute_name": "Teamwork Required",
+    "base_filename": "teamwork",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 67,
+    "group_id": 6,
+    "attribute_name": "GeoTour",
+    "base_filename": "geotour",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 69,
+    "group_id": 6,
+    "attribute_name": "Bonus cache",
+    "base_filename": "bonuscache",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 70,
+    "group_id": 6,
+    "attribute_name": "Power trail",
+    "base_filename": "powertrail",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 71,
+    "group_id": 6,
+    "attribute_name": "Challenge cache",
+    "base_filename": "challengecache",
+    "variants": ["yes", "no"]
+  },
+  {
+    "id": 72,
+    "group_id": 6,
+    "attribute_name": "Geocaching.com solution checker",
+    "base_filename": "hqsolutionchecker",
+    "variants": ["yes", "no"]
+  }
+] 

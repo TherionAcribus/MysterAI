@@ -6,6 +6,7 @@ from shapely.geometry import Point
 from bs4 import BeautifulSoup
 from flask import url_for, current_app
 import os
+from sqlalchemy import inspect
 
 def decimal_to_dm(decimal_degrees):
     """Convertit des degrés décimaux en degrés et minutes décimales"""
@@ -130,12 +131,80 @@ class Attribute(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False, unique=True)
     icon_url = db.Column(db.String(200))
+    is_negative = db.Column(db.Boolean, default=False)
+    base_name = db.Column(db.String(50))  # Stocke le nom de base sans le suffixe yes/no
     
     geocaches = db.relationship('Geocache', secondary='geocache_attribute', back_populates='attributes')
+    
+    @property
+    def opposite_attribute(self):
+        """Retourne l'attribut opposé (positif si négatif, négatif si positif)"""
+        if not self.base_name:
+            return None
+            
+        # Vérifier si la colonne existe
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('attribute')]
+        if 'is_negative' not in columns or 'base_name' not in columns:
+            return None
+        
+        # Chercher l'attribut opposé
+        opposite_is_negative = not self.is_negative
+        return Attribute.query.filter_by(
+            base_name=self.base_name, 
+            is_negative=opposite_is_negative
+        ).first()
+    
+    @property
+    def icon_full_url(self):
+        """Retourne l'URL complète de l'icône"""
+        from flask import current_app, url_for
+        if not self.icon_url:
+            return None
+        try:
+            return url_for('static', filename=f'images/attributes/{self.icon_url}')
+        except:
+            # En cas d'erreur (hors contexte Flask), retourne simplement le chemin relatif
+            return f'/static/images/attributes/{self.icon_url}'
+    
+    @staticmethod
+    def get_by_base_name(base_name, is_negative=False):
+        """Récupère un attribut par son nom de base et son type (positif/négatif)"""
+        # Vérifier si les colonnes existent
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('attribute')]
+        if 'is_negative' not in columns or 'base_name' not in columns:
+            return None
+            
+        return Attribute.query.filter_by(
+            base_name=base_name,
+            is_negative=is_negative
+        ).first()
+        
+    @staticmethod
+    def has_new_columns():
+        """Vérifie si les nouvelles colonnes existent déjà"""
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('attribute')]
+        return 'is_negative' in columns and 'base_name' in columns
+    
+    @staticmethod
+    def debug_all_attributes():
+        """Affiche tous les attributs en base de données pour debug"""
+        from app.utils.logger import setup_logger
+        logger = setup_logger()
+        
+        attributes = Attribute.query.all()
+        logger.debug(f"Total des attributs en base: {len(attributes)}")
+        
+        for attr in attributes:
+            logger.debug(f"ID: {attr.id}, Nom: {attr.name}, Icône: {attr.icon_url}, " +
+                         f"Base name: {attr.base_name}, Négatif: {attr.is_negative}")
+        
+        return attributes
 
 class GeocacheAttribute(db.Model):
     __table_args__ = {'extend_existing': True}
-    id = db.Column(db.Integer, primary_key=True)
     geocache_id = db.Column(db.Integer, db.ForeignKey('geocache.id'), primary_key=True)
     attribute_id = db.Column(db.Integer, db.ForeignKey('attribute.id'), primary_key=True)
     is_on = db.Column(db.Boolean, default=True)

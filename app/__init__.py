@@ -1,14 +1,16 @@
 import logging
 import os
+import json
 from flask import Flask, send_from_directory, jsonify, request, render_template, url_for
 from flask_cors import CORS
 from flask_migrate import Migrate
 from app.database import db
 from app.config import Config
-from app.models.geocache import Zone, Geocache
+from app.models.geocache import Zone, Geocache, Attribute
 from app.plugin_manager import PluginManager
 from app.utils.logger import setup_logger
 import base64
+from sqlalchemy import inspect
 
 logger = setup_logger()
 
@@ -93,6 +95,60 @@ def create_app():
             default_zone = Zone(name="default", description="Default zone")
             db.session.add(default_zone)
             db.session.commit()
+            
+        # Initialisation des attributs de geocaching si nécessaire
+        try:
+            # Vérifier si la table existe et si les colonnes sont présentes
+            inspector = inspect(db.engine)
+            if 'attribute' in inspector.get_table_names():
+                # Vérifier si des attributs existent déjà
+                attribute_count = db.session.query(db.func.count(Attribute.id)).scalar()
+                if attribute_count == 0:
+                    logger.info("Initializing geocaching attributes...")
+                    try:
+                        # Charger les attributs depuis le fichier JSON
+                        json_path = os.path.join(app.config['BASEDIR'], 'app', 'data', 'attributes.json')
+                        with open(json_path, 'r', encoding='utf-8') as f:
+                            attributes_data = json.load(f)
+                        
+                        # Vérifier si les nouvelles colonnes existent
+                        columns = [c['name'] for c in inspector.get_columns('attribute')]
+                        has_new_columns = 'is_negative' in columns and 'base_name' in columns
+                        
+                        # Créer les attributs en base de données
+                        for attr_data in attributes_data:
+                            base_name = attr_data['attribute_name']
+                            base_filename = attr_data['base_filename']
+                            
+                            # Pour chaque variante (yes/no), créer un attribut distinct
+                            for variant in attr_data.get('variants', ['yes']):
+                                attr_name = f"{base_name} - {variant.upper()}" if variant != 'yes' else base_name
+                                icon_url = f"{base_filename}-{variant}.png"
+                                is_negative = variant == 'no'
+                                
+                                # Créer l'attribut
+                                if has_new_columns:
+                                    attribute = Attribute(
+                                        name=attr_name, 
+                                        icon_url=icon_url,
+                                        is_negative=is_negative,
+                                        base_name=base_name
+                                    )
+                                else:
+                                    attribute = Attribute(
+                                        name=attr_name, 
+                                        icon_url=icon_url
+                                    )
+                                db.session.add(attribute)
+                        
+                        db.session.commit()
+                        logger.info(f"Successfully initialized {len(attributes_data) * 2} geocaching attributes")
+                    except Exception as e:
+                        logger.error(f"Error initializing geocaching attributes: {str(e)}")
+                        # Rollback en cas d'erreur
+                        db.session.rollback()
+        except Exception as e:
+            logger.error(f"Error checking attributes table: {str(e)}")
 
         # Initialisation du gestionnaire de plugins
         logger.info("Initializing PluginManager...")
