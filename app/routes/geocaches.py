@@ -2282,3 +2282,77 @@ def reset_coordinates():
             'message': f"Erreur lors de la réinitialisation des coordonnées: {str(e)}",
             'error': str(e)
         }), 500
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>', methods=['GET'])
+def get_geocache_map_data(geocache_id):
+    """
+    Récupère toutes les données d'une géocache pour l'affichage sur la carte.
+    Combine les informations de base avec les coordonnées et les waypoints.
+    """
+    logger.debug(f"Récupération des données de la géocache {geocache_id} pour la carte")
+    
+    geocache = Geocache.query.options(
+        db.joinedload(Geocache.additional_waypoints)
+    ).get_or_404(geocache_id)
+    
+    # Préparer les données de base de la géocache
+    geocache_data = {
+        'id': geocache.id,
+        'gc_code': geocache.gc_code,
+        'name': geocache.name,
+        'cache_type': geocache.cache_type,
+        'difficulty': geocache.difficulty,
+        'terrain': geocache.terrain,
+        'size': geocache.size,
+        'solved': geocache.solved,
+        'owner_name': geocache.owner.name if geocache.owner else None
+    }
+    
+    # Ajouter le retour de la fonction get_geocache_coordinates
+    coordinates = {}
+    
+    # Coordonnées originales
+    coordinates['original'] = {
+        'latitude': geocache.latitude,
+        'longitude': geocache.longitude,
+        'gc_lat': geocache.gc_lat,
+        'gc_lon': geocache.gc_lon,
+        'type': 'original',
+        'is_corrected': False
+    }
+    
+    # Ajouter les coordonnées corrigées si elles existent
+    if geocache.latitude_corrected is not None and geocache.longitude_corrected is not None:
+        coordinates['corrected'] = {
+            'latitude': geocache.latitude_corrected,
+            'longitude': geocache.longitude_corrected,
+            'gc_lat': geocache.gc_lat_corrected,
+            'gc_lon': geocache.gc_lon_corrected,
+            'type': 'corrected',
+            'is_corrected': True
+        }
+    
+    # Ajouter les waypoints additionnels
+    coordinates['waypoints'] = [
+        {
+            'id': wp.id,
+            'name': wp.name,
+            'prefix': wp.prefix,
+            'lookup': wp.lookup,
+            'latitude': wp.latitude,
+            'longitude': wp.longitude,
+            'gc_lat': wp.gc_lat,
+            'gc_lon': wp.gc_lon,
+            'type': 'waypoint',
+            'is_corrected': False,
+            'note': wp.note
+        } 
+        for wp in geocache.additional_waypoints 
+        if wp.latitude is not None and wp.longitude is not None
+    ]
+    
+    # Combiner les données
+    geocache_data.update(coordinates)
+    
+    logger.debug(f"Données récupérées pour la géocache {geocache.gc_code}")
+    return jsonify(geocache_data)
