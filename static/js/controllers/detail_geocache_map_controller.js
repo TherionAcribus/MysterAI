@@ -15,12 +15,25 @@
         }
 
         connect() {
-            console.log('%c[DetailMapCtrl] Contrôleur connecté pour la géocache:', "color:teal", this.geocacheIdValue);
-            if (this.hasGeocacheIdValue) {
-                this.initializeMap();
-            } else {
-                console.error('%c[DetailMapCtrl] Erreur: geocacheIdValue manquant', "background:red; color:white");
-            }
+            console.log('Detail Geocache Map Controller connected');
+            
+            // Définir des propriétés pour suivre l'état
+            this.isMapInitialized = false;
+            this.geocacheId = this.geocacheIdValue;
+            this.geocacheCode = this.geocacheCodeValue;
+            
+            this.initializeMap()
+                .then(() => {
+                    console.log('Map initialized successfully');
+                    this.isMapInitialized = true;
+                })
+                .catch(error => {
+                    console.error('Failed to initialize map:', error);
+                });
+            
+            // Écouter l'événement de waypoint sauvegardé
+            this.waypointSavedHandler = this.handleWaypointSaved.bind(this);
+            document.addEventListener('waypointSaved', this.waypointSavedHandler);
         }
 
         disconnect() {
@@ -54,6 +67,9 @@
                 this.baseLayerSelector.parentNode.removeChild(this.baseLayerSelector);
                 this.baseLayerSelector = null;
             }
+
+            // Nettoyer les écouteurs d'événements lors de la déconnexion
+            document.removeEventListener('waypointSaved', this.waypointSavedHandler);
         }
 
         async initializeMap() {
@@ -241,14 +257,16 @@
                             <div class="text-xs text-gray-500 mt-1">Cliquer pour copier</div>
                         </div>
                     </div>
-                    ${hasCircle ? 
-                        `<div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="remove-circle" data-gc-code="${props.gc_code}">
-                            <i class="fas fa-circle-minus mr-2"></i> Supprimer le cercle de 161m
-                        </div>` : 
-                        `<div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-circle" data-gc-code="${props.gc_code}">
-                            <i class="fas fa-circle-plus mr-2"></i> Ajouter un cercle de 161m
-                        </div>`
-                    }
+                    ${hasCircle ? `
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="remove-circle" data-gc-code="${props.gc_code}">
+                        <i class="fas fa-times-circle mr-2"></i> Supprimer le cercle de 161m
+                    </div>` : `
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-circle" data-gc-code="${props.gc_code}">
+                        <i class="fas fa-circle mr-2"></i> Ajouter un cercle de 161m
+                    </div>`}
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-waypoint-from-feature">
+                        <i class="fas fa-map-pin mr-2"></i> Créer un Waypoint à ce point
+                    </div>
                     <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="close">
                         Fermer
                     </div>
@@ -273,6 +291,9 @@
                     </div>
                     <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-marker">
                         <i class="fas fa-map-marker-alt mr-2"></i> Ajouter un marqueur temporaire
+                    </div>
+                    <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="add-waypoint">
+                        <i class="fas fa-map-pin mr-2"></i> Ajouter un Waypoint
                     </div>
                     ${hasTempMarker ? `
                     <div class="p-2 cursor-pointer hover:bg-gray-100 border-t border-gray-200" data-action="clear-temp-markers">
@@ -318,10 +339,27 @@
                         this.contextMenu.style.display = 'none';
                     });
                 }
+                
+                if (this.contextMenu.querySelector('[data-action="add-waypoint-from-feature"]')) {
+                    this.contextMenu.querySelector('[data-action="add-waypoint-from-feature"]').addEventListener('click', () => {
+                        const props = clickedFeature.getProperties();
+                        const coordinates = clickedFeature.getGeometry().getCoordinates();
+                        const lonLat = ol.proj.transform(coordinates, 'EPSG:3857', 'EPSG:4326');
+                        
+                        // Utiliser les propriétés de la feature pour pré-remplir le waypoint
+                        this.openWaypointForm(lonLat[0], lonLat[1], props);
+                        this.contextMenu.style.display = 'none';
+                    });
+                }
             } else {
                 // Gestionnaires pour le menu standard (sans point)
                 this.contextMenu.querySelector('[data-action="add-marker"]').addEventListener('click', () => {
                     this.addTemporaryMarker(this.rightClickCoords.lonLat[0], this.rightClickCoords.lonLat[1]);
+                    this.contextMenu.style.display = 'none';
+                });
+                
+                this.contextMenu.querySelector('[data-action="add-waypoint"]').addEventListener('click', () => {
+                    this.openWaypointForm(this.rightClickCoords.lonLat[0], this.rightClickCoords.lonLat[1]);
                     this.contextMenu.style.display = 'none';
                 });
                 
@@ -355,26 +393,30 @@
         }
         
         // Ajouter un marqueur temporaire sur la carte
-        addTemporaryMarker(lon, lat) {
+        addTemporaryMarker(lon, lat, isWaypointMarker = false) {
             // Créer un ID unique pour ce marqueur temporaire
             const tempMarkerId = `temp-marker-${Date.now()}`;
             
             // Vérifier s'il y a déjà un marqueur temporaire et le supprimer
-            const existingFeatures = this.vectorSource.getFeatures();
-            existingFeatures.forEach(feature => {
-                if (feature.get('temp_marker') === true) {
-                    this.vectorSource.removeFeature(feature);
-                }
-            });
+            // Mais uniquement si ce n'est pas un marqueur de waypoint
+            if (!isWaypointMarker) {
+                const existingFeatures = this.vectorSource.getFeatures();
+                existingFeatures.forEach(feature => {
+                    if (feature.get('temp_marker') === true && feature.get('waypoint_marker') !== true) {
+                        this.vectorSource.removeFeature(feature);
+                    }
+                });
+            }
             
             // Créer une nouvelle feature pour le marqueur temporaire
             const tempFeature = new ol.Feature({
                 geometry: new ol.geom.Point(ol.proj.fromLonLat([lon, lat])),
-                name: 'Point temporaire',
+                name: isWaypointMarker ? 'Nouveau waypoint' : 'Point temporaire',
                 temp_marker: true, // Marquer comme temporaire
+                waypoint_marker: isWaypointMarker, // Marquer comme un marqueur de waypoint
                 id: tempMarkerId,
-                gc_code: 'TEMP',
-                cache_type: 'TempPoint',
+                gc_code: isWaypointMarker ? 'WP' : 'TEMP',
+                cache_type: isWaypointMarker ? 'Waypoint' : 'TempPoint',
                 latitude: lat,
                 longitude: lon
             });
@@ -382,32 +424,38 @@
             // Ajouter la feature à la source vectorielle
             this.vectorSource.addFeature(tempFeature);
             
-            console.log(`%c[DetailMapCtrl] Marqueur temporaire ajouté (${lat.toFixed(6)}, ${lon.toFixed(6)})`, "color:green");
+            console.log(`%c[DetailMapCtrl] Marqueur ${isWaypointMarker ? 'waypoint' : 'temporaire'} ajouté (${lat.toFixed(6)}, ${lon.toFixed(6)})`, "color:green");
             
             return tempMarkerId;
         }
 
         // Formater les coordonnées au format géocaching
         formatGeoCoords(lat, lon) {
-            // Formatter la latitude
+            // Formatter la latitude au format DDM (Degrés, Minutes décimales)
             const latDir = lat >= 0 ? 'N' : 'S';
             lat = Math.abs(lat);
             const latDeg = Math.floor(lat);
-            const latMinDec = (lat - latDeg) * 60;
-            const latMin = Math.floor(latMinDec);
-            const latSec = ((latMinDec - latMin) * 60).toFixed(3);
+            let latMin = ((lat - latDeg) * 60).toFixed(3);
             
-            // Formatter la longitude
+            // Ajouter un zéro devant si nécessaire (par ex. 8.123 -> 08.123)
+            if (parseFloat(latMin) < 10) {
+                latMin = '0' + latMin;
+            }
+            
+            // Formatter la longitude au format DDM (Degrés, Minutes décimales)
             const lonDir = lon >= 0 ? 'E' : 'W';
             lon = Math.abs(lon);
             const lonDeg = Math.floor(lon);
-            const lonMinDec = (lon - lonDeg) * 60;
-            const lonMin = Math.floor(lonMinDec);
-            const lonSec = ((lonMinDec - lonMin) * 60).toFixed(3);
+            let lonMin = ((lon - lonDeg) * 60).toFixed(3);
+            
+            // Ajouter un zéro devant si nécessaire
+            if (parseFloat(lonMin) < 10) {
+                lonMin = '0' + lonMin;
+            }
             
             return {
-                latitude: `${latDir} ${latDeg}° ${latMin}' ${latSec}"`,
-                longitude: `${lonDir} ${lonDeg}° ${lonMin}' ${lonSec}"`
+                latitude: `${latDir} ${latDeg}° ${latMin}`,
+                longitude: `${lonDir} ${lonDeg}° ${lonMin}`
             };
         }
 
@@ -1317,6 +1365,320 @@
         // Convertir des radians en degrés
         rad2deg(rad) {
             return rad * (180/Math.PI);
+        }
+
+        // Ouvrir le formulaire d'ajout de waypoint dans le composant de détails de la géocache active
+        openWaypointForm(lon, lat, featureProps = null) {
+            try {
+                // Obtenir les informations sur le composant actif (la page détails de la géocache)
+                const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+                
+                if (!activeComponent || activeComponent.type !== 'geocache-details') {
+                    console.warn('%c[DetailMapCtrl] Impossible d\'ajouter un waypoint : aucun composant détail de géocache actif', "color:orange");
+                    
+                    // Notification pour informer l'utilisateur
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50';
+                    notification.textContent = 'Impossible d\'ajouter un waypoint : ouvrez d\'abord les détails de la géocache';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                    
+                    return;
+                }
+                
+                // Obtenir l'ID de la géocache
+                const geocacheId = activeComponent.metadata.geocacheId;
+                
+                if (!geocacheId) {
+                    console.error('%c[DetailMapCtrl] Impossible d\'ajouter un waypoint : ID de géocache manquant', "background:red; color:white");
+                    return;
+                }
+                
+                // Ajouter un marqueur temporaire sur la carte
+                const tempMarkerId = this.addTemporaryMarker(lon, lat, true); // true = waypointMarker
+
+                // Formater les coordonnées au format geocaching
+                const formattedCoords = this.formatGeoCoords(lat, lon);
+                
+                // Essayer d'abord la méthode par événement personnalisé
+                console.log('%c[DetailMapCtrl] Tentative d\'ajout de waypoint via événement personnalisé', "color:blue");
+                
+                // Créer un événement personnalisé avec toutes les données nécessaires
+                const waypointEvent = new CustomEvent('addWaypointFromMap', {
+                    detail: {
+                        geocacheId: geocacheId,
+                        latitude: lat,
+                        longitude: lon,
+                        gcLat: formattedCoords.latitude,
+                        gcLon: formattedCoords.longitude,
+                        featureProps: featureProps || {},
+                        tempMarkerId: tempMarkerId
+                    },
+                    bubbles: true
+                });
+                
+                // Dispatcher l'événement pour que le contrôleur de formulaire puisse l'intercepter
+                document.dispatchEvent(waypointEvent);
+                
+                // Attendre un peu pour voir si l'événement a été capturé (réponse attendue)
+                setTimeout(() => {
+                    // Si l'événement a été traité, il définira cette propriété globale
+                    if (window.waypointEventProcessed) {
+                        console.log('%c[DetailMapCtrl] Événement addWaypointFromMap traité avec succès', "color:green");
+                        // Réinitialiser le flag
+                        window.waypointEventProcessed = false;
+                        return;
+                    }
+                    
+                    // Si l'événement n'a pas été traité, utiliser la méthode DOM traditionnelle
+                    console.log('%c[DetailMapCtrl] Événement non traité, utilisation de la méthode DOM', "color:orange");
+                    this.openWaypointFormLegacy(geocacheId, lat, lon, formattedCoords, featureProps, tempMarkerId);
+                }, 300); // Attendre 300ms pour voir si l'événement est traité
+                
+            } catch (error) {
+                console.error('%c[DetailMapCtrl] Erreur lors de l\'ouverture du formulaire de waypoint:', "background:red; color:white", error);
+            }
+        }
+        
+        // Méthode traditionnelle (legacy) pour ouvrir le formulaire via manipulation DOM
+        openWaypointFormLegacy(geocacheId, lat, lon, formattedCoords, featureProps = null, tempMarkerId = null) {
+            try {
+                // Trouver le contrôleur de formulaire de waypoint dans le document
+                // Pour cela, on cherche le formulaire de waypoint dans les détails de géocache
+                const waypointFormControllers = document.querySelectorAll('[data-controller="waypoint-form"]');
+                
+                if (waypointFormControllers.length === 0) {
+                    console.error('%c[DetailMapCtrl] Contrôleur de formulaire de waypoint non trouvé', "background:red; color:white");
+                    return;
+                }
+                
+                // Parcourir tous les formulaires de waypoint trouvés et trouver celui associé à notre géocache
+                let waypointController = null;
+                
+                for (const controller of waypointFormControllers) {
+                    const geocacheIdInput = controller.querySelector('[data-waypoint-form-target="geocacheIdInput"]');
+                    
+                    if (geocacheIdInput && geocacheIdInput.value === geocacheId) {
+                        waypointController = controller;
+                        break;
+                    }
+                }
+                
+                // Si aucun contrôleur n'est trouvé, essayer une autre méthode
+                if (!waypointController) {
+                    console.warn('%c[DetailMapCtrl] Première méthode de recherche de contrôleur échouée, tentative alternative...', "color:orange");
+                    
+                    // Chercher le formulaire dans tous les composants de détail de géocache actifs
+                    const geocacheDetailsComponents = document.querySelectorAll('[data-controller="detail-geocache-map"][data-detail-geocache-map-geocache-id-value="' + geocacheId + '"]');
+                    
+                    if (geocacheDetailsComponents.length > 0) {
+                        // Trouver le conteneur parent de détails de geocache qui contient le formulaire
+                        const detailsContainer = geocacheDetailsComponents[0].closest('.w-full.h-full');
+                        
+                        if (detailsContainer) {
+                            // Chercher le contrôleur de formulaire à l'intérieur de ce conteneur
+                            const formController = detailsContainer.querySelector('[data-controller="waypoint-form"]');
+                            if (formController) {
+                                waypointController = formController;
+                                console.log('%c[DetailMapCtrl] Contrôleur de formulaire trouvé via méthode alternative', "color:green");
+                            }
+                        }
+                    }
+                }
+                
+                // Si toujours pas trouvé, essayer une dernière méthode : prendre le premier contrôleur de formulaire
+                if (!waypointController && waypointFormControllers.length > 0) {
+                    console.warn('%c[DetailMapCtrl] Méthodes principales échouées, utilisation du premier contrôleur disponible', "color:orange");
+                    waypointController = waypointFormControllers[0];
+                }
+                
+                if (!waypointController) {
+                    console.error('%c[DetailMapCtrl] Contrôleur de formulaire de waypoint pour cette géocache non trouvé', "background:red; color:white");
+                    
+                    // Notification pour informer l'utilisateur
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50';
+                    notification.textContent = 'Impossible de trouver le formulaire de waypoint. Veuillez recharger la page.';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                    
+                    return;
+                }
+                
+                // Vérifier si le formulaire est déjà ouvert, sinon l'ouvrir
+                const form = waypointController.querySelector('[data-waypoint-form-target="form"]');
+                if (form.classList.contains('hidden')) {
+                    // Simuler un clic sur le bouton pour ouvrir le formulaire
+                    const toggleButton = waypointController.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+                    if (toggleButton) {
+                        toggleButton.click();
+                    }
+                }
+                
+                // Obtenir les champs de lat/lon dans le formulaire
+                const gcLatInput = waypointController.querySelector('[data-waypoint-form-target="gcLatInput"]');
+                const gcLonInput = waypointController.querySelector('[data-waypoint-form-target="gcLonInput"]');
+                const nameInput = waypointController.querySelector('[data-waypoint-form-target="nameInput"]');
+                
+                // Remplir les champs de coordonnées
+                if (gcLatInput) {
+                    gcLatInput.value = formattedCoords.latitude;
+                }
+                
+                if (gcLonInput) {
+                    gcLonInput.value = formattedCoords.longitude;
+                }
+                
+                // Suggérer un nom de waypoint basé sur les coordonnées ou les propriétés de la feature
+                if (nameInput && !nameInput.value) {
+                    if (featureProps && featureProps.name && featureProps.name !== 'Point temporaire') {
+                        nameInput.value = `Copie de ${featureProps.name}`;
+                    } else {
+                        nameInput.value = `Point à ${formattedCoords.latitude} ${formattedCoords.longitude}`;
+                    }
+                }
+                
+                // Si nous avons un waypoint existant, remplir également d'autres champs si disponibles
+                if (featureProps) {
+                    // Remplir le préfixe si disponible
+                    const prefixInput = waypointController.querySelector('[data-waypoint-form-target="prefixInput"]');
+                    if (prefixInput && featureProps.prefix) {
+                        prefixInput.value = featureProps.prefix;
+                    } else if (prefixInput && featureProps.gc_code && featureProps.gc_code !== 'TEMP') {
+                        prefixInput.value = featureProps.gc_code;
+                    }
+                    
+                    // Remplir la note si disponible
+                    const noteInput = waypointController.querySelector('[data-waypoint-form-target="noteInput"]');
+                    if (noteInput && featureProps.note) {
+                        noteInput.value = featureProps.note;
+                    }
+                }
+                
+                // Faire défiler jusqu'au formulaire
+                form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Notification pour informer l'utilisateur
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+                notification.textContent = 'Coordonnées ajoutées au formulaire de waypoint';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+                
+                console.log(`%c[DetailMapCtrl] Formulaire de waypoint ouvert avec les coordonnées (${lat.toFixed(6)}, ${lon.toFixed(6)})`, "color:green");
+
+                // Vider le champ d'ID de waypoint (pour s'assurer qu'on crée un nouveau waypoint)
+                if (waypointController.querySelector('[data-waypoint-form-target="waypointIdInput"]')) {
+                    waypointController.querySelector('[data-waypoint-form-target="waypointIdInput"]').value = '';
+                }
+                
+                // Stocker l'ID du marqueur temporaire si disponible
+                if (tempMarkerId && window.WaypointFormController) {
+                    const controller = window.application.getControllerForElementAndIdentifier(
+                        waypointController, 'waypoint-form'
+                    );
+                    if (controller) {
+                        controller.tempMarkerId = tempMarkerId;
+                    }
+                }
+            } catch (error) {
+                console.error('%c[DetailMapCtrl] Erreur lors de l\'ouverture du formulaire de waypoint via méthode legacy:', "background:red; color:white", error);
+            }
+        }
+
+        // Gestionnaire d'événement quand un waypoint est sauvegardé
+        handleWaypointSaved(event) {
+            try {
+                console.log('%c[DetailMapCtrl] Événement waypointSaved reçu', "color:blue", event.detail);
+                
+                const { waypoint, geocacheId, isNew } = event.detail;
+                
+                // Vérifier que c'est pour la bonne géocache
+                if (geocacheId !== this.geocacheIdValue) {
+                    console.log('%c[DetailMapCtrl] Événement ignoré - ID de géocache différent', "color:orange");
+                    return;
+                }
+                
+                // Vérifier que les coordonnées sont disponibles
+                if (!waypoint.latitude || !waypoint.longitude) {
+                    console.error('%c[DetailMapCtrl] Coordonnées manquantes pour le waypoint', "background:red; color:white");
+                    return;
+                }
+                
+                // Si un ID de marqueur temporaire est fourni, supprimer ce marqueur temporaire
+                if (waypoint.tempMarkerId) {
+                    const features = this.vectorSource.getFeatures();
+                    const tempFeature = features.find(feature => feature.get('id') === waypoint.tempMarkerId);
+                    
+                    if (tempFeature) {
+                        this.vectorSource.removeFeature(tempFeature);
+                        console.log('%c[DetailMapCtrl] Marqueur temporaire supprimé', "color:orange");
+                    }
+                }
+                
+                // Définir les propriétés du waypoint
+                const waypointProps = {
+                    id: waypoint.id,
+                    gc_code: waypoint.lookup || waypoint.prefix || 'WP',
+                    name: waypoint.name || 'Waypoint',
+                    cache_type: 'Waypoint',
+                    difficulty: null,
+                    terrain: null,
+                    size: null,
+                    solved: null,
+                    latitude: waypoint.latitude,
+                    longitude: waypoint.longitude,
+                    gc_lat: waypoint.gc_lat,
+                    gc_lon: waypoint.gc_lon,
+                    note: waypoint.note,
+                    is_corrected: false,
+                    prefix: waypoint.prefix,
+                    lookup: waypoint.lookup
+                };
+                
+                // Ajouter ou mettre à jour le waypoint sur la carte
+                if (isNew) {
+                    // Ajouter un nouveau waypoint
+                    this.addFeature(waypoint.longitude, waypoint.latitude, waypointProps);
+                    console.log('%c[DetailMapCtrl] Nouveau waypoint ajouté à la carte', "color:green");
+                } else {
+                    // Mettre à jour un waypoint existant
+                    // Chercher s'il existe déjà une feature pour ce waypoint
+                    const features = this.vectorSource.getFeatures();
+                    const existingFeature = features.find(feature => 
+                        feature.get('id') === waypoint.id && 
+                        feature.get('cache_type') === 'Waypoint'
+                    );
+                    
+                    if (existingFeature) {
+                        // Mettre à jour la position de la feature existante
+                        existingFeature.setGeometry(new ol.geom.Point(
+                            ol.proj.fromLonLat([waypoint.longitude, waypoint.latitude])
+                        ));
+                        
+                        // Mettre à jour les propriétés
+                        for (const [key, value] of Object.entries(waypointProps)) {
+                            existingFeature.set(key, value);
+                        }
+                        
+                        console.log('%c[DetailMapCtrl] Waypoint existant mis à jour sur la carte', "color:green");
+                    } else {
+                        // Créer une nouvelle feature car elle n'existe pas
+                        this.addFeature(waypoint.longitude, waypoint.latitude, waypointProps);
+                        console.log('%c[DetailMapCtrl] Waypoint ajouté à la carte (mise à jour non trouvée)', "color:green");
+                    }
+                }
+                
+                // Notification pour informer l'utilisateur
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+                notification.textContent = isNew ? 'Nouveau waypoint ajouté sur la carte' : 'Waypoint mis à jour sur la carte';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+                
+            } catch (error) {
+                console.error('%c[DetailMapCtrl] Erreur lors du traitement de l\'événement waypointSaved:', "background:red; color:white", error);
+            }
         }
     }
 
