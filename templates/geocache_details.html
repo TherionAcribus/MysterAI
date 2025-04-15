@@ -4,15 +4,63 @@
      x-init="console.log('Component initialized with geocache ID:', '{{ geocache.id }}')"
      data-action="coordinatesFormLoaded@window->geocache-coordinates#formLoaded coordinatesUpdated@window->geocache-coordinates#coordinatesUpdated">
     <div class="max-w-4xl mx-auto">
-        <!-- En-tête -->
-        <div class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-100 mb-2">{{ geocache.name }}</h1>
-            <div class="flex items-center text-gray-400 space-x-4">
-                <span>{{ geocache.gc_code }}</span>
-                <span>•</span>
-                <span>{{ geocache.cache_type }}</span>
-                <span>•</span>
-                <span>Par {{ geocache.owner.name if geocache.owner else "Inconnu" }}</span>
+        <!-- Header avec titre de la géocache -->
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-white">{{ geocache.name }}</h1>
+                <div class="text-gray-300 flex items-center">
+                    <span class="mr-2">{{ geocache.gc_code }}</span>
+                    <span class="mx-2">•</span>
+                    <span class="mr-2">{{ geocache.cache_type }}</span>
+                    <span class="mx-2">•</span>
+                    <span>Par {{ geocache.owner }}</span>
+                </div>
+            </div>
+            <div class="flex items-center">
+                {% if not geocache.is_found %}
+                    <form method="POST" action="{{ url_for('mark_as_found', geocache_id=geocache.id) }}" class="mr-3">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded">
+                            <i class="fas fa-check mr-1"></i> Marquer comme trouvée
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="text-green-500 flex items-center mr-3">
+                        <i class="fas fa-check-circle mr-1"></i> Trouvée le {{ geocache.found_date.strftime('%d/%m/%Y') }}
+                    </div>
+                {% endif %}
+                <div class="relative" data-controller="dropdown">
+                    <button data-action="click->dropdown#toggle" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div data-dropdown-target="menu" class="hidden absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-10">
+                        <div class="py-1">
+                            <a href="{{ url_for('edit_geocache', geocache_id=geocache.id) }}" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
+                                <i class="fas fa-edit mr-2"></i> Modifier
+                            </a>
+                            <a href="#" data-action="click->geocache-details#confirmDelete" class="block px-4 py-2 text-sm text-red-400 hover:bg-gray-700">
+                                <i class="fas fa-trash-alt mr-2"></i> Supprimer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barre de lancement rapide -->
+        <div class="flex items-center justify-center mb-4 bg-gray-700 rounded-lg p-2">
+            <div class="flex space-x-3">
+                <button 
+                    class="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-10 h-10 flex items-center justify-center" 
+                    title="Ouvrir dans Google Maps"
+                    onclick="window.open('https://www.google.com/maps/search/?api=1&query={{ geocache.latitude }},{{ geocache.longitude }}', '_blank')">
+                    <i class="fas fa-map-marker-alt"></i>
+                </button>
+                <button 
+                    class="bg-green-600 hover:bg-green-700 text-white rounded-full w-10 h-10 flex items-center justify-center" 
+                    title="Résoudre les coordonnées"
+                    onclick="document.querySelector('#solver-geocache-button').click()">
+                    <i class="fas fa-calculator"></i>
+                </button>
             </div>
         </div>
 
@@ -161,6 +209,25 @@
                     </button>
                 </div>
             </h2>
+
+            <!-- Barre de lancement rapide -->
+            <div class="flex items-center justify-center mb-4 bg-gray-700 rounded-lg p-2">
+                <div class="flex space-x-3">
+                    <button 
+                        class="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-10 h-10 flex items-center justify-center" 
+                        title="Ouvrir dans Google Maps"
+                        onclick="window.open('https://www.google.com/maps/search/?api=1&query={{ geocache.latitude }},{{ geocache.longitude }}', '_blank')">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </button>
+                    <button 
+                        class="bg-green-600 hover:bg-green-700 text-white rounded-full w-10 h-10 flex items-center justify-center" 
+                        title="Résoudre les coordonnées"
+                        onclick="document.querySelector('#solver-geocache-button').click()">
+                        <i class="fas fa-calculator"></i>
+                    </button>
+                </div>
+            </div>
+            
             <div class="prose prose-invert max-w-none">
                 {{ geocache.description|safe }}
             </div>

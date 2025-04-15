@@ -62,12 +62,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <span>Importer GPX</span>
                 </button>
             </div>
-            <button id="openMapButton" 
-                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center gap-2"
-                    data-zone-id="{{ zone_id }}">
-                <i class="fas fa-map-marked-alt"></i>
-                <span>Map</span>
-            </button>
         </div>
         <div id="spinner" class="spinner"></div>
         <div id="message" class="mt-2"></div>
@@ -166,37 +160,104 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             </div>
         </div>
 
-        <div class="mt-4 flex justify-end">
-            <div class="flex justify-between items-center mb-4">
-                <div class="flex space-x-3">
-                    <div id="selected-count-container-{{ zone_id }}" class="hidden">
-                        <span class="bg-indigo-600 text-white px-2 py-1 rounded" id="selected-count-{{ zone_id }}">0</span>
-                        <span class="text-gray-300">géocaches sélectionnées</span>
-                    </div>
-                </div>
-                <div class="flex gap-3">
-                    <button id="keep-filtered-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-filter mr-1"></i> Conserver uniquement les filtrées
+        <div class="mt-4">
+            <!-- Barre de lancement rapide simplifiée -->
+            <div class="w-full mb-2">
+                <div class="flex flex-wrap gap-2 justify-center bg-gray-800 p-3 rounded-lg shadow-lg">
+                    <button id="quickMap-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" data-zone-id="{{ zone_id }}" title="Carte" onclick="(function() { 
+                        // Récupérer les IDs des géocaches filtrées
+                        const geocacheIds = getFilteredGeocacheIds();
+                        
+                        // Vérifier s'il y a des géocaches
+                        if (!geocacheIds || geocacheIds.length === 0) {
+                            alert('Aucune géocache filtrée à afficher sur la carte');
+                            return;
+                        }
+                        
+                        // Créer le composant de carte dans GoldenLayout
+                        const newItemConfig = {
+                            type: 'component',
+                            componentName: 'geocaches-map',
+                            title: `Carte (${geocacheIds.length} géocaches)`,
+                            componentState: { 
+                                geocacheIds: geocacheIds
+                            }
+                        };
+                        
+                        // Vérifier que GoldenLayout est disponible
+                        if (window.mainLayout && window.mainLayout.root) {
+                            // Ajouter à la première ligne si elle existe, sinon créer une nouvelle ligne
+                            if (window.mainLayout.root.contentItems[0].type === 'row') {
+                                window.mainLayout.root.contentItems[0].addChild(newItemConfig);
+                            } else {
+                                window.mainLayout.root.contentItems[0].addChild({
+                                    type: 'row',
+                                    content: [newItemConfig]
+                                });
+                            }
+                            
+                            console.log(`Carte ouverte avec ${geocacheIds.length} géocaches dans un nouvel onglet`);
+                        } else {
+                            alert('Impossible d\'ouvrir la carte: le layout principal n\'est pas accessible');
+                        }
+                    })();">
+                        <i class="fas fa-map-marked-alt text-xl"></i>
                     </button>
-                    <button id="copy-to-zone-btn-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-copy mr-1"></i> Copier vers une zone
-                    </button>
-                    <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-share mr-1"></i> Déplacer vers une zone
-                    </button>
-                    <button id="solve-filtered-btn-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-puzzle-piece mr-1"></i> Résoudre les caches filtrées
-                    </button>
-                    <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-trash mr-1"></i> Supprimer les géocaches filtrées
-                    </button>
-                    <button id="reset-coords-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded">
-                        <i class="fas fa-undo mr-1"></i> Réinitialiser les coordonnées
+                    <button id="quickSolve-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" title="Résoudre les caches filtrées" onclick="openMultiSolver();">
+                        <i class="fas fa-puzzle-piece text-xl"></i>
                     </button>
                 </div>
             </div>
+
+            <!-- Nouvelle section d'actions avec un bouton qui prend toute la largeur -->
+            <div class="w-full mb-4">
+                <!-- Compteur des géocaches sélectionnées -->
+                <div id="selected-count-container-{{ zone_id }}" class="mb-2 hidden">
+                    <span class="bg-indigo-600 text-white px-2 py-1 rounded" id="selected-count-{{ zone_id }}">0</span>
+                    <span class="text-gray-300">géocaches sélectionnées</span>
+                </div>
+                
+                <!-- Grande barre d'actions prenant toute la largeur -->
+                <button id="actions-collapse-btn-{{ zone_id }}" 
+                        class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-t-lg flex items-center justify-between"
+                        onclick="toggleActionsCollapse('{{ zone_id }}')">
+                    <span class="flex items-center">
+                        <i class="fas fa-cogs mr-2"></i>
+                        <span>Actions</span>
+                    </span>
+                    <i class="fas fa-chevron-down transition-transform" id="actions-chevron-{{ zone_id }}"></i>
+                </button>
+                
+                <!-- Conteneur des boutons d'actions -->
+                <div id="actions-container-{{ zone_id }}" 
+                     class="hidden bg-gray-800 p-4 rounded-b-lg shadow-lg border border-gray-700 border-t-0 w-full overflow-hidden transition-all duration-300"
+                     style="max-height: 0;">
+                    <div class="flex flex-wrap gap-2 justify-center">
+                        <button id="openMapButton-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center" data-zone-id="{{ zone_id }}">
+                            <i class="fas fa-map-marked-alt mr-2"></i> Carte
+                        </button>
+                        <button id="keep-filtered-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-filter mr-2"></i> Conserver uniquement les filtrées
+                        </button>
+                        <button id="copy-to-zone-btn-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-copy mr-2"></i> Copier vers une zone
+                        </button>
+                        <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-share mr-2"></i> Déplacer vers une zone
+                        </button>
+                        <button id="solve-filtered-btn-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-puzzle-piece mr-2"></i> Résoudre les caches filtrées
+                        </button>
+                        <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-trash mr-2"></i> Supprimer les géocaches filtrées
+                        </button>
+                        <button id="reset-coords-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-undo mr-2"></i> Réinitialiser les coordonnées
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
 
     <!-- Modal de confirmation de suppression multiple -->
     <div id="deleteMultipleModal-{{ zone_id }}" class="delete-multiple-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
@@ -547,7 +608,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         const spinner = document.getElementById('spinner');
         const messageDiv = document.getElementById('message');
         const submitButton = form.querySelector('button[type="submit"]');
-        const openMapButton = document.getElementById('openMapButton');
         
         // Éléments de filtrage du tableau
         const tableFilter = document.getElementById('tableFilter');
@@ -3049,7 +3109,118 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 });
             });
         });
+
+        // Gestionnaires pour les boutons de lancement rapide
+        document.querySelector('#quickMap-{{ zone_id }}').addEventListener('click', function() {
+            // Utiliser la fonction showGeocachesMapPanel existante
+            window.showGeocachesMapPanel();
+        });
+        
+        document.querySelector('#quickSolve-{{ zone_id }}').addEventListener('click', function() {
+            // Utiliser la même fonction que le bouton "Résoudre les caches filtrées"
+            openMultiSolver();
+        });
+
+        // Initialiser les tooltips pour les boutons de lancement rapide
+        document.querySelectorAll('[data-tooltip-content]').forEach(element => {
+            const tooltipContent = element.getAttribute('data-tooltip-content');
+            const tooltipPosition = element.getAttribute('data-tooltip-position') || 'top';
+            
+            // Créer le tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'absolute bg-black text-white text-xs rounded px-2 py-1 opacity-0 transition-opacity duration-300 pointer-events-none z-50';
+            tooltip.textContent = tooltipContent;
+            
+            // Positionner le tooltip selon la position spécifiée
+            if (tooltipPosition === 'top') {
+                tooltip.classList.add('bottom-full', 'mb-2', 'left-1/2', 'transform', '-translate-x-1/2');
+            } else if (tooltipPosition === 'bottom') {
+                tooltip.classList.add('top-full', 'mt-2', 'left-1/2', 'transform', '-translate-x-1/2');
+            }
+            
+            // Ajouter le tooltip au document
+            document.body.appendChild(tooltip);
+            
+            // Montrer le tooltip au survol
+            element.addEventListener('mouseenter', () => {
+                const rect = element.getBoundingClientRect();
+                if (tooltipPosition === 'top') {
+                    tooltip.style.left = rect.left + rect.width / 2 + 'px';
+                    tooltip.style.top = rect.top - 5 + 'px';
+                } else if (tooltipPosition === 'bottom') {
+                    tooltip.style.left = rect.left + rect.width / 2 + 'px';
+                    tooltip.style.top = rect.bottom + 5 + 'px';
+                }
+                tooltip.classList.replace('opacity-0', 'opacity-100');
+            });
+            
+            // Cacher le tooltip lorsque la souris quitte l'élément
+            element.addEventListener('mouseleave', () => {
+                tooltip.classList.replace('opacity-100', 'opacity-0');
+            });
+        });
     })();
+
+    // Script pour supprimer les tooltips problématiques
+    document.addEventListener('DOMContentLoaded', function() {
+        // Supprimer tous les tooltips créés par le script
+        const tooltips = document.querySelectorAll('div.absolute.bg-black.text-white.text-xs.rounded');
+        tooltips.forEach(tooltip => {
+            tooltip.remove();
+        });
+        
+        // Supprimer les écouteurs d'événements des éléments avec data-tooltip-content
+        document.querySelectorAll('[data-tooltip-content]').forEach(element => {
+            // Remplacer l'élément par une copie pour supprimer tous les écouteurs d'événements
+            const clone = element.cloneNode(true);
+            element.parentNode.replaceChild(clone, element);
+        });
+    });
+
+    // Fonction pour gérer le collapse des actions
+    function toggleActionsCollapse(zoneId) {
+        const container = document.getElementById(`actions-container-${zoneId}`);
+        const chevron = document.getElementById(`actions-chevron-${zoneId}`);
+        
+        if (container.classList.contains('hidden')) {
+            // Ouvrir le menu
+            container.classList.remove('hidden');
+            
+            // Permettre une animation fluide en ajoutant d'abord les classes, puis en modifiant les styles
+            setTimeout(() => {
+                container.style.maxHeight = '500px'; // Hauteur maximum pour éviter des problèmes d'affichage
+                chevron.style.transform = 'rotate(180deg)';
+            }, 10);
+            
+            // Fermer le menu si on clique ailleurs
+            document.addEventListener('click', function closeMenu(e) {
+                const clickedInsideMenu = container.contains(e.target);
+                const clickedOnButton = e.target.closest(`#actions-collapse-btn-${zoneId}`);
+                
+                if (!clickedInsideMenu && !clickedOnButton) {
+                    // Fermer le menu avec animation
+                    container.style.maxHeight = '0';
+                    chevron.style.transform = 'rotate(0deg)';
+                    
+                    // Attendre la fin de l'animation pour masquer complètement
+                    setTimeout(() => {
+                        container.classList.add('hidden');
+                    }, 300); // Durée correspondant à transition-all duration-300
+                    
+                    document.removeEventListener('click', closeMenu);
+                }
+            });
+        } else {
+            // Fermer le menu avec animation
+            container.style.maxHeight = '0';
+            chevron.style.transform = 'rotate(0deg)';
+            
+            // Attendre la fin de l'animation pour masquer complètement
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 300); // Durée correspondant à transition-all duration-300
+        }
+    }
 
     // Fonction pour récupérer les IDs des géocaches filtrées (pour l'intégration avec la carte)
     function getFilteredGeocacheIds() {

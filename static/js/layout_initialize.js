@@ -932,9 +932,10 @@ function initializeLayout() {
 
         // Ajouter le gestionnaire d'événements pour le bouton Map dans geocaches_table.html
         document.addEventListener('click', function(event) {
-            const mapButton = event.target.closest('#openMapButton');
+            const mapButton = event.target.closest('[id^="openMapButton"]');
             if (!mapButton) return;
 
+            // Récupérer zoneId depuis l'attribut data-zone-id
             const zoneId = mapButton.dataset.zoneId;
             const title = `Map - Zone ${zoneId}`;
 
