@@ -93,12 +93,13 @@
         static values = {
             geocacheId: String,
             geocacheCode: String,
-            geocacheIds: Array,
+            geocacheIds: { type: Array, default: [] },
             isMultiView: Boolean,
             isGoldenLayout: Boolean,
             zoneId: String,
             showAllPoints: Boolean,
-            showNames: Boolean
+            showNames: Boolean,
+            filteredGeocacheIds: { type: Array, default: [] }
         }
 
         connect() {
@@ -123,7 +124,21 @@
             console.log('Onglet map activé', event.detail);
             // Rafraîchir la carte si elle existe déjà
             if (this.map) {
-                this.map.updateSize();
+                setTimeout(() => {
+                    this.map.updateSize();
+                }, 100);
+            }
+        }
+
+        // Méthode pour charger les géocaches filtrées
+        loadFilteredGeocaches() {
+            console.log('loadFilteredGeocaches appelée');
+            if (this.hasFilteredGeocacheIdsValue && this.filteredGeocacheIdsValue.length > 0) {
+                console.log(`Chargement de ${this.filteredGeocacheIdsValue.length} géocaches filtrées`);
+                // Utiliser la méthode existante pour charger les géocaches
+                this.loadMultipleGeocaches(this.filteredGeocacheIdsValue);
+            } else {
+                console.warn('Aucun ID de géocache filtré à charger');
             }
         }
 

@@ -726,6 +726,65 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant map pour afficher des géocaches filtrées
+        mainLayout.registerComponent('map', function(container, componentState) {
+            const { geocacheIds } = componentState;
+            
+            if (!geocacheIds || !Array.isArray(geocacheIds) || geocacheIds.length === 0) {
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 p-4">
+                        <div class="text-red-500 mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Aucune géocache à afficher
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+            
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 p-4 relative">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement de la carte...</span>
+                    </div>
+                </div>
+            `);
+
+            // Créer la structure HTML pour le contrôleur map
+            const mapHtml = `
+                <div class="h-full w-full bg-gray-900" 
+                     data-controller="map"
+                     data-action="map-controller-ready@window->map#loadFilteredGeocaches"
+                     data-map-filtered-geocache-ids-value='${JSON.stringify(geocacheIds)}'>
+                    <div class="map-container h-full relative" data-map-target="container">
+                        <div id="base-layer-selector"></div>
+                    </div>
+                    <div id="popup" 
+                         data-map-target="popup"
+                         class="fixed bg-white shadow-lg rounded-lg z-[1000] transform -translate-x-1/2 -translate-y-full text-black" 
+                         style="display: none; pointer-events: none; background-color: white; color: black;">
+                        <div data-map-target="popupContent" class="p-3 bg-white" style="color: black;"></div>
+                        <div class="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+                            <div class="w-3 h-3 bg-white transform rotate-45 -translate-y-1.5 shadow-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Injecter le HTML et initialiser Stimulus
+            container.getElement().html(mapHtml);
+            
+            // Démarrer Stimulus
+            if (window.StimulusApp) {
+                setTimeout(() => {
+                    console.log("Initialisation du contrôleur map...");
+                    window.StimulusApp.start();
+                }, 100);
+            }
+        });
+
         // Enregistrer le composant Plugin
         mainLayout.registerComponent('plugin', function(container, state) {
             // Construire l'URL avec les paramètres
@@ -879,13 +938,47 @@ function initializeLayout() {
             const zoneId = mapButton.dataset.zoneId;
             const title = `Map - Zone ${zoneId}`;
 
-            // Créer un nouvel onglet avec la carte
+            // Récupérer les IDs des géocaches filtrées directement via Tabulator
+            // au lieu d'utiliser getFilteredGeocacheIds
+            const tableId = `geocaches-table-${zoneId}`;
+            
+            // Obtenir l'instance Tabulator 
+            let filteredGeocacheIds = [];
+            const tabulatorInstance = Tabulator.findTable(`#${tableId}`)[0];
+            
+            if (tabulatorInstance) {
+                // Récupérer les données filtrées directement depuis l'instance Tabulator
+                const filteredData = tabulatorInstance.getData("active");
+                console.log(`${filteredData.length} géocaches filtrées trouvées pour la carte`);
+                filteredGeocacheIds = filteredData.map(row => row.id);
+            } else {
+                console.error("Impossible de trouver l'instance Tabulator pour la table:", tableId);
+                
+                // Essayer de récupérer l'instance Tabulator via la variable globale
+                const table = window[`tabulator_${tableId}`];
+                if (table) {
+                    const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+                    // Comme nous ne pouvons pas accéder à getFilteredGeocaches, utiliser toutes les données
+                    filteredGeocacheIds = allData.map(row => row.id);
+                    console.log(`Utilisation de toutes les données (${filteredGeocacheIds.length} géocaches)`);
+                } else {
+                    console.error("Impossible de trouver la variable globale pour la table:", tableId);
+                }
+            }
+            
+            if (!filteredGeocacheIds || filteredGeocacheIds.length === 0) {
+                // Afficher un message si aucune géocache n'est filtrée
+                alert('Aucune géocache à afficher sur la carte.');
+                return;
+            }
+
+            // Créer un nouvel onglet avec le contrôleur map
             mainLayout.root.contentItems[0].addChild({
                 type: 'component',
-                componentName: 'geocachesMap',
-                title: title,
+                componentName: 'map',  // Utiliser le contrôleur map
+                title: `Carte (${filteredGeocacheIds.length} géocaches)`,
                 componentState: {
-                    zoneId: zoneId,
+                    geocacheIds: filteredGeocacheIds,  // Passer les IDs des géocaches filtrées
                     title: title
                 }
             });

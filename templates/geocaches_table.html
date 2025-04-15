@@ -2513,14 +2513,43 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 
         // Fonction pour obtenir les IDs des géocaches filtrées
         function getFilteredGeocacheIds() {
+            console.log("=== Récupération des géocaches filtrées pour la carte ===");
+            
+            // Utiliser la même méthode que les autres boutons
             const tableId = `geocaches-table-{{ zone_id }}`;
+            console.log("ID du tableau:", tableId);
+            
+            // Utiliser la variable globale du tableau
             const table = window[`tabulator_${tableId}`];
-            if (!table) return [];
+            if (!table) {
+                console.error("Table Tabulator non trouvée dans window[tabulator_" + tableId + "]");
+                
+                // Essayer de trouver l'instance Tabulator directement
+                const tabInstance = Tabulator.findTable(`#${tableId}`)[0];
+                if (!tabInstance) {
+                    console.error("Instance Tabulator non trouvée via Tabulator.findTable");
+                    return [];
+                }
+                
+                // Récupérer les données filtrées via l'instance trouvée
+                const filteredData = tabInstance.getData("active");
+                console.log(`${filteredData.length} géocaches filtrées trouvées via Tabulator.findTable`);
+                return filteredData.map(row => row.id);
+            }
 
+            // Récupérer toutes les données et appliquer le même filtrage
             const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+            
+            // Utiliser la fonction existante getFilteredGeocaches (comme les autres boutons)
             const filteredGeocaches = getFilteredGeocaches(allData);
+            console.log(`${filteredGeocaches.length} géocaches filtrées trouvées pour la carte`);
+            
+            // Extraire les IDs
             return filteredGeocaches.map(g => g.id);
         }
+        
+        // Rendre la fonction accessible globalement
+        window.getFilteredGeocacheIds = getFilteredGeocacheIds;
 
         // Fonction pour rafraîchir le tableau des géocaches
         async function refreshGeocachesTable() {
@@ -3021,4 +3050,41 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             });
         });
     })();
+
+    // Fonction pour récupérer les IDs des géocaches filtrées (pour l'intégration avec la carte)
+    function getFilteredGeocacheIds() {
+        console.log("=== Récupération des géocaches filtrées pour la carte ===");
+        
+        // Utiliser la même méthode que les autres boutons
+        const tableId = `geocaches-table-{{ zone_id }}`;
+        console.log("ID du tableau:", tableId);
+        
+        // Utiliser la variable globale du tableau
+        const table = window[`tabulator_${tableId}`];
+        if (!table) {
+            console.error("Table Tabulator non trouvée dans window[tabulator_" + tableId + "]");
+            
+            // Essayer de trouver l'instance Tabulator directement
+            const tabInstance = Tabulator.findTable(`#${tableId}`)[0];
+            if (!tabInstance) {
+                console.error("Instance Tabulator non trouvée via Tabulator.findTable");
+                return [];
+            }
+            
+            // Récupérer les données filtrées via l'instance trouvée
+            const filteredData = tabInstance.getData("active");
+            console.log(`${filteredData.length} géocaches filtrées trouvées via Tabulator.findTable`);
+            return filteredData.map(row => row.id);
+        }
+
+        // Récupérer toutes les données et appliquer le même filtrage
+        const allData = window[`allGeocachesData_${tableId}`] || table.getData();
+        
+        // Utiliser la fonction existante getFilteredGeocaches (comme les autres boutons)
+        const filteredGeocaches = getFilteredGeocaches(allData);
+        console.log(`${filteredGeocaches.length} géocaches filtrées trouvées pour la carte`);
+        
+        // Extraire les IDs
+        return filteredGeocaches.map(g => g.id);
+    }
 </script>
