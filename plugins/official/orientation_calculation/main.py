@@ -111,56 +111,143 @@ class MovePointPlugin:
         lon2, lat2, _ = self.geod.fwd(lon, lat, bearing_deg, distance_m, radians=False)
         return lat2, lon2
 
+    def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
+        """
+        Vérifie si le texte contient des coordonnées valides.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des caractères attendus
+            embedded: True si le texte peut contenir des coordonnées intégrées
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si des coordonnées valides ont été trouvées
+            - fragments: Liste des fragments de coordonnées trouvés
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        # Implémentation pour mode embedded dans une version future
+        if embedded:
+            # Pour l'instant, nous ne supportons pas la recherche de coordonnées dans un texte
+            return {"is_match": False, "fragments": [], "score": 0.0}
+        
+        # En mode non-embedded, on vérifie simplement si le texte est une coordonnée valide
+        try:
+            self.parse_coord(text)
+            return {
+                "is_match": True,
+                "fragments": [{"value": text, "start": 0, "end": len(text)}],
+                "score": 1.0
+            }
+        except ValueError:
+            return {"is_match": False, "fragments": [], "score": 0.0}
+
+    def decode_fragments(self, text: str, fragments: list) -> str:
+        """
+        Projette les coordonnées trouvées dans le texte.
+        Cette fonction sera implémentée complètement dans une version future avec le mode embedded.
+        """
+        # Pour l'instant, nous ne supportons que le mode non-embedded
+        if not fragments:
+            return text
+        
+        # Dans le cas non-embedded, il n'y a qu'un seul fragment qui correspond à tout le texte
+        fragment = fragments[0]
+        coord_str = fragment["value"]
+        
+        # Cette fonction ne fait pas de décodage en soi, mais sera utilisée pour le mode embedded
+        return coord_str
+
     def execute(self, inputs: dict):
         """
         Point d'entrée PluginManager.
         Inputs:
-          - coord_str (str) : ex "N 49° 12.374 E 5° 52.727"
+          - text (str) : ex "N 49° 12.374 E 5° 52.727"
           - bearing_deg (float) : ex 59.0
           - distance (float)
           - distance_unit (str) : "m", "km", "miles"
+          - mode (str) : "decode", "encode" (pour compatibilité avec le système de plugins)
         
         Output:
           {
-            "new_coord_str": "N 49° 12.XXX E 5° 52.XXX"
+            "result": {
+              "text": {
+                "text_output": "N 49° 12.XXX E 5° 52.XXX",
+                "text_input": "N 49° 12.374 E 5° 52.727",
+                "mode": "decode"
+              },
+              "gc_lat": "N 49° 12.XXX",
+              "gc_lon": "E 5° 52.XXX"
+            }
           }
         """
-        print(inputs)
+        mode = inputs.get("mode", "decode").lower()
         coord_str = inputs.get("text", "")
         bearing_deg = float(inputs.get("bearing_deg", 0.0))
         distance_val = float(inputs.get("distance", 0.0))
         distance_unit = inputs.get("distance_unit", "m")
+        
+        # Récupération des paramètres pour le mode embedded (future implémentation)
+        strict_mode = inputs.get("strict", "").lower() == "strict"
+        allowed_chars = inputs.get("allowed_chars", None)
+        embedded = inputs.get("embedded", False)
 
         if not coord_str:
-            raise ValueError("coord_str manquant ou vide")
+            return {"error": "Coordonnée manquante ou vide"}
 
-        # 1. Parser la coordonnée => lat/lon (degrés décimaux)
-        lat_dec, lon_dec = self.parse_coord(coord_str)
+        try:
+            if mode == "decode":
+                # Dans une version future, on utilisera embedded et strict
+                if embedded:
+                    # Vérification et extraction des coordonnées du texte
+                    check = self.check_code(coord_str, strict=strict_mode, allowed_chars=allowed_chars, embedded=embedded)
+                    if not check["is_match"]:
+                        return {"error": "Aucune coordonnée valide détectée dans le texte"}
+                    
+                    # Pour l'instant, nous ne supportons pas la recherche de coordonnées dans un texte
+                    return {"error": "Le mode embedded n'est pas encore implémenté"}
+                else:
+                    # Mode non-embedded : traitement standard
+                    # 1. Parser la coordonnée => lat/lon (degrés décimaux)
+                    lat_dec, lon_dec = self.parse_coord(coord_str)
 
-        # 2. Convertir la distance en mètres
-        dist_m = self.convert_distance_to_meters(distance_val, distance_unit)
+                    # 2. Convertir la distance en mètres
+                    dist_m = self.convert_distance_to_meters(distance_val, distance_unit)
 
-        # 3. Calculer la nouvelle position
-        new_lat, new_lon = self.move_point(lat_dec, lon_dec, dist_m, bearing_deg)
-        print(lat_dec, lon_dec, dist_m, bearing_deg)
-        print(new_lat, new_lon)
+                    # 3. Calculer la nouvelle position
+                    new_lat, new_lon = self.move_point(lat_dec, lon_dec, dist_m, bearing_deg)
 
-        # 4. Reformater la sortie => 'N 49° 12.XXX E 5° 52.XXX'
-        new_coord_str = self.format_coord(new_lat, new_lon)
+                    # 4. Reformater la sortie => 'N 49° 12.XXX E 5° 52.XXX'
+                    new_coord_str = self.format_coord(new_lat, new_lon)
+                    
+                    # Séparer la latitude et la longitude pour faciliter l'utilisation
+                    parts = new_coord_str.split()
+                    if len(parts) >= 6:
+                        gc_lat = f"{parts[0]} {parts[1]}° {parts[2]}"
+                        gc_lon = f"{parts[3]} {parts[4]}° {parts[5]}"
+                    else:
+                        gc_lat = ""
+                        gc_lon = ""
 
-        print('new_coord_str', new_coord_str)
-        
-        # Séparer la latitude et la longitude pour faciliter l'utilisation
-        parts = new_coord_str.split()
-        if len(parts) >= 6:
-            gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
-            gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
-        else:
-            gc_lat = ""
-            gc_lon = ""
-
-        return {
-            "text_output": new_coord_str,
-            "gc_lat": gc_lat,
-            "gc_lon": gc_lon
-        }
+                    return {
+                        "result": {
+                            "text": {
+                                "text_output": new_coord_str,
+                                "text_input": coord_str,
+                                "mode": mode
+                            },
+                            "gc_lat": gc_lat,
+                            "gc_lon": gc_lon
+                        }
+                    }
+            
+            elif mode == "encode":
+                # Le mode "encode" n'a pas de sens pour ce plugin, mais nous le supportons pour compatibilité
+                return {"error": "Le mode 'encode' n'est pas applicable pour ce plugin"}
+            
+            else:
+                return {"error": f"Mode inconnu : {mode}"}
+                
+        except Exception as e:
+            return {"error": f"Erreur pendant le traitement : {e}"}

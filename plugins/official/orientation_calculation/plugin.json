@@ -1,11 +1,11 @@
 {
     "name": "move_point_plugin",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "Plugin pour déplacer un point de coordonnée en fonction d'une distance et d'un azimut depuis le Nord.",
     "author": "MysterAI",
     "plugin_type": "python",
     "entry_point": "main.py",
-    "categories": ["CoordinatesCalculations"],
+    "categories": ["Coordinates"],
     "dependencies": ["pyproj"],
     "input_types": {
       "text": {
@@ -17,12 +17,12 @@
         "type": "float",
         "label": "Distance",
         "placeholder": "Entrez une distance en m, km ou miles"
-    },
+      },
       "bearing_deg": {
         "type": "float",
         "label": "Angle",
         "placeholder": "Entrez un angle en degrés"
-    },
+      },
       "distance_unit": {
           "type": "select",
           "label": "Unité de distance",
@@ -32,11 +32,33 @@
               "miles"
           ],
           "default": "m"
+      },
+      "mode": {
+        "type": "select",
+        "label": "Mode",
+        "options": ["decode"],
+        "default": "decode"
+      },
+      "strict": {
+        "type": "select",
+        "label": "Mode strict",
+        "options": ["strict", "smooth"],
+        "default": "smooth"
       }
     },
     "output_types": {
-      "new_lat": "float",
-      "new_lon": "float"
+      "text_output": {
+        "type": "string",
+        "label": "Coordonnée calculée"
+      },
+      "gc_lat": {
+        "type": "string",
+        "label": "Latitude"
+      },
+      "gc_lon": {
+        "type": "string",
+        "label": "Longitude"
+      }
     }
   }
   

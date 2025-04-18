@@ -51,6 +51,16 @@
                                 class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="{{ input_config.placeholder|default('') }}"
                                 value="{{ plugin.params.get(input_name, input_config.default|default('')) }}">
+                        {% elif input_config.type == "float" or input_config.type == "number" %}
+                            <input type="number" 
+                                id="{{ input_name }}"
+                                name="{{ input_name }}"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="{{ input_config.placeholder|default('') }}"
+                                value="{{ plugin.params.get(input_name, input_config.default|default('0')) }}"
+                                step="{{ input_config.step|default('any') }}"
+                                min="{{ input_config.min|default('') }}"
+                                max="{{ input_config.max|default('') }}">
                         {% elif input_config.type == "select" %}
                             <select id="{{ input_name }}"
                                     name="{{ input_name }}"
