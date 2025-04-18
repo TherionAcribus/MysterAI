@@ -1,10 +1,10 @@
 <!-- Template pour la liste des plugins -->
-<div class="p-4">
+<div class="p-3">
     <!-- Bouton pour ouvrir le Solver -->
-    <div class="mb-6 flex justify-between items-center">
+    <div class="mb-4 flex justify-between items-center">
         <h2 class="text-xl font-bold text-blue-400">Plugins</h2>
         <button 
-            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors flex items-center"
+            class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors flex items-center"
             onclick="window.openSolverTab()">
             <i class="fas fa-tools mr-2"></i>
             Ouvrir le Solver
@@ -12,17 +12,17 @@
     </div>
     
     {% if categories %}
-        <div class="space-y-4">
+        <div class="space-y-2">
             {% for category in categories %}
                 {% set depth = category.name.count('/') %}
                 {% set category_name = category.name.split('/')[-1] %}
-                <div class="bg-gray-800 rounded-lg p-4" style="margin-left: {{ depth * 20 }}px">
+                <div class="bg-gray-800 rounded-lg p-2" style="margin-left: {{ depth * 20 }}px">
                     <div class="flex items-center cursor-pointer" onclick="toggleCategory('{{ category.name|replace('/', '_') }}')">
-                        <i class="fas fa-chevron-right mr-2 transform transition-transform" id="chevron-{{ category.name|replace('/', '_') }}"></i>
+                        <i class="fas fa-chevron-right mr-2 transform transition-transform rotate-90" id="chevron-{{ category.name|replace('/', '_') }}"></i>
                         <h3 class="text-lg font-semibold text-blue-400">{{ category_name }}</h3>
                     </div>
                     
-                    <div class="pl-4 mt-2 hidden" id="plugins-{{ category.name|replace('/', '_') }}">
+                    <div class="pl-3 mt-1" id="plugins-{{ category.name|replace('/', '_') }}">
                         {% set category_plugins = [] %}
                         {% for plugin in plugins %}
                             {% for plugin_category in plugin.categories %}
@@ -34,7 +34,7 @@
                         
                         {% if category_plugins %}
                             {% for plugin in category_plugins %}
-                                <div class="bg-gray-700 rounded p-3 mb-2 hover:bg-gray-600 transition-colors cursor-pointer"
+                                <div class="bg-gray-700 rounded p-2 mb-1 hover:bg-gray-600 transition-colors cursor-pointer"
                                      onclick="window.openPluginTab('{{ plugin.name }}', '{{ plugin.name | escape }}')">
                                     <div class="flex justify-between items-center">
                                         <div>
