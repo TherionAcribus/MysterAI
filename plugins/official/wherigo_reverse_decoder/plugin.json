@@ -30,7 +30,7 @@
         "default": false
       }
     },
-   "output_types": {
+  "output_types": {
     "decoded_text": {
       "type": "string",
       "label": "Texte décodé"
@@ -42,4 +42,3 @@
       }
 }
 
-  

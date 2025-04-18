@@ -11,7 +11,7 @@
                     <p class="text-gray-400">Version {{ plugin.version }}</p>
                 </div>
                 <div class="text-gray-400">
-                    <p>Auteur!: {{ plugin.author }}</p>
+                    <p>Auteur: {{ plugin.author }}</p>
                 </div>
             </div>
             
@@ -234,6 +234,13 @@
                 normalizedData.text_output = data.output;
             }
             
+            // Extraire le log s'il existe
+            if (data.result && data.result.log !== undefined) {
+                normalizedData.log = data.result.log;
+            } else if (data.original_result && data.original_result.result && data.original_result.result.log !== undefined) {
+                normalizedData.log = data.original_result.result.log;
+            }
+            
             // Toujours mettre normalizedData dans window.lastPluginResult
             window.lastPluginResult = normalizedData;
             
@@ -265,6 +272,18 @@
                 // Copier dans text_output pour uniformité
                 normalizedData.text_output = normalizedData.output;
                 window.lastPluginResult.text_output = normalizedData.output;
+            }
+            
+            // Afficher le log s'il existe
+            if (normalizedData.log) {
+                outputHtml += `
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <h3 class="text-lg font-medium text-gray-300 mb-2">Détails de la projection</h3>
+                        <div class="bg-gray-800 p-4 rounded">
+                            <pre id="log_field" class="w-full bg-gray-800 text-gray-300 font-mono text-sm whitespace-pre-wrap">${normalizedData.log || ''}</pre>
+                        </div>
+                    </div>
+                `;
             }
             
             // Afficher les coordonnées si elles existent
@@ -410,6 +429,13 @@
                 normalizedData.text_output = rawData.output;
             }
             
+            // Extraire le log s'il existe
+            if (rawData.result && rawData.result.log !== undefined) {
+                normalizedData.log = rawData.result.log;
+            } else if (rawData.original_result && rawData.original_result.result && rawData.original_result.result.log !== undefined) {
+                normalizedData.log = rawData.original_result.result.log;
+            }
+            
             window.lastPluginResult = normalizedData;
             
             // Mettre à jour les champs d'interface
@@ -423,6 +449,12 @@
                 // Synchroniser text_output et output
                 normalizedData.text_output = normalizedData.output;
                 window.lastPluginResult.text_output = normalizedData.output;
+            }
+            
+            // Mettre à jour le log s'il existe
+            if (normalizedData.log !== undefined) {
+                const logField = document.getElementById('log_field');
+                if (logField) logField.textContent = normalizedData.log;
             }
             
             if (normalizedData.coordinates) {

@@ -277,24 +277,44 @@ def execute_plugin(plugin_name):
                     'text_output': result['result']['text'].get('text_output', ''),
                     'original_result': result  # Garder le résultat original pour référence
                 }
+                
+                # Récupérer le log s'il existe
+                if 'log' in result['result']:
+                    normalized_result['log'] = result['result']['log']
+                
+                # Traitement spécial pour les coordonnées GPS
+                if 'coordinates' in result:
+                    normalized_result['coordinates'] = result['coordinates']
+                elif 'result' in result and 'gps_coordinates' in result['result']:
+                    normalized_result['coordinates'] = result['result']['gps_coordinates']
+                
             # Cas 3: Plugin avec juste 'output' au lieu de 'text_output'
             elif isinstance(result, dict) and 'output' in result:
                 normalized_result = {
                     'text_output': result['output'],
                     'original_result': result
                 }
+                
+                # Traitement spécial pour les coordonnées GPS
+                if 'coordinates' in result:
+                    normalized_result['coordinates'] = result['coordinates']
             else:
                 # Pour tout autre format de résultat
                 normalized_result = result
             
             # S'assurer que les coordonnées sont gérées correctement
             if isinstance(normalized_result, dict) and 'coordinates' not in normalized_result:
-                normalized_result['coordinates'] = {
-                    'exist': False,
-                    'ddm_lat': None,
-                    'ddm_lon': None,
-                    'ddm': None
-                }
+                # Vérifier si les coordonnées existent dans result.gps_coordinates
+                if isinstance(result, dict) and 'result' in result and 'gps_coordinates' in result['result']:
+                    normalized_result['coordinates'] = result['result']['gps_coordinates']
+                else:
+                    normalized_result['coordinates'] = {
+                        'exist': False,
+                        'ddm_lat': None,
+                        'ddm_lon': None,
+                        'ddm': None,
+                        'decimal': {"latitude": None, "longitude": None}
+                    }
             
             # Si c'est un résultat d'analyse complexe (qui contient combined_results)
             if isinstance(result, dict) and 'combined_results' in result:
