@@ -398,7 +398,28 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <p class="text-gray-300 mb-6">Voulez-vous exporter <span class="geocaches-count-to-export font-semibold">0</span> géocaches correspondant aux filtres actuels au format GPX ?</p>
+            <p class="text-gray-300 mb-4">Voulez-vous exporter <span class="geocaches-count-to-export font-semibold">0</span> géocaches correspondant aux filtres actuels au format GPX ?</p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Format d'exportation</label>
+                <div class="flex flex-col space-y-2">
+                    <div class="flex items-center">
+                        <input type="radio" id="format-zip" name="export-format" value="zip" checked
+                               class="h-4 w-4 text-blue-600 border-gray-600 bg-gray-700 focus:ring-blue-500">
+                        <label for="format-zip" class="ml-2 block text-sm text-gray-300">
+                            ZIP (contient les géocaches et leurs waypoints additionnels)
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="format-gpx" name="export-format" value="gpx"
+                               class="h-4 w-4 text-blue-600 border-gray-600 bg-gray-700 focus:ring-blue-500">
+                        <label for="format-gpx" class="ml-2 block text-sm text-gray-300">
+                            GPX (uniquement les géocaches, sans les waypoints)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
             <div class="flex justify-end gap-2">
                 <button class="cancel-export-gpx bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Annuler
@@ -3272,6 +3293,17 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     throw new Error('Aucune géocache à exporter');
                 }
                 
+                // Récupérer le format d'exportation choisi
+                const formatZip = document.getElementById('format-zip');
+                const formatGpx = document.getElementById('format-gpx');
+                let exportFormat = 'zip'; // Par défaut
+                
+                if (formatZip && formatZip.checked) {
+                    exportFormat = 'zip';
+                } else if (formatGpx && formatGpx.checked) {
+                    exportFormat = 'gpx';
+                }
+                
                 // Appeler l'API pour générer le fichier GPX
                 const response = await fetch('/api/geocaches/export-gpx', {
                     method: 'POST',
@@ -3279,7 +3311,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        geocache_ids: geocacheIds
+                        geocache_ids: geocacheIds,
+                        format: exportFormat
                     })
                 });
                 
@@ -3296,7 +3329,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
                 
                 // Récupérer le nom du fichier depuis l'en-tête Content-Disposition
-                let filename = 'geocaches.gpx';
+                let filename = exportFormat === 'gpx' ? 'geocaches.gpx' : 'geocaches.zip';
                 const disposition = response.headers.get('content-disposition');
                 if (disposition && disposition.indexOf('attachment') !== -1) {
                     const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
@@ -3321,7 +3354,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 closeExportGpxModal();
                 
                 // Afficher un message de succès
-                showSuccess(`${geocacheIds.length} géocaches exportées avec succès`);
+                const formatLabel = exportFormat === 'gpx' ? 'GPX' : 'ZIP (avec waypoints)';
+                showSuccess(`${geocacheIds.length} géocaches exportées au format ${formatLabel} avec succès`);
                 
             } catch (error) {
                 console.error('Erreur lors de l\'exportation GPX:', error);

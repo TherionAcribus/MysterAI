@@ -36,7 +36,7 @@ import pytz
 from bs4 import BeautifulSoup
 from app.geocaching_client import GeocachingClient, Coordinates
 from app.utils.coordinates import convert_gc_coords_to_decimal
-from app.gpx_generator import create_gpx_file, generate_filename
+from app.gpx_generator import create_gpx_file, generate_filename, create_gpx_zip
 
 logger = setup_logger()
 
@@ -2748,34 +2748,55 @@ def send_to_geocaching(geocache_id):
 @geocaches_bp.route('/api/geocaches/export-gpx', methods=['POST'])
 def export_geocaches_as_gpx():
     """
-    Génère un fichier GPX contenant les géocaches filtrées
+    Génère des fichiers GPX contenant les géocaches filtrées et leurs waypoints,
+    puis les combine dans un fichier ZIP
     
     Query params:
         - geocache_ids: liste d'IDs de géocaches à inclure dans le fichier GPX
+        - format: 'gpx' pour un fichier GPX unique, 'zip' pour un ZIP avec tous les fichiers (par défaut)
     
     Returns:
-        Response: Le fichier GPX à télécharger
+        Response: Le fichier GPX ou ZIP à télécharger
     """
     try:
         data = request.json
         geocache_ids = data.get('geocache_ids', [])
+        export_format = data.get('format', 'zip')
         
         if not geocache_ids:
             return jsonify({'error': 'Aucun ID de géocache fourni'}), 400
         
-        # Générer le contenu GPX
-        gpx_content = create_gpx_file(geocache_ids)
+        # Format GPX simple (uniquement les géocaches, pas les waypoints)
+        if export_format == 'gpx':
+            # Générer le contenu GPX
+            gpx_content = create_gpx_file(geocache_ids)
+            
+            if not gpx_content:
+                return jsonify({'error': 'Erreur lors de la génération du fichier GPX'}), 500
+            
+            # Créer une réponse avec le fichier GPX
+            response = make_response(gpx_content)
+            response.headers['Content-Type'] = 'application/gpx+xml'
+            filename = generate_filename(filtered=True)
+            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
         
-        if not gpx_content:
-            return jsonify({'error': 'Erreur lors de la génération du fichier GPX'}), 500
-        
-        # Créer une réponse avec le fichier GPX
-        response = make_response(gpx_content)
-        response.headers['Content-Type'] = 'application/gpx+xml'
-        filename = generate_filename(filtered=True)
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
+        # Format ZIP (géocaches + waypoints)
+        else:
+            # Générer le contenu ZIP
+            zip_buffer = create_gpx_zip(geocache_ids)
+            
+            if not zip_buffer:
+                return jsonify({'error': 'Erreur lors de la génération du fichier ZIP'}), 500
+            
+            # Créer une réponse avec le fichier ZIP
+            response = make_response(zip_buffer.getvalue())
+            response.headers['Content-Type'] = 'application/zip'
+            filename = generate_filename(filtered=True).replace('.gpx', '.zip')
+            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
         
     except Exception as e:
         current_app.logger.error(f"Erreur lors de l'export GPX: {str(e)}")

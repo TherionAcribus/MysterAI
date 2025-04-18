@@ -6,6 +6,9 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from flask import current_app
 from app.models.geocache import Geocache
+import os
+import io
+import zipfile
 
 def create_gpx_file(geocache_ids):
     """
@@ -187,6 +190,171 @@ def create_gpx_file(geocache_ids):
     pretty_xml = minidom.parseString(xml_string).toprettyxml(indent="  ")
     
     return pretty_xml
+
+def create_waypoints_gpx_file(geocache_ids):
+    """
+    Crée un fichier GPX contenant les waypoints additionnels des géocaches spécifiées
+    
+    Args:
+        geocache_ids (list): Liste des IDs de géocaches dont on veut exporter les waypoints
+        
+    Returns:
+        str: Contenu du fichier GPX formaté pour les waypoints
+    """
+    # Récupérer les géocaches depuis la base de données
+    geocaches = Geocache.query.filter(Geocache.id.in_(geocache_ids)).all()
+    
+    if not geocaches:
+        return None
+    
+    # Récupérer tous les waypoints additionnels
+    all_waypoints = []
+    for geocache in geocaches:
+        if geocache.additional_waypoints:
+            all_waypoints.extend(geocache.additional_waypoints)
+    
+    if not all_waypoints:
+        return None
+    
+    # Créer la structure XML GPX
+    gpx = ET.Element('gpx')
+    gpx.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+    gpx.set('xmlns:xsd', 'http://www.w3.org/2001/XMLSchema')
+    gpx.set('version', '1.0')
+    gpx.set('creator', 'MysteryAI')
+    gpx.set('xmlns', 'http://www.topografix.com/GPX/1/0')
+    gpx.set('xsi:schemaLocation', 'http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd http://www.groundspeak.com/cache/1/0/1 http://www.groundspeak.com/cache/1/0/1/cache.xsd')
+    
+    # Ajouter les métadonnées
+    name = ET.SubElement(gpx, 'name')
+    name.text = "Waypoints for Cache Listings Generated from MysteryAI"
+    
+    desc = ET.SubElement(gpx, 'desc')
+    desc.text = "This is a list of supporting waypoints for caches generated from MysteryAI"
+    
+    author = ET.SubElement(gpx, 'author')
+    author.text = "MysteryAI"
+    
+    time = ET.SubElement(gpx, 'time')
+    time.text = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+    
+    keywords = ET.SubElement(gpx, 'keywords')
+    keywords.text = "cache, geocache, waypoints"
+    
+    # Calculer les limites (bounds) du GPX
+    if all_waypoints:
+        lats = [wp.latitude for wp in all_waypoints if wp.latitude is not None]
+        lons = [wp.longitude for wp in all_waypoints if wp.longitude is not None]
+        
+        if lats and lons:
+            bounds = ET.SubElement(gpx, 'bounds')
+            bounds.set('minlat', str(min(lats)))
+            bounds.set('minlon', str(min(lons)))
+            bounds.set('maxlat', str(max(lats)))
+            bounds.set('maxlon', str(max(lons)))
+    
+    # Ajouter chaque waypoint
+    for waypoint in all_waypoints:
+        if waypoint.latitude is None or waypoint.longitude is None:
+            continue
+        
+        wpt = ET.SubElement(gpx, 'wpt')
+        wpt.set('lat', str(waypoint.latitude))
+        wpt.set('lon', str(waypoint.longitude))
+        
+        # Date de création
+        time_tag = ET.SubElement(wpt, 'time')
+        current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_tag.text = current_time
+        
+        # Code du waypoint (généralement préfixe + code GC)
+        name_tag = ET.SubElement(wpt, 'name')
+        if waypoint.prefix and waypoint.geocache.gc_code:
+            name_tag.text = f"{waypoint.prefix}{waypoint.geocache.gc_code}"
+        elif waypoint.lookup:
+            name_tag.text = waypoint.lookup
+        else:
+            # Générer un code unique si pas de préfixe
+            name_tag.text = f"WP{waypoint.id:03d}_{waypoint.geocache.gc_code}"
+        
+        # Description
+        desc_tag = ET.SubElement(wpt, 'desc')
+        desc_tag.text = waypoint.name or "Additional Waypoint"
+        
+        # URL
+        url_tag = ET.SubElement(wpt, 'url')
+        url_tag.text = f"http://www.geocaching.com/seek/wpt.aspx?WID={waypoint.id}"
+        
+        # Nom d'URL
+        urlname_tag = ET.SubElement(wpt, 'urlname')
+        urlname_tag.text = waypoint.name or "Additional Waypoint"
+        
+        # Symbole du waypoint
+        sym_tag = ET.SubElement(wpt, 'sym')
+        # Déterminer le type de waypoint par le préfixe standard
+        sym = "Reference Point"  # Valeur par défaut
+        if waypoint.prefix:
+            prefix_lower = waypoint.prefix.lower()
+            if prefix_lower.startswith("pk") or prefix_lower.startswith("p"):
+                sym = "Parking Area"
+            elif prefix_lower.startswith("st") or prefix_lower.startswith("s"):
+                sym = "Stages of a Multicache"
+            elif prefix_lower.startswith("fn") or prefix_lower.startswith("f"):
+                sym = "Final Location"
+            elif prefix_lower.startswith("tr") or prefix_lower.startswith("t"):
+                sym = "Trailhead"
+        sym_tag.text = sym
+        
+        # Type
+        type_tag = ET.SubElement(wpt, 'type')
+        type_tag.text = f"Waypoint|{sym}"
+        
+        # Commentaire
+        cmt_tag = ET.SubElement(wpt, 'cmt')
+        cmt_tag.text = waypoint.note or ""
+    
+    # Convertir l'arbre XML en chaîne de caractères formatée
+    xml_string = ET.tostring(gpx, encoding='utf-8')
+    pretty_xml = minidom.parseString(xml_string).toprettyxml(indent="  ")
+    
+    return pretty_xml
+
+def create_gpx_zip(geocache_ids):
+    """
+    Crée un fichier ZIP contenant les fichiers GPX (principal et waypoints)
+    
+    Args:
+        geocache_ids (list): Liste des IDs de géocaches à inclure
+        
+    Returns:
+        BytesIO: Contenu du fichier ZIP en mémoire
+    """
+    # Générer les fichiers GPX
+    gpx_content = create_gpx_file(geocache_ids)
+    waypoints_gpx_content = create_waypoints_gpx_file(geocache_ids)
+    
+    if not gpx_content:
+        return None
+    
+    # Créer un objet BytesIO pour stocker le ZIP
+    zip_buffer = io.BytesIO()
+    
+    # Créer un fichier ZIP dans le buffer
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Nom du fichier de base sans extension
+        base_filename = generate_filename(filtered=True).replace('.gpx', '')
+        
+        # Ajouter le fichier GPX principal
+        zip_file.writestr(f"{base_filename}.gpx", gpx_content)
+        
+        # Ajouter le fichier de waypoints s'il existe
+        if waypoints_gpx_content:
+            zip_file.writestr(f"{base_filename}-wpts.gpx", waypoints_gpx_content)
+    
+    # Remettre le curseur du buffer au début
+    zip_buffer.seek(0)
+    
+    return zip_buffer
 
 def generate_filename(filtered=False):
     """
