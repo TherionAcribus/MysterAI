@@ -364,7 +364,7 @@
         
         // Préparer les données d'entrée en fonction du plugin
         let inputs = {
-            text: geocache.name || '', // On utilise le nom de la géocache comme texte d'entrée par défaut
+            text: geocache.description_text || geocache.name || '', // Utiliser la description plutôt que le nom
             geocache_id: geocache.id, // Toujours envoyer l'ID, certains plugins en ont besoin (comme analysis_web_page)
             gc_code: geocache.gc_code || '',
             enable_gps_detection: true
@@ -1170,14 +1170,23 @@
         // Vérifier si on a trouvé des géocaches
         if (geocaches && Array.isArray(geocaches) && geocaches.length > 0) {
             console.log("%c[MultiSolver] Géocaches trouvées:", "background:green; color:white", geocaches);
-            displayGeocachesList(geocaches);
             
-            // Stocker pour une utilisation future
-            try {
-                sessionStorage.setItem('multiSolverGeocaches', JSON.stringify(geocaches));
-            } catch (e) {
-                console.warn("%c[MultiSolver] Impossible de stocker les géocaches dans sessionStorage", "background:orange; color:black");
-            }
+            // Charger les descriptions des géocaches
+            loadGeocacheDescriptions(geocaches)
+                .then(geocachesWithDesc => {
+                    displayGeocachesList(geocachesWithDesc);
+                    
+                    // Stocker pour une utilisation future
+                    try {
+                        sessionStorage.setItem('multiSolverGeocaches', JSON.stringify(geocachesWithDesc));
+                    } catch (e) {
+                        console.warn("%c[MultiSolver] Impossible de stocker les géocaches dans sessionStorage", "background:orange; color:black");
+                    }
+                })
+                .catch(error => {
+                    console.error("%c[MultiSolver] Erreur lors du chargement des descriptions:", "background:red; color:white", error);
+                    displayGeocachesList(geocaches);
+                });
         } else {
             console.warn("%c[MultiSolver] Aucune géocache trouvée", "background:orange; color:black");
             const geocachesListElement = document.querySelector('[data-multi-solver-target="geocachesList"]');
@@ -1186,6 +1195,47 @@
                 showError("Aucune géocache spécifiée. Vous pouvez quand même utiliser les plugins mais aucun traitement ne sera appliqué.");
             }
         }
+    }
+    
+    // Ajouter la fonction pour charger les descriptions
+    async function loadGeocacheDescriptions(geocaches) {
+        console.log("%c[MultiSolver] Chargement des descriptions pour les géocaches", "background:blue; color:white");
+        
+        const geocachesWithDesc = [...geocaches];
+        
+        // Charger les descriptions pour chaque géocache
+        const promises = geocaches.map(async (geocache, index) => {
+            try {
+                // Si la géocache a déjà une description, ne pas la charger à nouveau
+                if (geocache.description_text) {
+                    return;
+                }
+                
+                const response = await fetch(`/geocaches/${geocache.id}/text`);
+                
+                if (!response.ok) {
+                    console.warn(`%c[MultiSolver] Impossible de charger la description pour ${geocache.gc_code}`, "background:orange; color:black");
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Mettre à jour la géocache avec la description
+                geocachesWithDesc[index] = {
+                    ...geocache,
+                    description_text: data.description || ""
+                };
+                
+                console.log(`%c[MultiSolver] Description chargée pour ${geocache.gc_code}`, "background:green; color:white");
+            } catch (error) {
+                console.error(`%c[MultiSolver] Erreur lors du chargement de la description pour ${geocache.gc_code}:`, "background:red; color:white", error);
+            }
+        });
+        
+        // Attendre que toutes les requêtes soient terminées
+        await Promise.all(promises);
+        
+        return geocachesWithDesc;
     }
     
     // Fonction pour ouvrir les détails d'une géocache
@@ -2226,6 +2276,26 @@
                 throw new Error("ID de géocache manquant");
             }
             
+            // S'assurer que nous avons la description de la géocache
+            if (!geocache.description_text) {
+                console.log("%c[MultiSolver] Description manquante, tentative de récupération...", "background:orange; color:black");
+                try {
+                    const response = await fetch(`/geocaches/${geocache.id}/text`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        geocache = {
+                            ...geocache,
+                            description_text: data.description || ""
+                        };
+                        console.log("%c[MultiSolver] Description récupérée avec succès", "background:green; color:white");
+                    } else {
+                        console.warn("%c[MultiSolver] Impossible de récupérer la description", "background:orange; color:black");
+                    }
+                } catch (error) {
+                    console.error("%c[MultiSolver] Erreur lors de la récupération de la description", "background:red; color:white", error);
+                }
+            }
+            
             // Exécuter le plugin sur la géocache
             const result = await executePlugin(plugin, geocache);
             console.log("%c[MultiSolver] Résultat:", "background:blue; color:white", result);
@@ -2341,7 +2411,7 @@
             document.getElementById('progress-container').classList.remove('hidden');
             
             // Récupérer les géocaches
-            const geocaches = getGeocaches();
+            let geocaches = getGeocaches();
             
             if (!geocaches || geocaches.length === 0) {
                 showError("Aucune géocache à traiter");
@@ -2350,6 +2420,57 @@
             }
             
             console.log("%c[MultiSolver] Nombre de géocaches à traiter:", "background:orange; color:black", geocaches.length);
+
+            // Précharger les descriptions manquantes pour toutes les géocaches
+            const geocachesNeedingDescriptions = geocaches.filter(g => !g.description_text);
+            if (geocachesNeedingDescriptions.length > 0) {
+                console.log("%c[MultiSolver] Préchargement des descriptions pour " + geocachesNeedingDescriptions.length + " géocaches", "background:blue; color:white");
+                
+                // Mettre à jour la barre de progression pour indiquer le préchargement
+                document.getElementById('progress-container').querySelector('div').innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            Préchargement des descriptions...
+                        </div>
+                        <div class="w-64 bg-gray-700 rounded-full h-2.5">
+                            <div class="bg-blue-600 h-2.5 rounded-full animate-pulse" style="width: 100%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                // Charger les descriptions
+                geocaches = await loadGeocacheDescriptions(geocaches);
+                
+                // Stocker les géocaches mises à jour
+                try {
+                    sessionStorage.setItem('multiSolverGeocaches', JSON.stringify(geocaches));
+                } catch (e) {
+                    console.warn("%c[MultiSolver] Impossible de stocker les géocaches avec descriptions dans sessionStorage", "background:orange; color:black");
+                }
+                
+                // Restaurer l'affichage normal de la barre de progression
+                document.getElementById('progress-container').innerHTML = `
+                    <div class="flex justify-between items-center p-3 bg-gray-900 rounded">
+                        <div class="flex items-center">
+                            <div class="mr-4">
+                                <span id="progress-count">0</span> / <span id="progress-total">0</span>
+                            </div>
+                            <div class="w-64 bg-gray-700 rounded-full h-2.5">
+                                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <button 
+                            id="stop-execution-button"
+                            class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs flex items-center"
+                            onclick="window.stopPluginExecution()">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Arrêter
+                        </button>
+                    </div>
+                `;
+            }
             
             // Initialiser la progression
             const progressTotal = document.getElementById('progress-total');
