@@ -25,6 +25,16 @@ import tempfile
 import os.path
 from app.routes.settings import get_specific_param
 from flask_login import login_required, current_user
+from typing import Optional, Dict, Any
+import uuid
+import logging
+from datetime import datetime, timezone
+from sqlalchemy import or_, and_, func, text, cast, Integer, String, asc, desc
+from sqlalchemy.orm import aliased
+import psycopg2
+import pytz
+from bs4 import BeautifulSoup
+from app.geocaching_client import GeocachingClient
 
 logger = setup_logger()
 
@@ -2656,3 +2666,116 @@ def get_waypoints_list(geocache_id):
     except Exception as e:
         logger.error(f"Erreur lors de la récupération de la liste des waypoints: {e}")
         return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/mark-as-found', methods=['POST'])
+def mark_as_found(geocache_id):
+    """Marque une géocache comme trouvée."""
+    try:
+        geocache = Geocache.query.get_or_404(geocache_id)
+        geocache.is_found = True
+        geocache.found_date = datetime.now()
+        db.session.commit()
+        flash('Géocache marquée comme trouvée avec succès.', 'success')
+        return redirect(url_for('geocaches.get_geocache_details', geocache_id=geocache_id))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors du marquage de la géocache comme trouvée: {str(e)}")
+        flash('Une erreur est survenue lors du marquage de la géocache comme trouvée.', 'error')
+        return redirect(url_for('geocaches.get_geocache_details', geocache_id=geocache_id))
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/send_to_geocaching', methods=['POST'])
+def send_to_geocaching(geocache_id):
+    """
+    Envoie les coordonnées corrigées d'une géocache vers geocaching.com
+    en utilisant la classe GeocachingClient
+    """
+    try:
+        # Vérifier que l'utilisateur a fourni un code GC
+        data = request.get_json()
+        if not data or 'gc_code' not in data:
+            return jsonify({'success': False, 'error': 'Code GC manquant'}), 400
+        
+        gc_code = data['gc_code']
+        
+        # Récupérer la géocache dans la base de données
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier que la géocache a des coordonnées corrigées
+        if not geocache.gc_lat_corrected or not geocache.gc_lon_corrected:
+            return jsonify({
+                'success': False, 
+                'error': 'Aucune coordonnée corrigée disponible pour cette géocache'
+            }), 400
+        
+        # Obtenir les identifiants de connexion depuis la configuration
+        gc_username = current_app.config.get('GEOCACHING_USERNAME')
+        gc_password = current_app.config.get('GEOCACHING_PASSWORD')
+        
+        if not gc_username or not gc_password:
+            return jsonify({
+                'success': False, 
+                'error': 'Identifiants Geocaching.com non configurés sur le serveur'
+            }), 500
+        
+        # Créer une instance du client Geocaching
+        client = GeocachingClient(username=gc_username, password=gc_password)
+        
+        # Se connecter au site
+        if not client.login():
+            return jsonify({
+                'success': False, 
+                'error': 'Échec de connexion à Geocaching.com'
+            }), 500
+        
+        # Obtenir le token utilisateur
+        try:
+            user_token = client.get_user_token(gc_code)
+        except Exception as e:
+            return jsonify({
+                'success': False, 
+                'error': f'Impossible d\'obtenir le token utilisateur: {str(e)}'
+            }), 500
+        
+        # Convertir les coordonnées GC en décimales
+        lat, lon = convert_gc_coords_to_decimal(geocache.gc_lat_corrected, geocache.gc_lon_corrected)
+        
+        # Préparer les données pour l'API de Geocaching
+        api_data = {
+            'userToken': user_token,
+            'wptCode': gc_code,
+            'lat': lat,
+            'lng': lon
+        }
+        
+        # Effectuer la requête API pour mettre à jour les coordonnées
+        api_url = 'https://www.geocaching.com/seek/cache_details.aspx/SetUserCoordinate'
+        response = client.make_api_request(api_url, api_data)
+        
+        if not response:
+            return jsonify({
+                'success': False, 
+                'error': 'Échec de l\'appel API Geocaching.com'
+            }), 500
+        
+        # Vérifier la réponse
+        status = response.get('status')
+        if status and status == 'success':
+            return jsonify({
+                'success': True,
+                'message': 'Coordonnées envoyées avec succès vers Geocaching.com',
+                'details': response
+            })
+        else:
+            error_msg = response.get('msg', 'Erreur inconnue')
+            return jsonify({
+                'success': False,
+                'error': f'Erreur renvoyée par Geocaching.com: {error_msg}',
+                'details': response
+            }), 500
+        
+    except Exception as e:
+        logging.error(f"Erreur lors de l'envoi des coordonnées vers Geocaching.com: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

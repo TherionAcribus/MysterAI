@@ -45,6 +45,75 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         });
     }
 
+    sendToGeocaching(event) {
+        console.log("Send to Geocaching button clicked", {
+            event,
+            currentTarget: event.currentTarget,
+            geocacheId: this.geocacheIdValue,
+            gcCode: event.currentTarget.dataset.gcCode
+        })
+        
+        event.preventDefault()
+        
+        // Récupérer le GC code depuis le bouton
+        const gcCode = event.currentTarget.dataset.gcCode
+        
+        if (!gcCode) {
+            console.error("GC code non trouvé, impossible d'envoyer les coordonnées")
+            return
+        }
+        
+        // Afficher un message de confirmation
+        if (!confirm(`Voulez-vous vraiment envoyer les coordonnées corrigées vers Geocaching.com pour ${gcCode}?`)) {
+            return
+        }
+        
+        // Désactiver le bouton pendant l'envoi
+        event.currentTarget.disabled = true
+        event.currentTarget.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Envoi en cours...'
+        
+        // Envoyer les coordonnées à l'API
+        fetch(`/geocaches/${this.geocacheIdValue}/send_to_geocaching`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                gc_code: gcCode
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`)
+            }
+            return response.json()
+        })
+        .then(data => {
+            // Réactiver le bouton
+            event.currentTarget.disabled = false
+            event.currentTarget.innerHTML = 'Envoyer sur Geocaching.com'
+            
+            if (data.success) {
+                // Afficher un message de succès
+                alert(`Les coordonnées ont été envoyées avec succès vers Geocaching.com pour ${gcCode}!`)
+            } else {
+                // Afficher un message d'erreur
+                alert(`Erreur lors de l'envoi des coordonnées: ${data.error}`)
+            }
+        })
+        .catch(error => {
+            console.error("Erreur lors de l'envoi des coordonnées:", error)
+            
+            // Réactiver le bouton
+            event.currentTarget.disabled = false
+            event.currentTarget.innerHTML = 'Envoyer sur Geocaching.com'
+            
+            // Afficher un message d'erreur
+            alert(`Erreur lors de l'envoi des coordonnées: ${error.message}`)
+        })
+    }
+
     edit(event) {
         console.log("Edit button clicked", {
             event,

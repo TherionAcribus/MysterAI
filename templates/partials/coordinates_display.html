@@ -13,10 +13,17 @@
                     <div class="text-sm text-gray-400 mb-1">Coordonnées corrigées:</div>
                     <div class="text-green-400">{{ geocache.gc_coords_corrected }}</div>
                 </div>
-                <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                        data-action="click->geocache-coordinates#edit">
-                    Modifier
-                </button>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                            data-action="click->geocache-coordinates#edit">
+                        Modifier
+                    </button>
+                    <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
+                            data-action="click->geocache-coordinates#sendToGeocaching"
+                            data-gc-code="{{ geocache.gc_code }}">
+                        Envoyer sur Geocaching.com
+                    </button>
+                </div>
             </div>
         </div>
     {% else %}
