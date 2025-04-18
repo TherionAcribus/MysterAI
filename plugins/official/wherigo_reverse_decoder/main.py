@@ -24,33 +24,141 @@ class WherigoReverseDecoderPlugin:
     def execute(self, inputs):
         """
         Exécute le décodage.
-        :param inputs: dict contenant 'numbers' (chaîne de caractères).
+        :param inputs: dict contenant les paramètres d'entrée.
         :return: dict avec les coordonnées ou un message d'erreur.
         """
         print('INPUTS', inputs)
         numbers_text = inputs.get("text", "").strip()
+        strict_mode = inputs.get("strict", True)
+        embedded_mode = inputs.get("embedded", False)
+        
         if not numbers_text:
             return {"error": "Aucun texte fourni pour l'analyse."}
 
-        # Extraire trois nombres de 6 chiffres avec une regex
-        numbers = re.findall(r'\b\d{6}\b', numbers_text)
-        if len(numbers) < 3:
-            return {"error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."}
-
         try:
-            # Appliquer l'algorithme de décodage
-            a, b, c = numbers[:3]
-            latitude, longitude = self._decode_coordinates(a, b, c)
-
-            # Conversion avec le plugin projection_plugin
-            formatted_coords = self._convert_to_wgs84(latitude, longitude)
-
-            print('FORMATTED_COORDS', formatted_coords)
-            return {
-                "text_output": formatted_coords
-            }
+            # En fonction du mode, on cherche différemment les nombres
+            if embedded_mode:
+                # Mode embedded: on cherche 3 nombres de 6 chiffres dans le texte
+                fragments = self.find_fragments(numbers_text, strict_mode)
+                if not fragments or len(fragments) < 3:
+                    return {"error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."}
+                
+                # Utiliser les 3 premiers nombres trouvés
+                a, b, c = fragments[:3]
+                latitude, longitude = self._decode_coordinates(a, b, c)
+                formatted_coords = self._convert_to_wgs84(latitude, longitude)
+                
+                # Retourner les résultats avec les fragments identifiés
+                return {
+                    "text_output": formatted_coords,
+                    "fragments": fragments,
+                    "is_match": True,
+                    "score": 1.0
+                }
+            else:
+                # Mode non-embedded: analyser tout le texte
+                if strict_mode:
+                    # En mode strict, on vérifie exactement 3 nombres de 6 chiffres
+                    numbers = re.findall(r'\b\d{6}\b', numbers_text)
+                    if len(numbers) != 3:
+                        return {"error": "Le texte doit contenir exactement trois nombres de 6 chiffres."}
+                else:
+                    # En mode smooth, on extrait au moins 3 nombres de 6 chiffres si possible
+                    numbers = re.findall(r'\b\d{6}\b', numbers_text)
+                    if len(numbers) < 3:
+                        return {"error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."}
+                
+                # Appliquer l'algorithme de décodage
+                a, b, c = numbers[:3]
+                latitude, longitude = self._decode_coordinates(a, b, c)
+                formatted_coords = self._convert_to_wgs84(latitude, longitude)
+                
+                return {
+                    "text_output": formatted_coords
+                }
+                
         except Exception as e:
             return {"error": f"Erreur lors du décodage : {str(e)}"}
+
+    def find_fragments(self, text, strict=True):
+        """
+        Cherche des fragments de texte qui pourraient être des nombres de 6 chiffres.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            
+        Returns:
+            Liste des fragments trouvés (nombres de 6 chiffres)
+        """
+        if strict:
+            # En mode strict, on cherche uniquement des nombres de exactement 6 chiffres
+            return re.findall(r'\b\d{6}\b', text)
+        else:
+            # En mode smooth, on est plus flexible sur les caractères autour
+            return re.findall(r'\d{6}', text)
+
+    def check_code(self, text, strict=True, allowed_chars=None, embedded=False):
+        """
+        Vérifie si le texte contient du code Wherigo Reverse valide.
+        
+        Args:
+            text: Texte à analyser
+            strict: Mode strict (True) ou smooth (False)
+            allowed_chars: Liste de caractères autorisés en plus des caractères du code
+            embedded: True si le texte peut contenir du code intégré
+            
+        Returns:
+            Un dictionnaire contenant:
+            - is_match: True si du code valide a été trouvé
+            - fragments: Liste des fragments de code trouvés
+            - score: Score de confiance (0.0 à 1.0)
+        """
+        fragments = self.find_fragments(text, strict)
+        
+        if embedded:
+            # En mode embedded, on cherche au moins 3 nombres dans le texte
+            is_match = len(fragments) >= 3
+            score = min(1.0, len(fragments) / 3.0) if is_match else 0.0
+        else:
+            # En mode non-embedded, tout le texte doit être des nombres
+            if strict:
+                # En mode strict, on doit avoir exactement 3 nombres
+                pattern = r'^\s*(\d{6})\s+(\d{6})\s+(\d{6})\s*$'
+                match = re.search(pattern, text)
+                is_match = bool(match)
+                score = 1.0 if is_match else 0.0
+            else:
+                # En mode smooth, on cherche au moins 3 nombres dans le texte
+                is_match = len(fragments) >= 3
+                # Score basé sur le ratio de chiffres dans le texte
+                total_digits = sum(len(frag) for frag in fragments)
+                total_chars = len(''.join(c for c in text if c.isdigit() or c.isalpha()))
+                score = total_digits / max(1, total_chars) if total_chars > 0 else 0.0
+        
+        return {
+            "is_match": is_match,
+            "fragments": fragments[:3] if len(fragments) >= 3 else fragments,
+            "score": score
+        }
+
+    def decode_fragments(self, text, fragments):
+        """
+        Décode uniquement les fragments valides dans leur contexte original.
+        
+        Args:
+            text: Texte original contenant les fragments
+            fragments: Liste des fragments à décoder
+            
+        Returns:
+            Texte avec les fragments décodés
+        """
+        if len(fragments) >= 3:
+            a, b, c = fragments[:3]
+            latitude, longitude = self._decode_coordinates(a, b, c)
+            formatted_coords = self._convert_to_wgs84(latitude, longitude)
+            return formatted_coords
+        return "Pas assez de fragments pour décoder"
 
     def _decode_coordinates(self, a, b, c):
         """

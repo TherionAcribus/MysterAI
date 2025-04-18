@@ -1,6 +1,6 @@
 {
     "name": "wherigo_reverse_decoder",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Plugin pour décoder les coordonnées d'un Wherigo Reverse à partir de trois nombres de 6 chiffres.",
     "author": "MysterAI",
     "plugin_type": "python",
@@ -18,6 +18,16 @@
         "type": "boolean",
         "label": "Activer la détection GPS",
         "default": true
+      },
+      "strict": {
+        "type": "boolean",
+        "label": "Mode strict",
+        "default": true
+      },
+      "embedded": {
+        "type": "boolean",
+        "label": "Texte avec code intégré",
+        "default": false
       }
     },
    "output_types": {
