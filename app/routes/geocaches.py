@@ -34,7 +34,8 @@ from sqlalchemy.orm import aliased
 import psycopg2
 import pytz
 from bs4 import BeautifulSoup
-from app.geocaching_client import GeocachingClient
+from app.geocaching_client import GeocachingClient, Coordinates
+from app.utils.coordinates import convert_gc_coords_to_decimal
 
 logger = setup_logger()
 
@@ -2687,7 +2688,7 @@ def mark_as_found(geocache_id):
 def send_to_geocaching(geocache_id):
     """
     Envoie les coordonnées corrigées d'une géocache vers geocaching.com
-    en utilisant la classe GeocachingClient
+    en utilisant les cookies Firefox du navigateur
     """
     try:
         # Vérifier que l'utilisateur a fourni un code GC
@@ -2707,70 +2708,33 @@ def send_to_geocaching(geocache_id):
                 'error': 'Aucune coordonnée corrigée disponible pour cette géocache'
             }), 400
         
-        # Obtenir les identifiants de connexion depuis la configuration
-        gc_username = current_app.config.get('GEOCACHING_USERNAME')
-        gc_password = current_app.config.get('GEOCACHING_PASSWORD')
+        # Créer une instance du client Geocaching avec les cookies Firefox
+        client = GeocachingClient()
         
-        if not gc_username or not gc_password:
+        # Vérifier si les cookies permettent l'accès à Geocaching.com
+        if not client.ensure_login():
             return jsonify({
                 'success': False, 
-                'error': 'Identifiants Geocaching.com non configurés sur le serveur'
-            }), 500
-        
-        # Créer une instance du client Geocaching
-        client = GeocachingClient(username=gc_username, password=gc_password)
-        
-        # Se connecter au site
-        if not client.login():
-            return jsonify({
-                'success': False, 
-                'error': 'Échec de connexion à Geocaching.com'
-            }), 500
-        
-        # Obtenir le token utilisateur
-        try:
-            user_token = client.get_user_token(gc_code)
-        except Exception as e:
-            return jsonify({
-                'success': False, 
-                'error': f'Impossible d\'obtenir le token utilisateur: {str(e)}'
-            }), 500
+                'error': 'Impossible de se connecter à Geocaching.com. Assurez-vous d\'être connecté dans Firefox.'
+            }), 401
         
         # Convertir les coordonnées GC en décimales
         lat, lon = convert_gc_coords_to_decimal(geocache.gc_lat_corrected, geocache.gc_lon_corrected)
         
-        # Préparer les données pour l'API de Geocaching
-        api_data = {
-            'userToken': user_token,
-            'wptCode': gc_code,
-            'lat': lat,
-            'lng': lon
-        }
+        # Créer une instance de la classe Coordinates de geocaching_client
+        from app.geocaching_client import Coordinates
+        coordinates = Coordinates(client)
         
-        # Effectuer la requête API pour mettre à jour les coordonnées
-        api_url = 'https://www.geocaching.com/seek/cache_details.aspx/SetUserCoordinate'
-        response = client.make_api_request(api_url, api_data)
-        
-        if not response:
-            return jsonify({
-                'success': False, 
-                'error': 'Échec de l\'appel API Geocaching.com'
-            }), 500
-        
-        # Vérifier la réponse
-        status = response.get('status')
-        if status and status == 'success':
+        # Envoyer les coordonnées
+        if coordinates.update(gc_code, lat, lon):
             return jsonify({
                 'success': True,
-                'message': 'Coordonnées envoyées avec succès vers Geocaching.com',
-                'details': response
+                'message': 'Coordonnées envoyées avec succès vers Geocaching.com'
             })
         else:
-            error_msg = response.get('msg', 'Erreur inconnue')
             return jsonify({
                 'success': False,
-                'error': f'Erreur renvoyée par Geocaching.com: {error_msg}',
-                'details': response
+                'error': 'Échec de l\'envoi des coordonnées à Geocaching.com'
             }), 500
         
     except Exception as e:

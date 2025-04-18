@@ -57,6 +57,7 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         
         // Récupérer le GC code depuis le bouton
         const gcCode = event.currentTarget.dataset.gcCode
+        const button = event.currentTarget
         
         if (!gcCode) {
             console.error("GC code non trouvé, impossible d'envoyer les coordonnées")
@@ -69,8 +70,10 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         }
         
         // Désactiver le bouton pendant l'envoi
-        event.currentTarget.disabled = true
-        event.currentTarget.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Envoi en cours...'
+        button.disabled = true
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Envoi en cours...'
+        
+        console.log("Bouton désactivé et texte modifié", button.innerHTML)
         
         // Envoyer les coordonnées à l'API
         fetch(`/geocaches/${this.geocacheIdValue}/send_to_geocaching`, {
@@ -84,15 +87,25 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             })
         })
         .then(response => {
+            console.log("Réponse reçue du serveur", {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText
+            })
+            
             if (!response.ok) {
                 throw new Error(`Erreur HTTP: ${response.status}`)
             }
             return response.json()
         })
         .then(data => {
+            console.log("Données JSON reçues", data)
+            
             // Réactiver le bouton
-            event.currentTarget.disabled = false
-            event.currentTarget.innerHTML = 'Envoyer sur Geocaching.com'
+            button.disabled = false
+            button.innerHTML = 'Envoyer sur Geocaching.com'
+            
+            console.log("Bouton réactivé et texte réinitialisé", button.innerHTML)
             
             if (data.success) {
                 // Afficher un message de succès
@@ -106,11 +119,23 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             console.error("Erreur lors de l'envoi des coordonnées:", error)
             
             // Réactiver le bouton
-            event.currentTarget.disabled = false
-            event.currentTarget.innerHTML = 'Envoyer sur Geocaching.com'
+            button.disabled = false
+            button.innerHTML = 'Envoyer sur Geocaching.com'
+            
+            console.log("Bouton réactivé et texte réinitialisé après erreur", button.innerHTML)
             
             // Afficher un message d'erreur
             alert(`Erreur lors de l'envoi des coordonnées: ${error.message}`)
+        })
+        .finally(() => {
+            // S'assurer que le bouton est bien réactivé et réinitialisé
+            setTimeout(() => {
+                if (button.disabled) {
+                    console.log("Forçage de la réinitialisation du bouton après délai")
+                    button.disabled = false
+                    button.innerHTML = 'Envoyer sur Geocaching.com'
+                }
+            }, 5000) // 5 secondes de délai pour être sûr
         })
     }
 

@@ -103,11 +103,6 @@ class Config:
         'ws_host': os.getenv('WS_HOST', 'localhost:5000')
     }
 
-    # Identifiants pour Geocaching.com
-    GEOCACHING_USERNAME = os.getenv('GEOCACHING_USERNAME', '')
-    GEOCACHING_PASSWORD = os.getenv('GEOCACHING_PASSWORD', '')
-
-# Écouteur d'événement pour SQLite uniquement
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     if not hasattr(dbapi_connection, 'enable_load_extension'):
