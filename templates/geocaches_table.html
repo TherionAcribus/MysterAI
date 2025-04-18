@@ -254,6 +254,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         <button id="reset-coords-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded flex items-center">
                             <i class="fas fa-undo mr-2"></i> Réinitialiser les coordonnées
                         </button>
+                        <button id="export-gpx-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-file-export mr-2"></i> Exporter en GPX
+                        </button>
                     </div>
                 </div>
             </div>
@@ -379,6 +382,30 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 <button class="confirm-reset-coords bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <span>Réinitialiser</span>
                     <div class="reset-loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'exportation GPX -->
+    <div id="exportGpxModal-{{ zone_id }}" class="export-gpx-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-blue-500">Exporter en GPX</h3>
+                <button class="close-export-gpx-modal text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="text-gray-300 mb-6">Voulez-vous exporter <span class="geocaches-count-to-export font-semibold">0</span> géocaches correspondant aux filtres actuels au format GPX ?</p>
+            <div class="flex justify-end gap-2">
+                <button class="cancel-export-gpx bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Annuler
+                </button>
+                <button class="confirm-export-gpx bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Exporter</span>
+                    <div class="export-loading-indicator hidden ml-2">
                         <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                     </div>
                 </button>
@@ -720,7 +747,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 closeResetCoordsModal: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .close-reset-coords-modal'),
                 cancelResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .cancel-reset-coords'),
                 confirmResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .confirm-reset-coords'),
-                resetLoadingIndicator: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .reset-loading-indicator')
+                resetLoadingIndicator: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .reset-loading-indicator'),
+                exportGpxBtn: document.getElementById('export-gpx-btn-{{ zone_id }}')
             };
         }
 
@@ -3159,6 +3187,155 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 tooltip.classList.replace('opacity-100', 'opacity-0');
             });
         });
+
+        // Gestionnaire pour le bouton "Réinitialiser les coordonnées"
+        document.getElementById(`reset-coords-btn-{{ zone_id }}`).addEventListener('click', function() {
+            openResetCoordsModal();
+        });
+        
+        // Gestionnaire pour le bouton "Exporter en GPX"
+        document.getElementById(`export-gpx-btn-{{ zone_id }}`).addEventListener('click', function() {
+            openExportGpxModal();
+        });
+
+        // ... existing code ...
+        
+        // Fonction pour ouvrir la modale d'exportation GPX
+        function openExportGpxModal() {
+            // Obtenir les IDs des géocaches filtrées
+            const geocacheIds = getFilteredGeocacheIds();
+            
+            // Vérifier s'il y a des géocaches à exporter
+            if (!geocacheIds || geocacheIds.length === 0) {
+                alert('Aucune géocache à exporter. Veuillez vérifier vos filtres.');
+                return;
+            }
+            
+            // Mettre à jour le compteur dans la modale
+            const countSpan = document.querySelector('.geocaches-count-to-export');
+            if (countSpan) {
+                countSpan.textContent = geocacheIds.length;
+            }
+            
+            // Afficher la modale
+            const modal = document.getElementById(`exportGpxModal-{{ zone_id }}`);
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+            
+            // Configurer les gestionnaires d'événements pour les boutons de la modale
+            setupExportGpxModalButtons();
+        }
+        
+        // Fonction pour fermer la modale d'exportation GPX
+        function closeExportGpxModal() {
+            const modal = document.getElementById(`exportGpxModal-{{ zone_id }}`);
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        // Fonction pour configurer les boutons de la modale d'exportation GPX
+        function setupExportGpxModalButtons() {
+            // Bouton de fermeture
+            const closeButton = document.querySelector('.close-export-gpx-modal');
+            if (closeButton) {
+                closeButton.onclick = closeExportGpxModal;
+            }
+            
+            // Bouton d'annulation
+            const cancelButton = document.querySelector('.cancel-export-gpx');
+            if (cancelButton) {
+                cancelButton.onclick = closeExportGpxModal;
+            }
+            
+            // Bouton de confirmation
+            const confirmButton = document.querySelector('.confirm-export-gpx');
+            if (confirmButton) {
+                confirmButton.onclick = exportGpxFile;
+            }
+        }
+        
+        // Fonction pour exporter les géocaches en fichier GPX
+        async function exportGpxFile() {
+            try {
+                // Afficher l'indicateur de chargement
+                const loadingIndicator = document.querySelector('.export-loading-indicator');
+                if (loadingIndicator) {
+                    loadingIndicator.classList.remove('hidden');
+                }
+                
+                // Obtenir les IDs des géocaches filtrées
+                const geocacheIds = getFilteredGeocacheIds();
+                
+                if (!geocacheIds || geocacheIds.length === 0) {
+                    throw new Error('Aucune géocache à exporter');
+                }
+                
+                // Appeler l'API pour générer le fichier GPX
+                const response = await fetch('/api/geocaches/export-gpx', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        geocache_ids: geocacheIds
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de l'exportation: ${response.status} ${response.statusText}`);
+                }
+                
+                // Vérifier si le contenu est un JSON (erreur) ou un blob (fichier)
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    // C'est une erreur au format JSON
+                    const error = await response.json();
+                    throw new Error(error.error || 'Erreur inconnue');
+                }
+                
+                // Récupérer le nom du fichier depuis l'en-tête Content-Disposition
+                let filename = 'geocaches.gpx';
+                const disposition = response.headers.get('content-disposition');
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                // Télécharger le fichier
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                // Fermer la modale
+                closeExportGpxModal();
+                
+                // Afficher un message de succès
+                showSuccess(`${geocacheIds.length} géocaches exportées avec succès`);
+                
+            } catch (error) {
+                console.error('Erreur lors de l\'exportation GPX:', error);
+                showError(`Erreur: ${error.message}`);
+            } finally {
+                // Cacher l'indicateur de chargement
+                const loadingIndicator = document.querySelector('.export-loading-indicator');
+                if (loadingIndicator) {
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+        }
+
+        // ... existing code ...
     })();
 
     // Script pour supprimer les tooltips problématiques

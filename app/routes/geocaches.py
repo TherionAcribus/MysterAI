@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, send_file, make_response, abort
 import json
 from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner, Log, Attribute
 from app.database import db
@@ -36,6 +36,7 @@ import pytz
 from bs4 import BeautifulSoup
 from app.geocaching_client import GeocachingClient, Coordinates
 from app.utils.coordinates import convert_gc_coords_to_decimal
+from app.gpx_generator import create_gpx_file, generate_filename
 
 logger = setup_logger()
 
@@ -2743,3 +2744,39 @@ def send_to_geocaching(geocache_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@geocaches_bp.route('/api/geocaches/export-gpx', methods=['POST'])
+def export_geocaches_as_gpx():
+    """
+    Génère un fichier GPX contenant les géocaches filtrées
+    
+    Query params:
+        - geocache_ids: liste d'IDs de géocaches à inclure dans le fichier GPX
+    
+    Returns:
+        Response: Le fichier GPX à télécharger
+    """
+    try:
+        data = request.json
+        geocache_ids = data.get('geocache_ids', [])
+        
+        if not geocache_ids:
+            return jsonify({'error': 'Aucun ID de géocache fourni'}), 400
+        
+        # Générer le contenu GPX
+        gpx_content = create_gpx_file(geocache_ids)
+        
+        if not gpx_content:
+            return jsonify({'error': 'Erreur lors de la génération du fichier GPX'}), 500
+        
+        # Créer une réponse avec le fichier GPX
+        response = make_response(gpx_content)
+        response.headers['Content-Type'] = 'application/gpx+xml'
+        filename = generate_filename(filtered=True)
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de l'export GPX: {str(e)}")
+        return jsonify({'error': str(e)}), 500
