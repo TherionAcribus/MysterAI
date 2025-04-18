@@ -367,14 +367,56 @@
             text: geocache.description_text || geocache.name || '', // Utiliser la description plutôt que le nom
             geocache_id: geocache.id, // Toujours envoyer l'ID, certains plugins en ont besoin (comme analysis_web_page)
             gc_code: geocache.gc_code || '',
-            enable_gps_detection: true
+            enable_gps_detection: true,
+            // Paramètres par défaut nécessaires pour tous les plugins
+            mode: "decode", // Le MultiSolver ne fait que du décodage
+            strict: "smooth", // Par défaut, sauf si modifié par l'utilisateur
+            embedded: true // Nécessaire pour tous les plugins
         };
+        
+        // Vérification de texte vide pour tous les plugins
+        if (!inputs.text || inputs.text.trim() === '') {
+            console.error(`%c[MultiSolver] Erreur: Aucun texte à analyser pour ${pluginName}`, "background:red; color:white");
+            console.error(`%c[MultiSolver] Description de la géocache manquante. GC=${geocache.gc_code}`, "background:red; color:white");
+            
+            // Pour le debug - afficher toutes les propriétés de la géocache
+            console.log("%c[MultiSolver] Données de la géocache:", "background:orange; color:black", geocache);
+            
+            // Texte par défaut pour éviter l'erreur
+            inputs.text = "Texte par défaut - Description manquante";
+        }
         
         // Pour le plugin analysis_web_page, s'assurer que l'ID de la géocache est correctement transmis
         // et ajouter _format: 'json' pour s'assurer de recevoir une réponse JSON
         if (pluginName === "analysis_web_page") {
             console.log("%c[MultiSolver] Utilisation du plugin analysis_web_page avec l'ID de géocache", "background:orange; color:black", geocache.id);
             inputs._format = 'json';
+        }
+        
+        // Configuration spécifique pour le plugin metadetection
+        if (pluginName === "metadetection") {
+            console.log("%c[MultiSolver] Utilisation du plugin metadetection", "background:orange; color:black");
+            
+            // Double vérification pour metadetection qui est sensible au texte vide
+            if (!inputs.text || inputs.text.trim() === '' || inputs.text === "Texte par défaut - Description manquante") {
+                console.error("%c[MultiSolver] Erreur: Aucun texte valide à analyser pour metadetection", "background:red; color:white");
+                return {
+                    mainDetection: {
+                        text: "Erreur: Aucun texte à analyser pour metadetection",
+                        coordinates: { exist: false }
+                    },
+                    detailedResults: [{
+                        source: `Erreur ${pluginName}`,
+                        sourceId: pluginName,
+                        details: {
+                            error: "Aucun texte valide fourni dans la description de la géocache"
+                        }
+                    }]
+                };
+            }
+            
+            // Approche simplifiée pour metadetection
+            return executeMetadetectionPlugin(inputs.text);
         }
         
         try {
@@ -427,7 +469,8 @@
                                     sourceId: pluginName,
                                     details: {
                                         error: `Erreur HTTP: ${xhr.status}`,
-                                        statusText: xhr.statusText
+                                        statusText: xhr.statusText,
+                                        responseText: xhr.responseText
                                     }
                                 }]
                             });
@@ -2528,4 +2571,90 @@
             window.isPluginExecutionRunning = false;
         }
     };
+
+    // Fonction dédiée pour exécuter le plugin metadetection avec un minimum de paramètres
+    async function executeMetadetectionPlugin(text) {
+        console.log("%c[MultiSolver] Exécution simplifiée de metadetection", "background:orange; color:black");
+        
+        // Créer un objet de données minimal
+        const minimalData = {
+            text: text,
+            mode: "decode",
+            strict: "smooth",
+            embedded: true,
+            enable_gps_detection: true
+        };
+        
+        console.log("%c[MultiSolver] Données minimales pour metadetection:", "background:blue; color:white", minimalData);
+        
+        try {
+            // Utiliser une requête fetch simplifiée
+            const formData = new FormData();
+            formData.append('text', text);
+            formData.append('mode', 'decode');
+            formData.append('strict', 'smooth');
+            formData.append('embedded', 'true');
+            formData.append('enable_gps_detection', 'true');
+            
+            console.log("%c[MultiSolver] Envoi des données en FormData", "background:blue; color:white");
+            
+            const response = await fetch(`/api/plugins/metadetection/execute`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                // Essayer avec JSON si FormData échoue
+                console.log("%c[MultiSolver] FormData a échoué, essai avec JSON", "background:orange; color:black");
+                
+                const jsonResponse = await fetch(`/api/plugins/metadetection/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                if (!jsonResponse.ok) {
+                    console.error("%c[MultiSolver] Échec de toutes les tentatives", "background:red; color:white");
+                    return {
+                        mainDetection: {
+                            text: "Échec de l'exécution de metadetection: erreur serveur",
+                            coordinates: { exist: false }
+                        },
+                        detailedResults: [{
+                            source: "Erreur metadetection",
+                            sourceId: "metadetection",
+                            details: {
+                                error: "Impossible d'exécuter le plugin metadetection"
+                            }
+                        }]
+                    };
+                }
+                
+                const jsonData = await jsonResponse.json();
+                return normalizePluginResults("metadetection", jsonData);
+            }
+            
+            const data = await response.json();
+            return normalizePluginResults("metadetection", data);
+            
+        } catch (error) {
+            console.error("%c[MultiSolver] Erreur avec metadetection:", "background:red; color:white", error);
+            
+            return {
+                mainDetection: {
+                    text: `Erreur avec metadetection: ${error.message}`,
+                    coordinates: { exist: false }
+                },
+                detailedResults: [{
+                    source: "Erreur metadetection",
+                    sourceId: "metadetection",
+                    details: {
+                        error: error.message
+                    }
+                }]
+            };
+        }
+    }
 })();

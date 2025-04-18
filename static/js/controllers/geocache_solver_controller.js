@@ -886,6 +886,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             // Récupérer les options du MetaSolver
             const strict = document.getElementById('metasolver-strict').value;
             const embedded = document.getElementById('metasolver-embedded').checked;
+            const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
             
             // Récupérer les informations sur les caractères autorisés
             const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
@@ -920,6 +921,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
             formData.append('plugin_name', pluginName);
+            formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
             
             // Ajouter les caractères autorisés si nécessaire
             if (allowedCharsType !== 'all') {
@@ -938,29 +940,16 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             const result = await response.json();
             
-            // Afficher le résultat
-            if (result.error) {
-                resultContentElement.innerHTML = `
-                    <div class="bg-red-900 text-red-100 p-4 rounded-lg">
-                        ${result.error}
-                    </div>
-                `;
-            } else if (result.result && result.result.decoded_text) {
-                resultContentElement.innerHTML = `
-                    <div class="bg-gray-700 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage avec ${pluginName}</h3>
-                        <div class="text-gray-200">${result.result.decoded_text}</div>
-                    </div>
-                `;
-            } else {
-                resultContentElement.innerHTML = `
-                    <div class="bg-gray-700 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat</h3>
-                        <div class="text-gray-200">Format de résultat non reconnu</div>
-                        <pre class="text-xs text-gray-400 mt-2 overflow-auto max-h-40">${JSON.stringify(result, null, 2)}</pre>
-                    </div>
-                `;
-            }
+            // Afficher le résultat en utilisant la méthode de formatage
+            resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
+            
+            // Ajouter à l'historique des plugins
+            this.addToPluginsHistory({
+                plugin: 'MetaSolver - ' + pluginName,
+                action: 'Décodage',
+                timestamp: new Date().toLocaleTimeString(),
+                result: result
+            });
             
         } catch (error) {
             console.error("Erreur lors du décodage:", error);
@@ -985,10 +974,75 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         }
         
-        // Vérifier si des coordonnées GPS ont été détectées
+        // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
         let gpsCoordinatesHtml = '';
-        if (result.coordinates && result.coordinates.exist) {
+        if (result.primary_coordinates) {
             // Stocker les coordonnées détectées pour une utilisation ultérieure
+            this.lastDetectedCoordinatesValue = result.primary_coordinates;
+            
+            // Récupérer les coordonnées en format DDM si disponibles
+            let ddmLat = "";
+            let ddmLon = "";
+            let ddmFull = "";
+            
+            // Parcourir les résultats combinés pour trouver les coordonnées DDM
+            if (result.combined_results) {
+                Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
+                    if (pluginResult.coordinates && pluginResult.coordinates.exist) {
+                        ddmLat = pluginResult.coordinates.ddm_lat || "";
+                        ddmLon = pluginResult.coordinates.ddm_lon || "";
+                        ddmFull = pluginResult.coordinates.ddm || "";
+                    }
+                });
+            }
+            
+            // Utiliser les coordonnées décimales si on n'a pas trouvé de format DDM
+            if (!ddmFull && result.primary_coordinates) {
+                const lat = result.primary_coordinates.latitude;
+                const lon = result.primary_coordinates.longitude;
+                ddmFull = `${lat > 0 ? 'N' : 'S'} ${Math.abs(lat).toFixed(6)}°, ${lon > 0 ? 'E' : 'W'} ${Math.abs(lon).toFixed(6)}°`;
+            }
+            
+            gpsCoordinatesHtml = `
+                <div class="bg-gray-700 rounded-lg p-4 mt-4">
+                    <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
+                    
+                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
+                        <div>
+                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Coordonnées:</label>
+                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                   value="${ddmFull}" readonly>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       value="${ddmLat || result.primary_coordinates.latitude}" readonly>
+                            </div>
+                            <div>
+                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       value="${ddmLon || result.primary_coordinates.longitude}" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-2">
+                            <a href="https://www.google.com/maps?q=${result.primary_coordinates.latitude},${result.primary_coordinates.longitude}" 
+                               target="_blank" 
+                               class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm inline-flex items-center mr-2">
+                               <i class="fas fa-map-marker-alt mr-1"></i> Google Maps
+                            </a>
+                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
+                                    onclick="navigator.clipboard.writeText('${ddmFull}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
+                                <i class="fas fa-copy mr-1"></i> Copier
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (result.coordinates && result.coordinates.exist) {
+            // Ancien format pour rétrocompatibilité
             this.lastDetectedCoordinatesValue = result.coordinates;
             
             gpsCoordinatesHtml = `
@@ -1029,8 +1083,39 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 </div>
             `;
         }
-        
-        if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
+
+        // Afficher les résultats des plugins combinés (nouveau format)
+        if (result.combined_results && Object.keys(result.combined_results).length > 0) {
+            let html = `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
+                    <div class="space-y-3">
+            `;
+            
+            // Parcourir tous les résultats combinés
+            Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
+                let resultText = "";
+                
+                // Extraire le texte décodé s'il existe
+                if (pluginResult.decoded_text) {
+                    resultText = pluginResult.decoded_text;
+                }
+                
+                html += `
+                    <div class="bg-gray-600 p-3 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-200 font-medium">${pluginName}</span>
+                        </div>
+                        <div class="text-gray-200 mt-1">${resultText}</div>
+                    </div>
+                `;
+            });
+            
+            html += `</div></div>`;
+            return html + gpsCoordinatesHtml;
+        }
+        // Gérer l'ancien format (mode détection)
+        else if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
             const codes = result.result.possible_codes;
             let html = `
                 <div class="bg-gray-700 p-4 rounded-lg">
@@ -1060,7 +1145,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             return html + gpsCoordinatesHtml;
-        } else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
+        }
+        // Gérer l'ancien format (décodage spécifique)
+        else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
             const decodedResults = result.result.decoded_results;
             let html = `
                 <div class="bg-gray-700 p-4 rounded-lg">
@@ -1079,7 +1166,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             return html + gpsCoordinatesHtml;
-        } else if (result.result && result.result.decoded_text) {
+        } 
+        // Gérer l'ancien format (décodage simple)
+        else if (result.result && result.result.decoded_text) {
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>

@@ -49,7 +49,7 @@ class MetaDetectionPlugin:
         enable_gps_detection = inputs.get("enable_gps_detection", True)
         
         if not text:
-            return {"result": {"error": "Aucun texte fourni à traiter."}}
+            return {"error": "Aucun texte fourni"}
             
         if mode == "detect":
             return self.detect_codes(text, strict, allowed_chars, embedded)
@@ -57,9 +57,65 @@ class MetaDetectionPlugin:
             strict_param = "strict" if strict else "smooth"
             result = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded)
             
-            # Ajouter le paramètre enable_gps_detection au résultat pour que le plugin_manager puisse l'utiliser
-            result["enable_gps_detection"] = enable_gps_detection
-            return result
+            # Structure de retour compatible avec analysis_web_page
+            combined_results = {}
+            primary_coordinates = None
+            
+            # Pour chaque résultat, extraire les coordonnées s'il y en a
+            if "result" in result and "decoded_results" in result["result"]:
+                for plugin_result in result["result"]["decoded_results"]:
+                    plugin_name = plugin_result.get("plugin_name", "")
+                    decoded_text = plugin_result.get("decoded_text", "")
+                    
+                    # Stocker le résultat dans combined_results
+                    combined_results[plugin_name] = {
+                        "decoded_text": decoded_text
+                    }
+                    
+                    # Vérifier si le texte contient des coordonnées GPS
+                    if enable_gps_detection and plugin_name == "wherigo_reverse_decoder":
+                        # Si c'est un plugin de coordonnées, extraire les coordonnées
+                        if "N " in decoded_text and "E " in decoded_text:
+                            combined_results[plugin_name]["coordinates"] = {
+                                "exist": True,
+                                "ddm": decoded_text,
+                                "certitude": True
+                            }
+                            
+                            # Extraire lat et lon pour le format décimal
+                            try:
+                                from app.routes.coordinates import convert_ddm_to_decimal
+                                parts = decoded_text.split()
+                                if len(parts) >= 4:
+                                    lat_dir = parts[0]
+                                    lat_deg = parts[1].replace("°", "")
+                                    lat_min = parts[2]
+                                    lon_dir = parts[3]
+                                    lon_deg = parts[4].replace("°", "")
+                                    lon_min = parts[5]
+                                    
+                                    combined_results[plugin_name]["coordinates"]["ddm_lat"] = f"{lat_dir} {lat_deg}° {lat_min}"
+                                    combined_results[plugin_name]["coordinates"]["ddm_lon"] = f"{lon_dir} {lon_deg}° {lon_min}"
+                                    
+                                    # Convertir en décimal
+                                    decimal_coords = convert_ddm_to_decimal(
+                                        combined_results[plugin_name]["coordinates"]["ddm_lat"],
+                                        combined_results[plugin_name]["coordinates"]["ddm_lon"]
+                                    )
+                                    combined_results[plugin_name]["coordinates"]["decimal"] = decimal_coords
+                                    
+                                    # Définir comme coordonnées principales si elles sont valides
+                                    if decimal_coords and "latitude" in decimal_coords and decimal_coords["latitude"] is not None:
+                                        primary_coordinates = decimal_coords
+                            except Exception as e:
+                                print(f"Erreur lors de la conversion des coordonnées: {str(e)}")
+            
+            # Retourner le résultat dans un format compatible avec analysis_web_page
+            return {
+                "combined_results": combined_results,
+                "primary_coordinates": primary_coordinates,
+                "enable_gps_detection": enable_gps_detection
+            }
         else:
             raise ValueError(f"Action inconnue: {mode}")
 
@@ -87,7 +143,8 @@ class MetaDetectionPlugin:
             "abaddon_code",
             "kenny_code",
             "hexadecimal_encoder_decoder",
-            "roman_numerals"
+            "roman_numerals",
+            "wherigo_reverse_decoder"
         ]
         
         if not text:
@@ -171,7 +228,8 @@ class MetaDetectionPlugin:
             "abaddon_code",
             "kenny_code",
             "hexadecimal_encoder_decoder",
-            "roman_numerals"
+            "roman_numerals",
+            "wherigo_reverse_decoder"
         ]
         
         if plugin_name:
@@ -200,7 +258,7 @@ class MetaDetectionPlugin:
                     "strict": strict,
                     "mode": "decode",
                     "embedded": embedded,
-                    "enable_gps_detection": False  # Désactiver la détection GPS pour les plugins individuels
+                    "enable_gps_detection": True  # Activer la détection GPS pour analyse complète
                 }
                 
                 # Ajouter les caractères autorisés si fournis
@@ -240,13 +298,14 @@ class MetaDetectionPlugin:
                     continue
                 
                 # Essayer de décoder avec ce plugin
+                print(f"Décodage avec {plugin_name}")
                 try:
                     inputs = {
                         "text": text,
                         "strict": strict,
                         "mode": "decode",
                         "embedded": embedded,
-                        "enable_gps_detection": False  # Désactiver la détection GPS pour les plugins individuels
+                        "enable_gps_detection": True  # Activer la détection GPS pour analyse complète
                     }
                     
                     # Ajouter les caractères autorisés si fournis
@@ -255,17 +314,24 @@ class MetaDetectionPlugin:
                     
                     result = p_instance.execute(inputs)
                     
-                    # Extraire le texte décodé du résultat
+                    # Extraire le texte décodé du résultat et les coordonnées si présentes
                     if result and "result" in result and "decoded_text" in result["result"]:
-                        decoded_results.append({
+                        plugin_result = {
                             "plugin_name": plugin_name,
                             "decoded_text": result["result"]["decoded_text"]
-                        })
+                        }
+                        
+                        # Ajouter les coordonnées si présentes
+                        if "coordinates" in result:
+                            plugin_result["coordinates"] = result["coordinates"]
+                        
+                        decoded_results.append(plugin_result)
                 except Exception as e:
                     print(f"Erreur lors du décodage avec {plugin_name}: {str(e)}")
                     continue
             
             if decoded_results:
+                print(f"Résultats du décodage: {decoded_results}")
                 return {"result": {"decoded_results": decoded_results}}
             else:
                 return {"result": {"error": "Aucun plugin n'a pu décoder le texte"}}

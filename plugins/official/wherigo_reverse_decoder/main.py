@@ -27,13 +27,18 @@ class WherigoReverseDecoderPlugin:
         :param inputs: dict contenant les paramètres d'entrée.
         :return: dict avec les coordonnées ou un message d'erreur.
         """
-        print('INPUTS', inputs)
+        print('INPUTS WHERIGO REVERSE DECODER', inputs)
         numbers_text = inputs.get("text", "").strip()
         strict_mode = inputs.get("strict", True)
         embedded_mode = inputs.get("embedded", False)
         
         if not numbers_text:
-            return {"error": "Aucun texte fourni pour l'analyse."}
+            return {
+                "result": {
+                    "error": "Aucun texte fourni pour l'analyse.",
+                    "decoded_text": "Erreur: Aucun texte fourni pour l'analyse."
+                }
+            }
 
         try:
             # En fonction du mode, on cherche différemment les nombres
@@ -41,19 +46,31 @@ class WherigoReverseDecoderPlugin:
                 # Mode embedded: on cherche 3 nombres de 6 chiffres dans le texte
                 fragments = self.find_fragments(numbers_text, strict_mode)
                 if not fragments or len(fragments) < 3:
-                    return {"error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."}
+                    return {
+                        "result": {
+                            "error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée.",
+                            "decoded_text": "Erreur: Impossible de trouver trois nombres de 6 chiffres dans l'entrée."
+                        }
+                    }
                 
                 # Utiliser les 3 premiers nombres trouvés
                 a, b, c = fragments[:3]
                 latitude, longitude = self._decode_coordinates(a, b, c)
                 formatted_coords = self._convert_to_wgs84(latitude, longitude)
                 
-                # Retourner les résultats avec les fragments identifiés
+                # Retourner les résultats avec les fragments identifiés dans le format attendu par metadetection
                 return {
-                    "text_output": formatted_coords,
-                    "fragments": fragments,
-                    "is_match": True,
-                    "score": 1.0
+                    "result": {
+                        "decoded_text": formatted_coords,
+                        "text": {
+                            "text_output": formatted_coords,
+                            "text_input": numbers_text,
+                            "mode": "decode"
+                        },
+                        "fragments": fragments,
+                        "is_match": True,
+                        "score": 1.0
+                    }
                 }
             else:
                 # Mode non-embedded: analyser tout le texte
@@ -61,24 +78,49 @@ class WherigoReverseDecoderPlugin:
                     # En mode strict, on vérifie exactement 3 nombres de 6 chiffres
                     numbers = re.findall(r'\b\d{6}\b', numbers_text)
                     if len(numbers) != 3:
-                        return {"error": "Le texte doit contenir exactement trois nombres de 6 chiffres."}
+                        return {
+                            "result": {
+                                "error": "Le texte doit contenir exactement trois nombres de 6 chiffres.",
+                                "decoded_text": "Erreur: Le texte doit contenir exactement trois nombres de 6 chiffres."
+                            }
+                        }
                 else:
                     # En mode smooth, on extrait au moins 3 nombres de 6 chiffres si possible
                     numbers = re.findall(r'\b\d{6}\b', numbers_text)
                     if len(numbers) < 3:
-                        return {"error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."}
+                        return {
+                            "result": {
+                                "error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée.",
+                                "decoded_text": "Erreur: Impossible de trouver trois nombres de 6 chiffres dans l'entrée."
+                            }
+                        }
                 
                 # Appliquer l'algorithme de décodage
                 a, b, c = numbers[:3]
                 latitude, longitude = self._decode_coordinates(a, b, c)
                 formatted_coords = self._convert_to_wgs84(latitude, longitude)
                 
+                print('FORMATTED COORDS WIG', formatted_coords)
+                
+                # Format de retour compatible avec metadetection
                 return {
-                    "text_output": formatted_coords
+                    "result": {
+                        "decoded_text": formatted_coords,
+                        "text": {
+                            "text_output": formatted_coords,
+                            "text_input": numbers_text,
+                            "mode": "decode"
+                        }
+                    }
                 }
                 
         except Exception as e:
-            return {"error": f"Erreur lors du décodage : {str(e)}"}
+            return {
+                "result": {
+                    "error": f"Erreur lors du décodage : {str(e)}",
+                    "decoded_text": f"Erreur lors du décodage : {str(e)}"
+                }
+            }
 
     def find_fragments(self, text, strict=True):
         """
