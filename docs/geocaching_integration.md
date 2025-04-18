@@ -134,9 +134,30 @@ def update(self, geocode, latitude, longitude):
     result = self.client.make_api_request(url, data)
 ```
 
-## Exemple d'utilisation
+### Mise à jour des notes personnelles
 
-Voici un exemple complet pour mettre à jour les coordonnées d'une géocache :
+La classe `PersonalNotes` permet d'envoyer des notes personnelles pour une géocache sur Geocaching.com :
+
+```python
+def update(self, geocode, note):
+    user_token = self.client.get_user_token(geocode)
+    
+    # Format attendu par l'API de Geocaching.com
+    data = {
+        "dto": {
+            "et": note,  # et = personal note text
+            "ut": user_token  # ut = user token
+        }
+    }
+    
+    url = "https://www.geocaching.com/seek/cache_details.aspx/SetUserCacheNote"
+    
+    result = self.client.make_api_request(url, data)
+```
+
+## Exemples d'utilisation
+
+### Exemple 1: Mise à jour des coordonnées
 
 ```python
 from app.geocaching_client import GeocachingClient, Coordinates
@@ -169,11 +190,41 @@ else:
     print("Vous devez être connecté sur Firefox à Geocaching.com")
 ```
 
+### Exemple 2: Mise à jour des notes personnelles
+
+```python
+from app.geocaching_client import GeocachingClient, PersonalNotes
+
+# Créer une instance du client
+client = GeocachingClient()
+
+# Vérifier si l'utilisateur est connecté
+if client.ensure_login():
+    # Créer une instance de la classe PersonalNotes
+    personal_notes = PersonalNotes(client)
+    
+    # Code de la géocache
+    gc_code = "GC12345"
+    
+    # Contenu de la note personnelle
+    note_content = "Cette géocache nécessite une torche et une corde. Pensez-y !"
+    
+    # Mettre à jour la note personnelle
+    if personal_notes.update(gc_code, note_content):
+        print("Note personnelle mise à jour avec succès!")
+    else:
+        print("Échec de la mise à jour de la note personnelle")
+else:
+    print("Vous devez être connecté sur Firefox à Geocaching.com")
+```
+
 ## Intégration dans l'application web
 
-L'intégration dans l'application web se fait via une route Flask et un contrôleur JavaScript Stimulus :
+L'intégration dans l'application web se fait via des routes Flask et des contrôleurs JavaScript.
 
-### Route Flask
+### Intégration des coordonnées
+
+#### Route Flask pour les coordonnées
 
 ```python
 @geocaches_bp.route('/geocaches/<int:geocache_id>/send_to_geocaching', methods=['POST'])
@@ -218,9 +269,7 @@ def send_to_geocaching(geocache_id):
         }), 500
 ```
 
-### Contrôleur JavaScript
-
-Le contrôleur Stimulus `GeocacheCoordinatesController` contient une méthode `sendToGeocaching` qui envoie les coordonnées via une requête AJAX :
+#### Contrôleur JavaScript pour les coordonnées
 
 ```javascript
 sendToGeocaching(event) {
@@ -262,6 +311,118 @@ sendToGeocaching(event) {
 }
 ```
 
+### Intégration des notes personnelles
+
+#### Route Flask pour les notes
+
+```python
+@logs_bp.route('/note/<note_id>/send_to_geocaching', methods=['POST'])
+def send_note_to_geocaching(note_id):
+    """Envoie une note à Geocaching.com en tant que note personnelle"""
+    try:
+        # Récupérer la note et la géocache associée
+        note = Note.query.get_or_404(note_id)
+        geocache_id = request.args.get('geocacheId')
+        
+        if not geocache_id:
+            geocache_note = GeocacheNote.query.filter_by(note_id=note_id).first()
+            if not geocache_note:
+                return jsonify({
+                    'success': False,
+                    'error': 'Impossible de trouver la géocache associée à cette note'
+                }), 400
+            geocache_id = geocache_note.geocache_id
+            
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier que la note est de type 'user'
+        if note.note_type != 'user':
+            return jsonify({
+                'success': False,
+                'error': 'Seules les notes personnelles peuvent être envoyées à Geocaching.com'
+            }), 400
+        
+        # Créer le client Geocaching et vérifier que l'utilisateur est connecté
+        client = GeocachingClient()
+        if not client.ensure_login():
+            return jsonify({
+                'success': False,
+                'error': 'Impossible de se connecter à Geocaching.com. Assurez-vous d\'être connecté dans Firefox.'
+            }), 401
+            
+        # Créer l'instance de PersonalNotes et envoyer la note
+        personal_notes = PersonalNotes(client)
+        if personal_notes.update(geocache.gc_code, note.content):
+            return jsonify({
+                'success': True,
+                'message': 'Note envoyée avec succès à Geocaching.com'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Échec de l\'envoi de la note à Geocaching.com'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+```
+
+#### JavaScript pour les notes
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    // Attacher les gestionnaires d'événements aux boutons d'envoi de note
+    document.querySelectorAll('.send-note-btn').forEach(button => {
+        button.addEventListener('click', function(event) {
+            const noteId = this.dataset.noteId;
+            const geocacheId = this.dataset.geocacheId;
+            
+            if (!confirm('Voulez-vous envoyer cette note vers Geocaching.com ?')) {
+                return;
+            }
+            
+            // Désactiver le bouton et changer son apparence
+            this.disabled = true;
+            const originalHTML = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
+            // Faire la requête AJAX
+            fetch(`/api/logs/note/${noteId}/send_to_geocaching?geocacheId=${geocacheId}`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Réactiver le bouton
+                this.disabled = false;
+                this.innerHTML = originalHTML;
+                
+                if (data.success) {
+                    alert(data.message);
+                    // Ajouter une classe pour indiquer que la note a été envoyée
+                    this.classList.add('text-green-500');
+                    this.title = 'Note envoyée à Geocaching.com';
+                } else {
+                    alert(`Erreur: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                // Réactiver le bouton
+                this.disabled = false;
+                this.innerHTML = originalHTML;
+                alert(`Erreur: ${error.message}`);
+            });
+        });
+    });
+});
+```
+
 ## Avantages et limitations
 
 ### Avantages
@@ -287,6 +448,7 @@ Le système actuel pourrait être étendu avec les fonctionnalités suivantes :
    - Ajouter une géocache aux favoris
    - Télécharger des géocaches pour une utilisation hors ligne
 4. **Interface de configuration** - Permettre à l'utilisateur de choisir son navigateur préféré
+5. **Synchronisation bidirectionnelle** - Récupérer les notes personnelles de Geocaching.com
 
 ## Conclusion
 

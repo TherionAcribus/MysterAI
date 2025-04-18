@@ -4,9 +4,11 @@
 
 Le système de notes permet aux utilisateurs de gérer des annotations pour chaque géocache. Les notes sont organisées par type et affichées dans un panneau dédié dans l'interface principale.
 
+De plus, les notes de type "personnelle" peuvent être synchronisées avec Geocaching.com, permettant ainsi de maintenir les mêmes notes entre notre application et le site officiel.
+
 ## Types de Notes
 
-- **Note personnelle** (user) : Notes générales de l'utilisateur
+- **Note personnelle** (user) : Notes générales de l'utilisateur, peuvent être synchronisées avec Geocaching.com
 - **Note système** (system) : Informations générées par le système
 - **Indice** (hint) : Indices supplémentaires pour la résolution
 - **Spoiler** (spoiler) : Informations révélant la solution
@@ -24,7 +26,10 @@ Chaque note affiche :
 - Son type (avec code couleur)
 - Sa date de création
 - Son contenu
-- Des boutons d'édition et de suppression
+- Des boutons d'actions :
+  - Synchroniser avec Geocaching.com (uniquement pour les notes personnelles)
+  - Éditer
+  - Supprimer
 
 ### Formulaire de Note
 
@@ -32,6 +37,18 @@ Le formulaire permet de :
 - Sélectionner le type de note
 - Saisir le contenu
 - Sauvegarder ou annuler les modifications
+
+## Synchronisation avec Geocaching.com
+
+Les notes de type "personnelle" peuvent être envoyées vers Geocaching.com. Pour ce faire :
+
+1. Créez une note de type "user" (personnelle)
+2. Cliquez sur l'icône de synchronisation (nuage) à côté de la note
+3. Confirmez l'envoi vers Geocaching.com
+
+La synchronisation nécessite que l'utilisateur soit connecté à Geocaching.com dans Firefox. Les cookies de Firefox sont utilisés pour authentifier les requêtes vers Geocaching.com.
+
+> **Note:** Actuellement, la synchronisation est unidirectionnelle (de l'application vers Geocaching.com). La récupération des notes depuis Geocaching.com n'est pas encore implémentée.
 
 ## Architecture Technique
 
@@ -60,6 +77,7 @@ class GeocacheNote(db.Model):
 - `POST /api/logs/geocache/<id>/notes` : Crée une nouvelle note
 - `PUT /api/logs/note/<id>` : Modifie une note existante
 - `DELETE /api/logs/note/<id>` : Supprime une note
+- `POST /api/logs/note/<id>/send_to_geocaching` : Envoie une note vers Geocaching.com
 
 ### Composants Frontend
 
@@ -78,6 +96,12 @@ class GeocacheNote(db.Model):
 - Mises à jour partielles de l'interface
 - Gestion des formulaires sans rechargement
 - Animations de transition
+
+### Intégration avec Geocaching.com
+
+L'envoi des notes vers Geocaching.com est géré par la classe `PersonalNotes` dans le module `geocaching_client.py`. Cette classe utilise les cookies Firefox pour authentifier les requêtes vers l'API de Geocaching.com.
+
+Pour plus de détails sur l'intégration avec Geocaching.com, voir le document [geocaching_integration.md](geocaching_integration.md).
 
 ## Exemples d'Utilisation
 
@@ -98,3 +122,10 @@ class GeocacheNote(db.Model):
 
 1. Cliquer sur l'icône de suppression
 2. Confirmer la suppression
+
+### Envoyer une Note vers Geocaching.com
+
+1. Ajouter ou modifier une note avec le type "personnelle" (user)
+2. Cliquer sur l'icône de synchronisation (nuage)
+3. Confirmer l'envoi
+4. L'icône devient verte si l'envoi est réussi

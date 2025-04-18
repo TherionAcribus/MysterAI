@@ -2,8 +2,72 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, render_template
 from app.database import db
 from app.models import Note, Geocache, GeocacheNote
+from app.geocaching_client import GeocachingClient, PersonalNotes
+import logging
 
 logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
+
+@logs_bp.route('/note/<note_id>/send_to_geocaching', methods=['POST'])
+def send_note_to_geocaching(note_id):
+    """Envoie une note à Geocaching.com en tant que note personnelle"""
+    try:
+        # Récupérer la note et la géocache associée
+        note = Note.query.get_or_404(note_id)
+        geocache_id = request.args.get('geocacheId')
+        
+        if not geocache_id:
+            # Essayer de trouver la géocache via la relation
+            geocache_note = GeocacheNote.query.filter_by(note_id=note_id).first()
+            if not geocache_note:
+                return jsonify({
+                    'success': False,
+                    'error': 'Impossible de trouver la géocache associée à cette note'
+                }), 400
+            geocache_id = geocache_note.geocache_id
+            
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Vérifier que la note est de type 'user'
+        if note.note_type != 'user':
+            return jsonify({
+                'success': False,
+                'error': 'Seules les notes personnelles peuvent être envoyées à Geocaching.com'
+            }), 400
+        
+        # Vérifier que la géocache a un GC code
+        if not geocache.gc_code:
+            return jsonify({
+                'success': False,
+                'error': 'Cette géocache n\'a pas de code GC valide'
+            }), 400
+            
+        # Créer le client Geocaching et vérifier que l'utilisateur est connecté
+        client = GeocachingClient()
+        if not client.ensure_login():
+            return jsonify({
+                'success': False,
+                'error': 'Impossible de se connecter à Geocaching.com. Assurez-vous d\'être connecté dans Firefox.'
+            }), 401
+            
+        # Créer l'instance de PersonalNotes et envoyer la note
+        personal_notes = PersonalNotes(client)
+        if personal_notes.update(geocache.gc_code, note.content):
+            return jsonify({
+                'success': True,
+                'message': 'Note envoyée avec succès à Geocaching.com'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Échec de l\'envoi de la note à Geocaching.com'
+            }), 500
+            
+    except Exception as e:
+        logging.error(f"Erreur lors de l'envoi de la note vers Geocaching.com: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @logs_bp.route('/notes_panel')
 def get_notes_panel():
@@ -15,8 +79,9 @@ def get_notes_panel():
         return render_template('notes_panel.html', 
                             notes=notes,
                             geocache_id=geocache_id,
+                            geocache=geocache,
                             geocache_name=geocache.name)
-    return render_template('notes_panel.html', notes=[], geocache_id=None)
+    return render_template('notes_panel.html', notes=[], geocache_id=None, geocache=None)
 
 @logs_bp.route('/logs_panel')
 def get_logs_panel():
@@ -70,6 +135,7 @@ def geocache_notes(geocache_id):
         return render_template('notes_panel.html',
                             notes=notes,
                             geocache_id=geocache_id,
+                            geocache=geocache,
                             geocache_name=geocache.name)
         
     # GET: renvoie toutes les notes
@@ -77,6 +143,7 @@ def geocache_notes(geocache_id):
     return render_template('notes_panel.html', 
                          notes=notes, 
                          geocache_id=geocache_id,
+                         geocache=geocache,
                          geocache_name=geocache.name)
 
 @logs_bp.route('/note_form')
@@ -115,6 +182,7 @@ def manage_note(note_id):
             return render_template('notes_panel.html',
                                 notes=notes,
                                 geocache_id=geocache_id,
+                                geocache=geocache,
                                 geocache_name=geocache.name)
         return '', 204
         
@@ -131,4 +199,5 @@ def manage_note(note_id):
     return render_template('notes_panel.html',
                         notes=notes,
                         geocache_id=geocache_id,
+                        geocache=geocache,
                         geocache_name=geocache.name)
