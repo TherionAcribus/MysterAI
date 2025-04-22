@@ -423,6 +423,8 @@ class MovePointPlugin:
         origin_coords = inputs.get("origin_coords", "")
         enable_gps_detection = inputs.get("enable_gps_detection", True)
         
+        print("PROJECTION", inputs)
+        
         # En mode smooth, vérifier si le texte contient des coordonnées GPS
         extracted_coords_from_text = None
         if not strict_mode and text:

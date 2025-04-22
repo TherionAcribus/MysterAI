@@ -362,6 +362,71 @@
             geocache: geocache
         });
         
+        // Pour le plugin d'orientation, s'assurer que nous avons les coordonnées
+        if (pluginName === "point_orientation") {
+            console.log("%c[MultiSolver] Préparation des coordonnées pour le plugin d'orientation", "background:blue; color:white");
+            
+            // S'assurer que nous avons les données complètes de la géocache
+            try {
+                // Toujours interroger l'API pour obtenir les coordonnées les plus à jour
+                const response = await fetch(`/api/geocaches/${geocache.id}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("%c[MultiSolver] Données récupérées de l'API:", "background:green; color:white", data);
+                    
+                    // Extraire les coordonnées dans tous les formats possibles
+                    let formattedCoords = "";
+                    
+                    // Priorité 1: Coordonnées GC originales
+                    if (data.gc_lat && data.gc_lon) {
+                        formattedCoords = `${data.gc_lat} ${data.gc_lon}`;
+                        console.log("%c[MultiSolver] Utilisation des coordonnées GC originales:", "background:green; color:white", formattedCoords);
+                    }
+                    // Priorité 2: Coordonnées originales (latitude, longitude)
+                    else if (data.latitude !== undefined && data.longitude !== undefined) {
+                        const lat = parseFloat(data.latitude);
+                        const lng = parseFloat(data.longitude);
+                        
+                        // Déterminer N/S et E/W
+                        const ns = lat >= 0 ? 'N' : 'S';
+                        const ew = lng >= 0 ? 'E' : 'W';
+                        
+                        const absLat = Math.abs(lat);
+                        const absLng = Math.abs(lng);
+                        
+                        const latDeg = Math.floor(absLat);
+                        const latMin = (absLat - latDeg) * 60;
+                        
+                        const lngDeg = Math.floor(absLng);
+                        const lngMin = (absLng - lngDeg) * 60;
+                        
+                        formattedCoords = `${ns} ${latDeg}° ${latMin.toFixed(3)} ${ew} ${lngDeg}° ${lngMin.toFixed(3)}`;
+                        console.log("%c[MultiSolver] Coordonnées décimales converties:", "background:green; color:white", formattedCoords);
+                    }
+                    // Priorité 3: Coordonnées de original
+                    else if (data.original && data.original.gc_lat && data.original.gc_lon) {
+                        formattedCoords = `${data.original.gc_lat} ${data.original.gc_lon}`;
+                        console.log("%c[MultiSolver] Utilisation des coordonnées de l'objet original:", "background:green; color:white", formattedCoords);
+                    }
+                    
+                    // Mise à jour des coordonnées de la géocache
+                    geocache = {
+                        ...geocache,
+                        coordinates: {
+                            ...geocache.coordinates,
+                            origin_coords: formattedCoords
+                        },
+                        origin_coords: formattedCoords
+                    };
+                    console.log("%c[MultiSolver] Géocache mise à jour avec les coordonnées:", "background:green; color:white", geocache);
+                } else {
+                    console.warn("%c[MultiSolver] Impossible de récupérer les données de l'API:", "background:orange; color:black", response.status);
+                }
+            } catch (error) {
+                console.error("%c[MultiSolver] Erreur lors de la récupération des coordonnées:", "background:red; color:white", error);
+            }
+        }
+        
         // Préparer les données d'entrée en fonction du plugin
         let inputs = {
             text: geocache.description_text || geocache.name || '', // Utiliser la description plutôt que le nom
@@ -373,6 +438,22 @@
             strict: "smooth", // Par défaut, sauf si modifié par l'utilisateur
             embedded: true // Nécessaire pour tous les plugins
         };
+        
+        // Ajouter les coordonnées d'origine pour le plugin d'orientation
+        if (pluginName === "point_orientation") {
+            if (geocache.origin_coords) {
+                console.log("%c[MultiSolver] Ajout des coordonnées d'origine aux inputs:", "background:green; color:white", geocache.origin_coords);
+                inputs.origin_coords = geocache.origin_coords;
+            } else if (geocache.coordinates && geocache.coordinates.origin_coords) {
+                console.log("%c[MultiSolver] Ajout des coordonnées d'origine depuis geocache.coordinates:", "background:green; color:white", geocache.coordinates.origin_coords);
+                inputs.origin_coords = geocache.coordinates.origin_coords;
+            } else {
+                console.warn("%c[MultiSolver] Aucune coordonnée d'origine disponible après récupération", "background:orange; color:black");
+            }
+            
+            // Log complet des inputs pour débogage
+            console.log("%c[MultiSolver] Inputs finaux pour le plugin d'orientation:", "background:purple; color:white", inputs);
+        }
         
         // Vérification de texte vide pour tous les plugins
         if (!inputs.text || inputs.text.trim() === '') {
@@ -2336,6 +2417,38 @@
                     }
                 } catch (error) {
                     console.error("%c[MultiSolver] Erreur lors de la récupération de la description", "background:red; color:white", error);
+                }
+            }
+            
+            // Pour le plugin d'orientation, s'assurer que nous avons les coordonnées de la géocache
+            if (plugin === "point_orientation" && (!geocache.coordinates || !geocache.lat)) {
+                console.log("%c[MultiSolver] Coordonnées manquantes pour le plugin d'orientation, tentative de récupération...", "background:orange; color:black");
+                try {
+                    // Essayer de récupérer les informations complètes de la géocache
+                    const response = await fetch(`/api/geocaches/${geocache.id}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Mettre à jour les coordonnées
+                        if (data.lat && data.lng) {
+                            geocache = {
+                                ...geocache,
+                                lat: data.lat,
+                                lng: data.lng,
+                                coordinates: {
+                                    lat: data.lat,
+                                    lng: data.lng
+                                }
+                            };
+                            console.log("%c[MultiSolver] Coordonnées récupérées avec succès:", "background:green; color:white", geocache.coordinates);
+                        } else {
+                            console.warn("%c[MultiSolver] Les coordonnées ne sont pas disponibles dans la réponse API", "background:orange; color:black");
+                        }
+                    } else {
+                        console.warn("%c[MultiSolver] Impossible de récupérer les coordonnées", "background:orange; color:black");
+                    }
+                } catch (error) {
+                    console.error("%c[MultiSolver] Erreur lors de la récupération des coordonnées:", "background:red; color:white", error);
                 }
             }
             
