@@ -183,6 +183,9 @@ class MovePointPlugin:
         # 2. Pattern pour "X m Y°" (format court)
         pattern2 = r'(\d+(?:\.\d+)?)\s*(m|km|miles)?\s+(\d+(?:\.\d+)?)\s*(?:°|degrés)'
         
+        # 3. Pattern pour "Xm, Y°" (format avec virgule)
+        pattern3 = r'(\d+(?:\.\d+)?)(m|km|miles)[\s,\.]+(\d+(?:\.\d+)?)\s*(?:°|degrés)'
+        
         # Essayer les patterns dans l'ordre
         match = re.search(pattern1, text, re.IGNORECASE)
         if match:
@@ -195,6 +198,16 @@ class MovePointPlugin:
             return result
             
         match = re.search(pattern2, text, re.IGNORECASE)
+        if match:
+            distance_str, unit, angle_str = match.groups()
+            result['found'] = True
+            result['distance'] = float(distance_str)
+            result['angle'] = float(angle_str)
+            if unit:
+                result['unit'] = unit.lower()
+            return result
+            
+        match = re.search(pattern3, text, re.IGNORECASE)
         if match:
             distance_str, unit, angle_str = match.groups()
             result['found'] = True
