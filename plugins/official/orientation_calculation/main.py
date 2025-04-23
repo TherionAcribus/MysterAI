@@ -170,52 +170,85 @@ class MovePointPlugin:
         - "Allez à 869,119 m direction 191,858 degrés et Entre minéral et végétal"
         - "A 744,747 m direction 193,974° à partir des coordonnées affichées"
         - "2390m 43.27°"
+        - "1313m, 197.97°"
+        - "Pour obtenir les coordonnées, projetez vous de 1247.162 mètres à 27,309 degrés"
+        - "À 25 degrés sur 500 mètres"
+        - "Project yourself 1000 meters at 90 degrees"
+        - "Projetez 2.5 kilomètres à 60 degrés"
+        - "Projetez 3 miles à 120 degrés"
         """
         result = {'found': False, 'distance': None, 'angle': None, 'unit': 'm'}
         
         # Normaliser le texte (remplacer virgules par points pour les nombres)
         text = text.replace(',', '.')
         
+        # Définir les unités de distance en français et anglais
+        unit_patterns = {
+            'm': r'm(?:(?:è|e)tres?|eters?)?',
+            'km': r'k(?:ilo)?(?:m(?:(?:è|e)tres?|eters?)?)',
+            'miles': r'miles?'
+        }
+        
+        # Regrouper toutes les unités possibles pour les utiliser dans les patterns
+        all_units = '|'.join(unit_patterns.values())
+        
+        # Pattern pour le mot "degrés" en français et anglais, avec ou sans accent
+        degrees_pattern = r'(?:degr[ée]s|degrees?|°)'
+        
         # Patterns pour extraire distance et angle
         # 1. Pattern pour "X m direction Y°" ou variantes
-        pattern1 = r'(?:à|allez\sà|a)\s+(\d+(?:\.\d+)?)\s*(m|km|miles)?\s+(?:direction|azimut|cap|à)\s+(\d+(?:\.\d+)?)\s*(?:°|degrés)'
+        pattern1 = r'(?:à|allez\sà|a|go|go\sto)\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')?\s+(?:direction|azimut|cap|à|toward|towards|at|to)\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
         
         # 2. Pattern pour "X m Y°" (format court)
-        pattern2 = r'(\d+(?:\.\d+)?)\s*(m|km|miles)?\s+(\d+(?:\.\d+)?)\s*(?:°|degrés)'
+        pattern2 = r'(\d+(?:\.\d+)?)\s*(' + all_units + r')?\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
         
         # 3. Pattern pour "Xm, Y°" (format avec virgule)
-        pattern3 = r'(\d+(?:\.\d+)?)(m|km|miles)[\s,\.]+(\d+(?:\.\d+)?)\s*(?:°|degrés)'
+        pattern3 = r'(\d+(?:\.\d+)?)(' + all_units + r')[\s,\.]+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
         
-        # Essayer les patterns dans l'ordre
-        match = re.search(pattern1, text, re.IGNORECASE)
-        if match:
-            distance_str, unit, angle_str = match.groups()
-            result['found'] = True
-            result['distance'] = float(distance_str)
-            result['angle'] = float(angle_str)
-            if unit:
-                result['unit'] = unit.lower()
-            return result
-            
-        match = re.search(pattern2, text, re.IGNORECASE)
-        if match:
-            distance_str, unit, angle_str = match.groups()
-            result['found'] = True
-            result['distance'] = float(distance_str)
-            result['angle'] = float(angle_str)
-            if unit:
-                result['unit'] = unit.lower()
-            return result
-            
-        match = re.search(pattern3, text, re.IGNORECASE)
-        if match:
-            distance_str, unit, angle_str = match.groups()
-            result['found'] = True
-            result['distance'] = float(distance_str)
-            result['angle'] = float(angle_str)
-            if unit:
-                result['unit'] = unit.lower()
-            return result
+        # 4. Pattern pour "projetez vous de X mètres à Y degrés" (format complet avec mots)
+        pattern4 = r'(?:projetez|projeter|project|move|go)(?:\s+(?:vous|yourself|from))?\s+(?:de|of|for)?\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')(?:\s+(?:à|a|to|at|en direction))?\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
+        
+        # 5. Pattern plus simple pour "projetez X kilomètres à Y degrés"
+        pattern5 = r'(?:projetez|projeter|project|move|go)(?:\s+(?:vous|yourself))?\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')\s+(?:à|a|to|at|en direction|direction|in direction)\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
+        
+        # 6. Pattern pour "Y degrés sur X mètres" (angle d'abord, puis distance)
+        pattern6 = r'(?:à|a|at)?\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')\s+(?:sur|sur une distance de|on|for|over)\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')'
+        
+        # 7. Pattern anglais "At X degrees for Y meters"
+        pattern7 = r'(?:at|to)?\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')\s+(?:for|over|of|on)\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')'
+        
+        # 8. Pattern spécial pour "Project yourself NUMBER meters at NUMBER degrees"
+        pattern8 = r'project\s+yourself\s+(\d+(?:\.\d+)?)\s*(' + all_units + r')\s+at\s+(\d+(?:\.\d+)?)\s*(?:' + degrees_pattern + r')'
+        
+        # Liste des patterns à essayer
+        patterns = [pattern1, pattern2, pattern3, pattern4, pattern5, pattern6, pattern7, pattern8]
+        
+        # Essayer tous les patterns
+        for i, pattern in enumerate(patterns):
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                # Les patterns 6 et 7 ont l'angle en premier, les autres ont la distance en premier
+                if i in [5, 6]:  # pattern6 ou pattern7
+                    angle_str, distance_str, unit = match.groups()  # Ordre inversé: angle puis distance
+                else:
+                    distance_str, unit, angle_str = match.groups()
+                
+                result['found'] = True
+                result['distance'] = float(distance_str)
+                result['angle'] = float(angle_str)
+                
+                if unit:
+                    unit = unit.lower()
+                    # Déterminer l'unité réelle basée sur le texte
+                    for unit_key, unit_pattern in unit_patterns.items():
+                        if re.match('^' + unit_pattern + '$', unit, re.IGNORECASE):
+                            result['unit'] = unit_key
+                            break
+                        
+                    # Vérification spécifique pour "miles"
+                    if 'mile' in unit:
+                        result['unit'] = 'miles'
+                return result
             
         return result
 
