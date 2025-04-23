@@ -1344,10 +1344,25 @@
                 
                 const data = await response.json();
                 
-                // Mettre à jour la géocache avec la description
+                // Récupérer également l'indice (hint) s'il existe
+                let hintText = "";
+                try {
+                    const hintResponse = await fetch(`/geocaches/${geocache.id}/hint`);
+                    if (hintResponse.ok) {
+                        const hintData = await hintResponse.json();
+                        if (hintData && hintData.hint && hintData.hint.trim()) {
+                            hintText = `\n\nHINT: ${hintData.hint.trim()}`;
+                            console.log(`%c[MultiSolver] Hint chargé pour ${geocache.gc_code}`, "background:green; color:white");
+                        }
+                    }
+                } catch (hintError) {
+                    console.warn(`%c[MultiSolver] Impossible de charger le hint pour ${geocache.gc_code}`, "background:orange; color:black", hintError);
+                }
+                
+                // Mettre à jour la géocache avec la description et le hint
                 geocachesWithDesc[index] = {
                     ...geocache,
-                    description_text: data.description || ""
+                    description_text: (data.description || "") + hintText
                 };
                 
                 console.log(`%c[MultiSolver] Description chargée pour ${geocache.gc_code}`, "background:green; color:white");

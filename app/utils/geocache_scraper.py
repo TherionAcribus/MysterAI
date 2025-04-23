@@ -94,8 +94,9 @@ def extract_description(soup: BeautifulSoup) -> str:
 
 def extract_hints(soup: BeautifulSoup) -> str:
     """Extrait les indices de la géocache"""
+    print('Extraction des indices...')
     hint_div = soup.find('div', {'id': 'div_hint'})
-    print(hint_div.get_text(strip=True))
+    print("VOici le hint_:" + hint_div.get_text(strip=True))
     if not hint_div:
         raise Exception("Impossible de trouver les indices. Êtes-vous connecté sur geocaching.com ?")
     return hint_div.get_text(strip=True)

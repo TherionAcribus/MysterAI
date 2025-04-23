@@ -37,6 +37,7 @@ from bs4 import BeautifulSoup
 from app.geocaching_client import GeocachingClient, Coordinates
 from app.utils.coordinates import convert_gc_coords_to_decimal
 from app.gpx_generator import create_gpx_file, generate_filename, create_gpx_zip
+from app.utils.tools import rot13
 
 logger = setup_logger()
 
@@ -401,6 +402,11 @@ def add_geocache():
             if not owner:
                 owner = Owner(name=owner_name)
                 db.session.add(owner)
+        
+        # Décoder les hints (ROT13)
+        decoded_hints = rot13(geocache_data.get('hints', ''))
+        logger.debug(f"Hints originaux: {geocache_data.get('hints', '')}")
+        logger.debug(f"Hints décodés: {decoded_hints}")
                 
         # Creer la nouvelle geocache
         geocache = Geocache(
@@ -412,7 +418,7 @@ def add_geocache():
             difficulty=float(geocache_data.get('difficulty', 1.0)),
             terrain=float(geocache_data.get('terrain', 1.0)),
             size=geocache_data.get('size', ''),
-            hints=geocache_data.get('hint', ''),
+            hints=decoded_hints,
             favorites_count=int(geocache_data.get('favorites', 0)),
             logs_count=int(geocache_data.get('logs_count', 0)),
             hidden_date=hidden_date
@@ -2801,3 +2807,20 @@ def export_geocaches_as_gpx():
     except Exception as e:
         current_app.logger.error(f"Erreur lors de l'export GPX: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/<int:geocache_id>/hint', methods=['GET'])
+def get_geocache_hint(geocache_id):
+    """Récupère l'indice (hint) d'une géocache."""
+    logger.debug(f"Récupération du hint pour la géocache {geocache_id}")
+    try:
+        # Récupérer la géocache depuis la base de données
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Retourner l'indice au format JSON
+        print(geocache.hints)
+        return jsonify({
+            "hint": geocache.hints or ""
+        })
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération du hint pour la géocache {geocache_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
