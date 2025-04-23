@@ -397,11 +397,13 @@ def add_geocache():
         owner_name = geocache_data.get('owner', '')
         owner = None
         if owner_name:
-            # Rechercher l'owner existant ou en créer un nouveau
-            owner = Owner.query.filter_by(name=owner_name).first()
-            if not owner:
-                owner = Owner(name=owner_name)
-                db.session.add(owner)
+            # Utiliser session.no_autoflush pour éviter les problèmes de contrainte d'unicité
+            with db.session.no_autoflush:
+                # Rechercher l'owner existant ou en créer un nouveau
+                owner = Owner.query.filter_by(name=owner_name).first()
+                if not owner:
+                    owner = Owner(name=owner_name)
+                    db.session.add(owner)
         
         # Décoder les hints (ROT13)
         decoded_hints = rot13(geocache_data.get('hints', ''))
