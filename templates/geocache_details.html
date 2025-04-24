@@ -76,6 +76,22 @@
                     <!-- Statut de résolution -->
                     <div class="mt-4 mb-4">
                         <span class="text-gray-400">Statut</span>
+                        
+                        <!-- Information sur l'état "trouvé" -->
+                        {% if geocache.found %}
+                        <div class="mt-1 mb-2 py-2 px-3 bg-green-700/30 rounded flex items-center">
+                            <span class="text-green-400 text-xl mr-2">😊</span>
+                            <div>
+                                <span class="text-green-300 font-medium">Cache trouvée</span>
+                                {% if geocache.found_date %}
+                                <span class="text-green-200 text-sm block">
+                                    Le {{ geocache.found_date.strftime('%d/%m/%Y') }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <select class="mt-1 bg-gray-700 text-white rounded px-2 py-1 w-full"
                                 data-action="change->geocache-coordinates#updateSolvedStatus"
                                 name="solved_status"

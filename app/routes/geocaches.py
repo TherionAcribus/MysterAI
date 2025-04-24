@@ -75,7 +75,9 @@ def get_geocaches(zone_id):
         'logs_count': cache.logs_count,
         'hidden_date': cache.hidden_date.isoformat() if cache.hidden_date else None,
         'created_at': cache.created_at.isoformat() if cache.created_at else None,
-        'solved': cache.solved
+        'solved': cache.solved,
+        'found': cache.found,
+        'found_date': cache.found_date.isoformat() if cache.found_date else None
     } for cache in geocaches])
 
 
@@ -409,6 +411,17 @@ def add_geocache():
         decoded_hints = rot13(geocache_data.get('hints', ''))
         logger.debug(f"Hints originaux: {geocache_data.get('hints', '')}")
         logger.debug(f"Hints décodés: {decoded_hints}")
+        
+        # Traiter les informations de statut "trouvé"
+        found = geocache_data.get('found', False)
+        found_date = None
+        if found and geocache_data.get('found_date'):
+            try:
+                # Convertir la date au format américain (MM/DD/YYYY) en objet datetime
+                found_date = datetime.strptime(geocache_data['found_date'], '%m/%d/%Y')
+                logger.debug(f"Date de trouvaille convertie: {found_date}")
+            except ValueError as e:
+                logger.warning(f"Impossible de parser la date de trouvaille: {geocache_data['found_date']} - {str(e)}")
                 
         # Creer la nouvelle geocache
         geocache = Geocache(
@@ -423,7 +436,9 @@ def add_geocache():
             hints=decoded_hints,
             favorites_count=int(geocache_data.get('favorites', 0)),
             logs_count=int(geocache_data.get('logs_count', 0)),
-            hidden_date=hidden_date
+            hidden_date=hidden_date,
+            found=found,
+            found_date=found_date
         )
         
         # Associer la géocache à la zone
@@ -1763,6 +1778,13 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                     
                     # Si update_existing est True, on traite les waypoints et les logs même si la géocache existe déjà
                     if update_existing:
+                        # Vérifier si la cache a été trouvée et mettre à jour le statut
+                        sym_elem = waypoint.find('default:sym', ns)
+                        if sym_elem is not None and sym_elem.text:
+                            is_found = 'Found' in sym_elem.text
+                            current_app.logger.debug(f"Mise à jour du statut trouvé pour {gc_code}: {sym_elem.text} -> {is_found}")
+                            existing_geocache.found = is_found
+                        
                         # Traiter les waypoints additionnels pour cette géocache
                         if gc_code in additional_waypoints:
                             waypoints_added = process_additional_waypoints(existing_geocache, additional_waypoints[gc_code], ns)
@@ -1919,6 +1941,13 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                     except ValueError:
                         pass
                 
+                # Vérifier si la cache a été trouvée
+                is_found = False
+                sym_elem = waypoint.find('default:sym', ns)
+                if sym_elem is not None and sym_elem.text:
+                    is_found = 'Found' in sym_elem.text
+                    current_app.logger.debug(f"Statut trouvé pour {gc_code}: {sym_elem.text} -> {is_found}")
+
                 # Logs et favoris
                 logs_count = 0
                 favorites_count = 0
@@ -1969,7 +1998,8 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                     hints=hints,
                     favorites_count=favorites_count,
                     logs_count=logs_count,
-                    hidden_date=hidden_date
+                    hidden_date=hidden_date,
+                    found=is_found
                 )
                 
                 # Définir la position

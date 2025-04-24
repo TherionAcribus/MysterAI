@@ -361,6 +361,47 @@ def check_premium_page(soup: BeautifulSoup) -> None:
         logger.error("Cette géocache est réservée aux membres Premium")
         raise Exception("Cette géocache est réservée aux membres Premium. Connectez-vous avec un compte Premium sur Firefox.")
 
+def extract_found_status(soup: BeautifulSoup) -> Tuple[bool, Optional[str]]:
+    """
+    Extrait l'information sur le fait que l'utilisateur a trouvé ou non la géocache,
+    ainsi que la date éventuelle de la trouvaille.
+    
+    Args:
+        soup: L'objet BeautifulSoup de la page
+        
+    Returns:
+        Tuple contenant:
+            - Un booléen indiquant si la géocache a été trouvée
+            - La date de trouvaille au format américain (MM/DD/YYYY) ou None si non trouvée
+    """
+    # Chercher le div contenant le statut
+    found_div = soup.find('div', {'id': 'ctl00_ContentBody_GeoNav_foundStatus'})
+    if not found_div:
+        logger.debug("Aucune information de statut 'trouvé' trouvée")
+        return False, None
+    
+    # Chercher le texte du statut
+    status_text = found_div.find('strong', {'id': 'ctl00_ContentBody_GeoNav_logText'})
+    if not status_text:
+        logger.debug("Texte de statut 'trouvé' non trouvé")
+        return False, None
+    
+    # Vérifier si le texte indique que la cache a été trouvée
+    found = "Found It" in status_text.text
+    
+    # Si trouvée, chercher la date
+    found_date = None
+    if found:
+        date_elem = found_div.find('small', {'id': 'ctl00_ContentBody_GeoNav_logDate'})
+        if date_elem:
+            # Extraire la date du format "Logged on: MM/DD/YYYY"
+            date_text = date_elem.text
+            if "Logged on:" in date_text:
+                found_date = date_text.split("Logged on:")[-1].strip()
+                logger.debug(f"Date de trouvaille: {found_date}")
+    
+    return found, found_date
+
 def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
     """
     Scrape les informations d'une géocache depuis geocaching.com en utilisant les cookies du navigateur.
@@ -404,6 +445,7 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
         additional_waypoints = extract_additional_waypoints(soup)
         checkers = extract_checkers(soup)
         images = extract_images(soup)
+        found, found_date = extract_found_status(soup)
         
         # Construire le dictionnaire de retour
         cache_data = {
@@ -424,7 +466,9 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
             'hidden_date': hidden_date,
             'additional_waypoints': additional_waypoints,
             'checkers': checkers,
-            'images': [{'url': url} for url in images]
+            'images': [{'url': url} for url in images],
+            'found': found,
+            'found_date': found_date
         }
         
         return cache_data
