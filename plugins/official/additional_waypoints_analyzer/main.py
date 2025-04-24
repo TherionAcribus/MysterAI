@@ -1,4 +1,4 @@
-from app.models.models import Geocache
+from app.models.geocache import Geocache
 from sqlalchemy import text
 
 class AdditionalWaypointsAnalyzerPlugin:
