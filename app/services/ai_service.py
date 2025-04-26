@@ -113,15 +113,22 @@ class AIService:
         # Déterminer si on utilise LangGraph ou LangChain
         use_langgraph = settings.get('use_langgraph', self.use_langgraph)
         
+        print(f"=== APPEL IA ===")
+        print(f"Utilisation de LangGraph: {use_langgraph}")
+        print(f"Mode: {settings.get('mode', 'online')}")
+        print(f"Modèle: {settings.get('model_name', settings.get('ai_model', 'inconnu'))}")
+        
         if use_langgraph:
             # Utiliser LangGraph (avec support des outils/plugins)
             # Importer ici pour éviter l'importation circulaire
             from app.services.langgraph_service import langgraph_service
             system_prompt = settings.get('system_prompt', '')
+            print(f"Utilisation de LangGraph avec system_prompt de {len(system_prompt)} caractères")
             return langgraph_service.chat(messages, system_prompt)
         else:
             # Utiliser LangChain (implémentation simple sans outils)
             mode = settings.get('mode', 'online')
+            print(f"Utilisation de LangChain en mode {mode}")
             
             if mode == 'online':
                 return self.chat_online(messages, settings)
@@ -353,6 +360,12 @@ class AIService:
             model = settings.get('online_model', 'gpt-3.5-turbo')
             api_key = settings.get('api_key', '')
             
+            print(f"=== CHAT ONLINE ===")
+            print(f"Modèle: {model}")
+            print(f"Température: {settings.get('temperature', 0.7)}")
+            print(f"Max tokens: {settings.get('max_tokens', 1000)}")
+            print(f"API Key configurée: {'Oui' if api_key else 'Non'}")
+            
             if not api_key:
                 return "Erreur: Clé API non configurée. Veuillez configurer votre clé API dans les paramètres."
             
@@ -371,6 +384,7 @@ class AIService:
             system_prompt = settings.get('system_prompt', '')
             if system_prompt:
                 formatted_messages.append(SystemMessage(content=system_prompt))
+                print(f"Message système ajouté: {len(system_prompt)} caractères")
             
             # Ajouter les messages de la conversation
             for msg in messages:
@@ -383,12 +397,19 @@ class AIService:
                     formatted_messages.append(AIMessage(content=content))
                 elif role == 'system':
                     formatted_messages.append(SystemMessage(content=content))
+                    
+                print(f"Message {role}: {len(content)} caractères")
+            
+            print(f"Envoi de {len(formatted_messages)} messages à l'API")
             
             # Appeler l'API via l'interface de LangChain
             response = chat_model.invoke(formatted_messages)
             
             # Extraire la réponse
-            return response.content
+            content = response.content
+            print(f"Réponse reçue: {len(content)} caractères")
+            
+            return content
         except Exception as e:
             print(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
             return f"Erreur: {str(e)}"

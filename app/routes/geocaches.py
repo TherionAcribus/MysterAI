@@ -2965,3 +2965,50 @@ def calculate_antipode():
     except Exception as e:
         logger.error(f"Erreur lors du calcul de l'antipode: {e}")
         return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/formula-questions', methods=['POST'])
+def extract_formula_questions():
+    """
+    Extrait les questions associées aux variables dans une formule de coordonnées
+    """
+    try:
+        # Importer le service
+        from app.services.formula_questions_service import formula_questions_service
+        
+        # Récupérer les données de la requête
+        data = request.json
+        geocache_id = data.get('geocache_id')
+        letters = data.get('letters', [])
+        method = data.get('method', 'ai')  # 'ai' ou 'regex'
+        
+        if not geocache_id or not letters:
+            return jsonify({
+                'success': False,
+                'error': 'Paramètres manquants (geocache_id et/ou letters)'
+            }), 400
+        
+        # Extraire les questions selon la méthode choisie
+        if method == 'regex':
+            questions = formula_questions_service.extract_questions_with_regex(geocache_id, letters)
+        else:
+            questions = formula_questions_service.extract_questions_with_ai(geocache_id, letters)
+        
+        # Vérifier si une erreur est survenue
+        if 'error' in questions:
+            return jsonify({
+                'success': False,
+                'error': questions['error']
+            }), 400
+        
+        # Retourner les questions
+        return jsonify({
+            'success': True,
+            'questions': questions
+        })
+    
+    except Exception as e:
+        print(f"Erreur lors de l'extraction des questions: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

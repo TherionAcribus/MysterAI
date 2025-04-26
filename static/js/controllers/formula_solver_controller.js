@@ -11,7 +11,11 @@
             "substitutedFormula", 
             "substitutedFormulaText", 
             "calculatedCoordinates", 
-            "calculatedCoordinatesText"
+            "calculatedCoordinatesText",
+            "geocacheId",
+            "loadingQuestions",
+            "extractionMethodAI",
+            "extractionMethodRegex"
         ]
         static values = {
             geocacheId: String,
@@ -96,6 +100,11 @@
             
             // Mettre à jour la formule substituée
             this.updateSubstitutedFormula();
+            
+            // Si l'ID de la géocache est disponible, extraire les questions
+            if (this.geocacheIdValue) {
+                this.extractQuestions(this.geocacheIdValue, letters);
+            }
         }
         
         // Extraire les lettres uniques de la formule
@@ -682,6 +691,134 @@
             const errorDetails = document.getElementById('error-details');
             if (errorDetails && errorMsg) {
                 errorDetails.textContent = errorMsg;
+            }
+        }
+
+        extractQuestionsManually() {
+            const geocacheId = this.geocacheIdTarget.value;
+            if (!geocacheId) {
+                alert('ID Géocache Manquant: Veuillez entrer un ID de géocache pour extraire les questions');
+                return;
+            }
+
+            const letters = this.extractUniqueLetters(this.formulaInputTarget.value);
+            if (letters.length === 0) {
+                alert('Aucune Variable Trouvée: La formule ne contient aucune variable (lettre)');
+                return;
+            }
+
+            // Détermine la méthode d'extraction choisie
+            const method = this.extractionMethodAITarget.checked ? 'ai' : 'regex';
+            
+            this.extractQuestions(geocacheId, letters, method);
+        }
+
+        extractQuestions(geocacheId, letters, method = 'ai') {
+            this.showLoadingQuestions();
+
+            fetch('/geocaches/formula-questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_id: geocacheId,
+                    letters: letters,
+                    method: method
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.hideLoadingQuestions();
+                
+                if (data.success) {
+                    this.updateQuestionsInUI(data.questions);
+                    console.log('Questions extraites:', data.questions);
+                    
+                    if (Object.keys(data.questions).length === 0) {
+                        alert(`Aucune Question Trouvée: Aucune question n'a été identifiée pour les variables de la formule avec la méthode ${method === 'ai' ? 'd\'IA' : 'regex'}.`);
+                    }
+                } else {
+                    console.error('Erreur lors de l\'extraction des questions:', data.error);
+                    alert(`Erreur d'Extraction: ${data.error || 'Une erreur s\'est produite lors de l\'extraction des questions'}`);
+                }
+            })
+            .catch(error => {
+                this.hideLoadingQuestions();
+                console.error('Erreur lors de la requête:', error);
+                alert('Erreur de Connexion: Impossible de se connecter au serveur pour extraire les questions');
+            });
+        }
+
+        updateQuestionsInUI(questions) {
+            // Parcourir chaque lettre et ajouter la question si elle existe
+            const letterContainers = this.letterFieldsTarget.querySelectorAll('.letter-container');
+            let questionsFound = false;
+            
+            letterContainers.forEach(container => {
+                const letter = container.dataset.letter;
+                if (letter && questions[letter]) {
+                    questionsFound = true;
+                    // Chercher ou créer l'élément de question
+                    let questionElement = container.querySelector('.letter-question');
+                    if (!questionElement) {
+                        questionElement = document.createElement('p');
+                        questionElement.className = 'letter-question text-sm text-yellow-300 mt-2 p-2 bg-gray-700 rounded';
+                        container.appendChild(questionElement);
+                    }
+                    questionElement.textContent = questions[letter];
+                }
+            });
+            
+            // Afficher un message de réussite si des questions ont été trouvées
+            const statusElement = document.getElementById('extraction-status');
+            if (statusElement) {
+                if (questionsFound) {
+                    statusElement.textContent = 'Les questions ont été extraites avec succès et apparaissent sous chaque variable.';
+                    statusElement.classList.remove('hidden');
+                    statusElement.classList.remove('text-red-400');
+                    statusElement.classList.add('text-green-400');
+                } else {
+                    statusElement.textContent = 'Aucune question n\'a été trouvée pour les variables de la formule.';
+                    statusElement.classList.remove('hidden');
+                    statusElement.classList.remove('text-green-400');
+                    statusElement.classList.add('text-red-400');
+                }
+                
+                // Masquer le message après 5 secondes
+                setTimeout(() => {
+                    statusElement.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        showLoadingQuestions() {
+            // Vérifie si l'élément loadingQuestions existe, sinon le crée
+            if (!this.hasLoadingQuestionsTarget) {
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'loading-questions text-center p-3 m-3 hidden';
+                loadingElement.innerHTML = `
+                    <div class="inline-block animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+                    <span class="text-gray-300">Extraction des questions en cours...</span>
+                `;
+                loadingElement.dataset.formulaSolverTarget = 'loadingQuestions';
+                this.letterInputsTarget.insertBefore(loadingElement, this.letterFieldsTarget);
+                
+                // Attendre le prochain cycle pour que Stimulus enregistre la cible
+                setTimeout(() => {
+                    if (this.hasLoadingQuestionsTarget) {
+                        this.loadingQuestionsTarget.classList.remove('hidden');
+                    }
+                }, 0);
+                return;
+            }
+            
+            this.loadingQuestionsTarget.classList.remove('hidden');
+        }
+
+        hideLoadingQuestions() {
+            if (this.hasLoadingQuestionsTarget) {
+                this.loadingQuestionsTarget.classList.add('hidden');
             }
         }
     }

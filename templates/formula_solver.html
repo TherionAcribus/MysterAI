@@ -54,6 +54,19 @@
                         data-formula-solver-target="formulaInput"
                         data-action="input->formula-solver#extractLetters">
                 </div>
+                <!-- Champ pour l'ID de géocache -->
+                <div class="mb-4">
+                    <label for="geocache-id" class="block text-gray-300 text-sm font-bold mb-2">
+                        ID de la géocache pour l'extraction des questions
+                    </label>
+                    <input 
+                        type="text" 
+                        id="geocache-id" 
+                        class="bg-gray-700 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="ID de la géocache (ex: 12345)"
+                        data-formula-solver-target="geocacheId"
+                        value="{{ geocache_id }}">
+                </div>
                 <div class="flex justify-end">
                     <button 
                         type="submit" 
@@ -70,6 +83,38 @@
         <!-- Section des lettres extraites -->
         <div id="letter-inputs" class="bg-gray-800 rounded-lg p-4 mb-6 hidden" data-formula-solver-target="letterInputs">
             <h2 class="text-lg font-semibold text-gray-100 mb-3">Valeurs des lettres</h2>
+            
+            <!-- Boutons pour l'extraction des questions -->
+            <div class="mb-4 bg-gray-700 p-3 rounded">
+                <p class="text-gray-300 font-medium mb-2">Extraction des questions:</p>
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center space-x-2 text-gray-300">
+                                <input type="radio" name="extraction-method" value="ai" checked
+                                       data-formula-solver-target="extractionMethodAI">
+                                <span>Intelligence Artificielle</span>
+                            </label>
+                            <label class="flex items-center space-x-2 text-gray-300">
+                                <input type="radio" name="extraction-method" value="regex"
+                                       data-formula-solver-target="extractionMethodRegex">
+                                <span>Expressions régulières</span>
+                            </label>
+                        </div>
+                        <button 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
+                            data-action="click->formula-solver#extractQuestionsManually">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Extraire les Questions</span>
+                        </button>
+                    </div>
+                    <div id="extraction-status" class="text-sm text-green-400 hidden">
+                        Les questions ont été extraites avec succès et apparaissent sous chaque variable.
+                    </div>
+                </div>
+            </div>
             
             <!-- Options de sélection globale -->
             <div class="mb-4 bg-gray-700 p-3 rounded">
