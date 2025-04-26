@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template, Response
 from app.services.ai_service import ai_service
+from app.models.app_config import AppConfig
 import logging
 import os
 
@@ -197,7 +198,7 @@ def settings_panel():
                 
                 <!-- Clé API -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Clé API</label>
+                    <label class="block text-sm font-medium mb-1">Clé API pour <span class="font-bold" id="provider-name">OpenAI</span></label>
                     <div class="flex">
                         <input type="password" class="form-input flex-grow" 
                                data-ai-settings-target="apiKey" 
@@ -208,6 +209,7 @@ def settings_panel():
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
+                    <p class="text-xs text-gray-500 mt-1">Chaque fournisseur utilise sa propre clé API. En changeant de fournisseur, la clé API correspondante sera chargée automatiquement.</p>
                 </div>
                 
                 <!-- Modèle -->
@@ -380,25 +382,43 @@ def get_ai_models():
         # Récupérer les paramètres actuels
         settings = ai_service.get_settings()
         
+        # Log détaillé des paramètres actuels pour le débogage
+        logger.info(f"=== DEBUG API MODELS === Paramètres: mode={settings.get('mode')}, provider={settings.get('provider')}")
+        logger.info(f"=== DEBUG API MODELS === api_key présente: {bool(settings.get('api_key'))}")
+        logger.info(f"=== DEBUG API MODELS === online_models: {list(settings.get('online_models', {}).keys())}")
+        logger.info(f"=== DEBUG API MODELS === online_model actif: {settings.get('online_model')}")
+        
         # Construire la liste des modèles
         models = []
         
-        # Modèles en ligne (OpenAI, etc.) - uniquement si une clé API est configurée
-        if settings.get('online_models') and settings.get('api_key'):
+        # Modèles en ligne (OpenAI, etc.) - Afficher même sans clé API
+        # Cela permet de visualiser les modèles disponibles même si la clé n'est pas configurée
+        if settings.get('online_models'):
             for model_id, model_info in settings['online_models'].items():
                 # Vérifier si le modèle correspond au fournisseur actuel
                 provider = settings.get('provider', 'openai')
+                
+                # Log pour vérifier le filtrage
+                logger.info(f"=== DEBUG API MODELS === Vérification modèle: {model_id}, provider={provider}")
                 
                 # Filtrer selon le fournisseur (à adapter selon votre structure)
                 if (provider == 'openai' and model_id.startswith('gpt')) or \
                    (provider == 'anthropic' and model_id.startswith('claude')) or \
                    (provider == 'google' and model_id.startswith('gemini')):
+                    # Déterminer si le modèle est utilisable (clé API configurée)
+                    is_usable = bool(settings.get('api_key'))
+                    
                     models.append({
                         'id': model_id,
-                        'name': model_info.get('name', model_id),
+                        'name': model_info.get('name', model_id) + ('' if is_usable else ' (API Key manquante)'),
                         'type': 'online',
-                        'is_active': settings.get('mode') == 'online' and settings.get('online_model') == model_id
+                        'is_active': settings.get('mode') == 'online' and settings.get('online_model') == model_id,
+                        'is_usable': is_usable
                     })
+                    logger.info(f"=== DEBUG API MODELS === Modèle ajouté: {model_id}, utilisable: {is_usable}")
+        else:
+            # Log pour comprendre pourquoi les modèles en ligne ne sont pas ajoutés
+            logger.info(f"=== DEBUG API MODELS === Modèles en ligne non ajoutés: online_models={bool(settings.get('online_models'))}")
         
         # Modèles locaux (Ollama, etc.) - uniquement ceux marqués comme enabled
         if settings.get('local_models'):
@@ -508,6 +528,126 @@ def set_active_model():
         })
     except Exception as e:
         logger.error(f"Erreur lors de la définition du modèle d'IA actif: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@ai_bp.route('/test_api_key', methods=['POST'])
+def test_api_key():
+    """
+    Teste la validité d'une clé API pour un fournisseur donné
+    """
+    try:
+        data = request.json
+        provider = data.get('provider')
+        api_key = data.get('api_key')
+        
+        if not provider or not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'Fournisseur ou clé API manquante'
+            }), 400
+        
+        logger.info(f"=== DEBUG: Test de clé API pour le fournisseur {provider} ===")
+        
+        # Test différent selon le fournisseur
+        if provider == 'openai':
+            # Importer les bibliothèques nécessaires
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=api_key)
+                models = client.models.list()
+                
+                # Récupérer les noms des modèles
+                model_names = [model.id for model in models.data if model.id.startswith('gpt')]
+                
+                return jsonify({
+                    'success': True,
+                    'models': model_names
+                })
+            except Exception as e:
+                logger.error(f"=== ERROR: Test OpenAI API échoué: {str(e)} ===")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                })
+                
+        elif provider == 'anthropic':
+            # Test pour Anthropic
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=api_key)
+                
+                # Une simple requête pour vérifier que la clé est valide
+                response = client.messages.create(
+                    model="claude-3-haiku-20240307",
+                    max_tokens=10,
+                    messages=[{"role": "user", "content": "Hello Claude"}]
+                )
+                
+                return jsonify({
+                    'success': True,
+                    'models': ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
+                })
+            except Exception as e:
+                logger.error(f"=== ERROR: Test Anthropic API échoué: {str(e)} ===")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                })
+                
+        else:
+            return jsonify({
+                'success': False,
+                'error': f"Test pour le fournisseur {provider} non implémenté"
+            })
+            
+    except Exception as e:
+        logger.error(f"=== ERROR: Erreur lors du test de la clé API: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@ai_bp.route('/provider_api_key/<provider>', methods=['GET'])
+def get_provider_api_key(provider):
+    """
+    Récupère la clé API pour un fournisseur spécifique
+    """
+    try:
+        if provider not in ['openai', 'anthropic', 'google']:
+            return jsonify({
+                'success': False,
+                'error': 'Fournisseur non reconnu'
+            }), 400
+            
+        # Construire le nom de la clé correspondant au fournisseur
+        key_name = f"{provider}_api_key"
+        
+        # Récupérer la clé API
+        api_key = AppConfig.get_value(key_name, '')
+        
+        # Masquer la clé pour la réponse si elle existe
+        masked_key = ''
+        if api_key:
+            if len(api_key) > 8:
+                # Masquer la clé en ne montrant que les 4 derniers caractères
+                masked_key = '*' * (len(api_key) - 4) + api_key[-4:]
+            else:
+                masked_key = '*' * len(api_key)
+                
+        logger.info(f"=== DEBUG: Récupération de la clé API pour {provider} ===")
+        
+        return jsonify({
+            'success': True,
+            'provider': provider,
+            'api_key': masked_key,
+            'has_key': bool(api_key)
+        })
+        
+    except Exception as e:
+        logger.error(f"=== ERROR: Erreur lors de la récupération de la clé API pour {provider}: {str(e)} ===")
         return jsonify({
             'success': False,
             'error': str(e)

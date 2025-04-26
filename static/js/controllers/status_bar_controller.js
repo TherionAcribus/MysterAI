@@ -32,6 +32,16 @@
                     return response.json();
                 })
                 .then(data => {
+                    // Log détaillé pour débogage
+                    console.log('=== DEBUG: Réponse API modèles ===', {
+                        success: data.success,
+                        totalModels: data.models.length,
+                        onlineModels: data.models.filter(m => m.type === 'online').length,
+                        localModels: data.models.filter(m => m.type === 'local').length,
+                        currentMode: data.current_mode,
+                        apiKey: data.models.some(m => m.type === 'online') ? 'Configurée' : 'Non configurée'
+                    });
+                    
                     // Vider le sélecteur
                     this.aiModelSelectorTarget.innerHTML = '';
                     
@@ -49,6 +59,7 @@
                             option.value = model.id;
                             option.textContent = model.name;
                             option.selected = model.is_active;
+                            option.setAttribute('data-usable', model.is_usable ? 'true' : 'false');
                             onlineGroup.appendChild(option);
                         });
                         
@@ -65,6 +76,7 @@
                             option.value = model.id;
                             option.textContent = model.name;
                             option.selected = model.is_active;
+                            option.setAttribute('data-usable', model.is_usable !== false ? 'true' : 'false');
                             localGroup.appendChild(option);
                         });
                         
@@ -92,6 +104,19 @@
         changeAIModel(event) {
             const modelId = event.target.value;
             console.log(`=== DEBUG: Changement de modèle d'IA vers ${modelId} ===`);
+            
+            // Vérifier si l'option sélectionnée a l'attribut data-usable à false
+            const selectedOption = event.target.options[event.target.selectedIndex];
+            const isUsable = selectedOption.getAttribute('data-usable') !== 'false';
+            
+            if (!isUsable) {
+                console.log(`=== DEBUG: Modèle ${modelId} non utilisable (clé API manquante) ===`);
+                this.showNotification('Veuillez configurer une clé API valide dans les paramètres pour utiliser ce modèle', true);
+                
+                // Restaurer la sélection précédente
+                this.loadAIModels(); // Recharger les modèles avec la sélection correcte
+                return;
+            }
             
             // Envoyer la requête pour changer le modèle actif
             fetch('/api/ai/set_active_model', {

@@ -41,6 +41,12 @@
                 this.updateVisibility();
                 if (this.hasProviderTarget && this.hasOnlineModelTarget) {
                     this.updateProviderVisibility();
+                    
+                    // Charger la clé API pour le fournisseur sélectionné
+                    if (this.hasProviderTarget && this.hasApiKeyTarget) {
+                        const provider = this.providerTarget.value;
+                        this.loadAPIKeyForProvider(provider);
+                    }
                 }
             }
         }
@@ -69,6 +75,11 @@
             if (mode === 'online') {
                 this.onlineSettingsTarget.style.display = 'block';
                 this.localSettingsTarget.style.display = 'none';
+                
+                // Initialiser le nom du fournisseur dans le libellé
+                if (this.hasProviderTarget) {
+                    this.updateProviderNameInLabel(this.providerTarget.value);
+                }
             } else {
                 this.onlineSettingsTarget.style.display = 'none';
                 this.localSettingsTarget.style.display = 'block';
@@ -77,6 +88,15 @@
         
         changeProvider() {
             this.updateProviderVisibility();
+            
+            // Récupérer la valeur du fournisseur sélectionné
+            const provider = this.providerTarget.value;
+            
+            // Mettre à jour la valeur du champ de clé API en fonction du fournisseur
+            this.loadAPIKeyForProvider(provider);
+            
+            // Mettre à jour le libellé du champ de clé API
+            this.updateProviderNameInLabel(provider);
         }
         
         updateProviderVisibility() {
@@ -169,13 +189,44 @@
             
             // Ajouter les paramètres spécifiques au mode
             if (mode === 'online') {
-                settings.ai_provider = this.providerTarget.value;
+                const provider = this.providerTarget.value;
+                settings.ai_provider = provider;
                 settings.ai_model = this.onlineModelTarget.value;
                 
                 // Ajouter la clé API si elle n'est pas vide
                 const apiKey = this.apiKeyTarget.value.trim();
                 if (apiKey) {
+                    // Enregistrer la clé API à la fois dans la clé générique et dans la clé spécifique au fournisseur
                     settings.api_key = apiKey;
+                    
+                    // Ajouter également la clé spécifique au fournisseur
+                    if (provider === 'openai') {
+                        settings.openai_api_key = apiKey;
+                    } else if (provider === 'anthropic') {
+                        settings.anthropic_api_key = apiKey;
+                    } else if (provider === 'google') {
+                        settings.google_api_key = apiKey;
+                    }
+                    
+                    console.log(`=== DEBUG: Clé API ajoutée pour ${provider} (longueur: ${apiKey.length}) ===`);
+                    
+                    // Vérifier que la clé API contient bien un format valide selon le provider
+                    if (provider === 'openai' && !apiKey.startsWith('sk-')) {
+                        if (!confirm('Votre clé API OpenAI ne semble pas avoir le format attendu (commence par "sk-"). Voulez-vous continuer quand même?')) {
+                            return;
+                        }
+                    } else if (provider === 'anthropic' && !apiKey.startsWith('sk-ant-')) {
+                        if (!confirm('Votre clé API Anthropic ne semble pas avoir le format attendu (commence par "sk-ant-"). Voulez-vous continuer quand même?')) {
+                            return;
+                        }
+                    }
+                } else {
+                    console.log('=== DEBUG: Pas de clé API à envoyer (champ vide) ===');
+                    
+                    // Avertir l'utilisateur que sans clé API, les modèles en ligne ne fonctionneront pas
+                    if (!confirm('Aucune clé API fournie. Les modèles en ligne ne fonctionneront pas sans clé API valide. Voulez-vous continuer quand même?')) {
+                        return;
+                    }
                 }
             } else {
                 settings.ollama_url = this.ollamaUrlTarget.value;
@@ -201,6 +252,13 @@
             .then(data => {
                 if (data.success) {
                     this.showNotification('Paramètres enregistrés avec succès!');
+                    
+                    // Si on a configuré une clé API, proposer de tester la connexion
+                    if (mode === 'online' && settings.api_key) {
+                        if (confirm('Voulez-vous tester votre clé API pour vérifier qu\'elle fonctionne?')) {
+                            this.testAPIKey(settings.ai_provider, settings.api_key);
+                        }
+                    }
                 } else {
                     this.showNotification('Erreur: ' + data.error, true);
                 }
@@ -208,6 +266,79 @@
             .catch(error => {
                 this.showNotification('Erreur: ' + error.message, true);
             });
+        }
+        
+        /**
+         * Teste la validité d'une clé API
+         * @param {string} provider - Le fournisseur d'API (openai, anthropic, etc.)
+         * @param {string} apiKey - La clé API à tester
+         */
+        testAPIKey(provider, apiKey) {
+            this.showNotification('Test de la clé API en cours...', false, false);
+            
+            // Appeler l'API appropriée pour tester la clé
+            fetch('/api/ai/test_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ provider, api_key: apiKey })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.showNotification('Clé API valide! Modèles disponibles: ' + 
+                                         (data.models ? data.models.join(', ') : 'inconnu'));
+                } else {
+                    this.showNotification('Erreur avec la clé API: ' + data.error, true);
+                }
+            })
+            .catch(error => {
+                this.showNotification('Erreur lors du test: ' + error.message, true);
+            });
+        }
+        
+        /**
+         * Affiche une notification temporaire
+         * @param {string} message - Le message à afficher
+         * @param {boolean} isError - Indique si c'est une erreur
+         * @param {boolean} autoHide - Indique si la notification doit disparaître automatiquement
+         */
+        showNotification(message, isError = false, autoHide = true) {
+            // Créer l'élément de notification
+            const notification = document.createElement('div');
+            notification.className = `notification ${isError ? 'error' : 'success'}`;
+            notification.textContent = message;
+            
+            // Ajouter au DOM
+            document.body.appendChild(notification);
+            
+            // Animer l'entrée
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+            
+            // Supprimer après un délai (sauf si autoHide est false)
+            if (autoHide) {
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                }, 3000);
+            } else {
+                // Ajouter un bouton pour fermer la notification
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.className = 'notification-close';
+                closeBtn.onclick = () => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 300);
+                };
+                notification.appendChild(closeBtn);
+            }
         }
         
         resetDefaults() {
@@ -234,27 +365,45 @@
             this.showNotification('Paramètres réinitialisés aux valeurs par défaut');
         }
         
-        showNotification(message, isError = false) {
-            // Créer l'élément de notification
-            const notification = document.createElement('div');
-            notification.className = `notification ${isError ? 'error' : 'success'}`;
-            notification.textContent = message;
-            
-            // Ajouter au DOM
-            document.body.appendChild(notification);
-            
-            // Animer l'entrée
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 10);
-            
-            // Supprimer après un délai
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 3000);
+        // Charge la clé API pour le fournisseur sélectionné
+        loadAPIKeyForProvider(provider) {
+            fetch(`/api/ai/provider_api_key/${provider}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.api_key) {
+                        // Masquer la clé pour l'affichage
+                        const maskedKey = data.api_key;
+                        this.apiKeyTarget.value = maskedKey;
+                        console.log(`=== DEBUG: Clé API chargée pour ${provider} ===`);
+                    } else {
+                        // Effacer le champ si aucune clé n'est configurée
+                        this.apiKeyTarget.value = '';
+                        console.log(`=== DEBUG: Aucune clé API configurée pour ${provider} ===`);
+                    }
+                })
+                .catch(error => {
+                    console.error(`Erreur lors du chargement de la clé API pour ${provider}:`, error);
+                    this.apiKeyTarget.value = '';
+                });
+        }
+        
+        /**
+         * Met à jour le nom du fournisseur dans le libellé du champ de clé API
+         * @param {string} provider - Le fournisseur sélectionné
+         */
+        updateProviderNameInLabel(provider) {
+            const providerNameElement = document.getElementById('provider-name');
+            if (providerNameElement) {
+                // Convertir en nom plus lisible
+                let displayName = 'OpenAI';
+                if (provider === 'anthropic') {
+                    displayName = 'Anthropic (Claude)';
+                } else if (provider === 'google') {
+                    displayName = 'Google (Gemini)';
+                }
+                
+                providerNameElement.textContent = displayName;
+            }
         }
     }
 

@@ -34,6 +34,21 @@ class AIService:
                 self.max_context = int(AppConfig.get_value('max_context', 10))
                 self.use_langgraph = AppConfig.get_value('use_langgraph', 'true').lower() == 'true'
                 
+                # Log des clés disponibles pour débogage
+                api_key_present = AppConfig.get_value('api_key', '') != ''
+                print(f"=== DEBUG: _ensure_initialized - Clé API présente dans la BD: {api_key_present} ===")
+                
+                # Clés API par fournisseur
+                self.api_keys = {
+                    'openai': AppConfig.get_value('openai_api_key', ''),
+                    'anthropic': AppConfig.get_value('anthropic_api_key', ''),
+                    'google': AppConfig.get_value('google_api_key', '')
+                }
+                
+                # Log des clés API disponibles
+                for provider, key in self.api_keys.items():
+                    print(f"=== DEBUG: Clé API pour {provider}: {'configurée' if key else 'non configurée'} ===")
+                
                 # Charger les modèles locaux activés
                 local_models_enabled_json = AppConfig.get_value('local_models_enabled', '{}')
                 try:
@@ -45,11 +60,18 @@ class AIService:
                 # Paramètres spécifiques au mode
                 if self.mode == 'online':
                     self.provider = AppConfig.get_value('ai_provider', 'openai')
-                    self.api_key = AppConfig.get_value('api_key', '')
+                    
+                    # Récupérer la clé API correspondant au fournisseur
+                    self.api_key = self.api_keys.get(self.provider, '')
+                    if not self.api_key:
+                        # Si pas de clé spécifique, utiliser la clé générique pour compatibilité
+                        self.api_key = AppConfig.get_value('api_key', '')
+                        
                     self.model_name = AppConfig.get_value('ai_model', 'gpt-3.5-turbo')
                     
                     # Log pour le débogage
                     print(f"=== DEBUG: Mode en ligne chargé - Provider: {self.provider}, Model: {self.model_name} ===")
+                    print(f"=== DEBUG: Clé API configurée: {bool(self.api_key)} ===")
                 else:
                     self.ollama_url = AppConfig.get_value('ollama_url', 'http://localhost:11434')
                     self.model_name = AppConfig.get_value('local_model', 'deepseek-coder:latest')
@@ -235,11 +257,43 @@ class AIService:
                 AppConfig.set_value('ai_provider', provider)
                 AppConfig.set_value('ai_model', model)
                 
-                # Enregistrer la clé API si elle est fournie et non vide
-                if settings.get('api_key'):
-                    AppConfig.set_value('api_key', settings.get('api_key'), 
+                # Traiter les clés API spécifiques au fournisseur
+                provider_key_map = {
+                    'openai': 'openai_api_key',
+                    'anthropic': 'anthropic_api_key',
+                    'google': 'google_api_key'
+                }
+                
+                # Enregistrer les clés API spécifiques si elles sont fournies
+                for provider_name, config_key in provider_key_map.items():
+                    if settings.get(config_key):
+                        AppConfig.set_value(config_key, settings.get(config_key), 
+                                           category='api_key', is_secret=True)
+                        print(f"=== DEBUG: Clé API pour {provider_name} enregistrée ===")
+                        
+                        # Mettre à jour les clés API dans l'instance
+                        if hasattr(self, 'api_keys'):
+                            self.api_keys[provider_name] = settings.get(config_key)
+                
+                # Enregistrer la clé API générique si elle est fournie
+                if 'api_key' in settings and settings['api_key']:
+                    print(f"=== DEBUG: Clé API générique fournie, longueur: {len(settings['api_key'])} ===")
+                    AppConfig.set_value('api_key', settings['api_key'], 
                                        category='api_key', is_secret=True)
                     
+                    # S'assurer également que la clé spécifique au fournisseur est mise à jour
+                    provider_key = provider_key_map.get(provider)
+                    if provider_key and provider_key not in settings:
+                        AppConfig.set_value(provider_key, settings['api_key'], 
+                                           category='api_key', is_secret=True)
+                        print(f"=== DEBUG: Clé API spécifique pour {provider} synchronisée avec la clé générique ===")
+                    
+                    # S'assurer que l'objet courant a aussi la clé API
+                    self.api_key = settings['api_key']
+                    print(f"=== DEBUG: Clé API enregistrée avec succès ===")
+                else:
+                    print(f"=== DEBUG: Pas de clé API générique fournie ou clé vide ===")
+                
                 # Log pour le débogage
                 print(f"=== DEBUG: Paramètres en ligne sauvegardés - Provider: {provider}, Model: {model} ===")
             else:
