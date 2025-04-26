@@ -70,7 +70,36 @@
         <!-- Section des lettres extraites -->
         <div id="letter-inputs" class="bg-gray-800 rounded-lg p-4 mb-6 hidden" data-formula-solver-target="letterInputs">
             <h2 class="text-lg font-semibold text-gray-100 mb-3">Valeurs des lettres</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-formula-solver-target="letterFields">
+            
+            <!-- Options de sélection globale -->
+            <div class="mb-4 bg-gray-700 p-3 rounded">
+                <p class="text-gray-300 font-medium mb-2">Sélectionner la valeur à utiliser pour toutes les lettres:</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <label class="flex items-center space-x-2 text-gray-300">
+                        <input type="radio" name="global-value-type" value="value" checked
+                               data-action="change->formula-solver#setGlobalValueType">
+                        <span>Valeur</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-gray-300">
+                        <input type="radio" name="global-value-type" value="checksum"
+                               data-action="change->formula-solver#setGlobalValueType">
+                        <span>Checksum</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-gray-300">
+                        <input type="radio" name="global-value-type" value="reduced-checksum"
+                               data-action="change->formula-solver#setGlobalValueType">
+                        <span>Checksum réduit</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-gray-300">
+                        <input type="radio" name="global-value-type" value="length"
+                               data-action="change->formula-solver#setGlobalValueType">
+                        <span>Longueur</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Champs pour chaque lettre -->
+            <div class="space-y-6" data-formula-solver-target="letterFields">
                 <!-- Les champs de saisie pour les lettres seront générés dynamiquement -->
             </div>
         </div>

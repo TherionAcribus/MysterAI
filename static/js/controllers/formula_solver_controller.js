@@ -25,7 +25,48 @@
             });
             
             // Map pour stocker les valeurs des lettres
-            this.letterValues = new Map();
+            this.letterData = new Map();
+            // Type de valeur sélectionné par défaut
+            this.selectedValueType = 'value';
+        }
+
+        // Définir le type de valeur pour toutes les lettres
+        setGlobalValueType(event) {
+            this.selectedValueType = event.target.value;
+            
+            // Mettre à jour tous les boutons radio des lettres individuelles
+            this.letterFieldsTarget.querySelectorAll(`input[name^="value-type-"]`).forEach(radio => {
+                if (radio.value === this.selectedValueType) {
+                    radio.checked = true;
+                } else {
+                    radio.checked = false;
+                }
+            });
+            
+            // Mettre à jour le type de valeur sélectionné pour chaque lettre dans letterData
+            this.letterData.forEach((data, letter) => {
+                data.selectedType = this.selectedValueType;
+            });
+            
+            // Mettre à jour la formule et les calculs
+            this.updateSubstitutedFormula();
+            this.calculateCoordinates();
+        }
+        
+        // Définir le type de valeur pour une lettre spécifique
+        setLetterValueType(event) {
+            const letter = event.target.dataset.letter;
+            const valueType = event.target.value;
+            
+            if (letter && this.letterData.has(letter)) {
+                const data = this.letterData.get(letter);
+                data.selectedType = valueType;
+                this.letterData.set(letter, data);
+                
+                // Mettre à jour la formule et les calculs
+                this.updateSubstitutedFormula();
+                this.calculateCoordinates();
+            }
         }
 
         // Extraire les lettres de la formule
@@ -92,27 +133,15 @@
         // Créer les champs de saisie pour chaque lettre
         createLetterInputFields(letters) {
             const existingLetters = new Set(
-                Array.from(this.letterFieldsTarget.querySelectorAll('input'))
-                    .map(input => input.dataset.letter)
+                Array.from(this.letterFieldsTarget.querySelectorAll('.letter-container'))
+                    .map(container => container.dataset.letter)
             );
             
             // Créer les nouveaux champs
             let html = '';
             letters.forEach(letter => {
                 if (!existingLetters.has(letter)) {
-                    html += `
-                        <div class="flex items-center">
-                            <label class="text-gray-300 w-10 font-bold">${letter}:</label>
-                            <input 
-                                type="number" 
-                                class="bg-gray-700 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                data-letter="${letter}"
-                                data-action="input->formula-solver#updateFormula"
-                                min="0"
-                                max="9"
-                                placeholder="0-9">
-                        </div>
-                    `;
+                    html += this.createLetterFieldHTML(letter);
                 }
             });
             
@@ -122,31 +151,199 @@
             }
             
             // Supprimer les champs pour les lettres qui ne sont plus dans la formule
-            Array.from(this.letterFieldsTarget.querySelectorAll('input')).forEach(input => {
-                const letter = input.dataset.letter;
+            Array.from(this.letterFieldsTarget.querySelectorAll('.letter-container')).forEach(container => {
+                const letter = container.dataset.letter;
                 if (!letters.includes(letter)) {
-                    input.closest('.flex').remove();
-                    this.letterValues.delete(letter);
+                    container.remove();
+                    this.letterData.delete(letter);
                 }
             });
         }
         
-        // Mettre à jour la formule quand une valeur est changée
-        updateFormula(event) {
-            const letter = event.target.dataset.letter;
-            const value = event.target.value.trim();
-            
-            if (value === '') {
-                this.letterValues.delete(letter);
-            } else {
-                this.letterValues.set(letter, parseInt(value, 10));
-            }
-            
-            this.updateSubstitutedFormula();
-            this.calculateCoordinates();
+        // Créer le HTML pour un champ de lettre
+        createLetterFieldHTML(letter) {
+            return `
+                <div class="bg-gray-700 p-4 rounded letter-container" data-letter="${letter}">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-bold text-white">Lettre ${letter}</h3>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center space-x-1 text-gray-300 text-sm">
+                                <input type="radio" name="value-type-${letter}" value="value" checked 
+                                       data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
+                                <span>Valeur</span>
+                            </label>
+                            <label class="flex items-center space-x-1 text-gray-300 text-sm">
+                                <input type="radio" name="value-type-${letter}" value="checksum" 
+                                       data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
+                                <span>Checksum</span>
+                            </label>
+                            <label class="flex items-center space-x-1 text-gray-300 text-sm">
+                                <input type="radio" name="value-type-${letter}" value="reduced-checksum" 
+                                       data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
+                                <span>Réduit</span>
+                            </label>
+                            <label class="flex items-center space-x-1 text-gray-300 text-sm">
+                                <input type="radio" name="value-type-${letter}" value="length" 
+                                       data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
+                                <span>Longueur</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-300 text-sm font-medium mb-1">
+                                Mot ou expression
+                            </label>
+                            <input 
+                                type="text" 
+                                class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                data-letter="${letter}"
+                                data-field="word"
+                                data-action="input->formula-solver#updateLetterData">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-gray-300 text-sm font-medium mb-1">
+                                    Checksum
+                                </label>
+                                <input 
+                                    type="text" 
+                                    class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3" 
+                                    data-letter="${letter}"
+                                    data-field="checksum"
+                                    readonly>
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 text-sm font-medium mb-1">
+                                    Réduit
+                                </label>
+                                <input 
+                                    type="text" 
+                                    class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3" 
+                                    data-letter="${letter}"
+                                    data-field="reduced-checksum"
+                                    readonly>
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 text-sm font-medium mb-1">
+                                    Longueur
+                                </label>
+                                <input 
+                                    type="text" 
+                                    class="bg-gray-800 text-white border border-gray-600 rounded w-full py-2 px-3" 
+                                    data-letter="${letter}"
+                                    data-field="length"
+                                    readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
         
-        // Mettre à jour l'affichage de la formule avec les substitutions
+        // Mettre à jour les données d'une lettre
+        updateLetterData(event) {
+            const letter = event.target.dataset.letter;
+            const field = event.target.dataset.field;
+            const value = event.target.value.trim();
+            
+            if (letter && field === 'word') {
+                // Initialiser ou mettre à jour les données pour cette lettre
+                const letterData = this.letterData.get(letter) || {
+                    word: '',
+                    checksum: 0,
+                    'reduced-checksum': 0,
+                    length: 0,
+                    selectedType: this.selectedValueType
+                };
+                
+                // Mettre à jour le mot
+                letterData.word = value;
+                
+                // Calculer le checksum (somme des valeurs des lettres A=1, B=2, etc.)
+                letterData.checksum = this.calculateChecksum(value);
+                
+                // Calculer le checksum réduit (réduire à un seul chiffre)
+                letterData['reduced-checksum'] = this.reduceChecksum(letterData.checksum);
+                
+                // Calculer la longueur
+                letterData.length = value.length;
+                
+                // Mettre à jour la map des données
+                this.letterData.set(letter, letterData);
+                
+                // Mettre à jour les champs d'affichage
+                this.updateLetterFields(letter, letterData);
+                
+                // Mettre à jour la formule et les coordonnées calculées
+                this.updateSubstitutedFormula();
+                this.calculateCoordinates();
+            }
+        }
+        
+        // Mettre à jour les champs d'affichage pour une lettre
+        updateLetterFields(letter, data) {
+            const container = this.letterFieldsTarget.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            // Mettre à jour les champs de lecture seule
+            container.querySelector(`[data-field="checksum"]`).value = data.checksum;
+            container.querySelector(`[data-field="reduced-checksum"]`).value = data['reduced-checksum'];
+            container.querySelector(`[data-field="length"]`).value = data.length;
+        }
+        
+        // Calculer le checksum d'un mot ou d'une expression
+        calculateChecksum(text) {
+            if (!text) return 0;
+            
+            // Convertir en majuscules et supprimer les espaces et caractères spéciaux
+            const cleanText = text.toUpperCase().replace(/[^A-Z]/g, '');
+            
+            // Calculer la somme (A=1, B=2, etc.)
+            return cleanText.split('').reduce((sum, char) => {
+                return sum + (char.charCodeAt(0) - 64);
+            }, 0);
+        }
+        
+        // Réduire un nombre à un seul chiffre (ex: 123 -> 1+2+3 = 6)
+        reduceChecksum(number) {
+            if (number < 10) return number;
+            
+            const digits = number.toString().split('').map(Number);
+            const sum = digits.reduce((a, b) => a + b, 0);
+            
+            // Réduire de manière récursive jusqu'à obtenir un seul chiffre
+            return this.reduceChecksum(sum);
+        }
+        
+        // Obtenir la valeur à utiliser pour une lettre donnée
+        getLetterValue(letter) {
+            if (!this.letterData.has(letter)) return '';
+            
+            const data = this.letterData.get(letter);
+            const valueType = data.selectedType || this.selectedValueType;
+            
+            switch (valueType) {
+                case 'value':
+                    return data.word || '';
+                case 'checksum':
+                    return data.checksum.toString();
+                case 'reduced-checksum':
+                    return data['reduced-checksum'].toString();
+                case 'length':
+                    return data.length.toString();
+                default:
+                    return '';
+            }
+        }
+        
+        // Vérifier si une valeur est numérique
+        isNumeric(value) {
+            return !isNaN(parseFloat(value)) && isFinite(value);
+        }
+        
+        // Mettre à jour la formule avec les substitutions
         updateSubstitutedFormula() {
             const formula = this.formulaInputTarget.value.trim();
             if (!formula) return;
@@ -167,14 +364,39 @@
                 } else if (part.type === 'content') {
                     // Appliquer les substitutions sur le contenu
                     let content = part.value;
-                    this.letterValues.forEach((value, letter) => {
-                        // Création d'une regex qui évite de remplacer les lettres cardinales
-                        // sauf si elles sont à l'intérieur des parenthèses
-                        const regex = new RegExp(`(\\([^()]*)(${letter})([^()]*\\)|\\.(${letter}))`, 'g');
-                        content = content.replace(regex, (match, prefix, letterMatch, suffix) => {
-                            return prefix + value + suffix;
-                        });
-                    });
+                    
+                    // Trouver toutes les lettres dans les formules
+                    const matches = content.match(/\(([^()]*[A-Z][^()]*)\)/g) || [];
+                    
+                    for (const match of matches) {
+                        let substituted = match;
+                        
+                        // Extraire les lettres de cette formule
+                        const letters = match.match(/[A-Z]/g) || [];
+                        
+                        // Remplacer chaque lettre par sa valeur
+                        for (const letter of letters) {
+                            const value = this.getLetterValue(letter);
+                            
+                            // Ne remplacer que si la valeur est numérique ou si c'est un mot/expression
+                            if (value !== '') {
+                                // Créer une expression régulière pour cette lettre spécifique
+                                const regex = new RegExp(letter, 'g');
+                                
+                                // Si la valeur est numérique, remplacer directement
+                                if (this.isNumeric(value)) {
+                                    substituted = substituted.replace(regex, value);
+                                } else {
+                                    // Si c'est un mot/expression, remplacer par "value"
+                                    substituted = substituted.replace(regex, `"${value}"`);
+                                }
+                            }
+                        }
+                        
+                        // Remplacer la formule originale par la version substituée
+                        content = content.replace(match, substituted);
+                    }
+                    
                     substitutedFormula += content;
                 }
             }
@@ -183,6 +405,9 @@
             this.substitutedFormulaTextTarget.textContent = substitutedFormula;
             this.substitutedFormulaTarget.classList.remove('hidden');
         }
+
+        // Autres méthodes existantes...
+        // Code inchangé...
         
         // Découper la formule en fragments (direction et contenu)
         splitCoordinates(formula) {
@@ -226,17 +451,20 @@
             return result;
         }
         
-        // Calculer les coordonnées finales
+        // Calculer les coordonnées finales en remplaçant les valeurs des lettres avec des nombres
         calculateCoordinates() {
             const formula = this.formulaInputTarget.value.trim();
             if (!formula) return;
             
-            // Vérifier si toutes les lettres ont des valeurs
+            // Vérifier si toutes les lettres ont des valeurs numériques
             const allLetters = this.extractUniqueLetters(formula);
-            const allLettersHaveValues = allLetters.every(letter => this.letterValues.has(letter));
+            const allLettersHaveNumericValues = allLetters.every(letter => {
+                const value = this.getLetterValue(letter);
+                return value !== '' && this.isNumeric(value);
+            });
             
-            if (!allLettersHaveValues) {
-                // Si toutes les lettres n'ont pas de valeur, cacher le résultat final
+            if (!allLettersHaveNumericValues) {
+                // Si toutes les lettres n'ont pas de valeur numérique, cacher le résultat final
                 this.calculatedCoordinatesTarget.classList.add('hidden');
                 return;
             }
@@ -262,9 +490,12 @@
                             const expression = expressionMatch[1];
                             // Remplacer les lettres par leurs valeurs
                             let substitutedExpression = expression;
-                            for (const [letter, value] of this.letterValues.entries()) {
-                                const regex = new RegExp(letter, 'g');
-                                substitutedExpression = substitutedExpression.replace(regex, value);
+                            for (const letter of allLetters) {
+                                const value = this.getLetterValue(letter);
+                                if (value !== '' && this.isNumeric(value)) {
+                                    const regex = new RegExp(letter, 'g');
+                                    substitutedExpression = substitutedExpression.replace(regex, value);
+                                }
                             }
                             // Évaluer l'expression
                             calculatedDecimal = this.evaluateExpression(substitutedExpression);
@@ -298,9 +529,12 @@
                             const expression = expressionMatch[1];
                             // Remplacer les lettres par leurs valeurs
                             let substitutedExpression = expression;
-                            for (const [letter, value] of this.letterValues.entries()) {
-                                const regex = new RegExp(letter, 'g');
-                                substitutedExpression = substitutedExpression.replace(regex, value);
+                            for (const letter of allLetters) {
+                                const value = this.getLetterValue(letter);
+                                if (value !== '' && this.isNumeric(value)) {
+                                    const regex = new RegExp(letter, 'g');
+                                    substitutedExpression = substitutedExpression.replace(regex, value);
+                                }
                             }
                             // Évaluer l'expression
                             calculatedDecimal = this.evaluateExpression(substitutedExpression);
@@ -328,41 +562,6 @@
                 this.calculatedCoordinatesTextTarget.textContent = "Erreur: Formule invalide ou incomplète";
                 this.calculatedCoordinatesTarget.classList.remove('hidden');
             }
-        }
-        
-        // Calculer les expressions mathématiques dans une chaîne
-        calculateExpressions(formula) {
-            if (!formula) return '';
-            
-            // Remplacer les expressions entre parenthèses par leur valeur calculée
-            let result = formula;
-            const parenthesesRegex = /\(([^()]+)\)/g;
-            let match;
-            
-            // Tant qu'il y a des expressions entre parenthèses, les calculer
-            while ((match = parenthesesRegex.exec(result)) !== null) {
-                const expression = match[1];
-                try {
-                    // Calculer l'expression
-                    const value = this.evaluateExpression(expression);
-                    // Remplacer l'expression par sa valeur
-                    result = result.replace(`(${expression})`, value);
-                    // Réinitialiser l'expression régulière pour continuer à chercher
-                    parenthesesRegex.lastIndex = 0;
-                } catch (error) {
-                    console.error(`Erreur lors de l'évaluation de l'expression ${expression}:`, error);
-                }
-            }
-            
-            // Rechercher des motifs comme "47° 5E.FTN" et calculer les décimales
-            const decimalRegex = /(\d+)°\s+(\d+)\.([^°\s]+)/g;
-            result = result.replace(decimalRegex, (match, degrees, minutes, decimal) => {
-                // Si decimal contient encore des expressions comme "A+B-317", les évaluer
-                const calculatedDecimal = this.evaluateExpression(decimal);
-                return `${degrees}° ${minutes}.${calculatedDecimal}`;
-            });
-            
-            return result;
         }
         
         // Évaluer une expression mathématique

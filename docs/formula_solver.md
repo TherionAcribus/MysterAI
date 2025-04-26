@@ -37,19 +37,26 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 - Génération dynamique de champs de saisie pour chaque lettre unique
 - Préservation des lettres cardinales (N, S, E, W) utilisées comme directions
 
-### 3. Résolution Interactive de Formules
+### 3. Traitement Avancé des Mots et Expressions
+- Saisie de mots ou expressions pour chaque variable détectée
+- Calcul automatique du checksum (somme des valeurs des lettres, A=1, B=2, etc.)
+- Calcul du checksum réduit à un chiffre (ex: 123 → 1+2+3 = 6)
+- Détermination de la longueur du mot ou de l'expression
+- Sélection du type de valeur à utiliser via boutons radio (mot, checksum, checksum réduit, longueur)
+
+### 4. Résolution Interactive de Formules
 - Interface pour entrer manuellement des formules
 - Mise à jour en temps réel de la formule avec substitution des variables
 - Résolution mathématique des expressions (addition, soustraction, multiplication, division)
 - Formatage des coordonnées avec préservation des formats standards (00.000)
 
-### 4. Visualisation des Résultats
+### 5. Visualisation des Résultats
 - Affichage de la formule détectée initiale
 - Visualisation de la formule avec les substitutions des variables
 - Affichage des coordonnées calculées en format GPS standard
 - Formatage automatique des minutes (2 chiffres) et décimales (3 chiffres)
 
-### 5. Consultation des Données de la Géocache
+### 6. Consultation des Données de la Géocache
 - Affichage de la description complète
 - Liste des waypoints additionnels
 - Accès facile aux coordonnées existantes
@@ -66,20 +73,27 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
    - Champ de saisie pour les coordonnées en format formule
    - Bouton pour lancer la résolution
 
-3. **Champs de Variables**
-   - Génération automatique de champs pour chaque variable (A-Z)
-   - Valeurs acceptées entre 0 et 9
-   - Mise à jour dynamique des formules lors de la saisie
+3. **Options de Type de Valeur Global**
+   - Sélection rapide du type de valeur à utiliser pour toutes les variables simultanément
+   - Boutons radio pour choisir entre valeur directe, checksum, checksum réduit et longueur
+   - Application instantanée à toutes les variables
 
-4. **Formule avec Substitution**
+4. **Champs de Variables**
+   - Génération automatique de sections pour chaque variable détectée (A-Z)
+   - Champ de saisie pour le mot ou l'expression
+   - Affichage du checksum, checksum réduit et longueur calculés automatiquement
+   - Boutons radio individuels pour sélectionner le type de valeur à utiliser pour cette variable
+
+5. **Formule avec Substitution**
    - Affichage de la formule avec les valeurs remplaçant les variables
-   - Mise à jour en temps réel à chaque modification de variable
+   - Mise à jour en temps réel à chaque modification de variable ou changement de type
+   - Substitution par valeurs numériques ou expressions entre guillemets selon le type
 
-5. **Coordonnées Calculées**
+6. **Coordonnées Calculées**
    - Résultat final du calcul avec format standard GPS
    - Respect du format avec 2 chiffres pour les minutes et 3 pour les décimales
 
-6. **Données de la Géocache**
+7. **Données de la Géocache**
    - Description complète
    - Liste des waypoints avec leurs coordonnées et notes
 
@@ -128,17 +142,24 @@ mainLayout.registerComponent('FormulaSolver', function(container, state) {
 - Filtrage pour exclure les lettres de direction (N, S, E, W) 
 - Génération dynamique de champs de saisie pour chaque variable
 
-### 2. Substitution des Variables
-- Remplacement des lettres par les valeurs saisies
+### 2. Calcul des Propriétés des Mots/Expressions
+- Conversion en majuscules et nettoyage pour la standardisation
+- Calcul du checksum: somme des valeurs numériques des lettres (A=1, B=2, ...)
+- Réduction récursive du checksum jusqu'à obtenir un chiffre (ex: 123 → 1+2+3=6)
+- Détermination de la longueur du texte saisi
+
+### 3. Substitution des Variables
+- Sélection du type de valeur pour chaque variable (globalement ou individuellement)
+- Remplacement des lettres par les valeurs numériques ou textuelles correspondantes
 - Mise à jour en temps réel à chaque modification
 - Traitement spécial pour préserver les lettres de direction
 
-### 3. Calcul des Expressions
+### 4. Calcul des Expressions
 - Évaluation des opérations mathématiques (addition, soustraction, etc.)
 - Traitement des expressions entre parenthèses
 - Formatage des résultats avec le bon nombre de chiffres
 
-### 4. Formatage des Coordonnées
+### 5. Formatage des Coordonnées
 - Respect du format standard GPS
 - Affichage des minutes avec exactement 2 chiffres
 - Affichage des décimales avec exactement 3 chiffres
@@ -164,17 +185,23 @@ Le plugin `formula_parser` est utilisé pour détecter les formules de coordonn�
    - Cliquer sur le bouton "Formula Solver"
    - Les formules détectées s'affichent automatiquement
 
-2. **Résolution Interactive**
+2. **Saisie des Mots-Clés**
    - Entrer une formule comme `N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)`
-   - Remplir les valeurs pour chaque lettre (A=4, B=0, C=2, etc.)
-   - Observer la mise à jour automatique de la formule et des coordonnées calculées
+   - Pour chaque lettre, saisir un mot ou une expression (ex: "GEOCACHING" pour A)
+   - Voir le checksum (73), le checksum réduit (1) et la longueur (10) se calculer automatiquement
+   - Sélectionner le type de valeur à utiliser via les boutons radio
 
-3. **Vérification des Résultats**
+3. **Changement Global du Type de Valeur**
+   - Cliquer sur l'un des boutons radio généraux en haut (ex: "Checksum réduit")
+   - Observer la mise à jour automatique de toutes les sélections individuelles
+   - Voir la formule et les coordonnées se recalculer immédiatement
+
+4. **Vérification des Résultats**
    - Les coordonnées sont calculées et formatées automatiquement
    - Le format respecte la norme avec 2 chiffres pour les minutes (ex: 12) et 3 pour les décimales (ex: 086)
    - Exemple: `N49° 12.086 E005° 59.209`
 
-4. **Utilisation des Waypoints**
+5. **Utilisation des Waypoints**
    - Consulter les waypoints affichés en bas de page
    - Cliquer sur "Utiliser" pour un waypoint particulier
    - La formule est automatiquement copiée dans le champ de résolution et les variables sont extraites 
