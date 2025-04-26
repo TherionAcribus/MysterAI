@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from app.services.ai_service import ai_service
 from app.models.geocache import Geocache
 from app import db  # Import direct de db depuis app au lieu de app.models
+import traceback
 
 class FormulaQuestionsService:
     """Service pour extraire les questions associées aux variables dans les formules de coordonnées"""
@@ -11,194 +12,162 @@ class FormulaQuestionsService:
         """Initialise le service d'extraction de questions"""
         pass
     
-    def extract_questions_with_ai(self, geocache_id: int, letters: List[str]) -> Dict[str, str]:
+    def extract_questions_with_ai(self, content, letters):
         """
-        Utilise l'IA pour extraire les questions correspondant aux lettres dans la formule
+        Extrait les questions associées aux lettres dans le contenu spécifié en utilisant l'IA
         
         Args:
-            geocache_id: ID de la géocache contenant les questions
-            letters: Liste des lettres à trouver dans la description
+            content: Contenu duquel extraire les questions (texte ou objet Geocache)
+            letters: Liste des lettres à rechercher
             
         Returns:
             Dictionnaire associant chaque lettre à sa question correspondante
         """
-        # Récupérer les données de la géocache
-        geocache = Geocache.query.options(
-            db.joinedload(Geocache.additional_waypoints)
-        ).get(geocache_id)
-        
-        if not geocache:
-            return {"error": f"Géocache avec ID {geocache_id} non trouvée"}
-        
-        # Préparer le contenu pour l'analyse
-        content_to_analyze = self._prepare_content_for_analysis(geocache)
-        
-        # Préparer le prompt pour l'IA
-        system_prompt = """
-        Tu es un assistant spécialisé dans l'analyse des descriptions de géocaches mystery.
-        Ta tâche est d'identifier les questions associées à des lettres spécifiques qui serviront
-        à résoudre les coordonnées finales de la géocache.
-        
-        Règles à suivre :
-        1. Cherche les questions qui sont clairement associées aux lettres fournies
-        2. Les questions sont souvent numérotées ou associées explicitement à une lettre (ex: "Question A:", "1.", etc.)
-        3. Si une lettre n'a pas de question clairement associée, laisse-la vide
-        4. Ignore les questions qui ne correspondent pas aux lettres recherchées
-        5. Extrais uniquement le texte de la question, pas les réponses potentielles
-        6. Retourne un JSON propre et bien formaté
-        """
-        
-        user_prompt = f"""
-        Analyse la description suivante d'une géocache mystery et identifie les questions
-        associées aux lettres suivantes: {', '.join(letters)}.
-        
-        Retourne ta réponse UNIQUEMENT au format JSON comme ceci:
-        {{
-            "A": "Question associée à A",
-            "B": "Question associée à B",
-            ...
-        }}
-        
-        Si aucune question n'est trouvée pour une lettre, utilise une chaîne vide.
-        N'inclus que les lettres qui sont dans la liste fournie.
-        
-        Voici le contenu à analyser:
-        
-        {content_to_analyze}
-        """
-        
-        # Appeler l'IA
         try:
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+            # Vérifier si le service AI est disponible
+            ai_service._ensure_initialized()
+            if not ai_service.api_key:
+                print("Erreur: Service IA non disponible ou clé API non configurée")
+                return {"error": "Service IA non disponible ou clé API non configurée"}
+                
+            # Préparer le contenu pour l'analyse
+            prepared_content = self._prepare_content_for_analysis(content, letters)
+            if not prepared_content:
+                print("Contenu vide, impossible d'extraire les questions")
+                return {"error": "Contenu vide, impossible d'extraire les questions"}
             
-            # Récupérer les paramètres de l'IA pour le log
-            ai_settings = ai_service.get_settings()
-            mode = ai_settings.get('mode', 'online')
-            model = ai_settings.get('model_name', ai_settings.get('ai_model', 'unknown'))
+            # Créer le message pour l'IA
+            instructions = self._build_ai_instructions(letters)
             
-            # Log détaillé avant l'appel
-            print(f"===== EXTRACTION DES QUESTIONS PAR IA =====")
-            print(f"Mode IA: {mode}")
-            print(f"Modèle utilisé: {model}")
-            print(f"Lettres recherchées: {', '.join(letters)}")
-            print(f"Longueur du contenu: {len(content_to_analyze)} caractères")
-            print(f"Extrait du contenu: {content_to_analyze[:200]}...")
-            print(f"System prompt: {system_prompt.strip()}")
-            print(f"User prompt: {user_prompt[:200]}...")
+            print(f"Extraction des questions pour {len(letters)} lettres avec l'IA...")
+            print(f"Instructions: {instructions[:100]}...")
             
-            # Appel à l'IA
-            response = ai_service.chat(messages, {"use_langgraph": False})
+            # Appeler l'IA pour extraire les questions
+            response = ai_service.chat(
+                [
+                    {"role": "system", "content": "Tu es un assistant spécialisé dans l'analyse des descriptions de géocaches."},
+                    {"role": "user", "content": f"{instructions}\n\nCONTENU DE LA GÉOCACHE:\n{prepared_content}"}
+                ]
+            )
             
-            # Log de la réponse
-            print(f"=== RÉPONSE DE L'IA ===")
-            print(f"Longueur de la réponse: {len(response)} caractères")
-            print(f"Réponse brute: {response[:500]}...")
-            
+            if not response:
+                print("Pas de réponse de l'IA")
+                return {"error": "Pas de réponse de l'IA"}
+                
             # Extraire le JSON de la réponse
             result = self._extract_json_from_response(response, letters)
-            
-            # Log du résultat
-            print(f"=== RÉSULTAT EXTRAIT ===")
-            print(f"Nombre de questions trouvées: {sum(1 for v in result.values() if v)}")
-            print(f"Résultat: {result}")
-            
+            print(f"Résultat de l'extraction IA: {result}")
             return result
             
         except Exception as e:
-            print(f"Erreur lors de l'extraction des questions par IA: {str(e)}")
-            return {"error": f"Erreur lors de l'analyse: {str(e)}"}
+            print(f"Erreur lors de l'extraction des questions avec l'IA: {str(e)}")
+            traceback.print_exc()
+            return {"error": f"Erreur lors de l'extraction des questions avec l'IA: {str(e)}"}
     
-    def extract_questions_with_regex(self, geocache_id: int, letters: List[str]) -> Dict[str, str]:
+    def extract_questions_with_regex(self, content, letters):
         """
-        Utilise des expressions régulières pour extraire les questions correspondant aux lettres
+        Extrait les questions à partir du contenu en utilisant des expressions régulières.
         
         Args:
-            geocache_id: ID de la géocache contenant les questions
-            letters: Liste des lettres à trouver dans la description
+            content: Contenu à analyser (texte ou objet Geocache)
+            letters (list): Liste des lettres à rechercher
             
         Returns:
-            Dictionnaire associant chaque lettre à sa question correspondante
+            dict: Dictionnaire des questions extraites par lettre
         """
-        # Récupérer les données de la géocache
-        geocache = Geocache.query.options(
-            db.joinedload(Geocache.additional_waypoints)
-        ).get(geocache_id)
-        
-        if not geocache:
-            return {"error": f"Géocache avec ID {geocache_id} non trouvée"}
+        print(f"=== EXTRACTION DE QUESTIONS PAR REGEX ===")
+        print(f"Lettres recherchées: {letters}")
         
         # Préparer le contenu pour l'analyse
-        content = self._prepare_content_for_analysis(geocache)
+        prepared_content = self._prepare_content_for_analysis(content, letters)
+        if not prepared_content:
+            print("Contenu vide, impossible d'extraire les questions")
+            return {"error": "Contenu vide, impossible d'extraire les questions"}
+            
+        print(f"Longueur du contenu préparé: {len(prepared_content)} caractères")
         
-        # Nettoyer le HTML
-        plain_text = re.sub(r'<[^>]*>', ' ', content)
-        
-        # Initialiser le résultat
         result = {letter: "" for letter in letters}
         
-        # Patterns courants pour les questions
+        # Modèles regex pour trouver les questions
         patterns = [
-            # Format "Question A : texte de la question"
-            r'(?:Question|Q)?\s*([A-Z])\s*(?::|-)?\s*([^.?!]*[.?!])',
+            # Format: A. Question?
+            r'(?:^|\n)\s*([' + ''.join(letters) + r'])\s*[\.\:\)]\s*(.*?)(?=\n\s*[A-Z]\s*[\.\:\)]|\n\s*\d+\s*[\.\:\)]|$)',
             
-            # Format "A. texte de la question"
-            r'([A-Z])\.?\s+([^.?!]*[.?!])',
+            # Format: Question A:
+            r'(?:^|\n)\s*(.*?)\s+([' + ''.join(letters) + r'])\s*[\.\:\)](?:.*?)(?=\n|$)',
             
-            # Format "A - texte de la question"
-            r'([A-Z])\s*-\s*([^.?!]*[.?!])',
-            
-            # Format "Pour A : texte de la question"
-            r'(?:Pour|For)\s+([A-Z])\s*(?::|-)?\s*([^.?!]*[.?!])'
+            # Format: 1. (A) Question?
+            r'(?:^|\n)\s*\d+\s*[\.\:\)]\s*\(([' + ''.join(letters) + r'])\)\s*(.*?)(?=\n\s*\d+\s*[\.\:\)]|\n\s*[A-Z]\s*[\.\:\)]|$)',
         ]
         
-        # Rechercher les questions pour chaque pattern
         for pattern in patterns:
-            matches = re.finditer(pattern, plain_text)
+            matches = re.finditer(pattern, prepared_content, re.DOTALL | re.MULTILINE)
             for match in matches:
-                letter = match.group(1)
-                if letter in letters and not result[letter]:
-                    question = match.group(2).strip()
-                    result[letter] = question
+                if len(match.groups()) >= 2:
+                    letter = match.group(1).upper()
+                    if letter in letters:
+                        # Si la lettre est le deuxième groupe, c'est probablement "Question A:"
+                        if match.lastindex == 2 and len(match.group(1)) > 3:
+                            question = match.group(1).strip()
+                            letter = match.group(2).upper()
+                        else:
+                            question = match.group(2).strip()
+                        
+                        # Ne remplacer que si la question n'est pas déjà trouvée ou si celle-ci est plus longue
+                        if not result[letter] or len(question) > len(result[letter]):
+                            result[letter] = question
+        
+        print(f"Nombre de questions trouvées: {len([q for q in result.values() if q])}")
+        print(f"Résultat extrait: {result}")
         
         return result
     
-    def _prepare_content_for_analysis(self, geocache: Geocache) -> str:
+    def _prepare_content_for_analysis(self, content, letters=None, geocache_id=None):
         """
-        Prépare le contenu de la géocache pour l'analyse
+        Prépare le contenu pour l'analyse
         
         Args:
-            geocache: Objet Geocache à analyser
+            content (str): Contenu brut à analyser
+            letters (list, optional): Liste des lettres recherchées
+            geocache_id (int, optional): ID de la géocache pour la référence
             
         Returns:
-            Contenu textuel combiné de la géocache
+            str: Contenu préparé pour l'analyse
         """
-        content_parts = []
-        
-        # Ajouter la description principale
-        if geocache.description:
-            content_parts.append("=== DESCRIPTION PRINCIPALE ===\n")
-            content_parts.append(re.sub(r'<[^>]*>', ' ', geocache.description))
-            content_parts.append("\n\n")
-        
-        # Ajouter les waypoints additionnels
-        if geocache.additional_waypoints:
-            content_parts.append("=== WAYPOINTS ADDITIONNELS ===\n")
-            for wp in geocache.additional_waypoints:
-                content_parts.append(f"{wp.prefix} - {wp.name}")
-                if wp.note:
-                    content_parts.append(f"Note: {wp.note}")
-                content_parts.append("\n")
-        
-        # Ajouter les indications (hint) - vérifier si l'attribut existe
-        if hasattr(geocache, 'hint') and geocache.hint:
-            content_parts.append("=== INDICE ===\n")
-            content_parts.append(geocache.hint)
-            content_parts.append("\n\n")
-        
-        return "".join(content_parts)
+        # Si le contenu est déjà une chaîne, pas besoin de traitement supplémentaire
+        if isinstance(content, str):
+            return content
+            
+        # Si l'entrée est un objet Geocache
+        if hasattr(content, 'description'):
+            geocache = content
+            content_parts = []
+            
+            # Ajouter la description principale
+            if geocache.description:
+                content_parts.append("=== DESCRIPTION PRINCIPALE ===\n")
+                content_parts.append(re.sub(r'<[^>]*>', ' ', geocache.description))
+                content_parts.append("\n\n")
+            
+            # Ajouter les waypoints additionnels
+            if geocache.additional_waypoints:
+                content_parts.append("=== WAYPOINTS ADDITIONNELS ===\n")
+                for wp in geocache.additional_waypoints:
+                    content_parts.append(f"{wp.prefix} - {wp.name}")
+                    if wp.note:
+                        content_parts.append(f"Note: {wp.note}")
+                    content_parts.append("\n")
+            
+            # Ajouter les indications (hint) - vérifier si l'attribut existe
+            if hasattr(geocache, 'hint') and geocache.hint:
+                content_parts.append("=== INDICE ===\n")
+                content_parts.append(geocache.hint)
+                content_parts.append("\n\n")
+            
+            return "".join(content_parts)
+            
+        # Si aucun cas ne correspond, retourner une chaîne vide
+        return ""
     
     def _extract_json_from_response(self, response: str, letters: List[str]) -> Dict[str, str]:
         """
@@ -268,6 +237,33 @@ class FormulaQuestionsService:
                     print(f"Question extraite par regex (en cas d'erreur) pour {letter}: {result[letter][:50]}...")
             
             return result
+
+    def _build_ai_instructions(self, letters):
+        """
+        Crée les instructions à envoyer à l'IA pour l'extraction des questions
+        
+        Args:
+            letters: Liste des lettres pour lesquelles extraire des questions
+            
+        Returns:
+            Instructions formatées pour l'IA
+        """
+        return f"""Analyse le contenu de cette géocache et identifie les questions associées aux lettres suivantes: {', '.join(letters)}.
+
+Pour chaque lettre, trouve la question correspondante. Les questions sont généralement indiquées par:
+- La lettre suivie d'un point, deux-points ou d'une parenthèse (ex: "A.", "B:", "C)")
+- Une formulation claire posant une question
+- La question peut s'étendre sur plusieurs lignes
+
+Réponds uniquement en format JSON avec une entrée par lettre, comme ceci:
+{{
+  "A": "Question pour A",
+  "B": "Question pour B",
+  ...
+}}
+
+Si tu ne trouves pas de question pour une lettre, mets une chaîne vide comme valeur.
+N'invente pas de questions si elles ne sont pas clairement identifiables dans le texte."""
 
 # Instance singleton du service
 formula_questions_service = FormulaQuestionsService() 

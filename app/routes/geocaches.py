@@ -2987,14 +2987,24 @@ def extract_formula_questions():
                 'error': 'Paramètres manquants (geocache_id et/ou letters)'
             }), 400
         
+        # Récupérer la géocache si un ID est fourni
+        from app.models.geocache import Geocache
+        geocache = Geocache.query.get(geocache_id)
+        
+        if not geocache:
+            return jsonify({
+                'success': False,
+                'error': f'Géocache non trouvée avec ID: {geocache_id}'
+            }), 404
+        
         # Extraire les questions selon la méthode choisie
         if method == 'regex':
-            questions = formula_questions_service.extract_questions_with_regex(geocache_id, letters)
+            questions = formula_questions_service.extract_questions_with_regex(geocache, letters)
         else:
-            questions = formula_questions_service.extract_questions_with_ai(geocache_id, letters)
+            questions = formula_questions_service.extract_questions_with_ai(geocache, letters)
         
         # Vérifier si une erreur est survenue
-        if 'error' in questions:
+        if isinstance(questions, dict) and 'error' in questions:
             return jsonify({
                 'success': False,
                 'error': questions['error']

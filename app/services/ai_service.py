@@ -132,13 +132,28 @@ class AIService:
         if settings is None:
             settings = self.get_settings()
         
+        # Support explicite pour model_id et provider dans les paramètres
+        if 'model_id' in settings:
+            model_name = settings['model_id']
+            # Mettre à jour les paramètres en ligne ou locaux selon le type de modèle
+            if settings.get('mode') == 'online':
+                settings['online_model'] = model_name
+                settings['ai_model'] = model_name  # Pour compatibilité
+            else:
+                settings['local_model'] = model_name
+        
+        # Support pour le fournisseur spécifié
+        if 'provider' in settings:
+            settings['ai_provider'] = settings['provider']
+        
         # Déterminer si on utilise LangGraph ou LangChain
         use_langgraph = settings.get('use_langgraph', self.use_langgraph)
         
         print(f"=== APPEL IA ===")
         print(f"Utilisation de LangGraph: {use_langgraph}")
         print(f"Mode: {settings.get('mode', 'online')}")
-        print(f"Modèle: {settings.get('model_name', settings.get('ai_model', 'inconnu'))}")
+        print(f"Fournisseur: {settings.get('ai_provider', 'inconnu')}")
+        print(f"Modèle: {settings.get('model_name', settings.get('ai_model', settings.get('online_model', 'inconnu')))}")
         
         if use_langgraph:
             # Utiliser LangGraph (avec support des outils/plugins)
