@@ -1,0 +1,65 @@
+{
+    "name": "antipode_plugin",
+    "version": "1.0.6",
+    "description": "Plugin pour calculer l'antipode de coordonnées 'Degrés, Minutes décimales' (DDM).",
+    "author": "MysterAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "categories": ["CalculationsCoordinates"],
+    "dependencies": [],
+    "input_types": {
+        "coordinates": {
+            "type": "string",
+            "label": "Coordonnées initiales",
+            "placeholder": "Ex: N 49° 12.469 E 005° 53.158"
+        }
+    },
+    "output_types": {
+        "result": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "object",
+                    "properties": {
+                        "text_output": {
+                            "type": "string",
+                            "label": "Résultat formaté"
+                        }
+                    }
+                },
+                "antipode_latitude_deg": {
+                    "type": "number",
+                    "label": "Latitude de l'antipode (degrés)"
+                },
+                "antipode_longitude_deg": {
+                    "type": "number",
+                    "label": "Longitude de l'antipode (degrés)"
+                },
+                "antipode_formatted": {
+                    "type": "string",
+                    "label": "Antipode formaté"
+                }
+            }
+        },
+        "latitude_deg": {
+            "type": "number",
+            "label": "Latitude d'origine (degrés)"
+        },
+        "longitude_deg": {
+            "type": "number",
+            "label": "Longitude d'origine (degrés)"
+        },
+        "antipode_latitude_deg": {
+            "type": "number",
+            "label": "Latitude de l'antipode (degrés)"
+        },
+        "antipode_longitude_deg": {
+            "type": "number",
+            "label": "Longitude de l'antipode (degrés)"
+        },
+        "antipode_formatted": {
+            "type": "string",
+            "label": "Antipode formaté"
+        }
+    }
+}
