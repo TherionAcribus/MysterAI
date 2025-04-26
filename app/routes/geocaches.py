@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, send_file, make_response, abort
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, send_file, make_response, abort, Response, stream_with_context
 import json
 from app.models.geocache import Geocache, Zone, AdditionalWaypoint, Checker, GeocacheImage, gc_coords_to_decimal, GeocacheZone, Owner, Log, Attribute
 from app.database import db
@@ -2461,6 +2461,61 @@ def geocache_solver_panel():
     gc_code = request.args.get('gc_code')
     
     return render_template('geocache_solver.html', geocache_id=geocache_id, gc_code=gc_code)
+
+@geocaches_bp.route('/geocaches/formula-solver', methods=['GET', 'POST'])
+def formula_solver_panel():
+    """
+    Affiche le panneau du Formula Solver pour résoudre des coordonnées avec des formules
+    """
+    # Récupérer les paramètres de GET ou POST
+    geocache_id = request.args.get('geocache_id') or request.form.get('geocache_id')
+    gc_code = request.args.get('gc_code') or request.form.get('gc_code')
+    
+    # Récupérer les données de la géocache si un ID est fourni
+    geocache = None
+    detected_formulas = []
+    
+    if geocache_id:
+        geocache = Geocache.query.options(
+            db.joinedload(Geocache.additional_waypoints)
+        ).get(geocache_id)
+        
+        if geocache:
+            # Importer et initialiser le plugin formula_parser
+            from plugins.official.formula_parser.main import FormulaParserPlugin
+            formula_parser = FormulaParserPlugin()
+            
+            # Analyser la description pour trouver des formules
+            if geocache.description:
+                # Nettoyer le HTML pour extraire le texte
+                description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
+                result = formula_parser.execute({'text': description_text})
+                
+                for coord in result.get('coordinates', []):
+                    if coord.get('north') and coord.get('east'):
+                        detected_formulas.append({
+                            'formula': f"{coord['north']} {coord['east']}",
+                            'source': 'Description'
+                        })
+            
+            # Analyser les waypoints
+            if geocache.additional_waypoints:
+                for wp in geocache.additional_waypoints:
+                    wp_text = f"{wp.name} {wp.note or ''}"
+                    result = formula_parser.execute({'text': wp_text})
+                    
+                    for coord in result.get('coordinates', []):
+                        if coord.get('north') and coord.get('east'):
+                            detected_formulas.append({
+                                'formula': f"{coord['north']} {coord['east']}",
+                                'source': f"Waypoint {wp.prefix} - {wp.name}"
+                            })
+    
+    return render_template('formula_solver.html', 
+                           geocache_id=geocache_id, 
+                           gc_code=gc_code,
+                           geocache=geocache,
+                           detected_formulas=detected_formulas)
 
 @geocaches_bp.route('/multi-solver', methods=['GET'])
 def multi_solver_panel():

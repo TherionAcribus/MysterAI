@@ -1,0 +1,142 @@
+<div class="w-full h-full bg-gray-900 overflow-auto p-4"
+     hx-ext="include-vals"
+     hx-headers='{"X-Layout-Component": "true"}'
+     data-controller="formula-solver"
+     data-formula-solver-geocache-id-value="{{ geocache_id }}"
+     data-formula-solver-gc-code-value="{{ gc_code }}">
+    
+    <div class="max-w-4xl mx-auto">
+        <!-- En-tête -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-100 mb-2">Formula Solver - {{ gc_code }}</h1>
+            <div class="text-gray-400">
+                Résolvez les coordonnées en format avec formules (exemple: N 47° 5E.FTN E 006° 5A.JVF)
+            </div>
+        </div>
+
+        <!-- Formules détectées automatiquement -->
+        {% if detected_formulas and detected_formulas|length > 0 %}
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h2 class="text-lg font-semibold text-gray-100 mb-3">Formules détectées</h2>
+            <div class="space-y-3">
+                {% for formula in detected_formulas %}
+                <div class="bg-gray-700 rounded p-3">
+                    <div class="flex justify-between">
+                        <div>
+                            <div class="text-gray-200">{{ formula.formula }}</div>
+                            <div class="text-gray-400 text-sm mt-1">Source: {{ formula.source }}</div>
+                        </div>
+                        <button
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded self-start"
+                            data-action="click->formula-solver#addToFormula"
+                            data-coordinates="{{ formula.formula }}">
+                            Utiliser
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Formulaire de résolution -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <form data-action="submit->formula-solver#solveFormula">
+                <div class="mb-4">
+                    <label for="formula-input" class="block text-gray-300 text-sm font-bold mb-2">
+                        Coordonnées avec formules
+                    </label>
+                    <input 
+                        type="text" 
+                        id="formula-input" 
+                        class="bg-gray-700 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="N 47° 5E.FTN E 006° 5A.JVF"
+                        data-formula-solver-target="formulaInput">
+                </div>
+                <div class="flex justify-end">
+                    <button 
+                        type="submit" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <span>Résoudre</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Résultats -->
+        <div id="solver-results" class="space-y-4">
+            <!-- Loading indicator -->
+            <div class="animate-pulse hidden" data-formula-solver-target="loading">
+                <div class="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
+                <div class="h-4 bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div class="h-4 bg-gray-700 rounded w-2/3"></div>
+            </div>
+
+            <!-- Results -->
+            <div data-formula-solver-target="results" class="hidden">
+                <!-- Les résultats seront injectés ici par le contrôleur -->
+            </div>
+
+            <!-- Error message -->
+            <div data-formula-solver-target="error" class="hidden">
+                <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                    <div class="font-bold">Une erreur est survenue lors de la résolution.</div>
+                    <div class="mt-2" id="error-details"></div>
+                </div>
+            </div>
+        </div>
+
+        {% if geocache %}
+        <!-- Informations de la géocache -->
+        <div class="space-y-6 mt-8">
+            <!-- Description de la géocache -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold text-gray-100 mb-3">Description</h2>
+                <div class="text-gray-300 prose prose-invert max-w-none">
+                    {{ geocache.description|safe }}
+                </div>
+            </div>
+
+            <!-- Waypoints additionnels -->
+            {% if geocache.additional_waypoints and geocache.additional_waypoints|length > 0 %}
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h2 class="text-lg font-semibold text-gray-100 mb-3">Waypoints additionnels</h2>
+                <div class="space-y-4">
+                    {% for waypoint in geocache.additional_waypoints %}
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="flex justify-between">
+                            <div>
+                                <div class="text-gray-200 font-medium">{{ waypoint.prefix }} - {{ waypoint.name }}</div>
+                                {% if waypoint.gc_lat and waypoint.gc_lon %}
+                                <div class="text-gray-400 text-sm mt-1">{{ waypoint.gc_lat }} {{ waypoint.gc_lon }}</div>
+                                {% endif %}
+                            </div>
+                            {% if waypoint.gc_lat and waypoint.gc_lon %}
+                            <button 
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded self-start"
+                                data-action="click->formula-solver#addToFormula"
+                                data-waypoint-id="{{ waypoint.id }}"
+                                data-coordinates="{{ waypoint.gc_lat }} {{ waypoint.gc_lon }}">
+                                Utiliser
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% if waypoint.note %}
+                        <div class="text-gray-300 text-sm mt-2 border-t border-gray-600 pt-2">
+                            {{ waypoint.note }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="/js/controllers/formula_solver_controller.js"></script> 

@@ -280,6 +280,53 @@ function initializeLayout() {
                 gc_code: state.gcCode
             });
         });
+        
+        // Enregistrer le composant Formula Solver
+        mainLayout.registerComponent('FormulaSolver', function(container, state) {
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Construire l'URL avec les paramètres dans la query string
+            const url = `/geocaches/formula-solver?geocache_id=${encodeURIComponent(state.geocacheId || '')}&gc_code=${encodeURIComponent(state.gcCode || '')}`;
+            
+            // Utiliser fetch avec GET au lieu de load
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    container.getElement().html(html);
+                    
+                    // Démarrer Stimulus pour initialiser le contrôleur
+                    if (window.StimulusApp) {
+                        window.StimulusApp.start();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement du Formula Solver:', error);
+                    container.getElement().html(`
+                        <div class="w-full h-full bg-gray-900 p-4">
+                            <div class="text-red-500 mb-4">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                Erreur lors du chargement du Formula Solver
+                            </div>
+                            <div class="text-gray-400 text-sm">
+                                ${error.message}
+                            </div>
+                        </div>
+                    `);
+                });
+        });
 
         // Enregistrer le composant Alphabets
         mainLayout.registerComponent('alphabets', function(container, state) {
@@ -1077,6 +1124,45 @@ window.openSolverTab = function(geocacheId = null, gcCode = null) {
         }
     } catch (error) {
         console.error('Erreur lors de l\'ouverture du Solver:', error);
+    }
+};
+
+// Fonction pour ouvrir le Formula Solver dans un nouvel onglet
+window.openFormulaSolverTab = function(geocacheId = null, gcCode = null) {
+    try {
+        console.log('openFormulaSolverTab called with:', { geocacheId, gcCode });
+        
+        // Titre par défaut si aucune géocache n'est spécifiée
+        const title = geocacheId ? `Formula Solver - ${gcCode}` : "Formula Solver";
+        
+        // Chercher si un onglet Formula Solver existe déjà pour cette géocache
+        let existingComponent = null;
+        window.mainLayout.root.contentItems.forEach(function(item) {
+            item.contentItems.forEach(function(subItem) {
+                if (subItem.config.componentName === 'FormulaSolver' && 
+                    subItem.config.componentState.geocacheId === geocacheId) {
+                    existingComponent = subItem;
+                }
+            });
+        });
+
+        if (existingComponent) {
+            // Si l'onglet existe, le mettre en focus
+            existingComponent.parent.setActiveContentItem(existingComponent);
+        } else {
+            // Sinon, créer un nouvel onglet
+            window.mainLayout.root.contentItems[0].addChild({
+                type: 'component',
+                componentName: 'FormulaSolver',
+                title: title,
+                componentState: { 
+                    geocacheId: geocacheId,
+                    gcCode: gcCode
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'ouverture du Formula Solver:', error);
     }
 };
 
