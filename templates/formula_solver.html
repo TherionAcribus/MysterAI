@@ -51,7 +51,8 @@
                         id="formula-input" 
                         class="bg-gray-700 text-white border border-gray-600 rounded w-full py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="N 47° 5E.FTN E 006° 5A.JVF"
-                        data-formula-solver-target="formulaInput">
+                        data-formula-solver-target="formulaInput"
+                        data-action="input->formula-solver#extractLetters">
                 </div>
                 <div class="flex justify-end">
                     <button 
@@ -64,6 +65,34 @@
                     </button>
                 </div>
             </form>
+        </div>
+
+        <!-- Section des lettres extraites -->
+        <div id="letter-inputs" class="bg-gray-800 rounded-lg p-4 mb-6 hidden" data-formula-solver-target="letterInputs">
+            <h2 class="text-lg font-semibold text-gray-100 mb-3">Valeurs des lettres</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-formula-solver-target="letterFields">
+                <!-- Les champs de saisie pour les lettres seront générés dynamiquement -->
+            </div>
+        </div>
+
+        <!-- Section formule avec substitutions -->
+        <div id="substituted-formula" class="bg-gray-800 rounded-lg p-4 mb-6 hidden" data-formula-solver-target="substitutedFormula">
+            <h2 class="text-lg font-semibold text-gray-100 mb-3">Formule avec substitutions</h2>
+            <div class="bg-gray-700 rounded p-3">
+                <div class="text-gray-200" data-formula-solver-target="substitutedFormulaText">
+                    <!-- La formule avec les substitutions sera affichée ici -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Section coordonnées calculées -->
+        <div id="calculated-coordinates" class="bg-gray-800 rounded-lg p-4 mb-6 hidden" data-formula-solver-target="calculatedCoordinates">
+            <h2 class="text-lg font-semibold text-gray-100 mb-3">Coordonnées calculées</h2>
+            <div class="bg-gray-700 rounded p-3">
+                <div class="text-gray-200" data-formula-solver-target="calculatedCoordinatesText">
+                    <!-- Les coordonnées calculées seront affichées ici -->
+                </div>
+            </div>
         </div>
 
         <!-- Résultats -->

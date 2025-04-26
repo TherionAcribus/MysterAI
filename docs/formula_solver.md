@@ -18,7 +18,8 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 
 3. **Contrôleur JavaScript**
    - `formula_solver_controller.js` pour la gestion des interactions utilisateur
-   - Méthodes pour résoudre les formules et afficher les résultats
+   - Méthodes pour extraire les variables, résoudre les formules et afficher les résultats
+   - Calcul dynamique des coordonnées à partir des formules mathématiques
 
 4. **GoldenLayout**
    - Composant `FormulaSolver` pour l'intégration dans l'interface principale
@@ -31,12 +32,24 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 - Extraction des formules de coordonnées (ex: `N 47° 5E.FTN E 006° 5A.JVF`)
 - Analyse des waypoints et leurs notes pour les formules additionnelles
 
-### 2. Résolution de Formules
-- Interface pour entrer manuellement des formules
-- Affichage des résultats de résolution (à développer davantage)
-- Utilisation directe des formules détectées via un bouton "Utiliser"
+### 2. Extraction des Variables
+- Détection automatique des lettres (A-Z) dans les formules entre parenthèses
+- Génération dynamique de champs de saisie pour chaque lettre unique
+- Préservation des lettres cardinales (N, S, E, W) utilisées comme directions
 
-### 3. Consultation des Données de la Géocache
+### 3. Résolution Interactive de Formules
+- Interface pour entrer manuellement des formules
+- Mise à jour en temps réel de la formule avec substitution des variables
+- Résolution mathématique des expressions (addition, soustraction, multiplication, division)
+- Formatage des coordonnées avec préservation des formats standards (00.000)
+
+### 4. Visualisation des Résultats
+- Affichage de la formule détectée initiale
+- Visualisation de la formule avec les substitutions des variables
+- Affichage des coordonnées calculées en format GPS standard
+- Formatage automatique des minutes (2 chiffres) et décimales (3 chiffres)
+
+### 5. Consultation des Données de la Géocache
 - Affichage de la description complète
 - Liste des waypoints additionnels
 - Accès facile aux coordonnées existantes
@@ -53,13 +66,35 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
    - Champ de saisie pour les coordonnées en format formule
    - Bouton pour lancer la résolution
 
-3. **Résultats**
-   - Affichage des coordonnées résolues
-   - Messages d'erreur en cas de problème
+3. **Champs de Variables**
+   - Génération automatique de champs pour chaque variable (A-Z)
+   - Valeurs acceptées entre 0 et 9
+   - Mise à jour dynamique des formules lors de la saisie
 
-4. **Données de la Géocache**
+4. **Formule avec Substitution**
+   - Affichage de la formule avec les valeurs remplaçant les variables
+   - Mise à jour en temps réel à chaque modification de variable
+
+5. **Coordonnées Calculées**
+   - Résultat final du calcul avec format standard GPS
+   - Respect du format avec 2 chiffres pour les minutes et 3 pour les décimales
+
+6. **Données de la Géocache**
    - Description complète
    - Liste des waypoints avec leurs coordonnées et notes
+
+## Format des Formules Supportées
+
+Le système supporte principalement les formules de type:
+```
+N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)
+```
+
+Où:
+- Les lettres majuscules (A-Z) représentent des variables à remplir
+- Les expressions entre parenthèses sont évaluées mathématiquement
+- Les lettres N, S, E, W sont préservées car elles indiquent les directions
+- Le format respecte la structure standard des coordonnées GPS
 
 ## Intégration Technique
 
@@ -86,7 +121,29 @@ mainLayout.registerComponent('FormulaSolver', function(container, state) {
 })
 ```
 
-## Plugin Formula Parser
+## Algorithme de Résolution
+
+### 1. Extraction des Variables
+- Identification des lettres majuscules dans les expressions entre parenthèses
+- Filtrage pour exclure les lettres de direction (N, S, E, W) 
+- Génération dynamique de champs de saisie pour chaque variable
+
+### 2. Substitution des Variables
+- Remplacement des lettres par les valeurs saisies
+- Mise à jour en temps réel à chaque modification
+- Traitement spécial pour préserver les lettres de direction
+
+### 3. Calcul des Expressions
+- Évaluation des opérations mathématiques (addition, soustraction, etc.)
+- Traitement des expressions entre parenthèses
+- Formatage des résultats avec le bon nombre de chiffres
+
+### 4. Formatage des Coordonnées
+- Respect du format standard GPS
+- Affichage des minutes avec exactement 2 chiffres
+- Affichage des décimales avec exactement 3 chiffres
+
+## Utilisation du Plugin Formula Parser
 
 Le plugin `formula_parser` est utilisé pour détecter les formules de coordonnées. Il fonctionne ainsi:
 
@@ -100,29 +157,6 @@ Le plugin `formula_parser` est utilisé pour détecter les formules de coordonn�
    - Application de différentes expressions régulières
    - Traitement des formules complexes avec opérations arithmétiques
 
-## Maintenance et Évolution
-
-### Ajout de Nouvelles Fonctionnalités
-1. **Résolution Complète des Formules**
-   - Implémenter l'algorithme de résolution des opérations dans les formules
-   - Convertir les résultats en coordonnées décimales
-   - Ajouter la validation des coordonnées calculées
-
-2. **Amélioration de la Détection**
-   - Étendre les expressions régulières pour capturer plus de formats
-   - Ajouter la détection de formules multiniveaux (formules imbriquées)
-   - Supporter les formules en plusieurs parties du texte
-
-3. **Interface Utilisateur**
-   - Ajouter des options de configuration pour le solveur
-   - Implémenter l'historique des formules résolues
-   - Ajouter la possibilité de sauvegarder les résultats comme waypoints
-
-### Debugging
-- Les résultats du plugin formula_parser sont loggés dans la console
-- Les erreurs de résolution sont affichées dans l'interface utilisateur
-- Le template inclut une section dédiée pour les messages d'erreur
-
 ## Exemples d'Utilisation
 
 1. **Détection Automatique**
@@ -130,12 +164,17 @@ Le plugin `formula_parser` est utilisé pour détecter les formules de coordonn�
    - Cliquer sur le bouton "Formula Solver"
    - Les formules détectées s'affichent automatiquement
 
-2. **Résolution Manuelle**
-   - Entrer une formule manuellement dans le champ dédié
-   - Cliquer sur "Résoudre"
-   - Voir les résultats de la résolution
+2. **Résolution Interactive**
+   - Entrer une formule comme `N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)`
+   - Remplir les valeurs pour chaque lettre (A=4, B=0, C=2, etc.)
+   - Observer la mise à jour automatique de la formule et des coordonnées calculées
 
-3. **Utilisation des Waypoints**
+3. **Vérification des Résultats**
+   - Les coordonnées sont calculées et formatées automatiquement
+   - Le format respecte la norme avec 2 chiffres pour les minutes (ex: 12) et 3 pour les décimales (ex: 086)
+   - Exemple: `N49° 12.086 E005° 59.209`
+
+4. **Utilisation des Waypoints**
    - Consulter les waypoints affichés en bas de page
    - Cliquer sur "Utiliser" pour un waypoint particulier
-   - La formule est automatiquement copiée dans le champ de résolution 
+   - La formule est automatiquement copiée dans le champ de résolution et les variables sont extraites 
