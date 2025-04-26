@@ -11,7 +11,7 @@ class MovePointPlugin:
     """
 
     def __init__(self):
-        self.name = "move_point_plugin"
+        self.name = "orientation_calculation"
         self.description = (
             "Déplace un point de 'distance' (en m, km, miles) selon un 'bearing_deg'"
             " et renvoie la nouvelle coordonnée au format 'N dd° mm.mmm E dd° mm.mmm'."

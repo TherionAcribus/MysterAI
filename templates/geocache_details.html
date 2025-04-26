@@ -245,7 +245,20 @@
                 </div>
               </div>
               
-              <!-- Section de projection de waypoint -->
+              <!-- Section de calcul d'antipode -->
+              <div class="bg-gray-800 p-3 rounded-lg mb-4 border border-gray-700">
+                <h5 class="text-white text-sm font-medium mb-2">Calcul d'antipode</h5>
+                <div class="flex items-center justify-between">
+                  <p class="text-xs text-gray-400">Calcule le point diamétralement opposé sur la Terre à partir des coordonnées actuelles.</p>
+                  <button class="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline" 
+                          type="button"
+                          data-action="click->waypoint-form#calculateAntipode">
+                    <i class="fas fa-globe-americas mr-1"></i> Calculer l'antipode
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Section de projection du waypoint -->
               <div class="bg-gray-800 p-3 rounded-lg mb-4 border border-gray-700" data-waypoint-form-target="projectionSection">
                 <h5 class="text-white text-sm font-medium mb-2">Projection du waypoint</h5>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -277,18 +290,30 @@
                            placeholder="0" value="0" data-waypoint-form-target="bearingInput">
                   </div>
                 </div>
+                <div class="flex justify-end">
+                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline" 
+                          type="button"
+                          data-action="click->waypoint-form#calculateProjection">
+                    <i class="fas fa-calculator mr-1"></i> Calculer
+                  </button>
+                </div>
+              </div>
+
+              <!-- Section des coordonnées calculées (commune) -->
+              <div class="bg-gray-800 p-3 rounded-lg mb-4 border border-gray-700">
+                <h5 class="text-white text-sm font-medium mb-2">Résultat du calcul</h5>
                 <div class="mb-3">
                   <label class="block text-gray-300 text-xs font-bold mb-1" for="wpProjectedCoords">
-                    Coordonnées projetées
+                    Coordonnées calculées
                   </label>
                   <div class="flex items-center">
                     <input class="bg-gray-700 text-white border border-gray-600 rounded w-full py-1 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
                            id="wpProjectedCoords" type="text" readonly
-                           placeholder="Les coordonnées projetées apparaîtront ici" 
+                           placeholder="Les coordonnées calculées apparaîtront ici" 
                            data-waypoint-form-target="projectedCoordsInput">
                     <!-- Le bouton "Appliquer" sera ajouté ici dynamiquement par JavaScript -->
                   </div>
-                  <p class="text-xs text-gray-400 mt-1">Cliquez sur "Calculer" pour projeter les coordonnées, puis sur "Appliquer" pour les utiliser.</p>
+                  <p class="text-xs text-gray-400 mt-1">Utilisez les outils ci-dessus pour calculer de nouvelles coordonnées, puis cliquez sur "Appliquer" pour les utiliser.</p>
                 </div>
                 <div class="mb-3">
                   <div class="flex items-center">
@@ -298,16 +323,9 @@
                            data-waypoint-form-target="addToNotesCheckbox" 
                            checked>
                     <label class="text-gray-300 text-xs" for="wpAddProjectionToNotes">
-                      Ajouter les informations de projection dans les notes
+                      Ajouter les informations de calcul dans les notes
                     </label>
                   </div>
-                </div>
-                <div class="flex justify-end">
-                  <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline" 
-                          type="button"
-                          data-action="click->waypoint-form#calculateProjection">
-                    <i class="fas fa-calculator mr-1"></i> Calculer
-                  </button>
                 </div>
               </div>
               

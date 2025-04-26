@@ -1328,13 +1328,13 @@ def project_waypoint():
         from app import get_plugin_manager
         plugin_manager = get_plugin_manager()
         
-        move_point_plugin = plugin_manager.get_plugin('move_point_plugin')
+        orientation_calculation = plugin_manager.get_plugin('orientation_calculation')
         
-        if not move_point_plugin:
+        if not orientation_calculation:
             return jsonify({'error': 'Plugin de projection non disponible'}), 500
         
         # Exécuter le plugin
-        result = move_point_plugin.execute({
+        result = orientation_calculation.execute({
             'text': coord_str,
             'bearing_deg': float(bearing_deg),
             'distance': float(distance),
@@ -2856,3 +2856,57 @@ def get_geocache_hint(geocache_id):
     except Exception as e:
         logger.error(f"Erreur lors de la récupération du hint pour la géocache {geocache_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@geocaches_bp.route('/api/tools/antipode', methods=['POST'])
+def calculate_antipode():
+    """
+    Calcule l'antipode d'un point à partir de coordonnées au format GC.
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Données JSON manquantes'}), 400
+        
+        # Récupérer les coordonnées
+        gc_lat = data.get('gc_lat')
+        gc_lon = data.get('gc_lon')
+        
+        # Vérifier que les coordonnées sont présentes
+        if not gc_lat or not gc_lon:
+            return jsonify({'error': 'Coordonnées manquantes'}), 400
+        
+        # Préparer les entrées pour le plugin
+        coord_str = f"{gc_lat} {gc_lon}"
+        
+        # Récupérer le plugin antipode
+        from app import get_plugin_manager
+        plugin_manager = get_plugin_manager()
+        
+        antipode_plugin = plugin_manager.get_plugin('antipode_plugin')
+        
+        if not antipode_plugin:
+            return jsonify({'error': 'Plugin antipode non disponible'}), 500
+        
+        # Exécuter le plugin
+        result = antipode_plugin.execute({
+            'coordinates': coord_str
+        })
+        
+        # Extraire les coordonnées de l'antipode
+        antipode_lat_deg = result.get('antipode_latitude_deg')
+        antipode_lon_deg = result.get('antipode_longitude_deg')
+        antipode_formatted = result.get('antipode_formatted')
+        
+        logger.info(f"Antipode calculé: {antipode_formatted}")
+        
+        # Retourner les coordonnées de l'antipode
+        return jsonify({
+            'antipode_latitude_deg': antipode_lat_deg,
+            'antipode_longitude_deg': antipode_lon_deg,
+            'antipode_formatted': antipode_formatted,
+            'original_coordinates': coord_str
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du calcul de l'antipode: {e}")
+        return jsonify({'error': str(e)}), 500

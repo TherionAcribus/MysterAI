@@ -534,6 +534,122 @@
     }
 
     /**
+     * Calcule l'antipode des coordonnées actuelles
+     */
+    async calculateAntipode(event) {
+      event.preventDefault();
+      
+      // Récupérer les coordonnées actuelles du waypoint
+      const gc_lat = this.gcLatInputTarget.value;
+      const gc_lon = this.gcLonInputTarget.value;
+      
+      // Vérifier que toutes les valeurs nécessaires sont présentes
+      if (!gc_lat || !gc_lon) {
+        alert('Veuillez remplir les champs de coordonnées.');
+        return;
+      }
+      
+      try {
+        // Appeler l'API pour utiliser le plugin antipode
+        const response = await fetch('/api/tools/antipode', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({
+            gc_lat: gc_lat,
+            gc_lon: gc_lon
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Erreur API:', errorText);
+          throw new Error('Une erreur est survenue lors du calcul de l\'antipode');
+        }
+        
+        // Extraire les résultats
+        const result = await response.json();
+        console.log('Résultat antipode:', result);
+        
+        // Vérifier si le résultat contient les coordonnées de l'antipode
+        if (result && result.antipode_formatted) {
+          // Obtenir le résultat formaté
+          const antipode_formatted = result.antipode_formatted;
+          
+          // Extraire la latitude et la longitude de la chaîne formatée
+          const parts = antipode_formatted.split(' ');
+          if (parts.length >= 6) {
+            const antipode_lat = `${parts[0]} ${parts[1]} ${parts[2]}`;
+            const antipode_lon = `${parts[3]} ${parts[4]} ${parts[5]}`;
+            
+            // Afficher les coordonnées dans le champ de coordonnées projetées
+            if (this.hasProjectedCoordsInputTarget) {
+              this.projectedCoordsInputTarget.value = antipode_formatted;
+            }
+            
+            // Ajouter un bouton pour appliquer les coordonnées de l'antipode
+            const applyButton = document.createElement('button');
+            applyButton.className = 'bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded ml-2 focus:outline-none focus:shadow-outline';
+            applyButton.textContent = 'Appliquer';
+            applyButton.addEventListener('click', () => {
+              // Appliquer les coordonnées de l'antipode aux champs de coordonnées
+              this.gcLatInputTarget.value = antipode_lat;
+              this.gcLonInputTarget.value = antipode_lon;
+              // Supprimer le bouton après utilisation
+              applyButton.remove();
+            });
+            
+            // Ajouter le bouton à côté du champ de coordonnées projetées
+            const projectionField = this.projectedCoordsInputTarget.parentElement;
+            
+            // Supprimer l'ancien bouton s'il existe
+            const existingApplyButton = projectionField.querySelector('.apply-projection-button');
+            if (existingApplyButton) {
+              existingApplyButton.remove();
+            }
+            
+            // Ajouter le nouveau bouton
+            applyButton.classList.add('apply-projection-button');
+            projectionField.appendChild(applyButton);
+            
+            // Ajouter les informations de l'antipode dans les notes si la case est cochée
+            if (this.hasAddToNotesCheckboxTarget && this.addToNotesCheckboxTarget.checked) {
+              const currentDate = new Date().toLocaleDateString('fr-FR');
+              const currentTime = new Date().toLocaleTimeString('fr-FR');
+              const antipodeInfo = `\n\n--- Antipode (${currentDate} à ${currentTime}) ---\nDepuis: ${gc_lat} ${gc_lon}\nAntipode: ${antipode_formatted}`;
+              
+              // Ajouter les informations à la fin des notes existantes
+              this.noteInputTarget.value = (this.noteInputTarget.value || '').trim() + antipodeInfo;
+              
+              // Ajuster la hauteur du textarea pour afficher tout le contenu
+              this.noteInputTarget.style.height = 'auto';
+              this.noteInputTarget.style.height = (this.noteInputTarget.scrollHeight) + 'px';
+            }
+          }
+        } else {
+          throw new Error('Le format de réponse du plugin antipode est invalide');
+        }
+        
+        // Notification de succès
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+        notification.textContent = 'Antipode calculé avec succès !';
+        document.body.appendChild(notification);
+        
+        // Supprimer la notification après 3 secondes
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+        
+      } catch (error) {
+        console.error('Error:', error);
+        alert(`Erreur: ${error.message}`);
+      }
+    }
+
+    /**
      * Utilise les coordonnées du waypoint actuel comme coordonnées corrigées pour la géocache
      */
     async useAsCorrectCoordinates(event) {

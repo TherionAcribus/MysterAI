@@ -1,6 +1,6 @@
 {
-    "name": "point_orientation",
-    "version": "1.9.0",
+    "name": "orientation_calculation",
+    "version": "1.9.2",
     "description": "Plugin pour déplacer un point de coordonnée en fonction d'une distance et d'un azimut depuis le Nord.",
     "author": "MysterAI",
     "plugin_type": "python",
