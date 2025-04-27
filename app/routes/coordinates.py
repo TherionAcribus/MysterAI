@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.geocache import Geocache
+import traceback
 
 coordinates_bp = Blueprint('coordinates', __name__)
 
@@ -42,6 +43,191 @@ def save_geocache_coordinates(geocache_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@coordinates_bp.route('/api/calculate_coordinates', methods=['POST'])
+def calculate_coordinates():
+    """
+    Calcule les coordonnées à partir d'une formule.
+    Peut calculer partiellement les coordonnées même si toutes les variables ne sont pas définies.
+    
+    Exemple de données attendues:
+    {
+        "formula": "N48° 39.(8/4)(27/9)(2x2x2) E06°11.(3x2)(16x2/4)(25/5)",
+        "variables": {"A": 5, "B": 10, ...}  # optionnel
+    }
+    
+    Retourne:
+    {
+        "coordinates": "N48° 39.286 E06°11.685",
+        "latitude": "N48° 39.286",
+        "longitude": "E06°11.685",
+        "status": "complete" | "partial"
+    }
+    """
+    try:
+        data = request.get_json()
+        formula = data.get('formula', '')
+        variables = data.get('variables', {})
+        
+        if not formula:
+            return jsonify({"error": "Aucune formule fournie"}), 400
+        
+        print(f"[DEBUG] Calcul des coordonnées pour la formule: {formula}")
+        print(f"[DEBUG] Variables fournies: {variables}")
+        
+        # Extraire les parties de latitude et longitude
+        lat_match = re.search(r'([NS])\s*(\d+)°\s*(\d+)\.(\([^()]+\)|[A-Z0-9]+)', formula)
+        lon_match = re.search(r'([EW])\s*(\d+)°\s*(\d+)\.(\([^()]+\)|[A-Z0-9]+)', formula)
+        
+        if not lat_match or not lon_match:
+            print(f"[ERROR] Format de formule invalide: lat_match={lat_match}, lon_match={lon_match}")
+            return jsonify({"error": "Format de formule invalide"}), 400
+        
+        # Trouver toutes les lettres dans la formule pour vérification
+        all_letters = re.findall(r'[A-Z]', formula)
+        print(f"[DEBUG] Toutes les lettres trouvées dans la formule: {all_letters}")
+        missing_letters = [letter for letter in all_letters if letter not in variables]
+        print(f"[DEBUG] Lettres sans valeur: {missing_letters}")
+        
+        # Traiter la latitude
+        lat_dir, lat_deg, lat_min, lat_decimal = lat_match.groups()
+        print(f"[DEBUG] Parties de latitude: dir={lat_dir}, deg={lat_deg}, min={lat_min}, decimal={lat_decimal}")
+        lat_decimal_value = _process_formula_part(lat_decimal, variables)
+        print(f"[DEBUG] Valeur calculée pour lat_decimal: {lat_decimal_value}")
+        
+        # Traiter la longitude
+        lon_dir, lon_deg, lon_min, lon_decimal = lon_match.groups()
+        print(f"[DEBUG] Parties de longitude: dir={lon_dir}, deg={lon_deg}, min={lon_min}, decimal={lon_decimal}")
+        lon_decimal_value = _process_formula_part(lon_decimal, variables)
+        print(f"[DEBUG] Valeur calculée pour lon_decimal: {lon_decimal_value}")
+        
+        # Vérifier si le calcul est complet ou partiel
+        status = "complete"
+        
+        # Si une partie décimale contient des lettres ou est entre parenthèses et contient des lettres
+        if isinstance(lat_decimal_value, str) and re.search(r'[A-Z]', lat_decimal_value):
+            print(f"[DEBUG] Calcul partiel: latitude contient encore des lettres ({lat_decimal_value})")
+            status = "partial"
+        if isinstance(lon_decimal_value, str) and re.search(r'[A-Z]', lon_decimal_value):
+            print(f"[DEBUG] Calcul partiel: longitude contient encore des lettres ({lon_decimal_value})")
+            status = "partial"
+            
+        # Formater les résultats
+        if status == "complete" and isinstance(lat_decimal_value, (int, float)) and isinstance(lon_decimal_value, (int, float)):
+            # Formater numériquement les parties calculées
+            lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(lat_decimal_value).zfill(3)}"
+            lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(lon_decimal_value).zfill(3)}"
+            print(f"[DEBUG] Coordonnées complètes calculées: {lat_formatted} {lon_formatted}")
+        else:
+            # Garder les expressions partielles
+            if isinstance(lat_decimal_value, (int, float)):
+                lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(lat_decimal_value).zfill(3)}"
+            else:
+                lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{lat_decimal_value}"
+                
+            if isinstance(lon_decimal_value, (int, float)):
+                lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(lon_decimal_value).zfill(3)}"
+            else:
+                lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{lon_decimal_value}"
+                
+            print(f"[DEBUG] Coordonnées partiellement calculées: {lat_formatted} {lon_formatted}")
+        
+        result = {
+            "coordinates": f"{lat_formatted} {lon_formatted}",
+            "latitude": lat_formatted,
+            "longitude": lon_formatted,
+            "status": status
+        }
+        print(f"[DEBUG] Résultat final: {result}")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[ERROR] Erreur lors du calcul des coordonnées: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def _process_formula_part(formula_part, variables):
+    """
+    Traite une partie de formule (généralement la partie décimale des minutes)
+    et remplace les variables par leurs valeurs si disponibles.
+    
+    Args:
+        formula_part: Partie de la formule à traiter (peut être une expression entre parenthèses)
+        variables: Dictionnaire des variables avec leurs valeurs
+        
+    Returns:
+        Le résultat calculé ou l'expression partiellement résolue
+    """
+    print(f"[DEBUG] _process_formula_part: Traitement de '{formula_part}' avec variables {variables}")
+    
+    # Si ce n'est pas une expression entre parenthèses, mais contient peut-être des lettres
+    if not formula_part.startswith('('):
+        # Si c'est juste un chiffre, le retourner directement
+        if formula_part.isdigit():
+            return int(formula_part)
+        
+        # Si la formule contient des lettres majuscules, la traiter comme une expression
+        if re.search(r'[A-Z]', formula_part):
+            print(f"[DEBUG] Détection de lettres dans '{formula_part}', traitement comme expression")
+            # Remplacer les lettres par leurs valeurs si disponibles
+            expression = formula_part
+            has_letters_with_values = False
+            
+            for var, value in variables.items():
+                if var in expression:
+                    has_letters_with_values = True
+                    expression = expression.replace(var, str(value))
+            
+            # Si aucune lettre n'a été remplacée, retourner l'expression telle quelle
+            if not has_letters_with_values:
+                print(f"[DEBUG] Aucune variable disponible pour '{formula_part}', retour tel quel")
+                return formula_part
+            
+            # Si l'expression contient encore des lettres majuscules, retourner l'expression partiellement résolue
+            if re.search(r'[A-Z]', expression):
+                print(f"[DEBUG] Expression partiellement résolue: '{expression}'")
+                return expression
+            
+            # Sinon, essayer d'évaluer comme une expression mathématique
+            try:
+                result = eval(expression)
+                print(f"[DEBUG] Expression évaluée: '{expression}' = {result}")
+                return round(result) if isinstance(result, (int, float)) else result
+            except Exception as e:
+                print(f"[ERROR] Impossible d'évaluer l'expression '{expression}': {str(e)}")
+                return expression
+        
+        # Sinon, retourner tel quel
+        return formula_part
+    
+    # Extraire l'expression entre parenthèses
+    expression = formula_part[1:-1] if formula_part.endswith(')') else formula_part[1:]
+    
+    # Remplacer les multiplications 'x' par '*' pour l'évaluation
+    expression = expression.replace('x', '*')
+    
+    # Remplacer les variables par leurs valeurs
+    original_expression = expression
+    for var, value in variables.items():
+        if var in expression:
+            expression = expression.replace(var, str(value))
+    
+    # Vérifier si toutes les variables ont été remplacées
+    # Si l'expression contient encore des lettres majuscules (sauf E pour notation scientifique)
+    if re.search(r'[A-DF-Z]', expression):
+        # Retourner l'expression partiellement résolue
+        return f"({expression})"
+    
+    try:
+        # Évaluer l'expression mathématique
+        result = eval(expression)
+        # Arrondir si c'est un nombre
+        if isinstance(result, (int, float)):
+            return round(result)
+        return result
+    except Exception as e:
+        print(f"[ERROR] Impossible d'évaluer l'expression '{expression}': {str(e)}")
+        # En cas d'erreur, retourner l'expression partiellement résolue
+        return f"({expression})"
 
 # ------------------------------------------------------------------------------
 # Configuration : listes/mappings pour les directions (Nord, Est, ...)

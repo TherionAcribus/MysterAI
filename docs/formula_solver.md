@@ -89,6 +89,7 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 - Mise à jour en temps réel de la formule avec substitution des variables
 - Résolution mathématique des expressions (addition, soustraction, multiplication, division)
 - Formatage des coordonnées avec préservation des formats standards (00.000)
+- Utilisation d'un appel API dédié pour le calcul des coordonnées finales (`/api/calculate_coordinates`)
 
 ### 8. Visualisation des Résultats
 - Affichage de la formule détectée initiale
@@ -322,6 +323,15 @@ def extract_formula_letters():
 ```
 
 ```python
+# Route pour calculer les coordonnées finales
+@geocaches_bp.route('/api/calculate_coordinates', methods=['POST'])
+def calculate_coordinates():
+    # Récupération de la formule et des variables
+    # Calcul des coordonnées en substituant les variables par leurs valeurs
+    # Formatage du résultat final en format GPS standard
+```
+
+```python
 # Route pour extraire les questions
 @geocaches_bp.route('/geocaches/formula-questions', methods=['POST'])
 def extract_formula_questions():
@@ -377,7 +387,8 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
 
 ### 4. Calcul des Propriétés des Mots/Expressions
 - Conversion en majuscules et nettoyage pour la standardisation
-- Calcul du checksum: somme des valeurs numériques des lettres (A=1, B=2, ...)
+- Calcul du checksum: somme des valeurs numériques des lettres (A=1, B=2, ...) et des chiffres (qui conservent leur valeur)
+- Exemple: "ABC123" donne 1+2+3+1+2+3 = 12
 - Réduction récursive du checksum jusqu'à obtenir un chiffre (ex: 123 → 1+2+3=6)
 - Détermination de la longueur du texte saisi
 
@@ -396,6 +407,44 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
 - Respect du format standard GPS
 - Affichage des minutes avec exactement 2 chiffres
 - Affichage des décimales avec exactement 3 chiffres
+- Traitement par le serveur via l'API `/api/calculate_coordinates` pour garantir la cohérence
+- Retour des coordonnées finales avec indication du statut (complet ou partiel si certaines variables n'ont pas de valeur)
+
+## Processus de Calcul des Coordonnées
+
+### Étapes du Calcul
+1. **Collecte des Variables**
+   - Les lettres uniques sont extraites de la formule
+   - Pour chaque lettre, sa valeur est récupérée selon le type sélectionné (valeur directe, checksum, etc.)
+   - Seules les valeurs numériques sont incluses dans le calcul
+
+2. **Appel à l'API de Calcul**
+   - Les données sont envoyées à l'endpoint `/api/calculate_coordinates` sous format JSON
+   - La requête inclut la formule originale et un dictionnaire des variables avec leurs valeurs
+   - Un timestamp est ajouté pour éviter les problèmes de cache
+
+3. **Traitement Côté Serveur**
+   - La formule est analysée pour identifier les parties directionnelles (N, S, E, W)
+   - Les expressions entre parenthèses sont évaluées
+   - Les substitutions sont appliquées en remplaçant les variables par leurs valeurs
+   - Les coordonnées sont calculées et formatées au format GPS standard
+
+4. **Gestion des Réponses**
+   - Succès : Les coordonnées complètes sont retournées et affichées
+   - Partielles : Si certaines variables n'ont pas de valeur, les coordonnées sont marquées comme partielles
+   - Erreur : Les messages d'erreur sont affichés de manière explicite
+
+### Mise à Jour Automatique
+- Les coordonnées sont recalculées en temps réel lorsque:
+  - Une valeur de lettre est modifiée
+  - Le type de valeur d'une lettre est changé
+  - Le type de valeur global est changé
+- Un délai court est appliqué après les modifications pour éviter des calculs excessifs
+
+### Formatage Visuel des Résultats
+- Les coordonnées complètes sont affichées en vert
+- Les coordonnées partielles sont affichées en orange
+- Les erreurs sont clairement indiquées en rouge
 
 ## Conseils d'Utilisation
 - **Commencez par l'extraction automatique des formules** : Le système peut détecter les formules dans la description et les waypoints

@@ -152,6 +152,8 @@
         setGlobalValueType(event) {
             this.selectedValueType = event.target.value;
             
+            console.log(`setGlobalValueType appelé, nouveau type: ${this.selectedValueType}`);
+            
             // Mettre à jour tous les boutons radio des lettres individuelles
             this.letterFieldsTarget.querySelectorAll(`input[name^="value-type-"]`).forEach(radio => {
                 if (radio.value === this.selectedValueType) {
@@ -166,9 +168,16 @@
                 data.selectedType = this.selectedValueType;
             });
             
-            // Mettre à jour la formule et les calculs
-            this.updateSubstitutedFormula();
-            this.calculateCoordinates();
+            console.log("Type de valeur mis à jour pour toutes les lettres");
+            
+            // Forcer la mise à jour avec un petit délai
+            setTimeout(() => {
+                console.log("Mise à jour forcée après changement global de type de valeur");
+                
+                // Mettre à jour la formule et les calculs
+                this.updateSubstitutedFormula();
+                this.calculateCoordinates();
+            }, 10);
         }
         
         // Définir le type de valeur pour une lettre spécifique
@@ -176,14 +185,23 @@
             const letter = event.target.dataset.letter;
             const valueType = event.target.value;
             
+            console.log(`setLetterValueType appelé pour lettre ${letter}, type ${valueType}`);
+            
             if (letter && this.letterData.has(letter)) {
                 const data = this.letterData.get(letter);
                 data.selectedType = valueType;
                 this.letterData.set(letter, data);
                 
-                // Mettre à jour la formule et les calculs
-                this.updateSubstitutedFormula();
-                this.calculateCoordinates();
+                console.log(`Type de valeur mis à jour pour ${letter}: ${valueType}`);
+                
+                // Forcer la mise à jour avec un petit délai pour s'assurer que tout est bien traité
+                setTimeout(() => {
+                    console.log("Mise à jour forcée après changement de type de valeur");
+                    
+                    // Mettre à jour la formule et les calculs
+                    this.updateSubstitutedFormula();
+                    this.calculateCoordinates();
+                }, 10);
             }
         }
 
@@ -201,22 +219,22 @@
             // Extraction des lettres (A-Z) dans la formule
             const letters = this.extractUniqueLetters(formula);
             
-            if (letters.length === 0) {
+            // Créer les champs de saisie pour chaque lettre si elles existent
+            if (letters.length > 0) {
+                this.createLetterInputFields(letters);
+                this.letterInputsTarget.classList.remove('hidden');
+            } else {
                 this.letterInputsTarget.classList.add('hidden');
-                return;
             }
-            
-            // Créer les champs de saisie pour chaque lettre
-            this.createLetterInputFields(letters);
-            
-            // Afficher la section des lettres
-            this.letterInputsTarget.classList.remove('hidden');
             
             // Mettre à jour la formule substituée
             this.updateSubstitutedFormula();
             
-            // Si l'ID de la géocache est disponible, extraire les questions
-            if (this.geocacheIdValue) {
+            // Calculer et afficher les coordonnées, même sans valeurs pour les lettres
+            this.calculateCoordinates();
+            
+            // Si l'ID de la géocache est disponible et qu'il y a des lettres, extraire les questions
+            if (this.geocacheIdValue && letters.length > 0) {
                 this.extractQuestions(this.geocacheIdValue, letters);
             }
         }
@@ -467,6 +485,8 @@
             const field = event.target.dataset.field;
             const value = event.target.value.trim();
             
+            console.log(`updateLetterData appelé pour lettre ${letter}, champ ${field}, valeur "${value}"`);
+            
             if (letter && field === 'word') {
                 // Initialiser ou mettre à jour les données pour cette lettre
                 const letterData = this.letterData.get(letter) || {
@@ -495,9 +515,19 @@
                 // Mettre à jour les champs d'affichage
                 this.updateLetterFields(letter, letterData);
                 
-                // Mettre à jour la formule et les coordonnées calculées
-                this.updateSubstitutedFormula();
-                this.calculateCoordinates();
+                console.log(`Données mises à jour pour ${letter}:`, letterData);
+                
+                // Forcer la mise à jour avec un petit délai pour s'assurer que tout est bien traité
+                // Pour éviter des problèmes potentiels de timing ou de mise en cache
+                setTimeout(() => {
+                    console.log("Mise à jour forcée après délai");
+                    
+                    // Mettre à jour la formule substituée
+                    this.updateSubstitutedFormula();
+                    
+                    // Recalculer les coordonnées
+                    this.calculateCoordinates();
+                }, 10);
             }
         }
         
@@ -569,6 +599,7 @@
         
         // Mettre à jour la formule avec les substitutions
         updateSubstitutedFormula() {
+            console.log("updateSubstitutedFormula appelé");
             const formula = this.formulaInputTarget.value.trim();
             if (!formula) return;
             
@@ -625,6 +656,8 @@
                 }
             }
             
+            console.log(`Formule substituée: "${substitutedFormula}"`);
+            
             // Afficher la formule substituée
             this.substitutedFormulaTextTarget.textContent = substitutedFormula;
             this.substitutedFormulaTarget.classList.remove('hidden');
@@ -677,117 +710,73 @@
         
         // Calculer les coordonnées finales en remplaçant les valeurs des lettres avec des nombres
         calculateCoordinates() {
+            console.log("calculateCoordinates appelé");
             const formula = this.formulaInputTarget.value.trim();
             if (!formula) return;
-            
-            // Vérifier si toutes les lettres ont des valeurs numériques
+
+            // Collecter les variables et leurs valeurs
             const allLetters = this.extractUniqueLetters(formula);
-            const allLettersHaveNumericValues = allLetters.every(letter => {
+            const variables = {};
+
+            for (const letter of allLetters) {
                 const value = this.getLetterValue(letter);
-                return value !== '' && this.isNumeric(value);
-            });
-            
-            if (!allLettersHaveNumericValues) {
-                // Si toutes les lettres n'ont pas de valeur numérique, cacher le résultat final
-                this.calculatedCoordinatesTarget.classList.add('hidden');
-                return;
+                if (value !== '' && this.isNumeric(value)) {
+                    variables[letter] = parseFloat(value);
+                }
             }
-            
-            try {
-                // Découper les coordonnées en parties Nord/Sud et Est/Ouest
-                // Format typique: N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)
-                
-                // Extraction de la partie Nord
-                const northMatch = formula.match(/([NS])\s*(\d+)°\s*(\d+)\.(\([^()]+\)|\w+)/);
-                let northPart = '';
-                
-                if (northMatch) {
-                    const [, northDirection, northDegrees, northMinutes, northDecimal] = northMatch;
-                    
-                    // Calculer la partie décimale
-                    let calculatedDecimal = northDecimal;
-                    
-                    // Si la partie décimale contient une formule entre parenthèses, la calculer
-                    if (northDecimal.startsWith('(')) {
-                        const expressionMatch = northDecimal.match(/\(([^()]+)\)/);
-                        if (expressionMatch) {
-                            const expression = expressionMatch[1];
-                            // Remplacer les lettres par leurs valeurs
-                            let substitutedExpression = expression;
-                            for (const letter of allLetters) {
-                                const value = this.getLetterValue(letter);
-                                if (value !== '' && this.isNumeric(value)) {
-                                    const regex = new RegExp(letter, 'g');
-                                    substitutedExpression = substitutedExpression.replace(regex, value);
-                                }
-                            }
-                            // Évaluer l'expression
-                            calculatedDecimal = this.evaluateExpression(substitutedExpression);
-                        }
-                    }
-                    
-                    // Formater les minutes avec 2 chiffres (00-59)
-                    const formattedMinutes = northMinutes.padStart(2, '0');
-                    
-                    // Formater la partie décimale avec 3 chiffres
-                    const formattedDecimal = calculatedDecimal.toString().padStart(3, '0');
-                    
-                    // Reconstruire la partie Nord
-                    northPart = `${northDirection}${northDegrees}° ${formattedMinutes}.${formattedDecimal}`;
+
+            console.log("Variables collectées:", variables);
+
+            // Appeler directement l'API qui fonctionne
+            fetch('/api/calculate_coordinates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    formula: formula,
+                    variables: variables,
+                    timestamp: new Date().getTime() // Pour éviter le cache
+                }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
                 }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Réponse de l'API calculate_coordinates:", data);
                 
-                // Extraction de la partie Est
-                const eastMatch = formula.match(/([EW])\s*(\d+)°\s*(\d+)\.(\([^()]+\)|\w+)/);
-                let eastPart = '';
-                
-                if (eastMatch) {
-                    const [, eastDirection, eastDegrees, eastMinutes, eastDecimal] = eastMatch;
-                    
-                    // Calculer la partie décimale
-                    let calculatedDecimal = eastDecimal;
-                    
-                    // Si la partie décimale contient une formule entre parenthèses, la calculer
-                    if (eastDecimal.startsWith('(')) {
-                        const expressionMatch = eastDecimal.match(/\(([^()]+)\)/);
-                        if (expressionMatch) {
-                            const expression = expressionMatch[1];
-                            // Remplacer les lettres par leurs valeurs
-                            let substitutedExpression = expression;
-                            for (const letter of allLetters) {
-                                const value = this.getLetterValue(letter);
-                                if (value !== '' && this.isNumeric(value)) {
-                                    const regex = new RegExp(letter, 'g');
-                                    substitutedExpression = substitutedExpression.replace(regex, value);
-                                }
-                            }
-                            // Évaluer l'expression
-                            calculatedDecimal = this.evaluateExpression(substitutedExpression);
-                        }
-                    }
-                    
-                    // Formater les minutes avec 2 chiffres (00-59)
-                    const formattedMinutes = eastMinutes.padStart(2, '0');
-                    
-                    // Formater la partie décimale avec 3 chiffres
-                    const formattedDecimal = calculatedDecimal.toString().padStart(3, '0');
-                    
-                    // Reconstruire la partie Est
-                    eastPart = `${eastDirection}${eastDegrees}° ${formattedMinutes}.${formattedDecimal}`;
+                if (data.error) {
+                    console.error("Erreur lors du calcul des coordonnées:", data.error);
+                    this.calculatedCoordinatesTextTarget.textContent = `Erreur: ${data.error}`;
+                    this.calculatedCoordinatesTarget.classList.remove('hidden');
+                    return;
                 }
-                
-                // Combiner les deux parties
-                const calculatedCoordinates = `${northPart} ${eastPart}`;
-                
+
                 // Afficher les coordonnées calculées
-                this.calculatedCoordinatesTextTarget.textContent = calculatedCoordinates;
+                this.calculatedCoordinatesTextTarget.textContent = data.coordinates;
                 this.calculatedCoordinatesTarget.classList.remove('hidden');
-            } catch (error) {
-                console.error("Erreur lors du calcul des coordonnées:", error);
-                this.calculatedCoordinatesTextTarget.textContent = "Erreur: Formule invalide ou incomplète";
+                console.log("Coordonnées mises à jour:", data.coordinates);
+
+                // Ajouter des classes CSS en fonction du statut
+                if (data.status === "partial") {
+                    this.calculatedCoordinatesTextTarget.classList.add('text-amber-300');
+                    this.calculatedCoordinatesTextTarget.classList.remove('text-green-400');
+                } else {
+                    this.calculatedCoordinatesTextTarget.classList.add('text-green-400');
+                    this.calculatedCoordinatesTextTarget.classList.remove('text-amber-300');
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de l'appel à l'API:", error);
+                this.calculatedCoordinatesTextTarget.textContent = "Erreur: Impossible de calculer les coordonnées";
                 this.calculatedCoordinatesTarget.classList.remove('hidden');
-            }
+            });
         }
-        
+
         // Évaluer une expression mathématique
         evaluateExpression(expression) {
             // Nettoyer l'expression (retirer les espaces et caractères non numériques/opérateurs)
@@ -833,6 +822,9 @@
             
             // Extraire les lettres et créer les champs
             this.extractLetters();
+            
+            // Calculer et afficher les coordonnées immédiatement, même sans valeurs pour les lettres
+            this.calculateCoordinates();
             
             // Afficher le résultat de base
             this.displayResults({
