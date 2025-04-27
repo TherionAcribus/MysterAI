@@ -45,6 +45,11 @@
             // Récupérer le paramètre de méthode d'extraction des formules (ia ou regex)
             this.formulaExtractionMethod = 'regex'; // Valeur par défaut
             this.loadFormulaExtractionMethod();
+            
+            // Ajouter un gestionnaire d'événements pour le clic droit sur les éléments avec la classe geocache-description
+            document.querySelectorAll('.geocache-description').forEach(element => {
+                element.addEventListener('contextmenu', this.handleContextMenu.bind(this));
+            });
         }
         
         /**
@@ -776,11 +781,18 @@
 
         // Méthode pour ajouter les coordonnées d'un waypoint au formulaire
         addToFormula(event) {
-            const coordinates = event.currentTarget.dataset.coordinates;
+            // Récupérer les coordonnées de l'attribut data-coordinates ou de l'objet event
+            let coordinates;
+            if (event.coordinates) {
+                coordinates = event.coordinates;
+            } else {
+                coordinates = event.currentTarget.dataset.coordinates;
+            }
+            
             if (coordinates) {
                 this.formulaInputTarget.value = coordinates;
                 // Extraire les lettres de la nouvelle formule
-                this.extractLetters();
+                this.extractLetters({ target: this.formulaInputTarget });
                 // Faire défiler jusqu'au formulaire
                 this.formulaInputTarget.scrollIntoView({ behavior: 'smooth' });
                 // Mettre le focus sur l'input
@@ -1681,6 +1693,51 @@
             // Mettre à jour le conteneur
             this.detectedFormulasContainerTarget.innerHTML = html;
             this.detectedFormulasContainerTarget.classList.remove('hidden');
+        }
+
+        /**
+         * Gère le clic droit sur la description pour créer un menu contextuel
+         * @param {Event} event - L'événement de clic droit
+         */
+        handleContextMenu(event) {
+            // Vérifier s'il y a du texte sélectionné
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (!selectedText) return; // Ne rien faire si aucun texte n'est sélectionné
+            
+            // Empêcher le menu contextuel par défaut
+            event.preventDefault();
+            
+            // Supprimer tout menu contextuel existant
+            const existingMenu = document.getElementById('formula-context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            // Créer le menu contextuel
+            const contextMenu = document.createElement('div');
+            contextMenu.id = 'formula-context-menu';
+            contextMenu.className = 'absolute bg-gray-800 border border-gray-600 rounded shadow-lg z-50';
+            contextMenu.style.left = `${event.pageX}px`;
+            contextMenu.style.top = `${event.pageY}px`;
+            
+            // Option pour utiliser comme formule
+            const useAsFormulaOption = document.createElement('div');
+            useAsFormulaOption.className = 'px-4 py-2 text-gray-200 hover:bg-blue-600 cursor-pointer';
+            useAsFormulaOption.innerText = 'Utiliser comme formule';
+            useAsFormulaOption.onclick = () => {
+                this.addToFormula({ coordinates: selectedText });
+                contextMenu.remove();
+            };
+            
+            contextMenu.appendChild(useAsFormulaOption);
+            document.body.appendChild(contextMenu);
+            
+            // Fermer le menu au clic ailleurs
+            document.addEventListener('click', () => {
+                contextMenu.remove();
+            }, { once: true });
         }
     }
 
