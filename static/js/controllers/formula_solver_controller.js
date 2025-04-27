@@ -15,7 +15,8 @@
             "geocacheId",
             "loadingQuestions",
             "extractionMethodAI",
-            "extractionMethodRegex"
+            "extractionMethodRegex",
+            "solvingWithAI"
         ]
         static values = {
             geocacheId: String,
@@ -819,6 +820,131 @@
         hideLoadingQuestions() {
             if (this.hasLoadingQuestionsTarget) {
                 this.loadingQuestionsTarget.classList.add('hidden');
+            }
+        }
+        
+        // Résoudre les questions avec l'IA
+        solveQuestionsWithAI() {
+            const geocacheId = this.geocacheIdTarget.value;
+            if (!geocacheId) {
+                alert('ID Géocache Manquant: Veuillez entrer un ID de géocache pour résoudre les questions');
+                return;
+            }
+
+            const letters = this.extractUniqueLetters(this.formulaInputTarget.value);
+            if (letters.length === 0) {
+                alert('Aucune Variable Trouvée: La formule ne contient aucune variable (lettre)');
+                return;
+            }
+            
+            // Récupérer les questions associées à chaque lettre
+            const questions = {};
+            letters.forEach(letter => {
+                const container = this.letterFieldsTarget.querySelector(`.letter-container[data-letter="${letter}"]`);
+                if (container) {
+                    const questionEl = container.querySelector('.letter-question');
+                    if (questionEl && questionEl.textContent) {
+                        questions[letter] = questionEl.textContent.trim();
+                    }
+                }
+            });
+            
+            // Vérifier si des questions existent pour les lettres
+            if (Object.keys(questions).length === 0) {
+                alert('Aucune Question Trouvée: Veuillez d\'abord extraire les questions');
+                return;
+            }
+            
+            this.showSolvingWithAI();
+            
+            fetch('/geocaches/formula-solve-questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_id: geocacheId,
+                    questions: questions,
+                    gc_code: this.gcCodeValue
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.hideSolvingWithAI();
+                
+                if (data.success) {
+                    this.updateLettersWithAnswers(data.answers);
+                    console.log('Réponses obtenues:', data.answers);
+                    
+                    // Afficher un message de réussite temporaire
+                    const statusElement = document.getElementById('extraction-status');
+                    if (statusElement) {
+                        statusElement.textContent = 'Les réponses ont été générées avec succès!';
+                        statusElement.classList.remove('hidden');
+                        statusElement.classList.remove('text-red-400');
+                        statusElement.classList.add('text-green-400');
+                        
+                        setTimeout(() => {
+                            statusElement.classList.add('hidden');
+                        }, 5000);
+                    }
+                } else {
+                    console.error('Erreur lors de la résolution des questions:', data.error);
+                    alert(`Erreur: ${data.error || 'Une erreur s\'est produite lors de la résolution des questions'}`);
+                }
+            })
+            .catch(error => {
+                this.hideSolvingWithAI();
+                console.error('Erreur lors de la requête:', error);
+                alert('Erreur de Connexion: Impossible de se connecter au serveur pour résoudre les questions');
+            });
+        }
+        
+        // Mettre à jour les lettres avec les réponses de l'IA
+        updateLettersWithAnswers(answers) {
+            // Parcourir chaque lettre et mettre à jour sa valeur
+            Object.entries(answers).forEach(([letter, answer]) => {
+                const container = this.letterFieldsTarget.querySelector(`.letter-container[data-letter="${letter}"]`);
+                if (container) {
+                    const input = container.querySelector(`[data-letter="${letter}"][data-field="word"]`);
+                    if (input) {
+                        input.value = answer;
+                        // Déclencher l'événement input pour mettre à jour les calculs
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            });
+        }
+        
+        // Afficher l'indicateur de chargement pour la résolution par IA
+        showSolvingWithAI() {
+            // Vérifie si l'élément solvingWithAI existe, sinon le crée
+            if (!this.hasSolvingWithAITarget) {
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'solving-with-ai text-center p-3 m-3 hidden';
+                loadingElement.innerHTML = `
+                    <div class="inline-block animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-500 mr-2"></div>
+                    <span class="text-gray-300">Résolution des questions avec IA en cours...</span>
+                `;
+                loadingElement.dataset.formulaSolverTarget = 'solvingWithAI';
+                this.letterInputsTarget.insertBefore(loadingElement, this.letterFieldsTarget);
+                
+                // Attendre le prochain cycle pour que Stimulus enregistre la cible
+                setTimeout(() => {
+                    if (this.hasSolvingWithAITarget) {
+                        this.solvingWithAITarget.classList.remove('hidden');
+                    }
+                }, 0);
+                return;
+            }
+            
+            this.solvingWithAITarget.classList.remove('hidden');
+        }
+        
+        // Masquer l'indicateur de chargement pour la résolution par IA
+        hideSolvingWithAI() {
+            if (this.hasSolvingWithAITarget) {
+                this.solvingWithAITarget.classList.add('hidden');
             }
         }
     }

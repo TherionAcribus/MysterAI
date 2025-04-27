@@ -38,6 +38,8 @@ from app.geocaching_client import GeocachingClient, Coordinates
 from app.utils.coordinates import convert_gc_coords_to_decimal
 from app.gpx_generator import create_gpx_file, generate_filename, create_gpx_zip
 from app.utils.tools import rot13
+from app.services.formula_questions_service import formula_questions_service
+from app.services.formula_solver_service import formula_solver_service
 
 logger = setup_logger()
 
@@ -2969,33 +2971,26 @@ def calculate_antipode():
 @geocaches_bp.route('/geocaches/formula-questions', methods=['POST'])
 def extract_formula_questions():
     """
-    Extrait les questions associées aux variables dans une formule de coordonnées
+    Extrait les questions correspondant aux variables dans une formule de coordonnées
     """
+    # Récupérer les données de la requête
+    data = request.json
+    geocache_id = data.get('geocache_id')
+    letters = data.get('letters', [])
+    method = data.get('method', 'ai')  # 'ai' ou 'regex'
+    
+    # Vérifier les paramètres
+    if not geocache_id:
+        return jsonify({'success': False, 'error': 'ID de géocache manquant'}), 400
+        
+    if not letters:
+        return jsonify({'success': False, 'error': 'Liste de lettres vide'}), 400
+    
     try:
-        # Importer le service
-        from app.services.formula_questions_service import formula_questions_service
-        
-        # Récupérer les données de la requête
-        data = request.json
-        geocache_id = data.get('geocache_id')
-        letters = data.get('letters', [])
-        method = data.get('method', 'ai')  # 'ai' ou 'regex'
-        
-        if not geocache_id or not letters:
-            return jsonify({
-                'success': False,
-                'error': 'Paramètres manquants (geocache_id et/ou letters)'
-            }), 400
-        
-        # Récupérer la géocache si un ID est fourni
-        from app.models.geocache import Geocache
+        # Récupérer la géocache
         geocache = Geocache.query.get(geocache_id)
-        
         if not geocache:
-            return jsonify({
-                'success': False,
-                'error': f'Géocache non trouvée avec ID: {geocache_id}'
-            }), 404
+            return jsonify({'success': False, 'error': f'Géocache avec ID {geocache_id} introuvable'}), 404
         
         # Extraire les questions selon la méthode choisie
         if method == 'regex':
@@ -3003,22 +2998,59 @@ def extract_formula_questions():
         else:
             questions = formula_questions_service.extract_questions_with_ai(geocache, letters)
         
-        # Vérifier si une erreur est survenue
+        # Si une erreur est retournée
         if isinstance(questions, dict) and 'error' in questions:
-            return jsonify({
-                'success': False,
-                'error': questions['error']
-            }), 400
+            return jsonify({'success': False, 'error': questions['error']}), 500
         
-        # Retourner les questions
+        # Retourner les questions extraites
         return jsonify({
             'success': True,
             'questions': questions
         })
-    
+        
     except Exception as e:
-        print(f"Erreur lors de l'extraction des questions: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/formula-solve-questions', methods=['POST'])
+def solve_formula_questions():
+    """
+    Résout les questions associées aux variables dans une formule de coordonnées en utilisant l'IA
+    """
+    # Récupérer les données de la requête
+    data = request.json
+    geocache_id = data.get('geocache_id')
+    questions = data.get('questions', {})
+    gc_code = data.get('gc_code')
+    
+    # Vérifier les paramètres
+    if not geocache_id:
+        return jsonify({'success': False, 'error': 'ID de géocache manquant'}), 400
+        
+    if not questions:
+        return jsonify({'success': False, 'error': 'Aucune question fournie'}), 400
+    
+    try:
+        # Récupérer la géocache
+        geocache = Geocache.query.get(geocache_id)
+        if not geocache:
+            return jsonify({'success': False, 'error': f'Géocache avec ID {geocache_id} introuvable'}), 404
+        
+        # Résoudre les questions avec l'IA
+        answers = formula_solver_service.solve_questions_with_ai(questions, geocache_id, gc_code)
+        
+        # Si une erreur est retournée
+        if isinstance(answers, dict) and 'error' in answers:
+            return jsonify({'success': False, 'error': answers['error']}), 500
+        
+        # Retourner les réponses générées
         return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+            'success': True,
+            'answers': answers
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
