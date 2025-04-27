@@ -40,13 +40,30 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 - Analyse de la description HTML de la géocache
 - Extraction des formules de coordonnées (ex: `N 47° 5E.FTN E 006° 5A.JVF`)
 - Analyse des waypoints et leurs notes pour les formules additionnelles
+- Choix entre deux méthodes de détection :
+  - **Intelligence Artificielle** : utilise le service AI pour analyser le contenu et détecter des formules même dans des formats complexes
+  - **Expressions Régulières** : utilise des patterns prédéfinis pour détecter les formats standards de coordonnées
+- Affichage du mode d'extraction actuel (IA ou Regex)
+- Boutons pour forcer la détection avec IA ou Regex
 
-### 2. Extraction des Variables
+### 2. Détection de Formules avec Intelligence Artificielle
+- Analyse complète de la description et des waypoints de la géocache
+- Compréhension du contexte permettant de détecter des formules dans des formats variés
+- Capacité à identifier des formules non standards ou dissimulées dans le texte
+- Réécriture propre des formules détectées pour corriger les éventuelles erreurs de formatage
+- Extraction intelligente des variables (lettres) à résoudre
+- Prise en compte du contexte thématique pour mieux comprendre les formules
+- Fonctionne particulièrement bien avec des formules complexes comme :
+  - `N 48° 41.EDB E 006° 09.FC(A/2)` où les lettres peuvent apparaître après un point décimal ET dans une expression
+  - `N 47° [A]C.D[H-3] E 006° [B]E.F[G*2]` avec des formats non conventionnels
+- Logs détaillés dans la console pour faciliter le débogage
+
+### 3. Extraction des Variables
 - Détection automatique des lettres (A-Z) dans les formules entre parenthèses
 - Génération dynamique de champs de saisie pour chaque lettre unique
 - Préservation des lettres cardinales (N, S, E, W) utilisées comme directions
 
-### 3. Extraction des Questions Associées aux Variables
+### 4. Extraction des Questions Associées aux Variables
 - Extraction automatique des questions correspondant à chaque variable
 - Analyse du contexte thématique de la géocache pour une meilleure compréhension
 - Choix entre deux méthodes d'extraction :
@@ -54,32 +71,32 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
   - **Expressions Régulières** : utilise des patterns prédéfinis pour extraire les questions selon différents formats courants
 - Les questions extraites sont affichées sous chaque variable pour faciliter leur résolution
 
-### 4. Résolution Automatique des Questions
+### 5. Résolution Automatique des Questions
 - Bouton "Résoudre avec IA" pour obtenir des réponses automatiques aux questions
 - Utilisation du contexte thématique extrait pour une meilleure précision des réponses
 - Prise en compte des informations de la géocache (titre, difficulté, etc.)
 - Remplissage automatique des réponses dans les champs correspondants
 
-### 5. Traitement Avancé des Mots et Expressions
+### 6. Traitement Avancé des Mots et Expressions
 - Saisie de mots ou expressions pour chaque variable détectée
 - Calcul automatique du checksum (somme des valeurs des lettres, A=1, B=2, etc.)
 - Calcul du checksum réduit à un chiffre (ex: 123 → 1+2+3 = 6)
 - Détermination de la longueur du mot ou de l'expression
 - Sélection du type de valeur à utiliser via boutons radio (mot, checksum, checksum réduit, longueur)
 
-### 6. Résolution Interactive de Formules
+### 7. Résolution Interactive de Formules
 - Interface pour entrer manuellement des formules
 - Mise à jour en temps réel de la formule avec substitution des variables
 - Résolution mathématique des expressions (addition, soustraction, multiplication, division)
 - Formatage des coordonnées avec préservation des formats standards (00.000)
 
-### 7. Visualisation des Résultats
+### 8. Visualisation des Résultats
 - Affichage de la formule détectée initiale
 - Visualisation de la formule avec les substitutions des variables
 - Affichage des coordonnées calculées en format GPS standard
 - Formatage automatique des minutes (2 chiffres) et décimales (3 chiffres)
 
-### 8. Consultation des Données de la Géocache
+### 9. Consultation des Données de la Géocache
 - Affichage de la description complète
 - Liste des waypoints additionnels
 - Accès facile aux coordonnées existantes
@@ -244,6 +261,33 @@ Où:
 - Les lettres N, S, E, W sont préservées car elles indiquent les directions
 - Le format respecte la structure standard des coordonnées GPS
 
+## Configuration du Mode d'Extraction des Formules
+
+Le Formula Solver propose deux modes d'extraction de formules configurables:
+
+### Configuration du Paramètre
+- Le paramètre `formula_extraction_method` détermine la méthode d'extraction par défaut
+- Les valeurs possibles sont:
+  - `ia` : utilise l'IA pour analyser et détecter les formules dans la géocache
+  - `regex` : utilise des expressions régulières (méthode traditionnelle)
+
+### Modification du Mode d'Extraction
+- Dans l'interface utilisateur, le mode d'extraction actuel est affiché
+- Deux boutons permettent de basculer entre les modes:
+  - **IA** : force l'utilisation de l'IA pour détecter les formules
+  - **Regex** : force l'utilisation des expressions régulières
+
+### Avantages du Mode IA
+- Meilleure détection des formules complexes ou non standards
+- Réécriture propre des formules détectées
+- Extraction complète de toutes les variables
+- Capacité à comprendre le contexte de la géocache
+
+### Avantages du Mode Regex
+- Très rapide et économe en ressources
+- Fonctionne même sans connexion internet ou clé API
+- Détection fiable des formats standards de coordonnées
+
 ## Intégration Technique
 
 ### Frontend
@@ -259,6 +303,22 @@ window.openFormulaSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')
 def formula_solver_panel():
     # Récupération des données et détection des formules
     # Utilisation du plugin formula_parser
+```
+
+```python
+# Route pour détecter les formules avec IA ou Regex
+@geocaches_bp.route('/geocaches/formula-detect', methods=['POST'])
+def detect_formula():
+    # Récupération des données et détection des formules selon la méthode choisie
+    # Utilisation du service AI ou du plugin formula_parser
+```
+
+```python
+# Route pour extraire les lettres d'une formule
+@geocaches_bp.route('/geocaches/formula-extract-letters', methods=['POST'])
+def extract_formula_letters():
+    # Extraction des lettres variables dans une formule de coordonnées
+    # Utilisation du service AI pour analyser et nettoyer la formule
 ```
 
 ```python
@@ -339,10 +399,13 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
 
 ## Conseils d'Utilisation
 - **Commencez par l'extraction automatique des formules** : Le système peut détecter les formules dans la description et les waypoints
-- **Utilisez l'extraction par IA** : Elle fournit à la fois les questions et le contexte thématique
+- **Pour les formules complexes, utilisez l'IA** : Le bouton "IA" permet une détection plus intelligente des formules inhabituelles
+- **Pour les formules standards, gardez le mode Regex** : Plus rapide et économe en ressources
+- **Si une formule n'est pas correctement détectée** : Essayez de changer de mode d'extraction
+- **Utilisez l'extraction par IA pour les questions** : Elle fournit à la fois les questions et le contexte thématique
 - **Essayez la résolution automatique** : Le bouton "Résoudre avec IA" peut vous faire gagner beaucoup de temps
 - **Vérifiez les résultats** : Parfois, certaines questions peuvent être mal comprises ou les réponses incorrectes
-- **Ajustez manuellement si nécessaire** : Vous pouvez toujours modifier les réponses générées
+- **Ajustez manuellement si nécessaire** : Vous pouvez toujours modifier les réponses générées ou les formules détectées
 
 ## Exemples d'Utilisation
 
@@ -351,29 +414,35 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
    - Cliquer sur le bouton "Formula Solver"
    - Les formules détectées s'affichent automatiquement
 
-2. **Extraction et Résolution des Questions**
+2. **Détection avec IA pour Formules Complexes**
+   - Dans la section "Formules détectées", noter le mode d'extraction actuel
+   - Si des formules complexes ne sont pas détectées, cliquer sur le bouton "IA"
+   - Attendre que l'IA analyse la géocache et détecte les formules
+   - Les nouvelles formules détectées s'affichent, potentiellement avec un formatage amélioré
+
+3. **Extraction et Résolution des Questions**
    - Sélectionner une formule détectée ou entrer une formule manuellement
    - Cliquer sur "Extraire les Questions" pour obtenir les questions et le contexte
    - Cliquer sur "Résoudre avec IA" pour générer des réponses automatiquement
    - Les réponses sont insérées dans les champs correspondants
 
-3. **Modification Manuelle**
+4. **Modification Manuelle**
    - Pour chaque lettre, saisir ou ajuster le mot ou l'expression
    - Voir le checksum, le checksum réduit et la longueur se calculer automatiquement
    - Sélectionner le type de valeur à utiliser via les boutons radio
 
-4. **Changement Global du Type de Valeur**
+5. **Changement Global du Type de Valeur**
    - Cliquer sur l'un des boutons radio généraux en haut pour changer toutes les variables
    - Observer la mise à jour automatique de la formule et des coordonnées
 
-5. **Gestion des Questions Individuelles**
+6. **Gestion des Questions Individuelles**
    - Modifier le texte d'une question dans le champ éditable pour la corriger ou la préciser
    - Cliquer sur "Copier" pour copier rapidement une question dans le presse-papier
    - Cliquer sur "Rechercher" pour ouvrir un onglet de recherche Google dans l'application
    - Cliquer sur "Résoudre" sur une question spécifique pour obtenir uniquement sa réponse
    - La réponse est automatiquement insérée dans le champ correspondant
 
-6. **Vérification des Résultats**
+7. **Vérification des Résultats**
    - Les coordonnées sont calculées et formatées automatiquement
    - Le format respecte la norme avec 2 chiffres pour les minutes et 3 pour les décimales
    - Exemple: `N49° 12.086 E005° 59.209` 

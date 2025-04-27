@@ -448,11 +448,16 @@
         calculateChecksum(text) {
             if (!text) return 0;
             
-            // Convertir en majuscules et supprimer les espaces et caractères spéciaux
-            const cleanText = text.toUpperCase().replace(/[^A-Z]/g, '');
+            // Convertir en majuscules et supprimer les caractères spéciaux mais garder les chiffres
+            const cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
             
-            // Calculer la somme (A=1, B=2, etc.)
+            // Calculer la somme (A=1, B=2, etc. et chiffres conservés tels quels)
             return cleanText.split('').reduce((sum, char) => {
+                // Si c'est un chiffre, ajouter directement sa valeur numérique
+                if (/[0-9]/.test(char)) {
+                    return sum + parseInt(char, 10);
+                }
+                // Si c'est une lettre, calculer comme avant (A=1, B=2, etc.)
                 return sum + (char.charCodeAt(0) - 64);
             }, 0);
         }
