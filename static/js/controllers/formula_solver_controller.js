@@ -16,7 +16,8 @@
             "loadingQuestions",
             "extractionMethodAI",
             "extractionMethodRegex",
-            "solvingWithAI"
+            "solvingWithAI",
+            "solvingOverlay"
         ]
         static values = {
             geocacheId: String,
@@ -247,6 +248,42 @@
                                     readonly>
                             </div>
                         </div>
+                    </div>
+                    
+                    <div class="mt-3 question-container">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-gray-300 text-sm font-medium">
+                                Question
+                            </label>
+                            <div class="flex items-center space-x-1">
+                                <button 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded"
+                                    data-action="click->formula-solver#copyQuestion"
+                                    data-letter="${letter}"
+                                    title="Copier la question">
+                                    Copier
+                                </button>
+                                <button 
+                                    class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded"
+                                    data-action="click->formula-solver#searchOnWeb" 
+                                    data-letter="${letter}"
+                                    title="Rechercher sur le web">
+                                    Rechercher
+                                </button>
+                                <button 
+                                    class="bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded"
+                                    data-action="click->formula-solver#solveSingleQuestion"
+                                    data-letter="${letter}">
+                                    Résoudre
+                                </button>
+                            </div>
+                        </div>
+                        <textarea 
+                            class="letter-question-input bg-gray-800 text-yellow-300 border border-gray-600 rounded w-full py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px]"
+                            data-letter="${letter}"
+                            data-field="question"
+                            data-action="change->formula-solver#updateQuestionData"
+                            placeholder="La question apparaîtra ici après l'extraction"></textarea>
                     </div>
                 </div>
             `;
@@ -875,14 +912,17 @@
                 const letter = container.dataset.letter;
                 if (letter && questions[letter]) {
                     questionsFound = true;
-                    // Chercher ou créer l'élément de question
-                    let questionElement = container.querySelector('.letter-question');
-                    if (!questionElement) {
-                        questionElement = document.createElement('p');
-                        questionElement.className = 'letter-question text-sm text-yellow-300 mt-2 p-2 bg-gray-700 rounded';
-                        container.appendChild(questionElement);
+                    // Mettre à jour le contenu du textarea de question
+                    const questionTextarea = container.querySelector(`.letter-question-input[data-letter="${letter}"]`);
+                    if (questionTextarea) {
+                        questionTextarea.value = questions[letter];
+                        
+                        // Mettre à jour notre stockage de questions
+                        if (!this.letterQuestions) {
+                            this.letterQuestions = {};
+                        }
+                        this.letterQuestions[letter] = questions[letter];
                     }
-                    questionElement.textContent = questions[letter];
                 }
             });
             
@@ -952,7 +992,7 @@
                 return;
             }
             
-            // Récupérer les questions associées à chaque lettre
+            // Récupérer les questions pour chaque lettre
             const questions = {};
             let thematicContext = "";
             
@@ -969,9 +1009,9 @@
             letters.forEach(letter => {
                 const container = this.letterFieldsTarget.querySelector(`.letter-container[data-letter="${letter}"]`);
                 if (container) {
-                    const questionEl = container.querySelector('.letter-question');
-                    if (questionEl && questionEl.textContent) {
-                        questions[letter] = questionEl.textContent.trim();
+                    const questionTextarea = container.querySelector(`.letter-question-input[data-letter="${letter}"]`);
+                    if (questionTextarea && questionTextarea.value.trim()) {
+                        questions[letter] = questionTextarea.value.trim();
                     }
                 }
             });
@@ -1082,6 +1122,258 @@
         hideSolvingWithAI() {
             if (this.hasSolvingWithAITarget) {
                 this.solvingWithAITarget.classList.add('hidden');
+            }
+        }
+        
+        // Mettre à jour les données de question lors de l'édition
+        updateQuestionData(event) {
+            const letter = event.target.dataset.letter;
+            const question = event.target.value.trim();
+            
+            if (letter) {
+                // Stocker la question éditée pour cette lettre
+                if (!this.letterQuestions) {
+                    this.letterQuestions = {};
+                }
+                this.letterQuestions[letter] = question;
+                console.log(`Question mise à jour pour la lettre ${letter}:`, question);
+            }
+        }
+        
+        // Résoudre une seule question avec l'IA
+        solveSingleQuestion(event) {
+            const letter = event.currentTarget.dataset.letter;
+            if (!letter) return;
+            
+            const geocacheId = this.geocacheIdTarget.value;
+            if (!geocacheId) {
+                alert('ID Géocache Manquant: Veuillez entrer un ID de géocache pour résoudre la question');
+                return;
+            }
+            
+            // Obtenir la question pour cette lettre
+            const questionInput = this.element.querySelector(`.letter-question-input[data-letter="${letter}"]`);
+            if (!questionInput || !questionInput.value.trim()) {
+                alert('Question Manquante: Veuillez extraire ou saisir une question pour cette lettre');
+                return;
+            }
+            
+            const question = questionInput.value.trim();
+            
+            // Obtenir le contexte thématique s'il existe
+            let thematicContext = "";
+            const contextElement = document.getElementById('thematic-context');
+            if (contextElement) {
+                thematicContext = contextElement.textContent || "";
+            }
+            
+            // Afficher un chargement pour cette lettre spécifique
+            this.showSingleQuestionLoading(letter);
+            
+            // Préparer les données à envoyer
+            const data = {
+                geocache_id: geocacheId,
+                letter: letter,
+                question: question,
+                thematic_context: thematicContext
+            };
+            
+            // Envoyer la requête pour résoudre cette question
+            fetch('/geocaches/formula-solve-single-question', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Masquer le chargement
+                this.hideSingleQuestionLoading(letter);
+                
+                // Vérifier si la réponse contient une erreur
+                if (data.error) {
+                    console.error("Erreur lors de la résolution de la question:", data.error);
+                    this.showSingleQuestionError(letter, data.error);
+                    return;
+                }
+                
+                console.log(`Réponse reçue pour la lettre ${letter}:`, data);
+                
+                // Mettre à jour la réponse pour cette lettre
+                if (data.answer) {
+                    const inputElement = this.element.querySelector(`input[data-letter="${letter}"][data-field="word"]`);
+                    if (inputElement) {
+                        inputElement.value = data.answer;
+                        inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+                        
+                        // Afficher un message de réussite
+                        this.showSingleQuestionSuccess(letter, data.answer);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la résolution de la question:", error);
+                this.hideSingleQuestionLoading(letter);
+                this.showSingleQuestionError(letter, error.message);
+            });
+        }
+        
+        // Afficher un indicateur de chargement pour une lettre spécifique
+        showSingleQuestionLoading(letter) {
+            const container = this.element.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            // Supprimer les messages d'erreur ou de réussite précédents
+            this.removeSingleQuestionMessages(letter);
+            
+            // Créer et ajouter l'indicateur de chargement
+            const loadingElement = document.createElement('div');
+            loadingElement.className = 'single-question-loading flex items-center text-sm text-blue-400 mt-2';
+            loadingElement.innerHTML = `
+                <div class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+                <span>Résolution de la question en cours...</span>
+            `;
+            
+            const questionContainer = container.querySelector('.question-container');
+            if (questionContainer) {
+                questionContainer.appendChild(loadingElement);
+            }
+        }
+        
+        // Masquer l'indicateur de chargement pour une lettre spécifique
+        hideSingleQuestionLoading(letter) {
+            const container = this.element.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            const loadingElement = container.querySelector('.single-question-loading');
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+        }
+        
+        // Afficher un message d'erreur pour une lettre spécifique
+        showSingleQuestionError(letter, errorMessage) {
+            const container = this.element.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            const errorElement = document.createElement('div');
+            errorElement.className = 'single-question-error text-sm text-red-400 mt-2';
+            errorElement.textContent = `Erreur: ${errorMessage}`;
+            
+            const questionContainer = container.querySelector('.question-container');
+            if (questionContainer) {
+                questionContainer.appendChild(errorElement);
+                
+                // Masquer le message après 5 secondes
+                setTimeout(() => {
+                    errorElement.remove();
+                }, 5000);
+            }
+        }
+        
+        // Afficher un message de réussite pour une lettre spécifique
+        showSingleQuestionSuccess(letter, answer) {
+            const container = this.element.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            const successElement = document.createElement('div');
+            successElement.className = 'single-question-success text-sm text-green-400 mt-2';
+            successElement.textContent = `Réponse trouvée: "${answer}"`;
+            
+            const questionContainer = container.querySelector('.question-container');
+            if (questionContainer) {
+                questionContainer.appendChild(successElement);
+                
+                // Masquer le message après 5 secondes
+                setTimeout(() => {
+                    successElement.remove();
+                }, 5000);
+            }
+        }
+        
+        // Supprimer tous les messages pour une lettre spécifique
+        removeSingleQuestionMessages(letter) {
+            const container = this.element.querySelector(`.letter-container[data-letter="${letter}"]`);
+            if (!container) return;
+            
+            const messages = container.querySelectorAll('.single-question-error, .single-question-success');
+            messages.forEach(el => el.remove());
+        }
+        
+        // Copier la question d'une lettre dans le presse-papier
+        copyQuestion(event) {
+            const letter = event.currentTarget.dataset.letter;
+            if (!letter) return;
+            
+            const questionTextarea = this.element.querySelector(`.letter-question-input[data-letter="${letter}"]`);
+            if (!questionTextarea || !questionTextarea.value.trim()) {
+                this.showSingleQuestionError(letter, "Aucune question à copier");
+                return;
+            }
+            
+            // Copier le texte dans le presse-papier
+            navigator.clipboard.writeText(questionTextarea.value.trim())
+                .then(() => {
+                    // Afficher une notification de succès
+                    this.showSingleQuestionSuccess(letter, "Question copiée dans le presse-papier");
+                })
+                .catch(err => {
+                    console.error("Erreur lors de la copie dans le presse-papier:", err);
+                    this.showSingleQuestionError(letter, "Impossible de copier la question");
+                });
+        }
+        
+        // Rechercher la question sur le web
+        searchOnWeb(event) {
+            const letter = event.currentTarget.dataset.letter;
+            if (!letter) return;
+            
+            const questionTextarea = this.element.querySelector(`.letter-question-input[data-letter="${letter}"]`);
+            if (!questionTextarea || !questionTextarea.value.trim()) {
+                this.showSingleQuestionError(letter, "Aucune question à rechercher");
+                return;
+            }
+            
+            const question = questionTextarea.value.trim();
+            
+            // Obtenir le contexte thématique s'il existe, pour enrichir la recherche
+            let thematicContext = "";
+            const contextElement = document.getElementById('thematic-context');
+            if (contextElement && contextElement.textContent.trim()) {
+                thematicContext = contextElement.textContent.trim();
+            }
+            
+            // Créer le terme de recherche en combinant la question et le contexte
+            let searchTerm = question;
+            if (thematicContext) {
+                // Extraire les mots-clés du contexte thématique (les 3-4 premiers mots significatifs)
+                const contextKeywords = thematicContext.split(/\s+/).filter(word => 
+                    word.length > 3 && 
+                    !['cette', 'dont', 'pour', 'avec', 'dans', 'comme'].includes(word.toLowerCase())
+                ).slice(0, 4).join(' ');
+                
+                if (contextKeywords) {
+                    searchTerm = `${question} ${contextKeywords}`;
+                }
+            }
+            
+            // Utiliser la fonction globale pour ouvrir un onglet de recherche
+            if (window.openWebSearchTab) {
+                const searchTitle = `Recherche ${letter}: ${question.substring(0, 20)}${question.length > 20 ? '...' : ''}`;
+                window.openWebSearchTab(searchTerm, searchTitle);
+                this.showSingleQuestionSuccess(letter, "Recherche ouverte dans un nouvel onglet");
+            } else {
+                // Fallback vers l'ouverture d'un nouvel onglet de navigateur si openWebSearchTab n'est pas disponible
+                const encodedSearch = encodeURIComponent(searchTerm);
+                window.open(`https://www.google.com/search?q=${encodedSearch}`, '_blank');
+                this.showSingleQuestionSuccess(letter, "Recherche lancée dans un nouvel onglet");
             }
         }
     }

@@ -17,6 +17,7 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
    - Analyse de la description et des waypoints de la géocache
    - Route `/geocaches/formula-questions` pour l'extraction des questions associées aux variables
    - Route `/geocaches/formula-solve-questions` pour la résolution automatique des questions par IA
+   - Route `/geocaches/formula-solve-single-question` pour la résolution d'une question individuelle
 
 3. **Services Dédiés**
    - `FormulaQuestionsService` pour l'extraction des questions liées aux variables et du contexte thématique
@@ -30,6 +31,7 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 
 5. **GoldenLayout**
    - Composant `FormulaSolver` pour l'intégration dans l'interface principale
+   - Composant `WebSearch` pour la recherche web intégrée
    - Fonction `openFormulaSolverTab` pour ouvrir l'outil dans un nouvel onglet
 
 ## Fonctionnalités
@@ -113,7 +115,11 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
    - Champ de saisie pour le mot ou l'expression
    - Affichage du checksum, checksum réduit et longueur calculés automatiquement
    - Boutons radio individuels pour sélectionner le type de valeur à utiliser pour cette variable
-   - Affichage de la question associée à chaque variable
+   - Champ de question éditable pour modifier les questions extraites
+   - Interactions individuelles pour chaque question:
+     - Bouton "Copier" pour copier le texte de la question dans le presse-papier
+     - Bouton "Rechercher" pour ouvrir un onglet de recherche web avec la question (et le contexte thématique)
+     - Bouton "Résoudre" pour obtenir la réponse à une question spécifique avec l'IA
 
 6. **Formule avec Substitution**
    - Affichage de la formule avec les valeurs remplaçant les variables
@@ -127,6 +133,30 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 8. **Données de la Géocache**
    - Description complète
    - Liste des waypoints avec leurs coordonnées et notes
+
+## Gestion des Questions et Réponses
+
+### Édition des Questions
+- Chaque variable dispose d'un champ de question éditable
+- Possibilité de modifier manuellement les questions extraites
+- Utile pour corriger les erreurs d'extraction ou améliorer la formulation
+
+### Résolution d'une Question Individuelle
+- Bouton "Résoudre" à côté de chaque question
+- Résout uniquement la question sélectionnée avec l'IA
+- Utilise le contexte thématique pour une meilleure précision
+- Remplissage automatique du champ de réponse correspondant
+
+### Recherche Web Intégrée
+- Bouton "Rechercher" pour lancer une recherche sur le web
+- Ouvre un nouvel onglet GoldenLayout avec les résultats Google
+- Combine automatiquement la question avec des mots-clés du contexte thématique
+- Permet de rester dans l'application sans ouvrir un navigateur externe
+
+### Copie et Partage
+- Bouton "Copier" pour copier rapidement la question
+- Facilite le partage ou la recherche externe
+- Notification visuelle confirmant la copie réussie
 
 ## Extraction du Contexte Thématique
 
@@ -247,11 +277,24 @@ def solve_formula_questions():
     # Génération des réponses avec l'IA
 ```
 
+```python
+# Route pour résoudre une question individuelle
+@geocaches_bp.route('/geocaches/formula-solve-single-question', methods=['POST'])
+def solve_formula_single_question():
+    # Récupération d'une question spécifique et du contexte
+    # Génération d'une réponse ciblée avec l'IA
+```
+
 ### GoldenLayout
 ```javascript
 // Enregistrement du composant
 mainLayout.registerComponent('FormulaSolver', function(container, state) {
     // Chargement de la page avec les paramètres
+})
+
+// Enregistrement du composant de recherche web
+mainLayout.registerComponent('WebSearch', function(container, state) {
+    // Chargement des résultats de recherche dans une iframe
 })
 ```
 
@@ -323,7 +366,14 @@ mainLayout.registerComponent('FormulaSolver', function(container, state) {
    - Cliquer sur l'un des boutons radio généraux en haut pour changer toutes les variables
    - Observer la mise à jour automatique de la formule et des coordonnées
 
-5. **Vérification des Résultats**
+5. **Gestion des Questions Individuelles**
+   - Modifier le texte d'une question dans le champ éditable pour la corriger ou la préciser
+   - Cliquer sur "Copier" pour copier rapidement une question dans le presse-papier
+   - Cliquer sur "Rechercher" pour ouvrir un onglet de recherche Google dans l'application
+   - Cliquer sur "Résoudre" sur une question spécifique pour obtenir uniquement sa réponse
+   - La réponse est automatiquement insérée dans le champ correspondant
+
+6. **Vérification des Résultats**
    - Les coordonnées sont calculées et formatées automatiquement
    - Le format respecte la norme avec 2 chiffres pour les minutes et 3 pour les décimales
    - Exemple: `N49° 12.086 E005° 59.209` 

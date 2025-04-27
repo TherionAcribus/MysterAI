@@ -968,6 +968,46 @@ function initializeLayout() {
                 });
         });
 
+        // Enregistrer le composant WebSearch
+        mainLayout.registerComponent('WebSearch', function(container, state) {
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Construire l'URL avec les paramètres
+            const searchTerm = state.searchTerm;
+            if (!searchTerm) {
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                        <div class="flex items-center justify-center h-full">
+                            <div class="text-red-500">Erreur: Terme de recherche manquant</div>
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+            
+            // Créer une iframe qui charge Google Search
+            const encodedSearch = encodeURIComponent(searchTerm);
+            const iframeHtml = `
+                <div class="w-full h-full bg-gray-900 overflow-auto">
+                    <iframe 
+                        src="https://www.google.com/search?q=${encodedSearch}&igu=1" 
+                        class="w-full h-full border-none"
+                        sandbox="allow-scripts allow-same-origin allow-forms">
+                    </iframe>
+                </div>
+            `;
+            
+            container.getElement().html(iframeHtml);
+        });
+
         mainLayout.init();
 
         // Ajuster la taille lors du redimensionnement de la fenêtre
@@ -1216,3 +1256,30 @@ function updateGeocacheCode(geocacheId) {
         }
     }
 }
+
+// Fonction pour ouvrir une recherche web dans un nouvel onglet GoldenLayout
+window.openWebSearchTab = function(searchTerm, title = null) {
+    try {
+        console.log('openWebSearchTab called with:', { searchTerm });
+        
+        if (!searchTerm) {
+            console.error('Terme de recherche manquant');
+            return;
+        }
+        
+        // Titre par défaut si aucun titre n'est spécifié
+        const searchTitle = title || `Recherche: ${searchTerm.substring(0, 30)}${searchTerm.length > 30 ? '...' : ''}`;
+        
+        // Créer un nouvel onglet
+        window.mainLayout.root.contentItems[0].addChild({
+            type: 'component',
+            componentName: 'WebSearch',
+            title: searchTitle,
+            componentState: { 
+                searchTerm: searchTerm
+            }
+        });
+    } catch (error) {
+        console.error('Erreur lors de l\'ouverture de la recherche web:', error);
+    }
+};

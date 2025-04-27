@@ -3054,3 +3054,59 @@ def solve_formula_questions():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/formula-solve-single-question', methods=['POST'])
+def solve_formula_single_question():
+    """
+    Résout une seule question associée à une variable spécifique
+    """
+    # Récupérer les données de la requête
+    data = request.json
+    geocache_id = data.get('geocache_id')
+    letter = data.get('letter')
+    question = data.get('question')
+    thematic_context = data.get('thematic_context', '')
+    
+    # Vérifier les paramètres
+    if not geocache_id:
+        return jsonify({'error': 'ID de géocache manquant'}), 400
+        
+    if not letter:
+        return jsonify({'error': 'Lettre manquante'}), 400
+        
+    if not question:
+        return jsonify({'error': 'Question manquante'}), 400
+    
+    try:
+        # Récupérer la géocache
+        geocache = Geocache.query.get(geocache_id)
+        if not geocache:
+            return jsonify({'error': f'Géocache avec ID {geocache_id} introuvable'}), 404
+        
+        # Préparer le dictionnaire de questions avec une seule entrée
+        questions = {letter: question}
+        
+        # Ajouter le contexte thématique s'il existe
+        if thematic_context:
+            questions['_thematic_context'] = thematic_context
+        
+        # Résoudre la question avec l'IA
+        answers = formula_solver_service.solve_questions_with_ai(questions, geocache_id, geocache.gc_code)
+        
+        # Si une erreur est retournée
+        if isinstance(answers, dict) and 'error' in answers:
+            return jsonify({'error': answers['error']}), 500
+        
+        # Extraire et retourner uniquement la réponse pour la lettre demandée
+        answer = answers.get(letter, '')
+        
+        return jsonify({
+            'success': True,
+            'letter': letter,
+            'answer': answer
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
