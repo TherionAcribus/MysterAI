@@ -116,7 +116,7 @@
             
             let letterMatches = [];
             
-            // On extrait uniquement les lettres à l'intérieur des parenthèses
+            // On extrait les lettres à l'intérieur des parenthèses
             const parenthesesRegex = /\(([^()]+)\)/g;
             let match;
             
@@ -127,14 +127,12 @@
                 letterMatches = [...letterMatches, ...letters];
             }
             
-            // Si on ne trouve pas de parenthèses, rechercher des lettres après un point
-            if (letterMatches.length === 0) {
-                const decimalRegex = /\.([A-Z0-9+\-*\/]+)/g;
-                while ((match = decimalRegex.exec(formula)) !== null) {
-                    const content = match[1];
-                    const letters = content.match(/[A-Z]/g) || [];
-                    letterMatches = [...letterMatches, ...letters];
-                }
+            // Rechercher également des lettres après un point (peu importe s'il y a des parenthèses ou non)
+            const decimalRegex = /\.([A-Z0-9+\-*\/]+)/g;
+            while ((match = decimalRegex.exec(formula)) !== null) {
+                const content = match[1];
+                const letters = content.match(/[A-Z]/g) || [];
+                letterMatches = [...letterMatches, ...letters];
             }
             
             // Filtrer et trier les lettres uniques
