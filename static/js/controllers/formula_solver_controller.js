@@ -20,7 +20,8 @@
             "solvingOverlay",
             "extractionModeDisplay",
             "detectedFormulasContainer",
-            "detectedFormulasLoading"
+            "detectedFormulasLoading",
+            "questionExtractionModeDisplay"
         ]
         static values = {
             geocacheId: String,
@@ -45,6 +46,10 @@
             // Récupérer le paramètre de méthode d'extraction des formules (ia ou regex)
             this.formulaExtractionMethod = 'regex'; // Valeur par défaut
             this.loadFormulaExtractionMethod();
+            
+            // Récupérer le paramètre de méthode d'extraction des questions (ia ou regex)
+            this.questionExtractionMethod = 'ai'; // Valeur par défaut
+            this.loadQuestionExtractionMethod();
             
             // Ajouter un gestionnaire d'événements pour le clic droit sur les éléments avec la classe geocache-description
             document.querySelectorAll('.geocache-description').forEach(element => {
@@ -83,6 +88,64 @@
                 .catch(error => {
                     console.error('Erreur lors du chargement du paramètre formula_extraction_method:', error);
                 });
+        }
+
+        /**
+         * Charge la méthode d'extraction des questions depuis les paramètres
+         */
+        loadQuestionExtractionMethod() {
+            console.log('=== DEBUG: Chargement du paramètre question_extraction_method ===');
+            
+            fetch('/api/settings/param/question_extraction_method')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('=== DEBUG: Méthode d\'extraction des questions ===', data);
+                    
+                    if (data.success && data.value) {
+                        this.questionExtractionMethod = data.value;
+                        console.log(`=== DEBUG: Méthode d'extraction des questions définie à: ${this.questionExtractionMethod} ===`);
+                        
+                        // Mettre à jour l'affichage des boutons radio en fonction de la méthode par défaut
+                        if (this.hasExtractionMethodAITarget && this.hasExtractionMethodRegexTarget) {
+                            if (this.questionExtractionMethod === 'ai') {
+                                this.extractionMethodAITarget.checked = true;
+                                this.extractionMethodRegexTarget.checked = false;
+                            } else {
+                                this.extractionMethodAITarget.checked = false;
+                                this.extractionMethodRegexTarget.checked = true;
+                            }
+                        }
+                        
+                        // Mettre à jour l'affichage du mode d'extraction
+                        this.updateQuestionExtractionModeDisplay();
+                    } else {
+                        console.warn('=== WARN: Paramètre question_extraction_method non disponible, utilisation de IA par défaut ===');
+                    }
+                    
+                    // Ajouter des écouteurs d'événements pour mettre à jour l'affichage lorsqu'on change de méthode
+                    if (this.hasExtractionMethodAITarget && this.hasExtractionMethodRegexTarget) {
+                        this.extractionMethodAITarget.addEventListener('change', () => this.updateQuestionExtractionModeDisplay());
+                        this.extractionMethodRegexTarget.addEventListener('change', () => this.updateQuestionExtractionModeDisplay());
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement du paramètre question_extraction_method:', error);
+                });
+        }
+
+        /**
+         * Met à jour l'affichage du mode d'extraction des questions
+         */
+        updateQuestionExtractionModeDisplay() {
+            if (this.hasQuestionExtractionModeDisplayTarget) {
+                const method = this.extractionMethodAITarget.checked ? 'IA' : 'Regex';
+                this.questionExtractionModeDisplayTarget.textContent = method;
+            }
         }
 
         // Définir le type de valeur pour toutes les lettres
@@ -866,13 +929,20 @@
                 return;
             }
 
-            // Détermine la méthode d'extraction choisie
+            // Utiliser la méthode sélectionnée par les boutons radio
             const method = this.extractionMethodAITarget.checked ? 'ai' : 'regex';
+            console.log(`=== DEBUG: Extraction manuelle des questions avec méthode: ${method} ===`);
             
             this.extractQuestions(geocacheId, letters, method);
         }
 
-        extractQuestions(geocacheId, letters, method = 'ai') {
+        extractQuestions(geocacheId, letters, method = null) {
+            // Si aucune méthode n'est spécifiée, utiliser la méthode par défaut chargée depuis les paramètres
+            if (method === null) {
+                method = this.questionExtractionMethod || 'ai';
+                console.log(`=== DEBUG: Utilisation de la méthode d'extraction par défaut: ${method} ===`);
+            }
+            
             this.showLoadingQuestions();
 
             fetch('/geocaches/formula-questions', {

@@ -10,7 +10,7 @@
     
     class FormulaSettingsController extends Stimulus.Controller {
         static targets = [
-            "extractionMethod"
+            "extractionMethod", "questionExtractionMethod"
         ];
         
         connect() {
@@ -71,25 +71,48 @@
             // Si settings est null ou undefined, utiliser un objet vide
             settings = settings || {};
             
-            // Récupérer la méthode d'extraction
-            const method = settings.formula_extraction_method || 'regex';
-            console.log(`=== DEBUG: Méthode d'extraction à afficher: ${method} ===`);
+            // Récupérer la méthode d'extraction de formule
+            const extractionMethod = settings.formula_extraction_method || 'regex';
+            console.log(`=== DEBUG: Méthode d'extraction de formule à afficher: ${extractionMethod} ===`);
             
-            // Mettre à jour les boutons radio directement via le DOM
+            // Récupérer la méthode d'extraction de question
+            const questionExtractionMethod = settings.question_extraction_method || 'regex';
+            console.log(`=== DEBUG: Méthode d'extraction de question à afficher: ${questionExtractionMethod} ===`);
+            
+            // Mettre à jour les boutons radio d'extraction de formule
             const iaRadio = document.getElementById('extraction_ia');
             const regexRadio = document.getElementById('extraction_regex');
             
             if (iaRadio && regexRadio) {
-                iaRadio.checked = (method === 'ia');
-                regexRadio.checked = (method === 'regex');
-                console.log(`=== DEBUG: Boutons radio mis à jour - IA: ${iaRadio.checked}, Regex: ${regexRadio.checked} ===`);
+                iaRadio.checked = (extractionMethod === 'ia');
+                regexRadio.checked = (extractionMethod === 'regex');
+                console.log(`=== DEBUG: Boutons radio de formule mis à jour - IA: ${iaRadio.checked}, Regex: ${regexRadio.checked} ===`);
             } else {
-                console.error('=== ERREUR: Impossible de trouver les boutons radio ===');
+                console.error('=== ERREUR: Impossible de trouver les boutons radio d\'extraction de formule ===');
                 
                 // Fallback à l'ancienne méthode
                 if (this.hasExtractionMethodTargets) {
                     this.extractionMethodTargets.forEach(radio => {
-                        radio.checked = radio.value === method;
+                        radio.checked = radio.value === extractionMethod;
+                    });
+                }
+            }
+            
+            // Mettre à jour les boutons radio d'extraction de question
+            const questionIARadio = document.getElementById('question_extraction_ia');
+            const questionRegexRadio = document.getElementById('question_extraction_regex');
+            
+            if (questionIARadio && questionRegexRadio) {
+                questionIARadio.checked = (questionExtractionMethod === 'ia');
+                questionRegexRadio.checked = (questionExtractionMethod === 'regex');
+                console.log(`=== DEBUG: Boutons radio de question mis à jour - IA: ${questionIARadio.checked}, Regex: ${questionRegexRadio.checked} ===`);
+            } else {
+                console.error('=== ERREUR: Impossible de trouver les boutons radio d\'extraction de question ===');
+                
+                // Fallback à l'ancienne méthode
+                if (this.hasQuestionExtractionMethodTargets) {
+                    this.questionExtractionMethodTargets.forEach(radio => {
+                        radio.checked = radio.value === questionExtractionMethod;
                     });
                 }
             }
@@ -99,9 +122,16 @@
          * Définir les valeurs par défaut
          */
         resetToDefaults() {
+            // Réinitialiser les boutons radio d'extraction de formule
             if (this.hasExtractionMethodTargets) {
-                // Par défaut, utiliser regex
                 this.extractionMethodTargets.forEach(radio => {
+                    radio.checked = radio.value === 'regex';
+                });
+            }
+            
+            // Réinitialiser les boutons radio d'extraction de question
+            if (this.hasQuestionExtractionMethodTargets) {
+                this.questionExtractionMethodTargets.forEach(radio => {
                     radio.checked = radio.value === 'regex';
                 });
             }
@@ -113,20 +143,29 @@
         saveSettings() {
             console.log('=== DEBUG: Enregistrement des paramètres ===');
             
-            // Récupérer la méthode d'extraction sélectionnée directement depuis le DOM
+            // Récupérer la méthode d'extraction de formule
             let extractionMethod = 'regex'; // Valeur par défaut
-
-            // Approche directe pour trouver le bouton radio sélectionné
             const checkedRadio = document.querySelector('input[name="extraction_method"]:checked');
             if (checkedRadio) {
                 extractionMethod = checkedRadio.value;
-                console.log(`=== DEBUG: Bouton radio sélectionné: ${checkedRadio.id}, valeur: ${extractionMethod} ===`);
+                console.log(`=== DEBUG: Bouton radio de formule sélectionné: ${checkedRadio.id}, valeur: ${extractionMethod} ===`);
             } else {
-                console.error('=== ERREUR: Aucun bouton radio sélectionné ===');
+                console.error('=== ERREUR: Aucun bouton radio d\'extraction de formule sélectionné ===');
+            }
+            
+            // Récupérer la méthode d'extraction de question
+            let questionExtractionMethod = 'regex'; // Valeur par défaut
+            const checkedQuestionRadio = document.querySelector('input[name="question_extraction_method"]:checked');
+            if (checkedQuestionRadio) {
+                questionExtractionMethod = checkedQuestionRadio.value;
+                console.log(`=== DEBUG: Bouton radio de question sélectionné: ${checkedQuestionRadio.id}, valeur: ${questionExtractionMethod} ===`);
+            } else {
+                console.error('=== ERREUR: Aucun bouton radio d\'extraction de question sélectionné ===');
             }
             
             const settings = {
-                formula_extraction_method: extractionMethod
+                formula_extraction_method: extractionMethod,
+                question_extraction_method: questionExtractionMethod
             };
             
             console.log('=== DEBUG: Paramètres à enregistrer ===', settings);

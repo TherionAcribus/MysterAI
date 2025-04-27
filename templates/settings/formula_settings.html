@@ -2,7 +2,7 @@
     <h2 class="text-lg font-semibold mb-4">Paramètres Formula Solver</h2>
     
     <div class="space-y-4">
-        <!-- Méthode d'extraction -->
+        <!-- Méthode d'extraction de formule -->
         <div class="mb-6">
             <label class="block text-gray-300 mb-2">Méthode d'extraction de formule</label>
             <div class="space-y-2">
@@ -28,6 +28,35 @@
                     <label for="extraction_regex" class="text-gray-300">Expressions régulières</label>
                 </div>
                 <p class="text-gray-400 ml-5 text-sm">Utilise des patterns prédéfinis pour extraire les formules (plus rapide mais moins précis)</p>
+            </div>
+        </div>
+        
+        <!-- Méthode d'extraction de question -->
+        <div class="mb-6">
+            <label class="block text-gray-300 mb-2">Méthode d'extraction de question</label>
+            <div class="space-y-2">
+                <div class="flex items-center">
+                    <input type="radio" 
+                           id="question_extraction_ia" 
+                           name="question_extraction_method" 
+                           value="ia" 
+                           data-formula-settings-target="questionExtractionMethod"
+                           class="mr-2">
+                    <label for="question_extraction_ia" class="text-gray-300">Intelligence Artificielle</label>
+                </div>
+                <p class="text-gray-400 ml-5 text-sm">Utilise le modèle d'IA pour extraire les questions (plus précis mais plus lent)</p>
+                
+                <div class="flex items-center">
+                    <input type="radio" 
+                           id="question_extraction_regex" 
+                           name="question_extraction_method" 
+                           value="regex" 
+                           data-formula-settings-target="questionExtractionMethod"
+                           class="mr-2" 
+                           checked>
+                    <label for="question_extraction_regex" class="text-gray-300">Expressions régulières</label>
+                </div>
+                <p class="text-gray-400 ml-5 text-sm">Utilise des patterns prédéfinis pour extraire les questions (plus rapide mais moins précis)</p>
             </div>
         </div>
     </div>

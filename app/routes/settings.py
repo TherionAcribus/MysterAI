@@ -68,7 +68,8 @@ def get_formula_settings():
     logger.info("=== DEBUG: Route /api/settings/formula appelée ===")
     try:
         settings = {
-            'formula_extraction_method': AppConfig.get_value('formula_extraction_method', 'regex')
+            'formula_extraction_method': AppConfig.get_value('formula_extraction_method', 'regex'),
+            'question_extraction_method': AppConfig.get_value('question_extraction_method', 'regex')
         }
         
         logger.info(f"=== DEBUG: Paramètres Formula Solver récupérés: {settings} ===")
@@ -143,27 +144,43 @@ def save_formula_settings():
                 'error': 'Format de données invalide'
             }), 400
         
-        # Récupérer la méthode d'extraction
-        extraction_method = data.get('formula_extraction_method', 'regex')
-        logger.info(f"=== DEBUG: Méthode d'extraction à enregistrer: {extraction_method} ===")
+        # Récupérer les méthodes d'extraction
+        formula_extraction_method = data.get('formula_extraction_method', 'regex')
+        question_extraction_method = data.get('question_extraction_method', 'regex')
+        
+        logger.info(f"=== DEBUG: Méthode d'extraction de formule à enregistrer: {formula_extraction_method} ===")
+        logger.info(f"=== DEBUG: Méthode d'extraction de question à enregistrer: {question_extraction_method} ===")
         
         # Enregistrer les paramètres
-        result = AppConfig.set_value(
+        result1 = AppConfig.set_value(
             'formula_extraction_method', 
-            extraction_method,
+            formula_extraction_method,
             category='formula',
             description='Méthode d\'extraction des formules (ia ou regex)'
         )
         
+        result2 = AppConfig.set_value(
+            'question_extraction_method', 
+            question_extraction_method,
+            category='formula',
+            description='Méthode d\'extraction des questions (ia ou regex)'
+        )
+        
         # Vérifier l'enregistrement
-        saved_value = AppConfig.get_value('formula_extraction_method', 'regex')
-        logger.info(f"=== DEBUG: Valeur enregistrée en base: {saved_value} ===")
+        saved_formula_value = AppConfig.get_value('formula_extraction_method', 'regex')
+        saved_question_value = AppConfig.get_value('question_extraction_method', 'regex')
+        
+        logger.info(f"=== DEBUG: Valeur de formule enregistrée en base: {saved_formula_value} ===")
+        logger.info(f"=== DEBUG: Valeur de question enregistrée en base: {saved_question_value} ===")
         
         logger.info("=== DEBUG: Paramètres Formula Solver enregistrés avec succès ===")
         return jsonify({
             'success': True,
             'message': 'Paramètres enregistrés avec succès',
-            'saved_value': saved_value  # Renvoyer la valeur enregistrée au client
+            'saved_values': {
+                'formula_extraction_method': saved_formula_value,
+                'question_extraction_method': saved_question_value
+            }
         })
         
     except Exception as e:
