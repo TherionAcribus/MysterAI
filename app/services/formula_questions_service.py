@@ -12,6 +12,98 @@ class FormulaQuestionsService:
         """Initialise le service d'extraction de questions"""
         pass
     
+    def extract_thematic_context(self, geocache):
+        """
+        Extrait le contexte thématique de la géocache à partir de son titre et sa description
+        
+        Args:
+            geocache: Objet Geocache contenant les informations de la géocache
+            
+        Returns:
+            str: Description du contexte thématique de la géocache
+        """
+        try:
+            print(f"===== DÉBUT EXTRACTION CONTEXTE THÉMATIQUE =====")
+            print(f"Géocache: {geocache.gc_code} - {geocache.name}")
+            
+            # Vérifier si le service AI est disponible
+            ai_service._ensure_initialized()
+            if not ai_service.api_key:
+                print("Erreur: Service IA non disponible ou clé API non configurée")
+                return ""
+            
+            # Préparer les données de la géocache
+            geocache_data = {
+                "gc_code": geocache.gc_code,
+                "name": geocache.name,
+                "type": getattr(geocache, 'cache_type', '') or getattr(geocache, 'type', ''),
+                "description": self._clean_html(geocache.description) if geocache.description else ""
+            }
+            
+            # Si la description est trop longue, la tronquer
+            description_length = len(geocache_data["description"])
+            if description_length > 2000:
+                print(f"Description tronquée: {description_length} caractères -> 2000 caractères")
+                geocache_data["description"] = geocache_data["description"][:2000] + "..."
+            else:
+                print(f"Longueur de la description: {description_length} caractères")
+            
+            # Créer le prompt pour l'IA
+            prompt = f"""Analyse le titre et la description de cette géocache mystery et identifie son thème principal.
+La géocache a pour titre: {geocache_data['name']}
+Description (extrait):
+{geocache_data['description']}
+
+Donne une courte description (max 3 phrases) du thème principal ou du contexte de cette géocache.
+Ce contexte sera utilisé pour aider à résoudre des questions liées à cette géocache.
+"""
+            
+            print(f"Envoi du prompt pour l'extraction du contexte thématique")
+            
+            # Appeler l'IA pour extraire le contexte
+            response = ai_service.chat(
+                [
+                    {"role": "system", "content": "Tu es un assistant spécialisé dans l'analyse des géocaches."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            if not response:
+                print("Pas de réponse de l'IA pour l'extraction du contexte")
+                return ""
+            
+            # Nettoyer la réponse
+            context = response.strip()
+            
+            print(f"Contexte thématique extrait: {context}")
+            print(f"===== FIN EXTRACTION CONTEXTE THÉMATIQUE =====")
+            return context
+            
+        except Exception as e:
+            print(f"Erreur lors de l'extraction du contexte thématique: {str(e)}")
+            traceback.print_exc()
+            return ""
+    
+    def _clean_html(self, html_content):
+        """
+        Nettoie le contenu HTML pour en extraire le texte
+        
+        Args:
+            html_content: Contenu HTML à nettoyer
+            
+        Returns:
+            str: Texte nettoyé
+        """
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+            return soup.get_text(separator=' ', strip=True)
+        except Exception:
+            # Si BeautifulSoup n'est pas disponible, utiliser une méthode plus simple
+            import re
+            clean = re.compile('<.*?>')
+            return re.sub(clean, ' ', html_content)
+    
     def extract_questions_with_ai(self, content, letters):
         """
         Extrait les questions associées aux lettres dans le contenu spécifié en utilisant l'IA
@@ -21,7 +113,7 @@ class FormulaQuestionsService:
             letters: Liste des lettres à rechercher
             
         Returns:
-            Dictionnaire associant chaque lettre à sa question correspondante
+            Dictionnaire associant chaque lettre à sa question correspondante, avec le contexte thématique
         """
         try:
             # Vérifier si le service AI est disponible
@@ -35,6 +127,11 @@ class FormulaQuestionsService:
             if not prepared_content:
                 print("Contenu vide, impossible d'extraire les questions")
                 return {"error": "Contenu vide, impossible d'extraire les questions"}
+            
+            # Extraire le contexte thématique si content est un objet Geocache
+            thematic_context = ""
+            if hasattr(content, 'gc_code'):
+                thematic_context = self.extract_thematic_context(content)
             
             # Créer le message pour l'IA
             instructions = self._build_ai_instructions(letters)
@@ -56,6 +153,12 @@ class FormulaQuestionsService:
                 
             # Extraire le JSON de la réponse
             result = self._extract_json_from_response(response, letters)
+            
+            # Ajouter le contexte thématique au résultat
+            if thematic_context:
+                result["_thematic_context"] = thematic_context
+                print(f"Contexte thématique ajouté au résultat: {thematic_context[:100]}...")
+            
             print(f"Résultat de l'extraction IA: {result}")
             return result
             

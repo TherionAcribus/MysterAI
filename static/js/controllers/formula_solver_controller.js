@@ -756,6 +756,121 @@
             const letterContainers = this.letterFieldsTarget.querySelectorAll('.letter-container');
             let questionsFound = false;
             
+            // Extraire d'abord le contexte thématique s'il existe
+            const thematicContext = questions._thematic_context || "";
+            
+            // Supprimer le contexte thématique du dictionnaire de questions
+            delete questions._thematic_context;
+            
+            // Afficher le contexte thématique s'il existe
+            if (thematicContext) {
+                let contextElement = document.getElementById('thematic-context');
+                let contextContainer = document.getElementById('thematic-context-container');
+                
+                // Créer l'élément de contexte s'il n'existe pas
+                if (!contextElement) {
+                    // Créer le conteneur s'il n'existe pas
+                    if (!contextContainer) {
+                        contextContainer = document.createElement('div');
+                        contextContainer.id = 'thematic-context-container';
+                        contextContainer.className = 'mb-4 bg-gray-700 p-3 rounded';
+                        
+                        // Ajouter le titre avec l'icône d'information
+                        const titleContainer = document.createElement('div');
+                        titleContainer.className = 'flex items-center justify-between mb-2';
+                        
+                        const titleElement = document.createElement('p');
+                        titleElement.className = 'text-gray-300 font-medium';
+                        titleElement.textContent = 'Contexte thématique:';
+                        titleContainer.appendChild(titleElement);
+                        
+                        // Ajouter une icône d'information avec tooltip
+                        const infoContainer = document.createElement('div');
+                        infoContainer.className = 'relative';
+                        
+                        const infoIcon = document.createElement('span');
+                        infoIcon.className = 'cursor-pointer text-blue-400 hover:text-blue-300';
+                        infoIcon.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        `;
+                        infoContainer.appendChild(infoIcon);
+                        
+                        // Ajouter l'infobulle
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'absolute z-10 bottom-full right-0 mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg hidden';
+                        tooltip.innerHTML = `
+                            <p>Ce contexte a été identifié par l'IA à partir du titre et de la description de la géocache.</p>
+                            <p class="mt-1">Il aide à comprendre le thème général et à résoudre des questions ambiguës.</p>
+                            <div class="absolute bottom-0 right-3 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
+                        `;
+                        infoContainer.appendChild(tooltip);
+                        
+                        // Ajouter des gestionnaires d'événements pour afficher/masquer l'infobulle
+                        infoIcon.addEventListener('mouseenter', () => {
+                            tooltip.classList.remove('hidden');
+                        });
+                        
+                        infoIcon.addEventListener('mouseleave', () => {
+                            tooltip.classList.add('hidden');
+                        });
+                        
+                        titleContainer.appendChild(infoContainer);
+                        contextContainer.appendChild(titleContainer);
+                        
+                        // Ajouter le contenu
+                        contextElement = document.createElement('p');
+                        contextElement.id = 'thematic-context';
+                        contextElement.className = 'text-yellow-300 text-sm p-2 bg-gray-800 rounded';
+                        contextContainer.appendChild(contextElement);
+                        
+                        // Ajouter un bouton pour copier le contexte dans le presse-papiers
+                        const copyButton = document.createElement('button');
+                        copyButton.className = 'mt-2 text-xs text-gray-400 hover:text-blue-400 flex items-center';
+                        copyButton.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                            Copier le contexte
+                        `;
+                        copyButton.onclick = () => {
+                            navigator.clipboard.writeText(thematicContext)
+                                .then(() => {
+                                    copyButton.textContent = "Copié!";
+                                    setTimeout(() => {
+                                        copyButton.innerHTML = `
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                            </svg>
+                                            Copier le contexte
+                                        `;
+                                    }, 2000);
+                                })
+                                .catch(err => console.error('Erreur lors de la copie du contexte:', err));
+                        };
+                        contextContainer.appendChild(copyButton);
+                        
+                        // Insérer le conteneur avant le conteneur des lettres
+                        this.letterFieldsTarget.insertBefore(contextContainer, this.letterFieldsTarget.firstChild);
+                    } else {
+                        // Si le conteneur existe mais pas l'élément de contexte
+                        contextElement = document.createElement('p');
+                        contextElement.id = 'thematic-context';
+                        contextElement.className = 'text-yellow-300 text-sm p-2 bg-gray-800 rounded';
+                        contextContainer.appendChild(contextElement);
+                    }
+                }
+                
+                // Mettre à jour le contenu
+                contextElement.textContent = thematicContext;
+                contextContainer.classList.remove('hidden');
+                
+                // Ajouter un log pour voir le contexte thématique
+                console.log("Contexte thématique utilisé:", thematicContext);
+            }
+            
+            // Afficher les questions pour chaque lettre
             letterContainers.forEach(container => {
                 const letter = container.dataset.letter;
                 if (letter && questions[letter]) {
@@ -774,7 +889,7 @@
             // Afficher un message de réussite si des questions ont été trouvées
             const statusElement = document.getElementById('extraction-status');
             if (statusElement) {
-                if (questionsFound) {
+                if (questionsFound || thematicContext) {
                     statusElement.textContent = 'Les questions ont été extraites avec succès et apparaissent sous chaque variable.';
                     statusElement.classList.remove('hidden');
                     statusElement.classList.remove('text-red-400');
@@ -839,6 +954,18 @@
             
             // Récupérer les questions associées à chaque lettre
             const questions = {};
+            let thematicContext = "";
+            
+            // Chercher d'abord s'il y a un élément contenant le contexte thématique
+            const contextEl = document.getElementById('thematic-context');
+            if (contextEl && contextEl.textContent) {
+                thematicContext = contextEl.textContent.trim();
+                console.log("Contexte thématique récupéré pour la résolution:", thematicContext);
+            } else {
+                console.log("Aucun contexte thématique trouvé pour la résolution");
+            }
+            
+            // Récupérer les questions pour chaque lettre
             letters.forEach(letter => {
                 const container = this.letterFieldsTarget.querySelector(`.letter-container[data-letter="${letter}"]`);
                 if (container) {
@@ -849,13 +976,23 @@
                 }
             });
             
+            console.log("Questions récupérées pour la résolution:", questions);
+            
             // Vérifier si des questions existent pour les lettres
             if (Object.keys(questions).length === 0) {
                 alert('Aucune Question Trouvée: Veuillez d\'abord extraire les questions');
                 return;
             }
             
+            // Ajouter le contexte thématique au dictionnaire de questions si disponible
+            if (thematicContext) {
+                questions["_thematic_context"] = thematicContext;
+                console.log("Contexte thématique ajouté à la requête de résolution");
+            }
+            
             this.showSolvingWithAI();
+            
+            console.log("Envoi de la requête de résolution avec l'IA...");
             
             fetch('/geocaches/formula-solve-questions', {
                 method: 'POST',
@@ -873,8 +1010,8 @@
                 this.hideSolvingWithAI();
                 
                 if (data.success) {
+                    console.log("Réponses reçues du serveur:", data.answers);
                     this.updateLettersWithAnswers(data.answers);
-                    console.log('Réponses obtenues:', data.answers);
                     
                     // Afficher un message de réussite temporaire
                     const statusElement = document.getElementById('extraction-status');

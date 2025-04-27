@@ -15,7 +15,7 @@ class FormulaSolverService:
         Résout les questions associées aux lettres en utilisant l'IA
         
         Args:
-            questions (dict): Dictionnaire de questions par lettre
+            questions (dict): Dictionnaire de questions par lettre, peut inclure un contexte thématique avec la clé "_thematic_context"
             geocache_id (int, optional): ID de la géocache pour le contexte
             gc_code (str, optional): Code GC de la géocache pour le contexte
             
@@ -23,11 +23,20 @@ class FormulaSolverService:
             dict: Dictionnaire associant chaque lettre à sa réponse générée
         """
         try:
+            print(f"===== DÉBUT RÉSOLUTION QUESTIONS AVEC IA =====")
+            
             # Vérifier si le service AI est disponible
             ai_service._ensure_initialized()
             if not ai_service.api_key:
                 print("Erreur: Service IA non disponible ou clé API non configurée")
                 return {"error": "Service IA non disponible ou clé API non configurée"}
+            
+            # Extraire le contexte thématique s'il est disponible
+            thematic_context = questions.pop("_thematic_context", "") if isinstance(questions, dict) else ""
+            if thematic_context:
+                print(f"Contexte thématique trouvé: {thematic_context}")
+            else:
+                print("Aucun contexte thématique fourni")
             
             # Obtenir le contexte de la géocache si un ID est fourni
             geocache_context = ""
@@ -35,9 +44,13 @@ class FormulaSolverService:
                 try:
                     geocache = Geocache.query.get(geocache_id)
                     if geocache:
+                        print(f"Informations de géocache trouvées: {gc_code or geocache.gc_code} - {geocache.name}")
+                        cache_type = getattr(geocache, 'cache_type', '') or getattr(geocache, 'type', '')
+                        
                         geocache_context = f"Cette géocache a pour code GC: {gc_code or geocache.gc_code}. "
                         geocache_context += f"Son nom est: {geocache.name}. "
-                        geocache_context += f"Elle est de type: {geocache.type}. "
+                        if cache_type:
+                            geocache_context += f"Elle est de type: {cache_type}. "
                         geocache_context += f"Difficulté: {geocache.difficulty}/5, Terrain: {geocache.terrain}/5. "
                 except Exception as e:
                     print(f"Erreur lors de la récupération de la géocache: {str(e)}")
@@ -48,11 +61,13 @@ class FormulaSolverService:
                 if question:
                     questions_text += f"Question {letter}: {question}\n"
             
-            # Créer les instructions pour l'IA
-            instructions = self._build_ai_instructions(questions, geocache_context)
+            print(f"Nombre de questions à résoudre: {len(questions)}")
             
+            # Créer les instructions pour l'IA
+            instructions = self._build_ai_instructions(questions, thematic_context, geocache_context)
+            
+            print(f"Instructions préparées pour l'IA")
             print(f"Résolution de {len(questions)} questions avec l'IA...")
-            print(f"Instructions: {instructions[:200]}...")
             
             # Appeler l'IA pour résoudre les questions
             response = ai_service.chat(
@@ -69,6 +84,7 @@ class FormulaSolverService:
             # Extraire le JSON de la réponse
             result = self._extract_json_from_response(response, questions.keys())
             print(f"Réponses générées: {result}")
+            print(f"===== FIN RÉSOLUTION QUESTIONS AVEC IA =====")
             return result
             
         except Exception as e:
@@ -76,12 +92,13 @@ class FormulaSolverService:
             traceback.print_exc()
             return {"error": f"Erreur lors de la résolution des questions avec l'IA: {str(e)}"}
     
-    def _build_ai_instructions(self, questions, geocache_context=""):
+    def _build_ai_instructions(self, questions, thematic_context="", geocache_context=""):
         """
         Crée les instructions à envoyer à l'IA pour la résolution des questions
         
         Args:
             questions: Dictionnaire des questions par lettre
+            thematic_context: Contexte thématique de la géocache
             geocache_context: Contexte supplémentaire sur la géocache
             
         Returns:
@@ -94,9 +111,17 @@ class FormulaSolverService:
             if question:
                 questions_text += f"Question {letter}: {question}\n"
         
+        # Construire le prompt avec le contexte thématique si disponible
+        context_text = ""
+        if thematic_context:
+            print(f"Ajout du contexte thématique aux instructions: {thematic_context}")
+            context_text += f"Contexte thématique de la géocache: {thematic_context}\n\n"
+        if geocache_context:
+            print(f"Ajout des informations de la géocache aux instructions")
+            context_text += f"{geocache_context}\n\n"
+        
         return f"""Je dois résoudre une géocache mystery qui utilise des formules avec des variables.
-{geocache_context}
-
+{context_text}
 Pour résoudre la formule, je dois trouver les réponses aux questions suivantes:
 {questions_text}
 
