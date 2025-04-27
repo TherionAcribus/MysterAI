@@ -17,8 +17,31 @@
         <!-- Formules détectées automatiquement -->
         {% if detected_formulas and detected_formulas|length > 0 %}
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h2 class="text-lg font-semibold text-gray-100 mb-3">Formules détectées</h2>
-            <div class="space-y-3">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-lg font-semibold text-gray-100">Formules détectées</h2>
+                <div class="flex items-center gap-2">
+                    <span id="extraction-mode" class="text-gray-400 text-sm px-2 py-1 rounded bg-gray-700">
+                        Mode: <span data-formula-solver-target="extractionModeDisplay">Regex</span>
+                    </span>
+                    <button 
+                        class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded flex items-center"
+                        data-action="click->formula-solver#detectFormulasWithAI">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>IA</span>
+                    </button>
+                    <button 
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded flex items-center"
+                        data-action="click->formula-solver#detectFormulasWithRegex">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Regex</span>
+                    </button>
+                </div>
+            </div>
+            <div class="space-y-3" data-formula-solver-target="detectedFormulasContainer">
                 {% for formula in detected_formulas %}
                 <div class="bg-gray-700 rounded p-3">
                     <div class="flex justify-between">
@@ -35,6 +58,11 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+            <div data-formula-solver-target="detectedFormulasLoading" class="hidden">
+                <div class="flex items-center justify-center p-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
             </div>
         </div>
         {% endif %}

@@ -17,7 +17,10 @@
             "extractionMethodAI",
             "extractionMethodRegex",
             "solvingWithAI",
-            "solvingOverlay"
+            "solvingOverlay",
+            "extractionModeDisplay",
+            "detectedFormulasContainer",
+            "detectedFormulasLoading"
         ]
         static values = {
             geocacheId: String,
@@ -25,15 +28,56 @@
         }
 
         connect() {
-            console.log("Formula Solver controller connected", {
+            console.log("Formula Solver Controller connected", {
                 geocacheId: this.geocacheIdValue,
                 gcCode: this.gcCodeValue
             });
             
-            // Map pour stocker les valeurs des lettres
+            // Initialiser le dictionnaire pour stocker les données des lettres
             this.letterData = new Map();
-            // Type de valeur sélectionné par défaut
-            this.selectedValueType = 'value';
+            
+            // Déclencher l'extraction des lettres si une formule est déjà présente
+            const formula = this.formulaInputTarget.value.trim();
+            if (formula) {
+                this.extractLetters();
+            }
+            
+            // Récupérer le paramètre de méthode d'extraction des formules (ia ou regex)
+            this.formulaExtractionMethod = 'regex'; // Valeur par défaut
+            this.loadFormulaExtractionMethod();
+        }
+        
+        /**
+         * Charge la méthode d'extraction des formules depuis les paramètres
+         */
+        loadFormulaExtractionMethod() {
+            console.log('=== DEBUG: Chargement du paramètre formula_extraction_method ===');
+            
+            fetch('/api/settings/param/formula_extraction_method')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('=== DEBUG: Méthode d\'extraction des formules ===', data);
+                    
+                    if (data.success && data.value) {
+                        this.formulaExtractionMethod = data.value;
+                        console.log(`=== DEBUG: Méthode d'extraction des formules définie à: ${this.formulaExtractionMethod} ===`);
+                        
+                        // Mettre à jour l'affichage
+                        if (this.hasExtractionModeDisplayTarget) {
+                            this.extractionModeDisplayTarget.textContent = this.formulaExtractionMethod === 'ia' ? 'IA' : 'Regex';
+                        }
+                    } else {
+                        console.warn('=== WARN: Paramètre formula_extraction_method non disponible, utilisation de regex par défaut ===');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement du paramètre formula_extraction_method:', error);
+                });
         }
 
         // Définir le type de valeur pour toutes les lettres
@@ -114,6 +158,68 @@
             // Cette méthode est optimisée pour les formules du type:
             // N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)
             
+            // Si la méthode d'extraction est IA et que l'on a un ID de géocache, utiliser l'IA
+            if (this.formulaExtractionMethod === 'ia' && this.geocacheIdValue) {
+                return this.extractUniqueLettersWithAI(formula);
+            } else {
+                // Sinon utiliser la méthode regex (par défaut)
+                return this.extractUniqueLettersWithRegex(formula);
+            }
+        }
+        
+        // Extraction des lettres avec IA
+        extractUniqueLettersWithAI(formula) {
+            console.log('=== DEBUG: Extraction des lettres avec IA ===');
+            
+            // REMARQUE: Comme l'IA est asynchrone, cette méthode ne peut pas retourner directement les lettres
+            // On doit donc faire une requête et traiter les résultats plus tard
+            // Pour l'instant, on utilise quand même regex en attendant
+            
+            // Déclencher une requête pour extraire les lettres par IA
+            fetch('/geocaches/formula-extract-letters', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_id: this.geocacheIdValue,
+                    formula: formula
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.letters && data.letters.length > 0) {
+                    console.log('=== Lettres extraites par IA ===', data.letters);
+                    
+                    // Mettre à jour l'interface avec les lettres extraites par l'IA
+                    this.createLetterInputFields(data.letters);
+                    
+                    // Si l'IA retourne une formule propre, la mettre à jour
+                    if (data.clean_formula) {
+                        this.formulaInputTarget.value = data.clean_formula;
+                    }
+                    
+                    // Mettre à jour la formule substituée
+                    this.updateSubstitutedFormula();
+                    
+                    // Extraire les questions si nécessaire
+                    if (this.geocacheIdValue) {
+                        this.extractQuestions(this.geocacheIdValue, data.letters);
+                    }
+                } else {
+                    console.error('Erreur lors de l\'extraction des lettres par IA:', data.error || 'Aucune lettre trouvée');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la requête d\'extraction par IA:', error);
+            });
+            
+            // En attendant la réponse de l'IA, utiliser regex pour ne pas bloquer l'interface
+            return this.extractUniqueLettersWithRegex(formula);
+        }
+        
+        // Extraction des lettres avec regex (méthode originale)
+        extractUniqueLettersWithRegex(formula) {
             let letterMatches = [];
             
             // On extrait les lettres à l'intérieur des parenthèses
@@ -1373,6 +1479,203 @@
                 window.open(`https://www.google.com/search?q=${encodedSearch}`, '_blank');
                 this.showSingleQuestionSuccess(letter, "Recherche lancée dans un nouvel onglet");
             }
+        }
+
+        /**
+         * Détecte les formules avec IA
+         */
+        detectFormulasWithAI() {
+            console.log('=== DEBUG: Détection des formules avec IA ===');
+            
+            if (!this.geocacheIdValue) {
+                alert('ID de géocache manquant. Impossible de détecter les formules avec IA.');
+                return;
+            }
+            
+            // Mettre à jour l'affichage du mode d'extraction
+            if (this.hasExtractionModeDisplayTarget) {
+                this.extractionModeDisplayTarget.textContent = 'IA';
+            }
+            
+            // Afficher le loading
+            if (this.hasDetectedFormulasLoadingTarget) {
+                this.detectedFormulasLoadingTarget.classList.remove('hidden');
+            }
+            
+            // Masquer le conteneur des formules détectées
+            if (this.hasDetectedFormulasContainerTarget) {
+                this.detectedFormulasContainerTarget.classList.add('hidden');
+            }
+            
+            // Appel à l'API pour détecter les formules
+            fetch('/geocaches/formula-detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_id: this.geocacheIdValue,
+                    method: 'ia'
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('=== DEBUG: Résultat de la détection IA ===', data);
+                
+                // Masquer le loading
+                if (this.hasDetectedFormulasLoadingTarget) {
+                    this.detectedFormulasLoadingTarget.classList.add('hidden');
+                }
+                
+                if (data.success) {
+                    // Mettre à jour l'affichage des formules détectées
+                    this.updateDetectedFormulas(data.formulas);
+                } else {
+                    console.error('Erreur lors de la détection des formules:', data.error);
+                    alert(`Erreur lors de la détection des formules: ${data.error || 'Une erreur est survenue'}`);
+                    
+                    // Réafficher le conteneur des formules détectées
+                    if (this.hasDetectedFormulasContainerTarget) {
+                        this.detectedFormulasContainerTarget.classList.remove('hidden');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la requête de détection:', error);
+                alert('Erreur de connexion: Impossible de se connecter au serveur pour détecter les formules');
+                
+                // Masquer le loading
+                if (this.hasDetectedFormulasLoadingTarget) {
+                    this.detectedFormulasLoadingTarget.classList.add('hidden');
+                }
+                
+                // Réafficher le conteneur des formules détectées
+                if (this.hasDetectedFormulasContainerTarget) {
+                    this.detectedFormulasContainerTarget.classList.remove('hidden');
+                }
+            });
+        }
+        
+        /**
+         * Détecte les formules avec Regex
+         */
+        detectFormulasWithRegex() {
+            console.log('=== DEBUG: Détection des formules avec Regex ===');
+            
+            if (!this.geocacheIdValue) {
+                alert('ID de géocache manquant. Impossible de détecter les formules avec Regex.');
+                return;
+            }
+            
+            // Mettre à jour l'affichage du mode d'extraction
+            if (this.hasExtractionModeDisplayTarget) {
+                this.extractionModeDisplayTarget.textContent = 'Regex';
+            }
+            
+            // Afficher le loading
+            if (this.hasDetectedFormulasLoadingTarget) {
+                this.detectedFormulasLoadingTarget.classList.remove('hidden');
+            }
+            
+            // Masquer le conteneur des formules détectées
+            if (this.hasDetectedFormulasContainerTarget) {
+                this.detectedFormulasContainerTarget.classList.add('hidden');
+            }
+            
+            // Appel à l'API pour détecter les formules
+            fetch('/geocaches/formula-detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    geocache_id: this.geocacheIdValue,
+                    method: 'regex'
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('=== DEBUG: Résultat de la détection Regex ===', data);
+                
+                // Masquer le loading
+                if (this.hasDetectedFormulasLoadingTarget) {
+                    this.detectedFormulasLoadingTarget.classList.add('hidden');
+                }
+                
+                if (data.success) {
+                    // Mettre à jour l'affichage des formules détectées
+                    this.updateDetectedFormulas(data.formulas);
+                } else {
+                    console.error('Erreur lors de la détection des formules:', data.error);
+                    alert(`Erreur lors de la détection des formules: ${data.error || 'Une erreur est survenue'}`);
+                    
+                    // Réafficher le conteneur des formules détectées
+                    if (this.hasDetectedFormulasContainerTarget) {
+                        this.detectedFormulasContainerTarget.classList.remove('hidden');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors de la requête de détection:', error);
+                alert('Erreur de connexion: Impossible de se connecter au serveur pour détecter les formules');
+                
+                // Masquer le loading
+                if (this.hasDetectedFormulasLoadingTarget) {
+                    this.detectedFormulasLoadingTarget.classList.add('hidden');
+                }
+                
+                // Réafficher le conteneur des formules détectées
+                if (this.hasDetectedFormulasContainerTarget) {
+                    this.detectedFormulasContainerTarget.classList.remove('hidden');
+                }
+            });
+        }
+        
+        /**
+         * Met à jour l'affichage des formules détectées
+         */
+        updateDetectedFormulas(formulas) {
+            console.log('=== DEBUG: Mise à jour des formules détectées ===', formulas);
+            
+            if (!this.hasDetectedFormulasContainerTarget) {
+                console.warn('Cible detectedFormulasContainer non disponible');
+                return;
+            }
+            
+            // Générer le HTML pour les formules
+            let html = '';
+            
+            formulas.forEach(formula => {
+                html += `
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="flex justify-between">
+                            <div>
+                                <div class="text-gray-200">${formula.formula}</div>
+                                <div class="text-gray-400 text-sm mt-1">Source: ${formula.source}</div>
+                            </div>
+                            <button
+                                class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded self-start"
+                                data-action="click->formula-solver#addToFormula"
+                                data-coordinates="${formula.formula}">
+                                Utiliser
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Si aucune formule n'a été trouvée
+            if (formulas.length === 0) {
+                html = `
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="text-gray-300">Aucune formule détectée.</div>
+                    </div>
+                `;
+            }
+            
+            // Mettre à jour le conteneur
+            this.detectedFormulasContainerTarget.innerHTML = html;
+            this.detectedFormulasContainerTarget.classList.remove('hidden');
         }
     }
 

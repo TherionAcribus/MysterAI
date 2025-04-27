@@ -3110,3 +3110,325 @@ def solve_formula_single_question():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/formula-extract-letters', methods=['POST'])
+def extract_formula_letters():
+    """
+    Extrait les lettres d'une formule de coordonnées en utilisant l'IA
+    """
+    # Imports nécessaires
+    import re
+    import traceback
+    import json
+    
+    # Récupérer les données de la requête
+    data = request.json
+    geocache_id = data.get('geocache_id')
+    formula = data.get('formula')
+    
+    logger.info(f"=== Extraction des lettres pour la formule: {formula} ===")
+    
+    # Vérifier les paramètres
+    if not geocache_id:
+        logger.error("ID de géocache manquant dans la requête")
+        return jsonify({'success': False, 'error': 'ID de géocache manquant'}), 400
+        
+    if not formula:
+        logger.error("Formule manquante dans la requête")
+        return jsonify({'success': False, 'error': 'Formule manquante'}), 400
+    
+    try:
+        # Récupérer la géocache
+        geocache = Geocache.query.get(geocache_id)
+        if not geocache:
+            logger.error(f"Géocache avec ID {geocache_id} introuvable")
+            return jsonify({'success': False, 'error': f'Géocache avec ID {geocache_id} introuvable'}), 404
+        
+        # Utiliser le service d'IA pour extraire les lettres
+        from app.services.ai_service import ai_service
+        
+        # Vérifier que le service IA est disponible
+        ai_service._ensure_initialized()
+        if not ai_service.api_key:
+            logger.error("Service IA non disponible ou clé API non configurée")
+            return jsonify({'success': False, 'error': 'Service IA non disponible ou clé API non configurée'}), 500
+        
+        # Préparer le contexte de la géocache
+        geocache_context = ""
+        
+        # Ajouter les informations de base
+        geocache_context += f"Titre: {geocache.name}\n"
+        geocache_context += f"Type: {geocache.cache_type}\n"
+        
+        # Ajouter un extrait de la description (pour le contexte)
+        if geocache.description:
+            # Nettoyer le HTML pour extraire le texte
+            description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
+            # Limiter à 500 caractères pour ne pas surcharger le prompt
+            short_desc = description_text[:500] + "..." if len(description_text) > 500 else description_text
+            geocache_context += f"Description (extrait): {short_desc}\n"
+        
+        # Créer le prompt pour l'IA
+        prompt = f"""Analyse cette formule de coordonnées géographiques et identifie toutes les lettres variables (A à Z) qui doivent être résolues.
+
+Formule: {formula}
+
+Contexte de la géocache:
+{geocache_context}
+
+Si nécessaire, réécris la formule de manière plus propre et normalisée, en respectant le format original mais sans erreurs de formatage.
+Retourne un objet JSON avec:
+1. "letters": Un tableau alphabétique des lettres uniques à résoudre (A-Z)
+2. "clean_formula": La formule réécrite proprement si nécessaire
+
+Voici quelques exemples:
+- N 48° 41.EDB E 006° 09.FC(A/2) contient les variables A, B, C, D, E, F
+- N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197) contient les variables A à J
+- N 47° [A]C.D[H-3] E 006° [B]E.F[G*2] contient les variables A, B, C, D, E, F, G, H
+"""
+        
+        logger.info("Envoi du prompt à l'IA pour extraction des lettres")
+        
+        # Appeler l'IA pour extraire les lettres
+        response = ai_service.chat(
+            [
+                {"role": "system", "content": "Tu es un assistant spécialisé dans l'analyse des formules de coordonnées géographiques."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        if not response:
+            logger.error("Pas de réponse de l'IA")
+            return jsonify({'success': False, 'error': 'Pas de réponse de l\'IA'}), 500
+        
+        logger.info(f"Réponse de l'IA reçue: {response[:100]}...")
+        
+        json_match = re.search(r'({[\s\S]*})', response)
+        result = {'letters': [], 'clean_formula': formula}
+        
+        if json_match:
+            try:
+                json_data = json.loads(json_match.group(1))
+                if 'letters' in json_data:
+                    result['letters'] = sorted(json_data['letters'])
+                    logger.info(f"Lettres extraites par IA: {result['letters']}")
+                if 'clean_formula' in json_data:
+                    result['clean_formula'] = json_data['clean_formula']
+                    logger.info(f"Formule propre: {result['clean_formula']}")
+            except json.JSONDecodeError:
+                logger.error(f"Erreur de décodage JSON: {response}")
+                # Extraction de secours avec regex
+                letters_match = re.search(r'"letters"\s*:\s*\[(.*?)\]', response)
+                if letters_match:
+                    letters_str = letters_match.group(1)
+                    result['letters'] = sorted([l.strip(' "\'') for l in letters_str.split(',')])
+                    logger.info(f"Lettres extraites par regex de secours: {result['letters']}")
+                
+                clean_formula_match = re.search(r'"clean_formula"\s*:\s*"(.*?)"', response)
+                if clean_formula_match:
+                    result['clean_formula'] = clean_formula_match.group(1)
+                    logger.info(f"Formule propre extraite par regex de secours: {result['clean_formula']}")
+        else:
+            logger.warning("Aucun JSON trouvé dans la réponse de l'IA")
+        
+        # Si aucune lettre n'a été trouvée via le JSON, essayer d'extraire directement du texte
+        if not result['letters']:
+            logger.warning("Aucune lettre trouvée dans le JSON, tentative d'extraction directe")
+            # Extraction directe de toutes les lettres majuscules uniques, en excluant N, S, E, W
+            all_letters = re.findall(r'[A-Z]', formula)
+            result['letters'] = sorted(list(set([l for l in all_letters if l not in ['N', 'S', 'E', 'W']])))
+            logger.info(f"Lettres extraites directement: {result['letters']}")
+        
+        return jsonify({
+            'success': True,
+            'letters': result['letters'],
+            'clean_formula': result['clean_formula']
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de l'extraction des lettres: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@geocaches_bp.route('/geocaches/formula-detect', methods=['POST'])
+def detect_formula():
+    """
+    Détecte les formules de coordonnées dans une géocache en utilisant IA ou Regex
+    """
+    # Imports nécessaires
+    import re
+    import traceback
+    
+    # Récupérer les données de la requête
+    data = request.json
+    geocache_id = data.get('geocache_id')
+    method = data.get('method', 'regex')  # 'ia' ou 'regex'
+    
+    logger.info(f"=== Détection de formules avec méthode: {method} pour géocache ID: {geocache_id} ===")
+    
+    # Vérifier les paramètres
+    if not geocache_id:
+        logger.error("ID de géocache manquant dans la requête")
+        return jsonify({'success': False, 'error': 'ID de géocache manquant'}), 400
+    
+    try:
+        # Récupérer la géocache
+        geocache = Geocache.query.options(
+            db.joinedload(Geocache.additional_waypoints)
+        ).get(geocache_id)
+        
+        if not geocache:
+            logger.error(f"Géocache avec ID {geocache_id} introuvable")
+            return jsonify({'success': False, 'error': f'Géocache avec ID {geocache_id} introuvable'}), 404
+        
+        detected_formulas = []
+        
+        if method == 'ia':
+            # Utiliser l'IA pour détecter les formules
+            from app.services.ai_service import ai_service
+            
+            # Vérifier que le service IA est disponible
+            ai_service._ensure_initialized()
+            if not ai_service.api_key:
+                logger.error("Service IA non disponible ou clé API non configurée")
+                return jsonify({'success': False, 'error': 'Service IA non disponible ou clé API non configurée'}), 500
+            
+            # Préparer le contenu pour l'IA
+            geocache_content = ""
+            
+            # Ajouter les informations de base
+            geocache_content += f"Titre: {geocache.name}\n"
+            geocache_content += f"Type: {geocache.cache_type}\n"
+            geocache_content += f"Difficulté: {geocache.difficulty}\n"
+            geocache_content += f"Terrain: {geocache.terrain}\n\n"
+            
+            # Ajouter la description
+            if geocache.description:
+                # Nettoyer le HTML pour extraire le texte
+                description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
+                geocache_content += f"Description:\n{description_text}\n\n"
+            
+            # Ajouter les waypoints
+            if geocache.additional_waypoints:
+                geocache_content += "Waypoints:\n"
+                for wp in geocache.additional_waypoints:
+                    geocache_content += f"- {wp.prefix} - {wp.name}\n"
+                    if wp.note:
+                        geocache_content += f"  Note: {wp.note}\n"
+            
+            # Créer le prompt pour l'IA
+            prompt = f"""Analyse ce contenu de géocache Mystery et identifie toutes les formules de coordonnées qui pourraient être présentes.
+
+CONTENU DE LA GÉOCACHE:
+{geocache_content}
+
+Une formule de coordonnées se présente souvent sous la forme:
+- N 47° 5E.FTN E 006° 5A.JVF
+- N49°12.(A+B+C+D+E+F+G+H+I+J-317) E005°59.(A+B+C+D+E+F+G+H+I+J-197)
+- N 48° 41.EDB E 006° 09.FC(A/2)
+
+Retourne un objet JSON avec un tableau "formulas" contenant les formules détectées, chacune ayant:
+1. "formula": La formule de coordonnées détectée
+2. "source": D'où vient cette formule (Description ou nom du waypoint)
+
+Recherche particulièrement les coordonnées qui contiennent des lettres majuscules (A-Z) ou des expressions entre parenthèses.
+"""
+            
+            logger.info("Envoi du prompt à l'IA pour détection de formules")
+            
+            # Appeler l'IA pour détecter les formules
+            response = ai_service.chat(
+                [
+                    {"role": "system", "content": "Tu es un assistant spécialisé dans l'analyse des géocaches Mystery pour en extraire les formules de coordonnées."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            if not response:
+                logger.error("Pas de réponse de l'IA")
+                return jsonify({'success': False, 'error': 'Pas de réponse de l\'IA'}), 500
+            
+            # Analyser la réponse de l'IA
+            logger.info(f"Réponse de l'IA reçue: {response[:100]}...")
+            
+            try:
+                # Extraire le JSON de la réponse
+                json_match = re.search(r'({[\s\S]*})', response)
+                if json_match:
+                    json_str = json_match.group(1)
+                    logger.info(f"JSON trouvé dans la réponse: {json_str[:100]}...")
+                    
+                    result = json.loads(json_str)
+                    if 'formulas' in result and isinstance(result['formulas'], list):
+                        detected_formulas = result['formulas']
+                        logger.info(f"Formules détectées par IA: {len(detected_formulas)}")
+                    else:
+                        logger.warning("Format JSON incorrect dans la réponse de l'IA")
+                else:
+                    logger.warning("Aucun JSON trouvé dans la réponse de l'IA")
+                    
+                    # Extraction de secours avec regex directement dans la réponse
+                    # Recherche de formules de coordonnées typiques dans la réponse
+                    coord_patterns = [
+                        r'N\s*\d+°\s*\d+\.\d+\s+E\s*\d+°\s*\d+\.\d+',  # N 47° 12.345 E 006° 78.901
+                        r'N\s*\d+°\s*[\dA-Z\.]+\s+E\s*\d+°\s*[\dA-Z\.]+',  # N 47° 5E.FTN E 006° 5A.JVF
+                        r'N\d+°\d+\.\(.*?\)\s+E\d+°\d+\.\(.*?\)'  # N49°12.(A+B+C+D+E-317) E005°59.(A+B+C+D+E-197)
+                    ]
+                    
+                    for pattern in coord_patterns:
+                        matches = re.finditer(pattern, response)
+                        for match in matches:
+                            formula = match.group(0)
+                            detected_formulas.append({
+                                'formula': formula,
+                                'source': 'Détectée par IA (extraction de secours)'
+                            })
+            except Exception as e:
+                logger.error(f"Erreur lors de l'analyse de la réponse de l'IA: {str(e)}")
+                logger.error(traceback.format_exc())
+                return jsonify({'success': False, 'error': f'Erreur lors de l\'analyse de la réponse de l\'IA: {str(e)}'}), 500
+        else:
+            # Méthode Regex (identique à celle utilisée dans formula_solver_panel)
+            from plugins.official.formula_parser.main import FormulaParserPlugin
+            formula_parser = FormulaParserPlugin()
+            
+            logger.info("Détection des formules avec Regex")
+            
+            # Analyser la description pour trouver des formules
+            if geocache.description:
+                # Nettoyer le HTML pour extraire le texte
+                description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
+                result = formula_parser.execute({'text': description_text})
+                
+                for coord in result.get('coordinates', []):
+                    if coord.get('north') and coord.get('east'):
+                        detected_formulas.append({
+                            'formula': f"{coord['north']} {coord['east']}",
+                            'source': 'Description'
+                        })
+            
+            # Analyser les waypoints
+            if geocache.additional_waypoints:
+                for wp in geocache.additional_waypoints:
+                    wp_text = f"{wp.name} {wp.note or ''}"
+                    result = formula_parser.execute({'text': wp_text})
+                    
+                    for coord in result.get('coordinates', []):
+                        if coord.get('north') and coord.get('east'):
+                            detected_formulas.append({
+                                'formula': f"{coord['north']} {coord['east']}",
+                                'source': f"Waypoint {wp.prefix} - {wp.name}"
+                            })
+            
+            logger.info(f"Formules détectées par Regex: {len(detected_formulas)}")
+        
+        return jsonify({
+            'success': True,
+            'formulas': detected_formulas,
+            'method': method
+        })
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la détection des formules: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
