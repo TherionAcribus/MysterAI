@@ -54,6 +54,7 @@
     <script src="/js/controllers/settings_controller.js"></script>
     <script src="/js/controllers/ai_settings_controller.js"></script>
     <script src="/js/controllers/general_settings_controller.js"></script>
+    <script src="/js/controllers/formula_settings_controller.js"></script>
     <script src="/js/controllers/status_bar_controller.js"></script>
     <script src="/js/zone_manager.js"></script>
     
@@ -197,6 +198,7 @@
     <script src="/js/controllers/settings_controller.js"></script> 
     <script src="/js/controllers/ai_settings_controller.js"></script> 
     <script src="/js/controllers/general_settings_controller.js"></script> 
+    <script src="/js/controllers/formula_settings_controller.js"></script> 
     <script src="/js/controllers/status_bar_controller.js"></script>
     
     <!-- Autres scripts -->
@@ -292,6 +294,7 @@
                             <div class="settings-tabs mb-4 border-b border-gray-700">
                                 <button class="settings-tab active" data-tab="general">Général</button>
                                 <button class="settings-tab" data-tab="ai">Intelligence Artificielle</button>
+                                <button class="settings-tab" data-tab="formula">Formula Solver</button>
                                 <button class="settings-tab" data-tab="appearance">Apparence</button>
                             </div>
                             
@@ -313,6 +316,18 @@
                                 <div id="ai-settings" class="settings-section" 
                                      data-controller="ai-settings"
                                      hx-get="/api/ai/settings_panel" 
+                                     hx-trigger="load"
+                                     hx-swap="innerHTML">
+                                    <!-- Le contenu sera chargé via HTMX -->
+                                    <div class="flex items-center justify-center h-32">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Paramètres Formula Solver -->
+                                <div id="formula-settings" class="settings-section" 
+                                     data-controller="formula-settings"
+                                     hx-get="/api/settings/formula_panel" 
                                      hx-trigger="load"
                                      hx-swap="innerHTML">
                                     <!-- Le contenu sera chargé via HTMX -->

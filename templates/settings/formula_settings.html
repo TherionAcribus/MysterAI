@@ -1,0 +1,47 @@
+<div data-controller="formula-settings">
+    <h2 class="text-lg font-semibold mb-4">Paramètres Formula Solver</h2>
+    
+    <div class="space-y-4">
+        <!-- Méthode d'extraction -->
+        <div class="mb-6">
+            <label class="block text-gray-300 mb-2">Méthode d'extraction de formule</label>
+            <div class="space-y-2">
+                <div class="flex items-center">
+                    <input type="radio" 
+                           id="extraction_ia" 
+                           name="extraction_method" 
+                           value="ia" 
+                           data-formula-settings-target="extractionMethod"
+                           class="mr-2">
+                    <label for="extraction_ia" class="text-gray-300">Intelligence Artificielle</label>
+                </div>
+                <p class="text-gray-400 ml-5 text-sm">Utilise le modèle d'IA pour extraire les formules (plus précis mais plus lent)</p>
+                
+                <div class="flex items-center">
+                    <input type="radio" 
+                           id="extraction_regex" 
+                           name="extraction_method" 
+                           value="regex" 
+                           data-formula-settings-target="extractionMethod"
+                           class="mr-2" 
+                           checked>
+                    <label for="extraction_regex" class="text-gray-300">Expressions régulières</label>
+                </div>
+                <p class="text-gray-400 ml-5 text-sm">Utilise des patterns prédéfinis pour extraire les formules (plus rapide mais moins précis)</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-6 flex space-x-4">
+        <button 
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            data-action="click->formula-settings#saveSettings">
+            Enregistrer
+        </button>
+        <button 
+            class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+            data-action="click->formula-settings#resetDefaults">
+            Réinitialiser
+        </button>
+    </div>
+</div> 

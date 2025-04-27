@@ -22,6 +22,20 @@ def get_general_settings_panel():
         logger.error(f"=== ERREUR lors du rendu du template: {str(e)} ===")
         return f"Erreur lors du chargement des paramètres: {str(e)}", 500
 
+@settings_bp.route('/formula_panel', methods=['GET'])
+def get_formula_settings_panel():
+    """
+    Retourne le template HTML pour les paramètres du Formula Solver
+    """
+    logger.info("=== DEBUG: Route /api/settings/formula_panel appelée ===")
+    try:
+        html = render_template('settings/formula_settings.html')
+        logger.info("=== DEBUG: Template des paramètres Formula Solver rendu avec succès ===")
+        return html
+    except Exception as e:
+        logger.error(f"=== ERREUR lors du rendu du template: {str(e)} ===")
+        return f"Erreur lors du chargement des paramètres: {str(e)}", 500
+
 @settings_bp.route('/general', methods=['GET'])
 def get_general_settings():
     """
@@ -41,6 +55,29 @@ def get_general_settings():
         })
     except Exception as e:
         logger.error(f"=== ERREUR lors de la récupération des paramètres: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@settings_bp.route('/formula', methods=['GET'])
+def get_formula_settings():
+    """
+    Récupère les paramètres du Formula Solver
+    """
+    logger.info("=== DEBUG: Route /api/settings/formula appelée ===")
+    try:
+        settings = {
+            'formula_extraction_method': AppConfig.get_value('formula_extraction_method', 'regex')
+        }
+        
+        logger.info(f"=== DEBUG: Paramètres Formula Solver récupérés: {settings} ===")
+        return jsonify({
+            'success': True,
+            'settings': settings
+        })
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la récupération des paramètres Formula Solver: {str(e)} ===")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -85,6 +122,52 @@ def save_general_settings():
         
     except Exception as e:
         logger.error(f"=== ERREUR lors de l'enregistrement des paramètres: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@settings_bp.route('/formula/save', methods=['POST'])
+def save_formula_settings():
+    """
+    Enregistre les paramètres du Formula Solver
+    """
+    try:
+        data = request.get_json()
+        logger.info(f"=== DEBUG: Données reçues pour enregistrement Formula Solver: {data} ===")
+        
+        # Valider les données
+        if not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Format de données invalide'
+            }), 400
+        
+        # Récupérer la méthode d'extraction
+        extraction_method = data.get('formula_extraction_method', 'regex')
+        logger.info(f"=== DEBUG: Méthode d'extraction à enregistrer: {extraction_method} ===")
+        
+        # Enregistrer les paramètres
+        result = AppConfig.set_value(
+            'formula_extraction_method', 
+            extraction_method,
+            category='formula',
+            description='Méthode d\'extraction des formules (ia ou regex)'
+        )
+        
+        # Vérifier l'enregistrement
+        saved_value = AppConfig.get_value('formula_extraction_method', 'regex')
+        logger.info(f"=== DEBUG: Valeur enregistrée en base: {saved_value} ===")
+        
+        logger.info("=== DEBUG: Paramètres Formula Solver enregistrés avec succès ===")
+        return jsonify({
+            'success': True,
+            'message': 'Paramètres enregistrés avec succès',
+            'saved_value': saved_value  # Renvoyer la valeur enregistrée au client
+        })
+        
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de l'enregistrement des paramètres Formula Solver: {str(e)} ===")
         return jsonify({
             'success': False,
             'error': str(e)

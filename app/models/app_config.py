@@ -1,6 +1,10 @@
 from datetime import datetime
 from app.database import db
 import json
+import logging
+
+# Configurer le logger
+logger = logging.getLogger(__name__)
 
 class AppConfig(db.Model):
     __bind_key__ = 'config'  # Utilise la base de données app_config.db
@@ -19,6 +23,7 @@ class AppConfig(db.Model):
     def get_value(key, default=None):
         config = AppConfig.query.filter_by(key=key).first()
         if not config:
+            logger.info(f"=== DEBUG: Aucune valeur trouvée pour {key}, retour à la valeur par défaut: {default} ===")
             return default
         
         if config.value_type == 'int':
@@ -29,10 +34,14 @@ class AppConfig(db.Model):
             return config.value.lower() == 'true'
         elif config.value_type == 'json':
             return json.loads(config.value)
+        
+        logger.info(f"=== DEBUG: Valeur récupérée pour {key}: {config.value} (type: {config.value_type}) ===")
         return config.value
 
     @staticmethod
     def set_value(key, value, category='general', description=None, is_secret=False):
+        logger.info(f"=== DEBUG: Tentative d'enregistrement pour {key}: {value} (type: {type(value).__name__}) ===")
+        
         config = AppConfig.query.filter_by(key=key).first()
         value_type = type(value).__name__
         if isinstance(value, dict):
@@ -40,6 +49,7 @@ class AppConfig(db.Model):
             value_type = 'json'
         
         if not config:
+            logger.info(f"=== DEBUG: Création d'une nouvelle entrée pour {key} ===")
             config = AppConfig(
                 key=key,
                 value=str(value),
@@ -50,9 +60,18 @@ class AppConfig(db.Model):
             )
             db.session.add(config)
         else:
+            logger.info(f"=== DEBUG: Mise à jour de l'entrée existante pour {key} ===")
+            logger.info(f"=== DEBUG: Ancienne valeur: {config.value}, nouvelle valeur: {value} ===")
             config.value = str(value)
             config.value_type = value_type
             config.updated_at = datetime.utcnow()
         
-        db.session.commit()
+        try:
+            db.session.commit()
+            logger.info(f"=== DEBUG: Enregistrement réussi pour {key} ===")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"=== ERREUR lors de l'enregistrement pour {key}: {str(e)} ===")
+            raise
+            
         return config
