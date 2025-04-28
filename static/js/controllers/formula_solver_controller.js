@@ -752,27 +752,78 @@
                 if (data.error) {
                     console.error("Erreur lors du calcul des coordonnées:", data.error);
                     this.calculatedCoordinatesTextTarget.textContent = `Erreur: ${data.error}`;
+                    this.calculatedCoordinatesTextTarget.classList.add('text-red-500');
                     this.calculatedCoordinatesTarget.classList.remove('hidden');
                     return;
                 }
 
-                // Afficher les coordonnées calculées
-                this.calculatedCoordinatesTextTarget.textContent = data.coordinates;
-                this.calculatedCoordinatesTarget.classList.remove('hidden');
-                console.log("Coordonnées mises à jour:", data.coordinates);
-
-                // Ajouter des classes CSS en fonction du statut
-                if (data.status === "partial") {
-                    this.calculatedCoordinatesTextTarget.classList.add('text-amber-300');
-                    this.calculatedCoordinatesTextTarget.classList.remove('text-green-400');
+                // Créer un affichage HTML avec des couleurs différentes pour chaque partie
+                let coordinatesHTML = '';
+                
+                // Ajouter la latitude avec la couleur appropriée
+                if (data.lat_status && data.lat_status.status) {
+                    let latClass = '';
+                    switch (data.lat_status.status) {
+                        case 'complete':
+                            latClass = 'text-green-400';
+                            break;
+                        case 'partial':
+                            latClass = 'text-amber-300';
+                            break;
+                        case 'error':
+                            latClass = 'text-red-500';
+                            break;
+                        default:
+                            latClass = 'text-white';
+                    }
+                    coordinatesHTML += `<span class="${latClass}" title="${data.lat_status.message || ''}">${data.latitude}</span>`;
                 } else {
-                    this.calculatedCoordinatesTextTarget.classList.add('text-green-400');
-                    this.calculatedCoordinatesTextTarget.classList.remove('text-amber-300');
+                    // Fallback pour maintenir la compatibilité avec l'ancienne API
+                    coordinatesHTML += data.latitude;
+                }
+                
+                // Ajouter un espace entre la latitude et la longitude
+                coordinatesHTML += ' ';
+                
+                // Ajouter la longitude avec la couleur appropriée
+                if (data.lon_status && data.lon_status.status) {
+                    let lonClass = '';
+                    switch (data.lon_status.status) {
+                        case 'complete':
+                            lonClass = 'text-green-400';
+                            break;
+                        case 'partial':
+                            lonClass = 'text-amber-300';
+                            break;
+                        case 'error':
+                            lonClass = 'text-red-500';
+                            break;
+                        default:
+                            lonClass = 'text-white';
+                    }
+                    coordinatesHTML += `<span class="${lonClass}" title="${data.lon_status.message || ''}">${data.longitude}</span>`;
+                } else {
+                    // Fallback pour maintenir la compatibilité avec l'ancienne API
+                    coordinatesHTML += data.longitude;
+                }
+
+                // Afficher les coordonnées avec formatage HTML
+                this.calculatedCoordinatesTextTarget.innerHTML = coordinatesHTML;
+                this.calculatedCoordinatesTarget.classList.remove('hidden');
+                console.log("Coordonnées mises à jour avec formatage spécifique");
+                
+                // Ajouter des infobulles pour les messages d'erreur
+                if (data.lat_status && data.lat_status.status === 'error' && data.lat_status.message) {
+                    console.log("Message d'erreur pour latitude:", data.lat_status.message);
+                }
+                if (data.lon_status && data.lon_status.status === 'error' && data.lon_status.message) {
+                    console.log("Message d'erreur pour longitude:", data.lon_status.message);
                 }
             })
             .catch(error => {
                 console.error("Erreur lors de l'appel à l'API:", error);
                 this.calculatedCoordinatesTextTarget.textContent = "Erreur: Impossible de calculer les coordonnées";
+                this.calculatedCoordinatesTextTarget.classList.add('text-red-500');
                 this.calculatedCoordinatesTarget.classList.remove('hidden');
             });
         }

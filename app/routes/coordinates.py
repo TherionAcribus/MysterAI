@@ -60,7 +60,15 @@ def calculate_coordinates():
         "coordinates": "N48° 39.286 E06°11.685",
         "latitude": "N48° 39.286",
         "longitude": "E06°11.685",
-        "status": "complete" | "partial"
+        "status": "complete" | "partial",
+        "lat_status": {
+            "status": "complete" | "partial" | "error",
+            "message": "Message d'erreur détaillé si applicable"
+        },
+        "lon_status": {
+            "status": "complete" | "partial" | "error",
+            "message": "Message d'erreur détaillé si applicable"
+        }
     }
     """
     try:
@@ -88,6 +96,10 @@ def calculate_coordinates():
         missing_letters = [letter for letter in all_letters if letter not in variables]
         print(f"[DEBUG] Lettres sans valeur: {missing_letters}")
         
+        # Initialiser les statuts pour chaque demi-coordonnée
+        lat_status = {"status": "complete", "message": ""}
+        lon_status = {"status": "complete", "message": ""}
+        
         # Traiter la latitude
         lat_dir, lat_deg, lat_min, lat_decimal = lat_match.groups()
         print(f"[DEBUG] Parties de latitude: dir={lat_dir}, deg={lat_deg}, min={lat_min}, decimal={lat_decimal}")
@@ -100,32 +112,63 @@ def calculate_coordinates():
         lon_decimal_value = _process_formula_part(lon_decimal, variables)
         print(f"[DEBUG] Valeur calculée pour lon_decimal: {lon_decimal_value}")
         
-        # Vérifier si le calcul est complet ou partiel
-        status = "complete"
-        
-        # Si une partie décimale contient des lettres ou est entre parenthèses et contient des lettres
+        # Vérifier le statut de la latitude
         if isinstance(lat_decimal_value, str) and re.search(r'[A-Z]', lat_decimal_value):
             print(f"[DEBUG] Calcul partiel: latitude contient encore des lettres ({lat_decimal_value})")
-            status = "partial"
+            lat_status["status"] = "partial"
+            lat_status["message"] = "Toutes les variables ne sont pas fournies"
+        elif isinstance(lat_decimal_value, (int, float)):
+            # Vérifier les erreurs potentielles dans la latitude
+            if lat_decimal_value < 0:
+                lat_status["status"] = "error"
+                lat_status["message"] = "Valeur négative détectée dans la latitude"
+            elif len(str(int(lat_min))) > 2:
+                lat_status["status"] = "error"
+                lat_status["message"] = "Plus de 2 chiffres dans les minutes de latitude"
+            elif len(str(int(lat_decimal_value)).rstrip('0')) > 3:
+                lat_status["status"] = "error"
+                lat_status["message"] = "Plus de 3 chiffres dans la partie décimale de latitude"
+        
+        # Vérifier le statut de la longitude
         if isinstance(lon_decimal_value, str) and re.search(r'[A-Z]', lon_decimal_value):
             print(f"[DEBUG] Calcul partiel: longitude contient encore des lettres ({lon_decimal_value})")
-            status = "partial"
+            lon_status["status"] = "partial"
+            lon_status["message"] = "Toutes les variables ne sont pas fournies"
+        elif isinstance(lon_decimal_value, (int, float)):
+            # Vérifier les erreurs potentielles dans la longitude
+            if lon_decimal_value < 0:
+                lon_status["status"] = "error"
+                lon_status["message"] = "Valeur négative détectée dans la longitude"
+            elif len(str(int(lon_min))) > 2:
+                lon_status["status"] = "error"
+                lon_status["message"] = "Plus de 2 chiffres dans les minutes de longitude"
+            elif len(str(int(lon_decimal_value)).rstrip('0')) > 3:
+                lon_status["status"] = "error"
+                lon_status["message"] = "Plus de 3 chiffres dans la partie décimale de longitude"
+        
+        # Déterminer le statut global
+        global_status = "complete"
+        if lat_status["status"] != "complete" or lon_status["status"] != "complete":
+            if lat_status["status"] == "error" or lon_status["status"] == "error":
+                global_status = "error"
+            else:
+                global_status = "partial"
             
         # Formater les résultats
-        if status == "complete" and isinstance(lat_decimal_value, (int, float)) and isinstance(lon_decimal_value, (int, float)):
+        if global_status == "complete" and isinstance(lat_decimal_value, (int, float)) and isinstance(lon_decimal_value, (int, float)):
             # Formater numériquement les parties calculées
-            lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(lat_decimal_value).zfill(3)}"
-            lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(lon_decimal_value).zfill(3)}"
+            lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(int(lat_decimal_value)).zfill(3)}"
+            lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(int(lon_decimal_value)).zfill(3)}"
             print(f"[DEBUG] Coordonnées complètes calculées: {lat_formatted} {lon_formatted}")
         else:
             # Garder les expressions partielles
             if isinstance(lat_decimal_value, (int, float)):
-                lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(lat_decimal_value).zfill(3)}"
+                lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{str(int(lat_decimal_value)).zfill(3)}"
             else:
                 lat_formatted = f"{lat_dir}{lat_deg}° {lat_min.zfill(2)}.{lat_decimal_value}"
                 
             if isinstance(lon_decimal_value, (int, float)):
-                lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(lon_decimal_value).zfill(3)}"
+                lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{str(int(lon_decimal_value)).zfill(3)}"
             else:
                 lon_formatted = f"{lon_dir}{lon_deg}° {lon_min.zfill(2)}.{lon_decimal_value}"
                 
@@ -135,7 +178,9 @@ def calculate_coordinates():
             "coordinates": f"{lat_formatted} {lon_formatted}",
             "latitude": lat_formatted,
             "longitude": lon_formatted,
-            "status": status
+            "status": global_status,
+            "lat_status": lat_status,
+            "lon_status": lon_status
         }
         print(f"[DEBUG] Résultat final: {result}")
         return jsonify(result)
