@@ -76,7 +76,9 @@ def calculate_coordinates():
             "meters": 1234.56,
             "miles": 0.76,
             "status": "ok" | "warning" | "far"
-        }  # optionnel, présent uniquement si origin_lat et origin_lon sont fournis
+        },  # optionnel, présent uniquement si origin_lat et origin_lon sont fournis
+        "decimal_latitude": 48.586,
+        "decimal_longitude": 6.195
     }
     """
     try:
@@ -178,6 +180,17 @@ def calculate_coordinates():
             "lat_status": lat_status,
             "lon_status": lon_status
         }
+        
+        # Ajouter les coordonnées décimales pour l'affichage automatique sur la carte
+        if global_status == "complete":
+            try:
+                decimal_coords = convert_ddm_to_decimal(lat_formatted, lon_formatted)
+                result["decimal_latitude"] = decimal_coords["latitude"]
+                result["decimal_longitude"] = decimal_coords["longitude"]
+                print(f"[DEBUG] Coordonnées décimales calculées: lat={decimal_coords['latitude']}, lon={decimal_coords['longitude']}")
+            except Exception as e:
+                print(f"[WARNING] Erreur lors de la conversion en coordonnées décimales: {str(e)}")
+                # Ne pas faire échouer l'appel si la conversion échoue
         
         # Si nous avons des coordonnées d'origine et que les coordonnées calculées sont complètes, 
         # calculer la distance entre les deux

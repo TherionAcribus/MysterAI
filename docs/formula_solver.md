@@ -495,3 +495,36 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
    - Les coordonnées sont calculées et formatées automatiquement
    - Le format respecte la norme avec 2 chiffres pour les minutes et 3 pour les décimales
    - Exemple: `N49° 12.086 E005° 59.209` 
+
+## Affichage automatique sur la carte
+
+### Fonctionnement
+
+1. **Conversion automatique des coordonnées**
+   - Lorsque le Formula Solver calcule des coordonnées complètes (sans variable non résolue), le serveur les convertit automatiquement en format décimal via la bibliothèque pyproj.
+   - Ces coordonnées décimales sont renvoyées au client dans la réponse JSON avec les clés `decimal_latitude` et `decimal_longitude`.
+
+2. **Affichage sur la carte de la géocache**
+   - Quand des coordonnées valides sont calculées, un point rouge est automatiquement affiché sur la carte de la fiche de la géocache (sans action utilisateur nécessaire).
+   - Le point est centré sur la carte et mis en évidence.
+   - Un message de confirmation "Point affiché sur la carte" apparaît sous les coordonnées calculées.
+
+3. **Intégration avec la carte existante**
+   - Le point est ajouté à la carte via un événement personnalisé `addCalculatedPointToMap`.
+   - Il est distingué des autres marqueurs (waypoints, géocaches) par sa couleur rouge spécifique.
+   - Le point est temporaire et disparaît si la page est actualisée.
+
+### Exemple d'utilisation
+
+1. Entrez une formule de coordonnées (ex: `N48°41.(A+B+C) E007°0(D+E).FGH`)
+2. Remplissez les valeurs des variables A-H.
+3. Les coordonnées se calculent automatiquement et s'affichent.
+4. Simultanément, un point rouge apparaît sur la carte de la géocache à la position calculée.
+5. Le message "Point affiché sur la carte" confirme que l'opération a réussi.
+
+### Avantages
+
+- **Visualisation instantanée** : Pas besoin de chercher manuellement les coordonnées sur une carte externe.
+- **Conversion précise** : Utilisation de pyproj côté serveur pour une conversion précise du format DMM au format décimal.
+- **Sans action utilisateur** : Affichage automatique dès que les coordonnées sont complètes et valides.
+- **Expérience unifiée** : Reste dans l'application sans ouvrir d'autres outils ou services. 

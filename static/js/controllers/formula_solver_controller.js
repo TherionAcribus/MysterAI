@@ -864,6 +864,33 @@
                 this.calculatedCoordinatesTarget.classList.remove('hidden');
                 console.log("Coordonnées mises à jour avec formatage spécifique");
                 
+                // Affichage automatique sur la carte si des coordonnées décimales sont fournies
+                if (data.status === 'complete' && data.decimal_latitude && data.decimal_longitude) {
+                    console.log(`Affichage automatique du point: ${data.decimal_latitude}, ${data.decimal_longitude}`);
+                    
+                    // Créer l'événement pour ajouter le point sur la carte
+                    const event = new CustomEvent('addCalculatedPointToMap', {
+                        detail: {
+                            latitude: data.decimal_latitude,
+                            longitude: data.decimal_longitude,
+                            label: 'Coordonnée calculée',
+                            color: 'rgba(255,0,0,0.8)'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                    
+                    // Afficher une indication que le point a été ajouté
+                    const container = this.calculatedCoordinatesTarget;
+                    const notificationDiv = document.createElement('div');
+                    notificationDiv.className = 'mt-2 text-sm text-green-500';
+                    notificationDiv.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Point affiché sur la carte';
+                    
+                    // Supprimer les notifications existantes
+                    container.querySelectorAll('.text-green-500').forEach(el => el.remove());
+                    // Ajouter la nouvelle notification
+                    container.appendChild(notificationDiv);
+                }
+                
                 // Ajouter des infobulles pour les messages d'erreur
                 if (data.lat_status && data.lat_status.status === 'error' && data.lat_status.message) {
                     console.log("Message d'erreur pour latitude:", data.lat_status.message);
@@ -871,6 +898,9 @@
                 if (data.lon_status && data.lon_status.status === 'error' && data.lon_status.message) {
                     console.log("Message d'erreur pour longitude:", data.lon_status.message);
                 }
+                // --- AJOUT : bouton afficher sur la carte ---
+                // Fonction supprimée car le point est désormais affiché automatiquement
+                // this.addShowOnMapButtonIfPossible(data);
             })
             .catch(error => {
                 console.error("Erreur lors de l'appel à l'API:", error);
@@ -1903,6 +1933,61 @@
             document.addEventListener('click', () => {
                 contextMenu.remove();
             }, { once: true });
+        }
+
+        // Ajout : Afficher sur la carte le point calculé
+        // Cette fonction est supprimée car les points sont maintenant affichés automatiquement
+        // en utilisant les coordonnées décimales fournies par le serveur.
+        /*
+        addShowOnMapButtonIfPossible(data) {
+            // Vérifier si les coordonnées sont complètes et bien numériques
+            if (data.status === 'complete' && data.latitude && data.longitude) {
+                // Chercher le conteneur
+                const container = this.calculatedCoordinatesTarget;
+                // Éviter de dupliquer le bouton
+                if (container.querySelector('.show-on-map-btn')) return;
+                // Créer le bouton
+                const btn = document.createElement('button');
+                btn.textContent = 'Afficher sur la carte';
+                btn.className = 'show-on-map-btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded ml-3';
+                btn.style.marginLeft = '1rem';
+                btn.onclick = () => {
+                    // Convertir DDM en décimal
+                    const lat = this.ddmToDecimal(data.latitude);
+                    const lon = this.ddmToDecimal(data.longitude);
+                    if (lat !== null && lon !== null) {
+                        const event = new CustomEvent('addCalculatedPointToMap', {
+                            detail: {
+                                latitude: lat,
+                                longitude: lon,
+                                label: 'Coordonnée calculée',
+                                color: 'rgba(255,0,0,0.8)'
+                            }
+                        });
+                        document.dispatchEvent(event);
+                    } else {
+                        alert('Impossible de convertir les coordonnées au format décimal.');
+                    }
+                };
+                // Ajouter le bouton à la fin du conteneur
+                container.appendChild(btn);
+            }
+        }
+        */
+
+        // Utilitaire : conversion DDM (ex: N48° 41.823 ou E007° 08.156) en décimal
+        ddmToDecimal(ddm) {
+            // Exemples acceptés : N48° 41.823, N 48° 41.823, E007° 08.156, E 7° 8.156
+            const match = ddm.match(/([NSWE])\s*0*([0-9]{1,3})[°º]?\s*([0-9]{1,2})\.(\d{1,6})/i);
+            if (!match) return null;
+            const dir = match[1].toUpperCase();
+            const deg = parseInt(match[2], 10);
+            const min = parseInt(match[3], 10);
+            const dec = match[4];
+            const minutes = parseFloat(`${min}.${dec}`);
+            let value = deg + (minutes / 60);
+            if (dir === 'S' || dir === 'W') value = -value;
+            return value;
         }
     }
 

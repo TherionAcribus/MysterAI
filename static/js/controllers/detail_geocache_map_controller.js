@@ -34,6 +34,10 @@
             // Écouter l'événement de waypoint sauvegardé
             this.waypointSavedHandler = this.handleWaypointSaved.bind(this);
             document.addEventListener('waypointSaved', this.waypointSavedHandler);
+
+            // === AJOUT : écouteur pour point calculé ===
+            this.addCalculatedPointHandler = this.handleAddCalculatedPoint.bind(this);
+            document.addEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
         }
 
         disconnect() {
@@ -88,6 +92,9 @@
             this.circleSource = null;
             this.circleLayer = null;
             this.baseLayerSelector = null;
+
+            // === AJOUT : retire l'écouteur pour point calculé ===
+            document.removeEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
         }
 
         async initializeMap() {
@@ -1713,6 +1720,24 @@
                 
             } catch (error) {
                 console.error('%c[DetailMapCtrl] Erreur lors du traitement de l\'événement waypointSaved:', "background:red; color:white", error);
+            }
+        }
+
+        // === AJOUT : méthode pour gérer l'ajout d'un point calculé ===
+        handleAddCalculatedPoint(event) {
+            const { latitude, longitude, label, color } = event.detail;
+            this.addFeature(longitude, latitude, {
+                name: label || "Point calculé",
+                cache_type: "TempPoint",
+                temp_marker: true,
+                latitude,
+                longitude,
+                color: color || 'rgba(255, 0, 0, 0.8)'
+            });
+            // Centrer la carte sur ce point
+            if (this.map) {
+                this.map.getView().setCenter(ol.proj.fromLonLat([longitude, latitude]));
+                this.map.getView().setZoom(15);
             }
         }
     }
