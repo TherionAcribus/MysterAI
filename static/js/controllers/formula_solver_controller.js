@@ -726,6 +726,37 @@
             }
 
             console.log("Variables collectées:", variables);
+            
+            // Récupérer les coordonnées d'origine de la géocache si disponible
+            let originData = {};
+            const geocacheId = this.geocacheIdValue;
+            
+            // Récupérer les coordonnées d'origine directement depuis l'élément
+            const originLat = this.element.dataset.originLat;
+            const originLon = this.element.dataset.originLon;
+            
+            console.log("Dataset de l'élément:", this.element.dataset);
+            console.log("Valeurs d'origine:", { originLat, originLon, geocacheId });
+            
+            if (originLat && originLon) {
+                originData = {
+                    origin_lat: originLat,
+                    origin_lon: originLon
+                };
+                console.log("Coordonnées d'origine trouvées:", originData);
+            } else {
+                console.log("ATTENTION: Aucune coordonnée d'origine trouvée!");
+            }
+
+            // Créer les données à envoyer à l'API
+            const requestData = {
+                formula: formula,
+                variables: variables,
+                ...originData,
+                timestamp: new Date().getTime() // Pour éviter le cache
+            };
+            
+            console.log("Données envoyées à l'API:", requestData);
 
             // Appeler directement l'API qui fonctionne
             fetch('/api/calculate_coordinates', {
@@ -734,11 +765,7 @@
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-                body: JSON.stringify({
-                    formula: formula,
-                    variables: variables,
-                    timestamp: new Date().getTime() // Pour éviter le cache
-                }),
+                body: JSON.stringify(requestData),
             })
             .then(response => {
                 if (!response.ok) {
@@ -748,6 +775,7 @@
             })
             .then(data => {
                 console.log("Réponse de l'API calculate_coordinates:", data);
+                console.log("Distance reçue:", data.distance_from_origin);
                 
                 if (data.error) {
                     console.error("Erreur lors du calcul des coordonnées:", data.error);
@@ -805,6 +833,30 @@
                 } else {
                     // Fallback pour maintenir la compatibilité avec l'ancienne API
                     coordinatesHTML += data.longitude;
+                }
+                
+                // Ajouter les informations de distance si disponibles
+                if (data.distance_from_origin) {
+                    const distance = data.distance_from_origin;
+                    let distanceClass = '';
+                    let distanceMessage = '';
+                    
+                    switch (distance.status) {
+                        case 'ok':
+                            distanceClass = 'text-green-400';
+                            distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Conforme aux règles du géocaching`;
+                            break;
+                        case 'warning':
+                            distanceClass = 'text-amber-300';
+                            distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Attention, proche de la limite de 2 miles!`;
+                            break;
+                        case 'far':
+                            distanceClass = 'text-red-500';
+                            distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.`;
+                            break;
+                    }
+                    
+                    coordinatesHTML += `<div class="mt-2 ${distanceClass}" title="Distance par rapport au point d'origine">${distanceMessage}</div>`;
                 }
 
                 // Afficher les coordonnées avec formatage HTML

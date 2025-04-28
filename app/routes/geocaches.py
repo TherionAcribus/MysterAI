@@ -2476,47 +2476,78 @@ def formula_solver_panel():
     # Récupérer les données de la géocache si un ID est fourni
     geocache = None
     detected_formulas = []
+    origin_lat = None
+    origin_lon = None
     
     if geocache_id:
-        geocache = Geocache.query.options(
-            db.joinedload(Geocache.additional_waypoints)
-        ).get(geocache_id)
-        
-        if geocache:
-            # Importer et initialiser le plugin formula_parser
-            from plugins.official.formula_parser.main import FormulaParserPlugin
-            formula_parser = FormulaParserPlugin()
+        try:
+            geocache = Geocache.query.options(
+                db.joinedload(Geocache.additional_waypoints)
+            ).get(geocache_id)
             
-            # Analyser la description pour trouver des formules
-            if geocache.description:
-                # Nettoyer le HTML pour extraire le texte
-                description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
-                result = formula_parser.execute({'text': description_text})
+            if geocache:
+                # Récupérer les coordonnées d'origine
+                origin_lat = geocache.gc_lat
+                origin_lon = geocache.gc_lon
                 
-                for coord in result.get('coordinates', []):
-                    if coord.get('north') and coord.get('east'):
-                        detected_formulas.append({
-                            'formula': f"{coord['north']} {coord['east']}",
-                            'source': 'Description'
-                        })
-            
-            # Analyser les waypoints
-            if geocache.additional_waypoints:
-                for wp in geocache.additional_waypoints:
-                    wp_text = f"{wp.name} {wp.note or ''}"
-                    result = formula_parser.execute({'text': wp_text})
+                print(f"[DEBUG][formula_solver_panel] Geocache trouvée: {gc_code}, ID: {geocache_id}")
+                print(f"[DEBUG][formula_solver_panel] Coordonnées d'origine: lat={origin_lat}, lon={origin_lon}")
+                print(f"[DEBUG][formula_solver_panel] Type des coordonnées: lat={type(origin_lat)}, lon={type(origin_lon)}")
+                
+                if not origin_lat or not origin_lon:
+                    print(f"[WARNING][formula_solver_panel] Coordonnées d'origine manquantes pour la géocache {gc_code}")
+                
+                # S'assurer que les coordonnées ont le bon format
+                if origin_lat and not origin_lat.startswith('N') and not origin_lat.startswith('S'):
+                    origin_lat = f"N{origin_lat}"
+                    print(f"[DEBUG][formula_solver_panel] Format corrigé de la latitude: {origin_lat}")
+                
+                if origin_lon and not origin_lon.startswith('E') and not origin_lon.startswith('W'):
+                    origin_lon = f"E{origin_lon}"
+                    print(f"[DEBUG][formula_solver_panel] Format corrigé de la longitude: {origin_lon}")
+                
+                # Importer et initialiser le plugin formula_parser
+                from plugins.official.formula_parser.main import FormulaParserPlugin
+                formula_parser = FormulaParserPlugin()
+                
+                # Analyser la description pour trouver des formules
+                if geocache.description:
+                    # Nettoyer le HTML pour extraire le texte
+                    description_text = re.sub(r'<[^>]*>', ' ', geocache.description)
+                    result = formula_parser.execute({'text': description_text})
                     
                     for coord in result.get('coordinates', []):
                         if coord.get('north') and coord.get('east'):
                             detected_formulas.append({
                                 'formula': f"{coord['north']} {coord['east']}",
-                                'source': f"Waypoint {wp.prefix} - {wp.name}"
+                                'source': 'Description'
                             })
+                
+                # Analyser les waypoints
+                if geocache.additional_waypoints:
+                    for wp in geocache.additional_waypoints:
+                        wp_text = f"{wp.name} {wp.note or ''}"
+                        result = formula_parser.execute({'text': wp_text})
+                        
+                        for coord in result.get('coordinates', []):
+                            if coord.get('north') and coord.get('east'):
+                                detected_formulas.append({
+                                    'formula': f"{coord['north']} {coord['east']}",
+                                    'source': f"Waypoint {wp.prefix} - {wp.name}"
+                                })
+        except Exception as e:
+            print(f"[ERROR][formula_solver_panel] Erreur lors de la récupération de la géocache: {str(e)}")
+            traceback.print_exc()
     
+    print(f"[DEBUG][formula_solver_panel] Coordonnées d'origine finales: lat={origin_lat}, lon={origin_lon}")
+    print(f"[DEBUG][formula_solver_panel] Types des coordonnées finales: lat={type(origin_lat)}, lon={type(origin_lon)}")
+
     return render_template('formula_solver.html', 
                            geocache_id=geocache_id, 
                            gc_code=gc_code,
                            geocache=geocache,
+                           origin_lat=origin_lat,
+                           origin_lon=origin_lon,
                            detected_formulas=detected_formulas)
 
 @geocaches_bp.route('/multi-solver', methods=['GET'])

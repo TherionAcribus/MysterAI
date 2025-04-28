@@ -3,7 +3,29 @@
      hx-headers='{"X-Layout-Component": "true"}'
      data-controller="formula-solver"
      data-formula-solver-geocache-id-value="{{ geocache_id }}"
-     data-formula-solver-gc-code-value="{{ gc_code }}">
+     data-formula-solver-gc-code-value="{{ gc_code }}"
+     {% if origin_lat and origin_lon %}
+     data-origin-lat="{{ origin_lat }}"
+     data-origin-lon="{{ origin_lon }}"
+     {% endif %}
+     data-geocache-id="{{ geocache_id }}">
+    
+    <!-- Débug coordonnées d'origine -->
+    {% if origin_lat and origin_lon %}
+    <div class="hidden">
+        <span id="debug-origin-lat">{{ origin_lat }}</span>
+        <span id="debug-origin-lon">{{ origin_lon }}</span>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DEBUG TEMPLATE: Coordonnées d\'origine déclenchées dans le template');
+            console.log('DEBUG TEMPLATE: Latitude: {{ origin_lat }}');
+            console.log('DEBUG TEMPLATE: Longitude: {{ origin_lon }}');
+            console.log('DEBUG TEMPLATE: data-origin-lat:', document.querySelector('[data-controller="formula-solver"]').dataset.originLat);
+            console.log('DEBUG TEMPLATE: data-origin-lon:', document.querySelector('[data-controller="formula-solver"]').dataset.originLon);
+        });
+    </script>
+    {% endif %}
     
     <div class="max-w-4xl mx-auto">
         <!-- En-tête -->
@@ -208,6 +230,13 @@
                     <!-- Les coordonnées calculées seront affichées ici -->
                 </div>
             </div>
+            
+            {% if origin_lat and origin_lon %}
+            <div class="mt-3 bg-gray-700 rounded p-3 text-sm">
+                <div class="text-gray-400 mb-1">Coordonnées d'origine: <span class="text-gray-200">{{ origin_lat }} {{ origin_lon }}</span></div>
+                <div class="text-gray-400">Les règles du géocaching exigent que les caches mystère récentes soient situées à moins de 2 miles (environ 3,2 km) des coordonnées d'origine.</div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Résultats -->

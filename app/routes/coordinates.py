@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.geocache import Geocache
 import traceback
+from pyproj import Geod
 
 coordinates_bp = Blueprint('coordinates', __name__)
 
@@ -52,7 +53,9 @@ def calculate_coordinates():
     Exemple de données attendues:
     {
         "formula": "N48° 39.(8/4)(27/9)(2x2x2) E06°11.(3x2)(16x2/4)(25/5)",
-        "variables": {"A": 5, "B": 10, ...}  # optionnel
+        "variables": {"A": 5, "B": 10, ...},  # optionnel
+        "origin_lat": "N48° 40.123",  # optionnel
+        "origin_lon": "E06° 10.456"   # optionnel
     }
     
     Retourne:
@@ -60,7 +63,7 @@ def calculate_coordinates():
         "coordinates": "N48° 39.286 E06°11.685",
         "latitude": "N48° 39.286",
         "longitude": "E06°11.685",
-        "status": "complete" | "partial",
+        "status": "complete" | "partial" | "error",
         "lat_status": {
             "status": "complete" | "partial" | "error",
             "message": "Message d'erreur détaillé si applicable"
@@ -68,13 +71,20 @@ def calculate_coordinates():
         "lon_status": {
             "status": "complete" | "partial" | "error",
             "message": "Message d'erreur détaillé si applicable"
-        }
+        },
+        "distance_from_origin": {
+            "meters": 1234.56,
+            "miles": 0.76,
+            "status": "ok" | "warning" | "far"
+        }  # optionnel, présent uniquement si origin_lat et origin_lon sont fournis
     }
     """
     try:
         data = request.get_json()
         formula = data.get('formula', '')
         variables = data.get('variables', {})
+        origin_lat = data.get('origin_lat')
+        origin_lon = data.get('origin_lon')
         
         if not formula:
             return jsonify({"error": "Aucune formule fournie"}), 400
@@ -182,6 +192,37 @@ def calculate_coordinates():
             "lat_status": lat_status,
             "lon_status": lon_status
         }
+        
+        # Si nous avons des coordonnées d'origine et que les coordonnées calculées sont complètes, 
+        # calculer la distance entre les deux
+        print(f"[DEBUG] Vérification des conditions pour le calcul de distance:")
+        print(f"[DEBUG] - origin_lat: {origin_lat} ({type(origin_lat).__name__ if origin_lat else 'None'})")
+        print(f"[DEBUG] - origin_lon: {origin_lon} ({type(origin_lon).__name__ if origin_lon else 'None'})")
+        print(f"[DEBUG] - global_status: {global_status}")
+        print(f"[DEBUG] - lat_decimal_value: {lat_decimal_value} ({type(lat_decimal_value).__name__})")
+        print(f"[DEBUG] - lon_decimal_value: {lon_decimal_value} ({type(lon_decimal_value).__name__})")
+        
+        if origin_lat and origin_lon and global_status == "complete" and isinstance(lat_decimal_value, (int, float)) and isinstance(lon_decimal_value, (int, float)):
+            try:
+                print(f"[DEBUG] Conditions remplies pour calculer la distance entre les coordonnées")
+                print(f"[DEBUG] Origin lat: {origin_lat}, Origin lon: {origin_lon}")
+                print(f"[DEBUG] Destination lat: {lat_formatted}, Destination lon: {lon_formatted}")
+                distance_info = calculate_distance_between_coords(
+                    origin_lat=origin_lat,
+                    origin_lon=origin_lon,
+                    dest_lat=lat_formatted,
+                    dest_lon=lon_formatted
+                )
+                result["distance_from_origin"] = distance_info
+                print(f"[DEBUG] Distance calculée: {distance_info}")
+            except Exception as e:
+                print(f"[ERROR] Erreur lors du calcul de la distance: {str(e)}")
+                traceback.print_exc()
+        else:
+            print(f"[DEBUG] Calcul de distance impossible: origin_lat={origin_lat}, origin_lon={origin_lon}, global_status={global_status}")
+            print(f"[DEBUG] lat_decimal_value est de type {type(lat_decimal_value).__name__}: {lat_decimal_value}")
+            print(f"[DEBUG] lon_decimal_value est de type {type(lon_decimal_value).__name__}: {lon_decimal_value}")
+        
         print(f"[DEBUG] Résultat final: {result}")
         return jsonify(result)
         
@@ -189,6 +230,68 @@ def calculate_coordinates():
         print(f"[ERROR] Erreur lors du calcul des coordonnées: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+def calculate_distance_between_coords(origin_lat, origin_lon, dest_lat, dest_lon):
+    """
+    Calcule la distance entre deux coordonnées au format DDM
+    
+    Args:
+        origin_lat (str): Latitude d'origine au format DDM (ex: "N48° 40.123")
+        origin_lon (str): Longitude d'origine au format DDM (ex: "E06° 10.456")
+        dest_lat (str): Latitude de destination au format DDM (ex: "N48° 39.286")
+        dest_lon (str): Longitude de destination au format DDM (ex: "E06°11.685")
+        
+    Returns:
+        dict: Dictionnaire contenant la distance en mètres, en miles et un statut
+    """
+    print(f"[DEBUG] *** DÉBUT CALCUL DISTANCE ***")
+    print(f"[DEBUG] Origine: {origin_lat} {origin_lon}")
+    print(f"[DEBUG] Destination: {dest_lat} {dest_lon}")
+    
+    # Convertir les coordonnées DDM en format décimal
+    origin_coords = convert_ddm_to_decimal(origin_lat, origin_lon)
+    dest_coords = convert_ddm_to_decimal(dest_lat, dest_lon)
+    
+    print(f"[DEBUG] Origine (décimal): lat={origin_coords['latitude']}, lon={origin_coords['longitude']}")
+    print(f"[DEBUG] Destination (décimal): lat={dest_coords['latitude']}, lon={dest_coords['longitude']}")
+    
+    if not origin_coords['latitude'] or not origin_coords['longitude'] or not dest_coords['latitude'] or not dest_coords['longitude']:
+        print(f"[ERROR] Conversion des coordonnées en décimal impossible")
+        raise ValueError("Impossible de convertir les coordonnées en format décimal")
+    
+    # Calculer la distance avec Geod
+    geod = Geod(ellps="WGS84")
+    _, _, distance_m = geod.inv(
+        origin_coords['longitude'], origin_coords['latitude'],
+        dest_coords['longitude'], dest_coords['latitude']
+    )
+    
+    # Convertir en miles (1 mile = 1609.344 mètres)
+    distance_miles = distance_m / 1609.344
+    
+    print(f"[DEBUG] Distance calculée: {distance_m} mètres ({distance_miles} miles)")
+    
+    # Déterminer le statut en fonction de la distance
+    # Moins de 2 miles = ok
+    # Entre 2 et 2.5 miles = warning
+    # Plus de 2.5 miles = far
+    status = "ok"
+    if distance_miles > 2.5:
+        status = "far"
+        print(f"[DEBUG] Statut: FAR - Distance > 2.5 miles")
+    elif distance_miles > 2.0:
+        status = "warning"
+        print(f"[DEBUG] Statut: WARNING - Distance entre 2.0 et 2.5 miles")
+    else:
+        print(f"[DEBUG] Statut: OK - Distance < 2.0 miles")
+    
+    print(f"[DEBUG] *** FIN CALCUL DISTANCE ***")
+    
+    return {
+        "meters": round(distance_m, 2),
+        "miles": round(distance_miles, 2),
+        "status": status
+    }
 
 def _process_formula_part(formula_part, variables):
     """
@@ -877,25 +980,36 @@ def convert_ddm_to_decimal(ddm_lat: str, ddm_lon: str) -> Dict[str, float]:
     
     try:
         # Extraction des composants de la latitude
-        lat_match = re.search(r'([NS])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)', ddm_lat)
+        lat_pattern = r'([NS])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)'
+        lat_match = re.search(lat_pattern, ddm_lat)
         if lat_match:
             lat_dir, lat_deg, lat_min = lat_match.groups()
             lat_decimal = float(lat_deg) + float(lat_min) / 60
             if lat_dir == 'S':
                 lat_decimal = -lat_decimal
             result['latitude'] = lat_decimal
+            print(f"[DEBUG] Latitude convertie: {lat_dir}{lat_deg}° {lat_min} -> {lat_decimal}")
+        else:
+            print(f"[ERROR] Format de latitude non reconnu: {ddm_lat}")
+            print(f"[DEBUG] Motif recherché: {lat_pattern}")
         
         # Extraction des composants de la longitude
-        lon_match = re.search(r'([EW])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)', ddm_lon)
+        lon_pattern = r'([EW])\s*(\d+)\s*[°º]\s*(\d+(?:\.\d+)?)'
+        lon_match = re.search(lon_pattern, ddm_lon)
         if lon_match:
             lon_dir, lon_deg, lon_min = lon_match.groups()
             lon_decimal = float(lon_deg) + float(lon_min) / 60
             if lon_dir == 'W':
                 lon_decimal = -lon_decimal
             result['longitude'] = lon_decimal
+            print(f"[DEBUG] Longitude convertie: {lon_dir}{lon_deg}° {lon_min} -> {lon_decimal}")
+        else:
+            print(f"[ERROR] Format de longitude non reconnu: {ddm_lon}")
+            print(f"[DEBUG] Motif recherché: {lon_pattern}")
             
         print(f"[DEBUG] convert_ddm_to_decimal: Résultat de la conversion: {result}")
     except Exception as e:
-        print(f"[DEBUG] convert_ddm_to_decimal: Erreur lors de la conversion: {str(e)}")
+        print(f"[ERROR] convert_ddm_to_decimal: Erreur lors de la conversion: {str(e)}")
+        traceback.print_exc()
     
     return result
