@@ -935,33 +935,52 @@
                     `;
                 } else {
                     // Affichage pour une géocache normale (existant)
-                const coordInfo = properties.is_corrected
-                    ? `<div style="color: #ff5555; font-weight: bold; margin-top: 4px;">⚠️ Coordonnées corrigées</div>`
-                    : (properties.cache_type === 'Waypoint' ? '<div style="color: #4444ff; font-weight: bold; margin-top: 4px;">📍 Waypoint</div>' : '<div style="color: #55aa55; font-weight: bold; margin-top: 4px;">🎯 Coordonnées Originales</div>');
 
-                const originalCoordInfo = (properties.is_corrected && properties.original_latitude && properties.original_longitude)
-                    ? `<div style="color: #999; margin-top: 4px; font-size: 0.9em;">Original: ${properties.original_latitude.toFixed(6)}, ${properties.original_longitude.toFixed(6)}</div>`
-                    : '';
+                    // Personnalisation de l'affichage pour les points calculés
+                    if (properties.isCalculatedPoint === true) {
+                        // Popup spéciale pour les points calculés (affiche uniquement les coordonnées DDM)
+                        popupHtml = `
+                            <div>
+                                <div style="font-weight: bold; margin-bottom: 4px; color: #0066cc;">Point calculé</div>
+                                <div style="font-family: monospace; font-size: 1em; color: #333; margin-top: 8px;">
+                                    ${properties.gc_lat || ''}<br>
+                                    ${properties.gc_lon || ''}
+                                </div>
+                                <div style="color: #888; margin-top: 4px; font-size: 0.9em;">
+                                    Calculé à ${properties.calculatedAt || 'récemment'}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Popup standard pour les autres points
+                        const coordInfo = properties.is_corrected
+                            ? `<div style="color: #ff5555; font-weight: bold; margin-top: 4px;">⚠️ Coordonnées corrigées</div>`
+                            : (properties.cache_type === 'Waypoint' ? '<div style="color: #4444ff; font-weight: bold; margin-top: 4px;">📍 Waypoint</div>' : '<div style="color: #55aa55; font-weight: bold; margin-top: 4px;">🎯 Coordonnées Originales</div>');
 
-                popupHtml = `
-                    <div>
-                        <div style="font-weight: bold; margin-bottom: 4px;">${properties.gc_code || 'Waypoint'}</div>
-                        <div style="margin-bottom: 4px;">${properties.name}</div>
-                        ${properties.cache_type !== 'Waypoint' ? `<div style="color: #666;">${properties.cache_type}</div>` : ''}
-                        ${properties.cache_type !== 'Waypoint' ? `
-                        <div style="margin-top: 8px;">
-                            <span style="font-weight: bold;">D:</span> ${properties.difficulty || '?'}
-                            <span style="font-weight: bold; margin-left: 8px;">T:</span> ${properties.terrain || '?'}
-                        </div>` : ''}
-                        <div style="margin-top: 4px; font-family: monospace; font-size: 0.9em;">
-                            ${properties.gc_lat || properties.latitude?.toFixed(6) || 'N/A'}<br>
-                            ${properties.gc_lon || properties.longitude?.toFixed(6) || 'N/A'}
-                        </div>
-                        ${coordInfo}
-                        ${originalCoordInfo}
-                        ${properties.note ? `<div style="color: #888; margin-top: 4px; font-size: 0.9em; max-height: 50px; overflow-y: auto;">Note: ${properties.note}</div>` : ''}
-                    </div>
-                `;
+                        const originalCoordInfo = (properties.is_corrected && properties.original_latitude && properties.original_longitude)
+                            ? `<div style="color: #999; margin-top: 4px; font-size: 0.9em;">Original: ${properties.original_latitude.toFixed(6)}, ${properties.original_longitude.toFixed(6)}</div>`
+                            : '';
+
+                        popupHtml = `
+                            <div>
+                                <div style="font-weight: bold; margin-bottom: 4px;">${properties.gc_code || 'Waypoint'}</div>
+                                <div style="margin-bottom: 4px;">${properties.name}</div>
+                                ${properties.cache_type !== 'Waypoint' ? `<div style="color: #666;">${properties.cache_type}</div>` : ''}
+                                ${properties.cache_type !== 'Waypoint' ? `
+                                <div style="margin-top: 8px;">
+                                    <span style="font-weight: bold;">D:</span> ${properties.difficulty || '?'}
+                                    <span style="font-weight: bold; margin-left: 8px;">T:</span> ${properties.terrain || '?'}
+                                </div>` : ''}
+                                <div style="margin-top: 4px; font-family: monospace; font-size: 0.9em;">
+                                    ${properties.gc_lat || properties.latitude?.toFixed(6) || 'N/A'}<br>
+                                    ${properties.gc_lon || properties.longitude?.toFixed(6) || 'N/A'}
+                                </div>
+                                ${coordInfo}
+                                ${originalCoordInfo}
+                                ${properties.note ? `<div style="color: #888; margin-top: 4px; font-size: 0.9em; max-height: 50px; overflow-y: auto;">Note: ${properties.note}</div>` : ''}
+                            </div>
+                        `;
+                    }
                 }
 
                 this.popupContentTarget.innerHTML = popupHtml;
@@ -1001,6 +1020,17 @@
                 shapePoints = 4; // Carré
                 shapeAngle = Math.PI / 4; // Rotation de 45 degrés (losange)
                 cacheIcon = '✖'; // Icône X
+                
+                // Style spécial pour les points calculés (différent des marqueurs temporaires standards)
+                if (properties.calculatedPoint === true) {
+                    cacheColor = 'rgba(0, 90, 220, 0.8)'; // Bleu
+                    strokeColor = '#ffffff'; // Bordure blanche
+                    strokeWidth = 2;
+                    cacheRadius = 8;
+                    shapePoints = 4; // Carré
+                    shapeAngle = 0; // Pas de rotation (carré droit)
+                    cacheIcon = '!'; // Point d'exclamation
+                }
             } else if (cacheType === 'Waypoint') {
                 cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu pour waypoint
                 cacheIcon = '📍';
@@ -1180,19 +1210,33 @@
         // Ajouter une feature à la carte
         addFeature(lon, lat, properties) {
             try {
+                if (!this.vectorSource) return null;
+
+                // Convertir les coordonnées en format OpenLayers
+                const coordinates = ol.proj.fromLonLat([parseFloat(lon), parseFloat(lat)]);
+                
+                // Créer la feature
                 const feature = new ol.Feature({
-                    geometry: new ol.geom.Point(ol.proj.fromLonLat([lon, lat]))
+                    geometry: new ol.geom.Point(coordinates)
                 });
+                
                 // Attribuer toutes les propriétés à la feature pour le style et le popup
                 feature.setProperties(properties, true);
+                
                 // Définir explicitement l'ID de la feature si disponible (utile pour la mise à jour)
                 if (properties.id) {
                     feature.setId(properties.id);
                 }
+                
+                // Ajouter à la source
                 this.vectorSource.addFeature(feature);
-                console.log(`%c[DetailMapCtrl] Feature ajoutée: ${properties.gc_code || properties.name || 'Point'}`, "color:green", properties);
+                console.log(`[MAP] Feature ajoutée: ${properties.gc_code || properties.name || 'Point'} à ${lon}, ${lat}`);
+                
+                // Retourner la feature pour pouvoir la modifier après création
+                return feature;
             } catch (e) {
                 console.error("Erreur lors de l'ajout de la feature", e, {lon, lat, properties});
+                return null;
             }
         }
         
@@ -1723,22 +1767,113 @@
             }
         }
 
-        // === AJOUT : méthode pour gérer l'ajout d'un point calculé ===
+        // === MÉTHODE AMÉLIORÉE : supprimer tous les points calculés ===
+        clearCalculatedPoints() {
+            console.log('[MAP] Tentative de suppression des points calculés précédents');
+            
+            if (!this.vectorSource || !this.map) {
+                console.log('[MAP] Aucune source vectorielle ou carte disponible');
+                return;
+            }
+            
+            // Recherche toutes les features avec l'attribut "calculatedPoint" en utilisant un ID spécifique
+            const calculatedFeatures = [];
+            this.vectorSource.getFeatures().forEach(feature => {
+                // Vérifier différentes façons dont la propriété pourrait être stockée
+                const directProp = feature.get('calculatedPoint');
+                const properties = feature.get('properties');
+                const nestedProp = properties ? properties.calculatedPoint : false;
+                
+                console.log('[MAP] Feature trouvée:', {
+                    id: feature.getId(),
+                    directProp,
+                    nestedProp,
+                    properties
+                });
+                
+                if (directProp === true || nestedProp === true) {
+                    calculatedFeatures.push(feature);
+                }
+            });
+            
+            console.log(`[MAP] ${calculatedFeatures.length} point(s) calculé(s) trouvé(s) pour suppression`);
+            
+            // Supprimer chaque feature calculée
+            calculatedFeatures.forEach(feature => {
+                console.log('[MAP] Suppression de la feature:', feature.getId());
+                this.vectorSource.removeFeature(feature);
+            });
+        }
+
+        // === MÉTHODE AMÉLIORÉE : gérer l'ajout d'un point calculé ===
         handleAddCalculatedPoint(event) {
+            console.log('[MAP] Réception d\'un événement pour ajouter un point calculé');
             const { latitude, longitude, label, color } = event.detail;
-            this.addFeature(longitude, latitude, {
-                name: label || "Point calculé",
+            
+            // Supprimer d'abord tous les points calculés précédents
+            this.clearCalculatedPoints();
+            
+            // Convertir les coordonnées décimales en format DDM
+            const ddmCoords = this.decimalToDDM(latitude, longitude);
+            console.log('[MAP] Coordonnées converties:', ddmCoords);
+            
+            // Créer un ID unique pour ce point
+            const pointId = `calculated-point-${Date.now()}`;
+            
+            // Ajouter le nouveau point avec un marqueur spécial et un ID unique
+            const feature = this.addFeature(longitude, latitude, {
+                name: "Coordonnées calculées",
                 cache_type: "TempPoint",
                 temp_marker: true,
+                calculatedPoint: true, // Marqueur pour identifier ce point
                 latitude,
                 longitude,
-                color: color || 'rgba(255, 0, 0, 0.8)'
+                color: 'rgba(0, 90, 220, 0.8)',
+                // Coordonnées formatées pour l'infobulle
+                gc_lat: ddmCoords.latitude,
+                gc_lon: ddmCoords.longitude,
+                // Spécifique au point calculé
+                isCalculatedPoint: true,
+                calculatedAt: new Date().toLocaleTimeString()
             });
+            
+            // Définir les propriétés directement sur la feature pour être sûr
+            if (feature) {
+                feature.setId(pointId);
+                feature.set('calculatedPoint', true);
+                feature.set('gc_lat', ddmCoords.latitude);
+                feature.set('gc_lon', ddmCoords.longitude);
+                feature.set('isCalculatedPoint', true);
+                console.log('[MAP] Nouveau point calculé ajouté avec ID:', pointId);
+            }
+            
             // Centrer la carte sur ce point
             if (this.map) {
                 this.map.getView().setCenter(ol.proj.fromLonLat([longitude, latitude]));
                 this.map.getView().setZoom(15);
             }
+        }
+
+        // Fonction pour convertir les coordonnées décimales en format DDM (degrés, minutes décimales)
+        decimalToDDM(lat, lon) {
+            // Gérer la latitude
+            const latDir = lat >= 0 ? 'N' : 'S';
+            const latAbs = Math.abs(lat);
+            const latDeg = Math.floor(latAbs);
+            const latMin = (latAbs - latDeg) * 60;
+            const latMinFormatted = latMin.toFixed(3);
+            
+            // Gérer la longitude
+            const lonDir = lon >= 0 ? 'E' : 'W';
+            const lonAbs = Math.abs(lon);
+            const lonDeg = Math.floor(lonAbs);
+            const lonMin = (lonAbs - lonDeg) * 60;
+            const lonMinFormatted = lonMin.toFixed(3);
+            
+            return {
+                latitude: `${latDir}${latDeg.toString().padStart(2, '0')}° ${latMinFormatted.padStart(6, '0')}`,
+                longitude: `${lonDir}${lonDeg.toString().padStart(3, '0')}° ${lonMinFormatted.padStart(6, '0')}`
+            };
         }
     }
 
