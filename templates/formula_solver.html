@@ -249,7 +249,17 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                             </svg>
-                            <span>Ajouter comme waypoint</span>
+                            <span>Ajouter WP</span>
+                        </button>
+                        <button 
+                            class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded flex items-center"
+                            data-action="click->formula-solver#createWaypointAuto"
+                            data-formula-solver-target="createWaypointAutoButton"
+                            title="Créer un waypoint automatiquement">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Créer WP auto</span>
                         </button>
                     </div>
                 </div>
@@ -258,7 +268,10 @@
             {% if origin_lat and origin_lon %}
             <div class="mt-3 bg-gray-700 rounded p-3 text-sm">
                 <div class="text-gray-400 mb-1">Coordonnées d'origine: <span class="text-gray-200">{{ origin_lat }} {{ origin_lon }}</span></div>
-                <div class="text-gray-400">Les règles du géocaching exigent que les caches mystère récentes soient situées à moins de 2 miles (environ 3,2 km) des coordonnées d'origine.</div>
+                <div class="text-gray-400 flex justify-between items-center">
+                    <span>Les règles du géocaching exigent que les caches mystère récentes soient situées à moins de 2 miles (environ 3,2 km) des coordonnées d'origine.</span>
+                    <span data-formula-solver-target="distanceInfo" class="font-medium"></span>
+                </div>
             </div>
             {% endif %}
         </div>

@@ -23,7 +23,8 @@
             "detectedFormulasLoading",
             "questionExtractionModeDisplay",
             "copyCoordinatesButton",
-            "addWaypointButton"
+            "addWaypointButton",
+            "createWaypointAutoButton"
         ]
         static values = {
             geocacheId: String,
@@ -2223,6 +2224,242 @@
                 this.addWaypointButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
                 this.addWaypointButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
             }, 3000); // Augmenter le délai pour donner à l'utilisateur plus de temps pour lire le message
+        }
+
+        createWaypointAuto() {
+            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+            
+            if (!coordinatesText) {
+                return;
+            }
+            
+            // Vérifier si les coordonnées contiennent des variables non résolues (lettres A-Z)
+            const containsVariables = /[A-Z]{2,}/.test(coordinatesText);
+            if (containsVariables) {
+                console.error("Les coordonnées contiennent des variables non résolues");
+                this.showCreateWaypointAutoError("Variables non résolues");
+                return;
+            }
+            
+            // Récupérer l'ID de la géocache
+            const geocacheId = this.geocacheIdValue;
+            
+            // Extraire les coordonnées calculées
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+            const match = coordinatesText.match(regex);
+            
+            if (!match || match.length < 3) {
+                console.error("Format de coordonnées non reconnu");
+                this.showCreateWaypointAutoError("Format de coordonnées non reconnu");
+                return;
+            }
+            
+            const gcLat = match[1].trim();
+            const gcLon = match[2].trim();
+            
+            // Générer un nom de waypoint par défaut basé sur la formule
+            const formulaText = this.formulaInputTarget.value.trim();
+            let waypointName = "Point calculé";
+            
+            if (formulaText) {
+                // Utiliser les 20 premiers caractères de la formule pour le nom du waypoint
+                waypointName = "Calc: " + (formulaText.length > 20 ? formulaText.substring(0, 20) + "..." : formulaText);
+            }
+            
+            // Ajouter la distance si des coordonnées d'origine sont disponibles
+            let note = `Point calculé automatiquement avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinatesText}`;
+            
+            // Vérifier si on a des éléments de distance pour les ajouter à la note
+            if (document.querySelector('#debug-origin-lat') && document.querySelector('#debug-origin-lon')) {
+                const originLat = document.querySelector('#debug-origin-lat').textContent;
+                const originLon = document.querySelector('#debug-origin-lon').textContent;
+                
+                if (originLat && originLon) {
+                    // Si on a des données de distance, les ajouter à la note
+                    const distanceElement = document.querySelector('[data-formula-solver-target="distanceInfo"]');
+                    if (distanceElement && distanceElement.textContent) {
+                        note += `\nDistance: ${distanceElement.textContent}`;
+                    }
+                }
+            }
+            
+            // Préparer les données pour la création du waypoint
+            const waypointData = {
+                geocache_id: geocacheId,
+                name: waypointName,
+                prefix: "FS", // Formula Solver
+                gc_lat: gcLat,
+                gc_lon: gcLon,
+                note: note
+            };
+            
+            // Afficher l'indicateur de chargement
+            this.showCreateWaypointAutoLoading();
+            
+            // Appeler l'API pour créer le waypoint
+            fetch(`/api/geocaches/${geocacheId}/waypoints`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(waypointData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                // Vérifier d'abord le type de contenu pour savoir si on attend du JSON
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Si ce n'est pas du JSON, traiter comme du texte
+                    return response.text().then(text => {
+                        // Si la réponse est vide ou non-JSON, créer un objet factice avec les données essentielles
+                        console.log("Réponse non-JSON reçue:", text);
+                        return {
+                            id: new Date().getTime(), // ID temporaire unique
+                            name: waypointName,
+                            prefix: "FS",
+                            gc_lat: gcLat,
+                            gc_lon: gcLon,
+                            // Convertir les coordonnées GC en latitude/longitude
+                            latitude: this.convertGCToDecimal(gcLat, "lat"),
+                            longitude: this.convertGCToDecimal(gcLon, "lon"),
+                            note: note,
+                            _success: true // Marqueur indiquant que l'opération a réussi malgré la réponse non-JSON
+                        };
+                    });
+                }
+            })
+            .then(data => {
+                // Vérifier si on a une structure de données valide
+                if (data && (data.id || data._success)) {
+                    console.log("Waypoint créé avec succès:", data);
+                    this.showCreateWaypointAutoSuccess();
+                    
+                    // Annoncer la création du waypoint pour mettre à jour la carte
+                    const event = new CustomEvent('waypointSaved', {
+                        detail: {
+                            waypoint: data,
+                            geocacheId: geocacheId,
+                            isNew: true
+                        },
+                        bubbles: true
+                    });
+                    document.dispatchEvent(event);
+                } else {
+                    throw new Error("Structure de données invalide ou incomplète");
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la création du waypoint:", error);
+                this.showCreateWaypointAutoError("Erreur API");
+            });
+        }
+        
+        // Méthode utilitaire pour convertir les coordonnées GC en coordonnées décimales
+        convertGCToDecimal(coordStr, type) {
+            try {
+                if (type === "lat") {
+                    // Format N/S DD° MM.MMM
+                    const match = coordStr.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/);
+                    if (match) {
+                        const direction = match[1];
+                        const degrees = parseInt(match[2]);
+                        const minutes = parseFloat(match[3]);
+                        let decimal = degrees + (minutes / 60);
+                        if (direction === 'S') decimal = -decimal;
+                        return decimal;
+                    }
+                } else if (type === "lon") {
+                    // Format E/W DDD° MM.MMM
+                    const match = coordStr.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/);
+                    if (match) {
+                        const direction = match[1];
+                        const degrees = parseInt(match[2]);
+                        const minutes = parseFloat(match[3]);
+                        let decimal = degrees + (minutes / 60);
+                        if (direction === 'W') decimal = -decimal;
+                        return decimal;
+                    }
+                }
+                // En cas d'échec de parsing, retourner 0
+                return 0;
+            } catch (error) {
+                console.error("Erreur de conversion des coordonnées:", error);
+                return 0;
+            }
+        }
+        
+        showCreateWaypointAutoLoading() {
+            // Changer temporairement le texte du bouton pour indiquer le chargement
+            const originalButtonHTML = this.createWaypointAutoButtonTarget.innerHTML;
+            this.createWaypointAutoButtonTarget.innerHTML = `
+                <svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span>Création...</span>
+            `;
+            this.createWaypointAutoButtonTarget.disabled = true;
+            this.createWaypointAutoButtonTarget.classList.add("opacity-75");
+        }
+        
+        showCreateWaypointAutoSuccess() {
+            // Changer temporairement le texte du bouton pour indiquer le succès
+            const originalButtonHTML = this.createWaypointAutoButtonTarget.innerHTML;
+            this.createWaypointAutoButtonTarget.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>WP créé!</span>
+            `;
+            this.createWaypointAutoButtonTarget.disabled = false;
+            this.createWaypointAutoButtonTarget.classList.remove("opacity-75");
+            this.createWaypointAutoButtonTarget.classList.remove("bg-purple-600", "hover:bg-purple-700");
+            this.createWaypointAutoButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                this.createWaypointAutoButtonTarget.innerHTML = originalButtonHTML;
+                this.createWaypointAutoButtonTarget.classList.remove("bg-green-600", "hover:bg-green-700");
+                this.createWaypointAutoButtonTarget.classList.add("bg-purple-600", "hover:bg-purple-700");
+            }, 3000);
+        }
+        
+        showCreateWaypointAutoError(message) {
+            console.error('Erreur lors de la création automatique du waypoint:', message);
+            
+            // Déterminer le message à afficher
+            let displayMessage = "Erreur";
+            if (message === "Variables non résolues") {
+                displayMessage = "Variables non résolues";
+            } else if (message === "Format de coordonnées non reconnu") {
+                displayMessage = "Format invalide";
+            } else if (message === "Erreur API") {
+                displayMessage = "Erreur API";
+            }
+            
+            // Afficher un message d'erreur
+            const originalButtonHTML = this.createWaypointAutoButtonTarget.innerHTML;
+            this.createWaypointAutoButtonTarget.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${displayMessage}</span>
+            `;
+            this.createWaypointAutoButtonTarget.disabled = false;
+            this.createWaypointAutoButtonTarget.classList.remove("opacity-75");
+            this.createWaypointAutoButtonTarget.classList.remove("bg-purple-600", "hover:bg-purple-700");
+            this.createWaypointAutoButtonTarget.classList.add("bg-red-600", "hover:bg-red-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                this.createWaypointAutoButtonTarget.innerHTML = originalButtonHTML;
+                this.createWaypointAutoButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
+                this.createWaypointAutoButtonTarget.classList.add("bg-purple-600", "hover:bg-purple-700");
+            }, 3000);
         }
     }
 
