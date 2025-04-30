@@ -21,7 +21,9 @@
             "extractionModeDisplay",
             "detectedFormulasContainer",
             "detectedFormulasLoading",
-            "questionExtractionModeDisplay"
+            "questionExtractionModeDisplay",
+            "copyCoordinatesButton",
+            "addWaypointButton"
         ]
         static values = {
             geocacheId: String,
@@ -1988,6 +1990,239 @@
             let value = deg + (minutes / 60);
             if (dir === 'S' || dir === 'W') value = -value;
             return value;
+        }
+
+        copyCalculatedCoordinates() {
+            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+            
+            if (!coordinatesText) {
+                return;
+            }
+            
+            // Copier le texte dans le presse-papier
+            navigator.clipboard.writeText(coordinatesText)
+                .then(() => {
+                    // Changer temporairement le texte du bouton pour indiquer le succès
+                    const originalButtonHTML = this.copyCoordinatesButtonTarget.innerHTML;
+                    this.copyCoordinatesButtonTarget.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Copié!</span>
+                    `;
+                    this.copyCoordinatesButtonTarget.classList.remove("bg-blue-600", "hover:bg-blue-700");
+                    this.copyCoordinatesButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
+                    
+                    // Rétablir le bouton après un délai
+                    setTimeout(() => {
+                        this.copyCoordinatesButtonTarget.innerHTML = originalButtonHTML;
+                        this.copyCoordinatesButtonTarget.classList.remove("bg-green-600", "hover:bg-green-700");
+                        this.copyCoordinatesButtonTarget.classList.add("bg-blue-600", "hover:bg-blue-700");
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Erreur lors de la copie des coordonnées:', err);
+                    
+                    // Afficher un message d'erreur
+                    this.copyCoordinatesButtonTarget.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Erreur</span>
+                    `;
+                    this.copyCoordinatesButtonTarget.classList.remove("bg-blue-600", "hover:bg-blue-700");
+                    this.copyCoordinatesButtonTarget.classList.add("bg-red-600", "hover:bg-red-700");
+                    
+                    // Rétablir le bouton après un délai
+                    setTimeout(() => {
+                        this.copyCoordinatesButtonTarget.innerHTML = originalButtonHTML;
+                        this.copyCoordinatesButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
+                        this.copyCoordinatesButtonTarget.classList.add("bg-blue-600", "hover:bg-blue-700");
+                    }, 2000);
+                });
+        }
+
+        addAsWaypoint() {
+            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+            
+            if (!coordinatesText) {
+                return;
+            }
+            
+            // Vérifier si les coordonnées contiennent des variables non résolues (lettres A-Z)
+            const containsVariables = /[A-Z]{2,}/.test(coordinatesText);
+            if (containsVariables) {
+                console.error("Les coordonnées contiennent des variables non résolues");
+                this.showAddWaypointError("Variables non résolues");
+                return;
+            }
+            
+            // Récupérer l'ID de la géocache
+            const geocacheId = this.geocacheIdValue;
+            
+            // Extraire les coordonnées calculées
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+            const match = coordinatesText.match(regex);
+            
+            if (!match || match.length < 3) {
+                console.error("Format de coordonnées non reconnu");
+                this.showAddWaypointError("Format de coordonnées non reconnu");
+                return;
+            }
+            
+            const gcLat = match[1].trim();
+            const gcLon = match[2].trim();
+            
+            // Générer un nom de waypoint par défaut basé sur la formule
+            const formulaText = this.formulaInputTarget.value.trim();
+            let waypointName = "Point calculé";
+            
+            if (formulaText) {
+                // Utiliser les 20 premiers caractères de la formule pour le nom du waypoint
+                waypointName = "Calc: " + (formulaText.length > 20 ? formulaText.substring(0, 20) + "..." : formulaText);
+            }
+            
+            try {
+                // Approche alternative: ouvrir directement le panneau de waypoint
+                // Trouver l'onglet actif avec les détails de la géocache
+                let detailsTab = null;
+                if (window.mainLayout) {
+                    const components = window.mainLayout.root.getItemsByType('component');
+                    for (const comp of components) {
+                        if (comp.config.componentName === 'geocache-details' && 
+                            comp.container && 
+                            comp.container.getState().geocacheId == geocacheId) {
+                            detailsTab = comp;
+                            break;
+                        }
+                    }
+                    
+                    // Si on trouve un onglet de détails, l'activer
+                    if (detailsTab) {
+                        detailsTab.parent.setActiveContentItem(detailsTab);
+                        
+                        // Créer une fonction pour continuer après que l'onglet soit activé
+                        const continueWithWaypointForm = () => {
+                            // Trouver la section waypoint dans le détail
+                            const container = detailsTab.container.getElement()[0];
+                            if (!container) {
+                                console.error("Container du panneau de détails non trouvé");
+                                this.showAddWaypointError("Erreur panneau");
+                                return;
+                            }
+                            
+                            // Trouver le bouton pour ajouter un waypoint
+                            const waypointSection = container.querySelector('.waypoints-section');
+                            if (!waypointSection) {
+                                console.error("Section waypoints non trouvée");
+                                this.showAddWaypointError("Erreur section");
+                                return;
+                            }
+                            
+                            // Trouver le bouton et simuler un clic
+                            const addButton = waypointSection.querySelector('button');
+                            if (!addButton) {
+                                console.error("Bouton d'ajout de waypoint non trouvé");
+                                this.showAddWaypointError("Erreur bouton");
+                                return;
+                            }
+                            
+                            // Cliquer sur le bouton pour ouvrir le formulaire
+                            addButton.click();
+                            
+                            // Attendre l'ouverture du formulaire puis remplir les champs
+                            setTimeout(() => {
+                                // Chercher le formulaire ouvert
+                                const form = waypointSection.querySelector('form');
+                                if (!form) {
+                                    console.error("Formulaire de waypoint non trouvé");
+                                    this.showAddWaypointError("Erreur form");
+                                    return;
+                                }
+                                
+                                // Remplir les champs
+                                const gcLatInput = form.querySelector('[name="gc_lat"]');
+                                const gcLonInput = form.querySelector('[name="gc_lon"]');
+                                const nameInput = form.querySelector('[name="name"]');
+                                const prefixInput = form.querySelector('[name="prefix"]');
+                                const noteInput = form.querySelector('[name="note"]');
+                                
+                                if (gcLatInput) gcLatInput.value = gcLat;
+                                if (gcLonInput) gcLonInput.value = gcLon;
+                                if (nameInput) nameInput.value = waypointName;
+                                if (prefixInput) prefixInput.value = "FS"; // Formula Solver
+                                if (noteInput) noteInput.value = `Point calculé avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinatesText}`;
+                                
+                                // Faire défiler jusqu'au formulaire
+                                form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Afficher message de succès
+                                this.showAddWaypointSuccess();
+                            }, 500);
+                        };
+                        
+                        // Exécuter après un court délai pour laisser l'onglet s'activer
+                        setTimeout(continueWithWaypointForm, 200);
+                    } else {
+                        console.error("Aucun panneau de détails de géocache trouvé");
+                        this.showAddWaypointError("Aucun panneau");
+                    }
+                } else {
+                    console.error("window.mainLayout n'est pas disponible");
+                    this.showAddWaypointError("Erreur Layout");
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'ajout du waypoint:", error);
+                this.showAddWaypointError("Erreur");
+            }
+        }
+        
+        showAddWaypointSuccess() {
+            // Changer temporairement le texte du bouton pour indiquer le succès
+            const originalButtonHTML = this.addWaypointButtonTarget.innerHTML;
+            this.addWaypointButtonTarget.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Waypoint créé!</span>
+            `;
+            this.addWaypointButtonTarget.classList.remove("bg-green-600", "hover:bg-green-700");
+            this.addWaypointButtonTarget.classList.add("bg-teal-600", "hover:bg-teal-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                this.addWaypointButtonTarget.innerHTML = originalButtonHTML;
+                this.addWaypointButtonTarget.classList.remove("bg-teal-600", "hover:bg-teal-700");
+                this.addWaypointButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
+            }, 2000);
+        }
+        
+        showAddWaypointError(message) {
+            console.error('Erreur lors de l\'ajout du waypoint:', message);
+            
+            // Déterminer le message à afficher
+            let displayMessage = "Erreur";
+            if (message === "Variables non résolues") {
+                displayMessage = "Variables non résolues";
+            }
+            
+            // Afficher un message d'erreur
+            const originalButtonHTML = this.addWaypointButtonTarget.innerHTML;
+            this.addWaypointButtonTarget.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${displayMessage}</span>
+            `;
+            this.addWaypointButtonTarget.classList.remove("bg-green-600", "hover:bg-green-700");
+            this.addWaypointButtonTarget.classList.add("bg-red-600", "hover:bg-red-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                this.addWaypointButtonTarget.innerHTML = originalButtonHTML;
+                this.addWaypointButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
+                this.addWaypointButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
+            }, 3000); // Augmenter le délai pour donner à l'utilisateur plus de temps pour lire le message
         }
     }
 

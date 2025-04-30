@@ -38,6 +38,12 @@
             // === AJOUT : écouteur pour point calculé ===
             this.addCalculatedPointHandler = this.handleAddCalculatedPoint.bind(this);
             document.addEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
+            
+            // Écouter l'événement d'ajout de point calculé depuis d'autres composants
+            window.addEventListener('addCalculatedPointToMap', this.handleAddCalculatedPoint.bind(this));
+            
+            // Écouter l'événement pour ouvrir le formulaire de waypoint avec des données
+            window.addEventListener('openWaypointFormWithData', this.handleOpenWaypointFormWithData.bind(this));
         }
 
         disconnect() {
@@ -93,8 +99,10 @@
             this.circleLayer = null;
             this.baseLayerSelector = null;
 
-            // === AJOUT : retire l'écouteur pour point calculé ===
+            // === AJOUT : retire les écouteurs d'événements ===
             document.removeEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
+            window.removeEventListener('addCalculatedPointToMap', this.handleAddCalculatedPoint.bind(this));
+            window.removeEventListener('openWaypointFormWithData', this.handleOpenWaypointFormWithData.bind(this));
         }
 
         async initializeMap() {
@@ -1460,7 +1468,32 @@
                 const activeComponent = window.layoutStateManager.getActiveComponentInfo();
                 
                 if (!activeComponent || activeComponent.type !== 'geocache-details') {
-                    console.warn('%c[DetailMapCtrl] Impossible d\'ajouter un waypoint : aucun composant détail de géocache actif', "color:orange");
+                    console.error('%c[DetailMapCtrl] Impossible d\'ajouter un waypoint : aucun composant détail de géocache actif', "color:orange");
+                    
+                    // Vérifier s'il y a un composant de détail de géocache ouvert mais non actif
+                    if (window.mainLayout) {
+                        let detailsComponent = null;
+                        // Parcourir tous les composants pour trouver un détail de géocache
+                        const components = window.mainLayout.root.getItemsByType('component');
+                        for (const comp of components) {
+                            if (comp.config.componentName === 'geocache-details') {
+                                detailsComponent = comp;
+                                break;
+                            }
+                        }
+                        
+                        if (detailsComponent) {
+                            // Activer ce composant
+                            detailsComponent.parent.setActiveContentItem(detailsComponent);
+                            console.log('%c[DetailMapCtrl] Composant de détail de géocache activé', "color:green");
+                            
+                            // Attendre que le composant soit activé et réessayer
+                            setTimeout(() => {
+                                this.openWaypointForm(lon, lat, featureProps);
+                            }, 300);
+                            return;
+                        }
+                    }
                     
                     // Notification pour informer l'utilisateur
                     const notification = document.createElement('div');
@@ -1529,78 +1562,76 @@
         // Méthode traditionnelle (legacy) pour ouvrir le formulaire via manipulation DOM
         openWaypointFormLegacy(geocacheId, lat, lon, formattedCoords, featureProps = null, tempMarkerId = null) {
             try {
-                // Trouver le contrôleur de formulaire de waypoint dans le document
-                // Pour cela, on cherche le formulaire de waypoint dans les détails de géocache
-                const waypointFormControllers = document.querySelectorAll('[data-controller="waypoint-form"]');
+                console.log(`%c[DetailMapCtrl] Ouverture du formulaire legacy pour geocache ${geocacheId}`, "color:teal");
                 
-                if (waypointFormControllers.length === 0) {
-                    console.error('%c[DetailMapCtrl] Contrôleur de formulaire de waypoint non trouvé', "background:red; color:white");
-                    return;
-                }
+                // Rechercher le composant de détail de géocache contenant cette geocache
+                let detailsContainer = null;
+                const possibleContainers = document.querySelectorAll('.w-full.h-full');
                 
-                // Parcourir tous les formulaires de waypoint trouvés et trouver celui associé à notre géocache
-                let waypointController = null;
-                
-                for (const controller of waypointFormControllers) {
-                    const geocacheIdInput = controller.querySelector('[data-waypoint-form-target="geocacheIdInput"]');
-                    
-                    if (geocacheIdInput && geocacheIdInput.value === geocacheId) {
-                        waypointController = controller;
+                for (const container of possibleContainers) {
+                    // Vérifier si ce conteneur contient un élément avec l'ID de geocache
+                    const idElements = container.querySelectorAll(`[data-geocache-id="${geocacheId}"]`);
+                    if (idElements.length > 0) {
+                        detailsContainer = container;
+                        console.log('%c[DetailMapCtrl] Conteneur de détails trouvé', "color:green");
                         break;
                     }
                 }
                 
-                // Si aucun contrôleur n'est trouvé, essayer une autre méthode
-                if (!waypointController) {
-                    console.warn('%c[DetailMapCtrl] Première méthode de recherche de contrôleur échouée, tentative alternative...', "color:orange");
-                    
-                    // Chercher le formulaire dans tous les composants de détail de géocache actifs
-                    const geocacheDetailsComponents = document.querySelectorAll('[data-controller="detail-geocache-map"][data-detail-geocache-map-geocache-id-value="' + geocacheId + '"]');
-                    
-                    if (geocacheDetailsComponents.length > 0) {
-                        // Trouver le conteneur parent de détails de geocache qui contient le formulaire
-                        const detailsContainer = geocacheDetailsComponents[0].closest('.w-full.h-full');
-                        
-                        if (detailsContainer) {
-                            // Chercher le contrôleur de formulaire à l'intérieur de ce conteneur
-                            const formController = detailsContainer.querySelector('[data-controller="waypoint-form"]');
-                            if (formController) {
-                                waypointController = formController;
-                                console.log('%c[DetailMapCtrl] Contrôleur de formulaire trouvé via méthode alternative', "color:green");
-                            }
-                        }
-                    }
-                }
-                
-                // Si toujours pas trouvé, essayer une dernière méthode : prendre le premier contrôleur de formulaire
-                if (!waypointController && waypointFormControllers.length > 0) {
-                    console.warn('%c[DetailMapCtrl] Méthodes principales échouées, utilisation du premier contrôleur disponible', "color:orange");
-                    waypointController = waypointFormControllers[0];
-                }
-                
-                if (!waypointController) {
-                    console.error('%c[DetailMapCtrl] Contrôleur de formulaire de waypoint pour cette géocache non trouvé', "background:red; color:white");
-                    
-                    // Notification pour informer l'utilisateur
-                    const notification = document.createElement('div');
-                    notification.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50';
-                    notification.textContent = 'Impossible de trouver le formulaire de waypoint. Veuillez recharger la page.';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
-                    
+                if (!detailsContainer) {
+                    console.error('%c[DetailMapCtrl] Conteneur de détails non trouvé', "background:red; color:white");
                     return;
                 }
                 
-                // Vérifier si le formulaire est déjà ouvert, sinon l'ouvrir
-                const form = waypointController.querySelector('[data-waypoint-form-target="form"]');
-                if (form.classList.contains('hidden')) {
-                    // Simuler un clic sur le bouton pour ouvrir le formulaire
-                    const toggleButton = waypointController.querySelector('[data-action="click->waypoint-form#toggleForm"]');
-                    if (toggleButton) {
-                        toggleButton.click();
-                    }
+                // Rechercher la section des waypoints
+                const waypointSection = detailsContainer.querySelector('.waypoints-section');
+                if (!waypointSection) {
+                    console.error('%c[DetailMapCtrl] Section des waypoints non trouvée', "background:red; color:white");
+                    return;
                 }
                 
+                // Trouver le bouton "Ajouter un waypoint"
+                const addButton = waypointSection.querySelector('button');
+                if (!addButton) {
+                    console.error('%c[DetailMapCtrl] Bouton d\'ajout de waypoint non trouvé', "background:red; color:white");
+                    return;
+                }
+                
+                // Trouver le contrôleur de formulaire
+                const waypointController = waypointSection;
+                if (!waypointController) {
+                    console.error('%c[DetailMapCtrl] Contrôleur de formulaire non trouvé', "background:red; color:white");
+                    return;
+                }
+                
+                // Vérifier si le formulaire est déjà visible
+                const form = waypointController.querySelector('[data-waypoint-form-target="form"]');
+                const isFormHidden = form.classList.contains('hidden');
+                
+                console.log(`%c[DetailMapCtrl] État du formulaire: ${isFormHidden ? 'caché' : 'visible'}`, "color:teal");
+                
+                // Si le formulaire est caché, cliquer sur le bouton pour l'ouvrir
+                if (isFormHidden) {
+                    console.log('%c[DetailMapCtrl] Clic sur le bouton pour ouvrir le formulaire', "color:green");
+                    addButton.click();
+                    
+                    // Attendre que le formulaire soit ouvert
+                    setTimeout(() => {
+                        this._fillWaypointForm(waypointController, formattedCoords, featureProps, tempMarkerId);
+                    }, 300);
+                } else {
+                    // Le formulaire est déjà ouvert, remplir les champs directement
+                    this._fillWaypointForm(waypointController, formattedCoords, featureProps, tempMarkerId);
+                }
+                
+            } catch (error) {
+                console.error('%c[DetailMapCtrl] Erreur lors de l\'ouverture du formulaire de waypoint via méthode legacy:', "background:red; color:white", error);
+            }
+        }
+        
+        // Méthode auxiliaire pour remplir le formulaire de waypoint
+        _fillWaypointForm(waypointController, formattedCoords, featureProps, tempMarkerId) {
+            try {
                 // Obtenir les champs de lat/lon dans le formulaire
                 const gcLatInput = waypointController.querySelector('[data-waypoint-form-target="gcLatInput"]');
                 const gcLonInput = waypointController.querySelector('[data-waypoint-form-target="gcLonInput"]');
@@ -1642,7 +1673,10 @@
                 }
                 
                 // Faire défiler jusqu'au formulaire
-                form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const form = waypointController.querySelector('[data-waypoint-form-target="form"]');
+                if (form) {
+                    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
                 
                 // Notification pour informer l'utilisateur
                 const notification = document.createElement('div');
@@ -1651,11 +1685,12 @@
                 document.body.appendChild(notification);
                 setTimeout(() => notification.remove(), 3000);
                 
-                console.log(`%c[DetailMapCtrl] Formulaire de waypoint ouvert avec les coordonnées (${lat.toFixed(6)}, ${lon.toFixed(6)})`, "color:green");
+                console.log(`%c[DetailMapCtrl] Formulaire de waypoint rempli avec les coordonnées`, "color:green");
 
                 // Vider le champ d'ID de waypoint (pour s'assurer qu'on crée un nouveau waypoint)
-                if (waypointController.querySelector('[data-waypoint-form-target="waypointIdInput"]')) {
-                    waypointController.querySelector('[data-waypoint-form-target="waypointIdInput"]').value = '';
+                const waypointIdInput = waypointController.querySelector('[data-waypoint-form-target="waypointIdInput"]');
+                if (waypointIdInput) {
+                    waypointIdInput.value = '';
                 }
                 
                 // Stocker l'ID du marqueur temporaire si disponible
@@ -1668,7 +1703,7 @@
                     }
                 }
             } catch (error) {
-                console.error('%c[DetailMapCtrl] Erreur lors de l\'ouverture du formulaire de waypoint via méthode legacy:', "background:red; color:white", error);
+                console.error('%c[DetailMapCtrl] Erreur lors du remplissage du formulaire de waypoint:', "background:red; color:white", error);
             }
         }
 
@@ -1874,6 +1909,124 @@
                 latitude: `${latDir}${latDeg.toString().padStart(2, '0')}° ${latMinFormatted.padStart(6, '0')}`,
                 longitude: `${lonDir}${lonDeg.toString().padStart(3, '0')}° ${lonMinFormatted.padStart(6, '0')}`
             };
+        }
+
+        // Gérer l'ouverture du formulaire de waypoint avec des données externes
+        handleOpenWaypointFormWithData(event) {
+            const formData = event.detail;
+            
+            if (!formData || !formData.geocacheId || !formData.gcLat || !formData.gcLon) {
+                console.error("Données du waypoint incomplètes:", formData);
+                return;
+            }
+            
+            // Vérifier que cette carte est associée à la même géocache
+            if (this.geocacheIdValue && this.geocacheIdValue != formData.geocacheId) {
+                console.log("Cette carte n'est pas associée à la géocache demandée");
+                
+                // Si nous avons un mainLayout, nous pouvons tenter d'ouvrir un nouveau composant
+                if (window.mainLayout) {
+                    // Chercher un composant de carte de géocache existant
+                    let foundComponent = false;
+                    const components = window.mainLayout.root.getItemsByType('component');
+                    for (const comp of components) {
+                        if (comp.config.componentName === 'geocache-map' && 
+                            comp.config.componentState && 
+                            comp.config.componentState.geocacheId == formData.geocacheId) {
+                            
+                            // Envoyer un événement à ce composant
+                            const targetEvent = new CustomEvent('openWaypointFormWithData', {
+                                detail: formData
+                            });
+                            window.dispatchEvent(targetEvent);
+                            
+                            // Activer cet onglet
+                            comp.parent.setActiveContentItem(comp);
+                            foundComponent = true;
+                            break;
+                        }
+                    }
+                    
+                    // Si aucun composant n'est trouvé, ouvrir un nouvel onglet avec la carte
+                    if (!foundComponent) {
+                        console.log("Ouverture d'une nouvelle carte pour la géocache", formData.geocacheId);
+                        // Logique pour ouvrir une nouvelle carte
+                    }
+                }
+                return;
+            }
+            
+            // Créer un objet temporaire pour stocker les propriétés du formulaire
+            const featureProps = {
+                name: formData.name || "Point calculé",
+                prefix: formData.prefix || "FS",
+                note: formData.note || "Point ajouté depuis Formula Solver"
+            };
+            
+            // Extraire les coordonnées décimales si disponibles, sinon convertir depuis le format GC
+            let lat, lon;
+            
+            if (formData.lat && formData.lon) {
+                lat = parseFloat(formData.lat);
+                lon = parseFloat(formData.lon);
+            } else if (formData.gcLat && formData.gcLon) {
+                // Convertir depuis le format GC vers décimal
+                try {
+                    const coords = this.convertGCCoordsToDecimal(formData.gcLat, formData.gcLon);
+                    lat = coords.lat;
+                    lon = coords.lon;
+                } catch (error) {
+                    console.error("Erreur de conversion des coordonnées:", error);
+                    return;
+                }
+            } else {
+                console.error("Aucune coordonnée valide fournie");
+                return;
+            }
+            
+            // Ouvrir le formulaire de waypoint avec ces coordonnées
+            this.openWaypointForm(lon, lat, featureProps);
+        }
+        
+        // Fonction pour convertir les coordonnées GC en décimal
+        convertGCCoordsToDecimal(gcLat, gcLon) {
+            try {
+                // Traiter la latitude
+                const latRegex = /([NS])[\s]*(\d+)°[\s]*(\d+\.\d+)/;
+                const latMatch = gcLat.match(latRegex);
+                
+                if (!latMatch) {
+                    throw new Error("Format de latitude non reconnu: " + gcLat);
+                }
+                
+                const latDir = latMatch[1];
+                const latDeg = parseInt(latMatch[2]);
+                const latMin = parseFloat(latMatch[3]);
+                
+                // Traiter la longitude
+                const lonRegex = /([EW])[\s]*(\d+)°[\s]*(\d+\.\d+)/;
+                const lonMatch = gcLon.match(lonRegex);
+                
+                if (!lonMatch) {
+                    throw new Error("Format de longitude non reconnu: " + gcLon);
+                }
+                
+                const lonDir = lonMatch[1];
+                const lonDeg = parseInt(lonMatch[2]);
+                const lonMin = parseFloat(lonMatch[3]);
+                
+                // Convertir en decimal
+                let lat = latDeg + (latMin / 60);
+                if (latDir === 'S') lat = -lat;
+                
+                let lon = lonDeg + (lonMin / 60);
+                if (lonDir === 'W') lon = -lon;
+                
+                return { lat, lon };
+            } catch (error) {
+                console.error("Erreur lors de la conversion des coordonnées:", error);
+                throw error;
+            }
         }
     }
 
