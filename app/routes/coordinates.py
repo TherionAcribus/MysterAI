@@ -130,7 +130,15 @@ def calculate_coordinates():
         def part_status(val, label):
             # Vérifie si la valeur contient encore des lettres (résolution partielle)
             if isinstance(val, str) and re.search(r'[A-Z]', val):
+                # Vérifier si c'est une expression avec des parenthèses qui n'a pas pu être évaluée
+                if '(' in val and ')' in val:
+                    return ("error", f"La partie {label} contient une expression mathématique non évaluable: {val}")
                 return ("partial", f"La partie {label} contient encore des lettres")
+            
+            # Vérifie si la valeur est une expression entre parenthèses (erreur de calcul)
+            if isinstance(val, str) and val.startswith('(') and val.endswith(')'):
+                # C'est une expression qui n'a pas pu être calculée comme un entier
+                return ("error", f"L'expression {val} dans {label} ne donne pas un nombre entier. Vérifiez vos valeurs.")
             
             # Vérifie si la valeur est négative
             if isinstance(val, (int, float)):
@@ -341,7 +349,7 @@ def _process_formula_part(formula_part, variables):
     """
     print(f"[DEBUG] _process_formula_part: Traitement de '{formula_part}' avec variables {variables}")
     
-    # Si ce n'est pas une expression entre parenthèses, mais contient peut-être des lettres
+    # Si ce n'est pas une expression entre parenthèses initiale, mais peut contenir des sous-expressions
     if not formula_part.startswith('('):
         # Si c'est juste un chiffre, le retourner directement
         if formula_part.isdigit():
@@ -364,19 +372,48 @@ def _process_formula_part(formula_part, variables):
                 print(f"[DEBUG] Aucune variable disponible pour '{formula_part}', retour tel quel")
                 return formula_part
             
+            # Si l'expression contient des parenthèses après le remplacement, essayer de résoudre les sous-expressions
+            if '(' in expression and ')' in expression:
+                # Chercher toutes les sous-expressions entre parenthèses simples
+                sub_expr_pattern = r'\(([^()]+)\)'
+                while re.search(sub_expr_pattern, expression):
+                    # Évaluer la sous-expression
+                    expression = re.sub(sub_expr_pattern, lambda m: str(_evaluate_math_expression(m.group(1).replace('x', '*'))), expression)
+                    
+                    # Si l'expression contient un marqueur d'erreur, arrêter le traitement
+                    if 'ERR:' in expression:
+                        # Extraire et retourner l'expression originale avec parenthèses
+                        parts = expression.split(':')
+                        if len(parts) >= 3:
+                            return f"({parts[2]})"
+                
+                # Si après résolution des sous-expressions il ne reste plus de lettres, évaluer l'expression complète
+                if not re.search(r'[A-Z]', expression):
+                    result = _evaluate_math_expression(expression)
+                    # Vérifier si le résultat contient un marqueur d'erreur
+                    if isinstance(result, str) and result.startswith('ERR:'):
+                        # Extraire et retourner l'expression originale avec parenthèses
+                        parts = result.split(':')
+                        if len(parts) >= 3:
+                            return f"({parts[2]})"
+                    print(f"[DEBUG] Résultat final: {result}")
+                    return result
+            
             # Si l'expression contient encore des lettres majuscules, retourner l'expression partiellement résolue
             if re.search(r'[A-Z]', expression):
                 print(f"[DEBUG] Expression partiellement résolue: '{expression}'")
                 return expression
             
             # Sinon, essayer d'évaluer comme une expression mathématique
-            try:
-                result = eval(expression)
-                print(f"[DEBUG] Expression évaluée: '{expression}' = {result}")
-                return round(result) if isinstance(result, (int, float)) else result
-            except Exception as e:
-                print(f"[ERROR] Impossible d'évaluer l'expression '{expression}': {str(e)}")
-                return expression
+            result = _evaluate_math_expression(expression)
+            # Vérifier si le résultat contient un marqueur d'erreur
+            if isinstance(result, str) and result.startswith('ERR:'):
+                # Extraire et retourner l'expression originale avec parenthèses
+                parts = result.split(':')
+                if len(parts) >= 3:
+                    return f"({parts[2]})"
+            print(f"[DEBUG] Expression évaluée: '{expression}' = {result}")
+            return result
         
         # Sinon, retourner tel quel
         return formula_part
@@ -399,17 +436,51 @@ def _process_formula_part(formula_part, variables):
         # Retourner l'expression partiellement résolue
         return f"({expression})"
     
+    # Évaluer l'expression mathématique
+    result = _evaluate_math_expression(expression)
+    # Vérifier si le résultat contient un marqueur d'erreur
+    if isinstance(result, str) and result.startswith('ERR:'):
+        # Extraire et retourner l'expression originale avec parenthèses
+        parts = result.split(':')
+        if len(parts) >= 3:
+            return f"({parts[2]})"
+    return result
+
+def _evaluate_math_expression(expression):
+    """
+    Évalue une expression mathématique et vérifie que le résultat est un entier.
+    
+    Args:
+        expression: L'expression mathématique à évaluer (sans lettres, uniquement des chiffres et opérateurs)
+        
+    Returns:
+        Le résultat arrondi si c'est un nombre entier ou proche d'un entier
+        Sinon, retourne l'expression originale entre parenthèses avec un marqueur d'erreur
+    """
+    print(f"[DEBUG] _evaluate_math_expression: Évaluation de '{expression}'")
+    
     try:
-        # Évaluer l'expression mathématique
+        # Évaluer l'expression
         result = eval(expression)
-        # Arrondir si c'est un nombre
+        print(f"[DEBUG] _evaluate_math_expression: Résultat brut = {result}")
+        
+        # Vérifier si le résultat est un nombre
         if isinstance(result, (int, float)):
-            return round(result)
-        return result
+            # Vérifier si c'est un entier ou très proche d'un entier (tolérance pour les erreurs de virgule flottante)
+            if abs(result - round(result)) < 1e-10:
+                return round(result)
+            else:
+                # Si c'est une valeur décimale significative, signaler l'erreur mais ne pas lever d'exception
+                error_msg = f"L'expression '{expression}' donne un résultat non entier: {result}"
+                print(f"[ERROR] {error_msg}")
+                # Retourner l'expression originale avec un marqueur spécial pour la gestion des erreurs
+                return f"ERR:NONINTEGER:{expression}"
     except Exception as e:
         print(f"[ERROR] Impossible d'évaluer l'expression '{expression}': {str(e)}")
-        # En cas d'erreur, retourner l'expression partiellement résolue
-        return f"({expression})"
+        # Retourner l'expression originale avec un marqueur d'erreur
+        return f"ERR:SYNTAX:{expression}"
+    
+    return result
 
 # ------------------------------------------------------------------------------
 # Configuration : listes/mappings pour les directions (Nord, Est, ...)

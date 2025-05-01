@@ -645,3 +645,72 @@ Le Formula Solver offre quatre options pour traiter les valeurs associées à ch
 | Checksum       | 4                   | La somme 4+0+0 = 4 est utilisée |
 | Checksum réduit| 4                   | Le checksum est déjà réduit (4) |
 | Longueur       | 3                   | La longueur de "400" (3 caractères) est utilisée | 
+
+## Validation des Coordonnées et Calculs Mathématiques
+
+### Format de Coordonnées en Géocaching
+
+En géocaching, les coordonnées GPS doivent respecter un format précis:
+- Exactement 3 chiffres après le point pour les décimales des minutes
+- Si une coordonnée a plus de 3 chiffres, c'est généralement le signe d'une erreur dans les valeurs utilisées
+- Si une coordonnée a moins de 3 chiffres, elle est complétée avec des zéros (par exemple "94" devient "094")
+
+### Détection des Erreurs dans les Coordonnées
+
+Le Formula Solver détecte et signale automatiquement deux types d'erreurs:
+
+#### 1. Trop de Chiffres Décimaux
+- Lorsqu'une coordonnée calculée contient plus de 3 chiffres après le point
+- Exemple: `N48° 41.402121 E003° 48.323245`
+- La coordonnée est affichée telle quelle (sans correction automatique)
+- Un message d'erreur rouge apparaît pour informer l'utilisateur
+- Les décimales trop nombreuses indiquent souvent une erreur dans les valeurs utilisées
+
+#### 2. Expressions Mathématiques non Entières
+- Les opérations dans les formules de géocaching doivent toujours donner des nombres entiers
+- Exemple: une division comme `(4/2)` qui donne 2 est valide, mais `(3/2)` qui donne 1.5 ne l'est pas
+- Lorsqu'une expression ne donne pas un entier exact, elle est affichée telle quelle dans la coordonnée
+- Par exemple `N48° 41.222 E006° 09.FC(3/2)` avec l'expression problématique entre parenthèses
+- Un message d'erreur rouge explique le problème
+
+### Affichage des Erreurs dans l'Interface
+
+Pour les deux types d'erreurs mentionnés ci-dessus:
+- Les coordonnées sont affichées sans correction automatique pour montrer l'erreur
+- La partie problématique est mise en évidence en rouge
+- Un message d'erreur détaillé apparaît sous les coordonnées calculées
+- Ce message explique la nature du problème et comment le résoudre
+
+### Pourquoi ces Validations sont Importantes
+
+1. **Respect des Normes du Géocaching**
+   - Les coordonnées en géocaching suivent des règles strictes de formatage
+   - Un format incorrect peut mener à des emplacements erronés
+
+2. **Détection Précoce des Erreurs**
+   - Permet d'identifier rapidement si les valeurs utilisées sont incorrectes
+   - Évite de chercher au mauvais endroit à cause de coordonnées mal calculées
+
+3. **Guidage pour la Correction**
+   - L'affichage sans modification des erreurs aide à comprendre où se situe le problème
+   - Les messages explicatifs guident l'utilisateur vers la solution
+
+### Exemples de Messages d'Erreur
+
+| Type d'Erreur | Exemple Affiché | Message d'Erreur |
+|---------------|-----------------|------------------|
+| Trop de décimales | `N48° 41.402121` | "Erreur de coordonnées : Les coordonnées affichées ont plus de 3 chiffres après le point. En géocaching, les coordonnées correctes doivent avoir exactement 3 chiffres après le point." |
+| Expression non entière | `E006° 09.FC(3/2)` | "Erreur de calcul : Une ou plusieurs expressions mathématiques n'ont pas pu être évaluées correctement. Vérifiez les parties entre parenthèses dans les coordonnées affichées." |
+
+### Comment Corriger ces Erreurs
+
+1. **Pour les Trop de Décimales**
+   - Vérifiez les valeurs numériques utilisées dans vos calculs
+   - Assurez-vous que les expressions mathématiques sont correctes
+   - Essayez des valeurs alternatives si vous n'êtes pas sûr
+
+2. **Pour les Expressions Non Entières**
+   - Identifiez les expressions entre parenthèses qui ne donnent pas un nombre entier
+   - Vérifiez si vous avez utilisé les bonnes valeurs dans ces expressions
+   - Ajustez les expressions pour qu'elles donnent des nombres entiers
+   - Par exemple, remplacez (3/2) par (3*2) ou (6/2) selon le contexte

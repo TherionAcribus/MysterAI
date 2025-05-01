@@ -916,6 +916,27 @@
                     this.calculatedCoordinatesTextTarget.textContent = `Erreur: ${data.error}`;
                     this.calculatedCoordinatesTextTarget.classList.add('text-red-500');
                     this.calculatedCoordinatesTarget.classList.remove('hidden');
+                    
+                    // Afficher un message d'erreur convivial pour les problèmes de calcul
+                    if (data.error.includes("Erreur de calcul")) {
+                        const container = this.calculatedCoordinatesTarget;
+                        const warningDiv = document.createElement('div');
+                        warningDiv.className = 'mt-2 p-2 bg-red-100 border border-red-300 rounded text-red-900 text-sm';
+                        warningDiv.innerHTML = `
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <strong>Erreur de calcul :</strong> Une opération mathématique a échoué.
+                            <br>
+                            ${data.error}
+                            <br>
+                            En géocaching, toutes les opérations doivent donner des nombres entiers.
+                        `;
+                        
+                        // Supprimer les avertissements existants
+                        container.querySelectorAll('.bg-amber-100, .bg-red-100').forEach(el => el.remove());
+                        // Ajouter le nouvel avertissement
+                        container.appendChild(warningDiv);
+                    }
+                    
                     return;
                 }
 
@@ -1029,18 +1050,41 @@
                 const hasDecimalIssue = (data.lat_status && data.lat_status.message && data.lat_status.message.includes('décimales')) || 
                                        (data.lon_status && data.lon_status.message && data.lon_status.message.includes('décimales'));
                 
-                if (hasDecimalIssue) {
+                // Vérifier si une erreur concernant une expression mathématique est présente
+                const hasMathIssue = (data.lat_status && data.lat_status.message && 
+                                     (data.lat_status.message.includes('expression mathématique') || 
+                                      data.lat_status.message.includes('ne donne pas un nombre entier'))) || 
+                                    (data.lon_status && data.lon_status.message && 
+                                     (data.lon_status.message.includes('expression mathématique') || 
+                                      data.lon_status.message.includes('ne donne pas un nombre entier')));
+                
+                if (hasDecimalIssue || hasMathIssue) {
                     const container = this.calculatedCoordinatesTarget;
                     const warningDiv = document.createElement('div');
                     warningDiv.className = 'mt-2 p-2 bg-red-100 border border-red-300 rounded text-red-900 text-sm';
-                    warningDiv.innerHTML = `
-                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                        <strong>Erreur de coordonnées :</strong> Les coordonnées affichées ont plus de 3 chiffres après le point.
-                        <br>
-                        En géocaching, les coordonnées correctes doivent avoir exactement 3 chiffres après le point.
-                        <br>
-                        Cette erreur indique probablement que certaines valeurs utilisées sont incorrectes.
-                    `;
+                    
+                    let errorMessage = '';
+                    if (hasDecimalIssue) {
+                        errorMessage = `
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <strong>Erreur de coordonnées :</strong> Les coordonnées affichées ont plus de 3 chiffres après le point.
+                            <br>
+                            En géocaching, les coordonnées correctes doivent avoir exactement 3 chiffres après le point.
+                            <br>
+                            Cette erreur indique probablement que certaines valeurs utilisées sont incorrectes.
+                        `;
+                    } else if (hasMathIssue) {
+                        errorMessage = `
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <strong>Erreur de calcul :</strong> Une ou plusieurs expressions mathématiques n'ont pas pu être évaluées correctement.
+                            <br>
+                            Vérifiez les parties entre parenthèses dans les coordonnées affichées.
+                            <br>
+                            En géocaching, toutes les opérations doivent donner des nombres entiers (par exemple 4/2=2, mais 3/2=1.5 n'est pas valide).
+                        `;
+                    }
+                    
+                    warningDiv.innerHTML = errorMessage;
                     
                     // Supprimer les avertissements existants
                     container.querySelectorAll('.bg-amber-100, .bg-red-100').forEach(el => el.remove());
