@@ -1933,6 +1933,9 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                 if not is_html and description:
                     description = "<p>" + description.replace('\n', '<br>') + "</p>"
                 
+                # Extraire les checkers de la description HTML
+                checkers_list = extract_checkers_from_description(description)
+                
                 # Date de création
                 time_elem = waypoint.find('default:time', ns)
                 hidden_date = None
@@ -2009,6 +2012,15 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                 
                 # Associer la géocache à la zone
                 geocache.zones.append(zone)
+                
+                # Extraire et ajouter les checkers de la description HTML
+                checkers_list = extract_checkers_from_description(description)
+                for checker_data in checkers_list:
+                    checker = Checker(
+                        name=checker_data.get('name', ''),
+                        url=checker_data.get('url', '')
+                    )
+                    geocache.checkers.append(checker)
                 
                 # Traiter les attributs de la géocache
                 attributes_elem = cache_data.find('groundspeak:attributes', ns)
@@ -3463,3 +3475,60 @@ Recherche particulièrement les coordonnées qui contiennent des lettres majuscu
         logger.error(f"Erreur lors de la détection des formules: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
+
+def extract_checkers_from_description(description_html):
+    """
+    Extrait les checkers d'une description HTML de géocache.
+    
+    Args:
+        description_html (str): La description HTML d'une géocache
+        
+    Returns:
+        list: Liste de dictionnaires contenant les informations des checkers trouvés
+    """
+    checkers = []
+    
+    if not description_html:
+        return checkers
+    
+    try:
+        # Parser le HTML avec BeautifulSoup
+        soup = BeautifulSoup(description_html, 'html.parser')
+        
+        # Recherche des liens pour les checkers
+        links = soup.find_all('a', href=True)
+        for link in links:
+            href = link['href']
+            checker_info = None
+            
+            # GeoCheck - plusieurs domaines possibles (geocheck.org, geotjek.dk, etc.)
+            if any(domain in href.lower() for domain in ['geocheck.org', 'geotjek.dk', 'geo_inputchkcoord.php']):
+                checker_info = {
+                    'name': 'GeoCheck',
+                    'url': href
+                }
+                
+            # Certitude
+            elif 'certitudes.org' in href.lower():
+                checker_info = {
+                    'name': 'Certitude',
+                    'url': href
+                }
+            
+            if checker_info:
+                # Vérifier que ce checker n'est pas déjà dans la liste
+                if not any(c['url'] == checker_info['url'] for c in checkers):
+                    checkers.append(checker_info)
+        
+        # Recherche du checker Geocaching.com (moins probable dans un GPX)
+        coord_checker = soup.find('div', {'class': 'CoordChecker'})
+        if coord_checker:
+            checkers.append({
+                'name': 'Geocaching',
+                'url': '#solution-checker'
+            })
+    
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de l'extraction des checkers de la description: {str(e)}")
+    
+    return checkers

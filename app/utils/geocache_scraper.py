@@ -300,7 +300,7 @@ def extract_additional_waypoints(soup: BeautifulSoup) -> List[Dict[str, str]]:
     
     return waypoints
 
-def extract_checkers(soup: BeautifulSoup) -> Dict[str, Any]:
+def extract_checkers(soup: BeautifulSoup) -> List[Dict[str, str]]:
     """
     Extrait les différents checkers présents sur la page de la géocache.
     
@@ -308,27 +308,44 @@ def extract_checkers(soup: BeautifulSoup) -> Dict[str, Any]:
         soup (BeautifulSoup): L'objet BeautifulSoup de la page
         
     Returns:
-        dict: Dictionnaire contenant les informations sur les checkers trouvés
+        List[Dict[str, str]]: Liste de dictionnaires contenant les informations sur les checkers trouvés
+                             avec 'name' et 'url' pour chaque checker
     """
-    checkers = {
-        'geocheck': [],
-        'certitude': [],
-        'geocaching': False
-    }
+    checkers = []
     
-    # Recherche des liens Geocheck et Certitude
+    # Recherche des liens de checker (GeoCheck, Certitude, etc.)
     links = soup.find_all('a', href=True)
     for link in links:
         href = link['href']
-        if 'geocheck.org' in href:
-            checkers['geocheck'].append(href)
-        elif 'certitudes.org' in href:
-            checkers['certitude'].append(href)
-            
+        checker_info = None
+        
+        # GeoCheck - plusieurs domaines possibles (geocheck.org, geotjek.dk, etc.)
+        if any(domain in href.lower() for domain in ['geocheck.org', 'geotjek.dk', 'geo_inputchkcoord.php']):
+            checker_info = {
+                'name': 'GeoCheck',
+                'url': href
+            }
+                
+        # Certitude
+        elif 'certitudes.org' in href.lower():
+            checker_info = {
+                'name': 'Certitude',
+                'url': href
+            }
+        
+        if checker_info:
+            # Vérifier que ce checker n'est pas déjà dans la liste
+            if not any(c['url'] == checker_info['url'] for c in checkers):
+                checkers.append(checker_info)
+    
     # Recherche du checker Geocaching.com
     geocaching_checker = soup.find('div', {'class': 'CoordChecker'})
     if geocaching_checker:
-        checkers['geocaching'] = True
+        # Ajouter le checker Geocaching.com à la liste
+        checkers.append({
+            'name': 'Geocaching',
+            'url': '#solution-checker'  # URL symbolique puisque c'est intégré à la page
+        })
         
     return checkers
 

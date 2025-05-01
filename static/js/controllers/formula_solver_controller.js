@@ -24,7 +24,8 @@
             "questionExtractionModeDisplay",
             "copyCoordinatesButton",
             "addWaypointButton",
-            "createWaypointAutoButton"
+            "createWaypointAutoButton",
+            "openGeoCheckButton"
         ]
         static values = {
             geocacheId: String,
@@ -2849,6 +2850,192 @@
             } catch (error) {
                 console.error("Erreur lors de la mise à jour de la liste des waypoints:", error);
             }
+        }
+        
+        /**
+         * Ouvre les coordonnées calculées dans GeoCheck pour vérification
+         */
+        openGeoCheck(event) {
+            event.preventDefault();
+            
+            // Récupérer les coordonnées calculées
+            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+            if (!coordinatesText) {
+                this.showOpenGeoCheckError("Aucune coordonnée calculée");
+                return;
+            }
+            
+            // Vérifier si les coordonnées sont complètes (pas de variables non résolues)
+            if (coordinatesText.match(/[A-Z]{2,}/)) {
+                this.showOpenGeoCheckError("Coordonnées incomplètes");
+                return;
+            }
+            
+            // Extraire les coordonnées au format N/E
+            // Format attendu: N 47° 12.345 E 006° 12.345
+            const regex = /([NS])[\s]*(\d+)°[\s]*(\d+)\.(\d+)[\s]*([EW])[\s]*(\d+)°[\s]*(\d+)\.(\d+)/;
+            const match = coordinatesText.match(regex);
+            
+            if (!match || match.length < 9) {
+                this.showOpenGeoCheckError("Format non reconnu");
+                return;
+            }
+            
+            // Extraire les composants des coordonnées
+            const latHemisphere = match[1];  // N ou S
+            const latDegrees = match[2];     // degrés latitude
+            const latMinutes = match[3];     // minutes latitude
+            const latDecimals = match[4];    // décimales minutes latitude
+            
+            const lonHemisphere = match[5];  // E ou W
+            const lonDegrees = match[6];     // degrés longitude
+            const lonMinutes = match[7];     // minutes longitude
+            const lonDecimals = match[8];    // décimales minutes longitude
+            
+            // URL de base pour GeoCheck
+            const geoCheckUrl = 'https://geotjek.dk/geo_inputchkcoord.php';
+            
+            // Créer un script qui sera exécuté dans l'iframe pour remplir automatiquement les champs du formulaire
+            const autoFillScript = `
+                // Exécuter quand la page est chargée
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Sélectionner le bon hémisphère pour la latitude (N/S)
+                    const latRadios = document.querySelectorAll('input[name="lat"]');
+                    for(let radio of latRadios) {
+                        if(radio.value === '${latHemisphere}') {
+                            radio.checked = true;
+                        }
+                    }
+                    
+                    // Sélectionner le bon hémisphère pour la longitude (E/W)
+                    const lonRadios = document.querySelectorAll('input[name="lon"]');
+                    for(let radio of lonRadios) {
+                        if(radio.value === '${lonHemisphere}') {
+                            radio.checked = true;
+                        }
+                    }
+                    
+                    // Remplir les champs de degrés, minutes et décimales
+                    document.querySelector('input[name="latdeg"]').value = '${latDegrees}';
+                    document.querySelector('input[name="latmin"]').value = '${latMinutes}';
+                    document.querySelector('input[name="latdec"]').value = '${latDecimals}';
+                    
+                    document.querySelector('input[name="londeg"]').value = '${lonDegrees}';
+                    document.querySelector('input[name="lonmin"]').value = '${lonMinutes}';
+                    document.querySelector('input[name="londec"]').value = '${lonDecimals}';
+                    
+                    console.log('GeoCheck Form Autofilled!');
+                });
+            `;
+            
+            // Vérifier si GoldenLayout est disponible
+            if (window.mainLayout) {
+                try {
+                    // Créer le nouvel onglet dans GoldenLayout
+                    window.mainLayout.root.contentItems[0].addChild({
+                        type: 'component',
+                        componentName: 'external-url',
+                        title: 'GeoCheck Verification',
+                        componentState: {
+                            url: geoCheckUrl,
+                            autoFillScript: autoFillScript,
+                            icon: 'check-circle'
+                        }
+                    });
+                    
+                    // Afficher un message de succès
+                    this.showOpenGeoCheckSuccess();
+                } catch (error) {
+                    console.error("Erreur lors de l'ouverture de GeoCheck:", error);
+                    this.showOpenGeoCheckError("Erreur d'affichage");
+                    
+                    // Fallback: ouvrir dans un nouvel onglet du navigateur
+                    window.open(geoCheckUrl, '_blank');
+                }
+            } else if (window.parent && window.parent.mainLayout) {
+                // Si nous sommes dans un iframe, utiliser le layout parent
+                try {
+                    window.parent.mainLayout.root.contentItems[0].addChild({
+                        type: 'component',
+                        componentName: 'external-url',
+                        title: 'GeoCheck Verification',
+                        componentState: {
+                            url: geoCheckUrl,
+                            autoFillScript: autoFillScript,
+                            icon: 'check-circle'
+                        }
+                    });
+                    
+                    // Afficher un message de succès
+                    this.showOpenGeoCheckSuccess();
+                } catch (error) {
+                    console.error("Erreur lors de l'ouverture de GeoCheck depuis l'iframe:", error);
+                    this.showOpenGeoCheckError("Erreur d'affichage");
+                    
+                    // Fallback: ouvrir dans un nouvel onglet du navigateur
+                    window.open(geoCheckUrl, '_blank');
+                }
+            } else {
+                // Fallback: ouvrir dans un nouvel onglet du navigateur si GoldenLayout n'est pas disponible
+                console.warn("GoldenLayout n'est pas disponible, ouverture dans un nouvel onglet navigateur");
+                window.open(geoCheckUrl, '_blank');
+                this.showOpenGeoCheckSuccess();
+            }
+        }
+        
+        /**
+         * Affiche un message de succès pour l'ouverture de GeoCheck
+         */
+        showOpenGeoCheckSuccess() {
+            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
+            if (!button) return;
+            
+            const originalHTML = button.innerHTML;
+            
+            // Mettre à jour le bouton avec un message de succès
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Ouvert!</span>
+            `;
+            button.classList.remove("bg-indigo-600", "hover:bg-indigo-700");
+            button.classList.add("bg-green-600", "hover:bg-green-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove("bg-green-600", "hover:bg-green-700");
+                button.classList.add("bg-indigo-600", "hover:bg-indigo-700");
+            }, 3000);
+        }
+        
+        /**
+         * Affiche un message d'erreur pour l'ouverture de GeoCheck
+         * @param {string} message - Le message d'erreur à afficher
+         */
+        showOpenGeoCheckError(message) {
+            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
+            if (!button) return;
+            
+            const originalHTML = button.innerHTML;
+            
+            // Mettre à jour le bouton avec un message d'erreur
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${message}</span>
+            `;
+            button.classList.remove("bg-indigo-600", "hover:bg-indigo-700");
+            button.classList.add("bg-red-600", "hover:bg-red-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove("bg-red-600", "hover:bg-red-700");
+                button.classList.add("bg-indigo-600", "hover:bg-indigo-700");
+            }, 3000);
         }
     }
 

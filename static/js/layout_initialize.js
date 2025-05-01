@@ -1008,6 +1008,68 @@ function initializeLayout() {
             container.getElement().html(iframeHtml);
         });
 
+        // Enregistrer le composant external-url pour afficher des pages web externes dans un iframe
+        mainLayout.registerComponent('external-url', function(container, componentState) {
+            const { url, autoFillScript, icon } = componentState;
+            
+            // Utiliser l'icône spécifiée si disponible, sinon utiliser une icône par défaut
+            if (icon) {
+                container.setTitle(`<i class="fas fa-${icon}"></i> ${container.title}`);
+            }
+            
+            // Afficher un état de chargement
+            container.getElement().html(`
+                <div class="w-full h-full bg-gray-900 p-4">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <span class="ml-2 text-gray-300">Chargement de la page externe...</span>
+                    </div>
+                </div>
+            `);
+            
+            // Générer un ID unique pour l'iframe
+            const iframeId = `iframe-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            
+            // Créer l'iframe
+            const iframeHtml = `
+                <div class="w-full h-full bg-white overflow-hidden">
+                    <iframe 
+                        id="${iframeId}" 
+                        src="${url}" 
+                        class="w-full h-full border-0" 
+                        allowfullscreen
+                    ></iframe>
+                </div>
+            `;
+            
+            container.getElement().html(iframeHtml);
+            
+            // Si un script d'auto-remplissage est fourni, l'injecter dans l'iframe après chargement
+            if (autoFillScript) {
+                const iframe = document.getElementById(iframeId);
+                
+                if (iframe) {
+                    iframe.addEventListener('load', function() {
+                        try {
+                            // Accéder au document de l'iframe
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            
+                            // Créer un élément script
+                            const scriptElement = iframeDoc.createElement('script');
+                            scriptElement.textContent = autoFillScript;
+                            
+                            // Ajouter le script au document de l'iframe
+                            iframeDoc.body.appendChild(scriptElement);
+                            
+                            console.log('Script auto-remplissage injecté dans l\'iframe');
+                        } catch (error) {
+                            console.error('Erreur lors de l\'injection du script dans l\'iframe:', error);
+                        }
+                    });
+                }
+            }
+        });
+
         mainLayout.init();
 
         // Ajuster la taille lors du redimensionnement de la fenêtre
