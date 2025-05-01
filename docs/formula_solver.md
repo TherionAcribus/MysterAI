@@ -588,4 +588,60 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
 - Gestion des erreurs de parsing JSON
 - Vérification du format des coordonnées
 - Conversion de formats entre différents systèmes de coordonnées
-- Traitement approprié des réponses HTTP inattendues 
+- Traitement approprié des réponses HTTP inattendues
+
+## Traitement des Valeurs et Checksum
+
+### Types de Valeurs Disponibles
+
+Le Formula Solver offre quatre options pour traiter les valeurs associées à chaque lettre :
+
+1. **Valeur** 
+   - Si vous entrez une **valeur numérique** (ex: "400"), cette valeur sera utilisée directement dans les calculs de coordonnées.
+   - Si vous entrez du texte (ex: "Eiffel"), cette valeur textuelle sera ignorée dans les calculs.
+   - Cette option est idéale quand la réponse à une question est directement un nombre (date, année, quantité, etc.).
+
+2. **Checksum**
+   - Calcule la somme des valeurs des caractères (A=1, B=2, etc. et chiffres conservés tels quels).
+   - Exemple: "ABC123" donne 1+2+3+1+2+3 = 12
+   - Pour une valeur numérique comme "400", le checksum sera 4+0+0 = 4.
+   - Utile quand la formule demande un calcul sur les caractères du mot.
+
+3. **Checksum réduit**
+   - Réduit récursivement le checksum à un seul chiffre.
+   - Exemple: checksum 123 → 1+2+3 = 6
+   - Pour une valeur numérique comme "400", le checksum réduit sera 4.
+   - Pratique quand la formule nécessite un seul chiffre.
+
+4. **Longueur**
+   - Utilise simplement le nombre de caractères dans la valeur.
+   - Exemple: "Eiffel" a une longueur de 6.
+   - Une valeur comme "400" a une longueur de 3.
+   - Utile quand la formule se base sur la longueur du mot.
+
+### Processus de Calcul
+
+1. **Saisie de la Valeur**
+   - Vous entrez un mot, une expression ou un nombre dans le champ correspondant à une lettre.
+
+2. **Calcul Automatique des Propriétés**
+   - Le système calcule automatiquement le checksum, le checksum réduit et la longueur.
+   - Ces valeurs sont affichées dans les champs à droite à titre informatif.
+
+3. **Sélection du Type de Valeur**
+   - Pour chaque lettre ou globalement, vous sélectionnez le type de valeur à utiliser.
+   - Cette sélection détermine quelle valeur sera substituée dans la formule.
+
+4. **Substitution dans la Formule**
+   - Lorsque vous avez le type "Valeur" sélectionné :
+     - Si c'est un nombre, il est directement inséré dans la formule.
+     - Si c'est du texte, il n'est pas utilisé dans les calculs (mais reste visible dans l'interface).
+   - Pour les autres types (Checksum, Checksum réduit, Longueur), les valeurs numériques calculées sont toujours insérées.
+
+### Exemple de traitement avec "400"
+| Type de valeur | Résultat pour "400" | Utilisation dans la formule |
+|----------------|---------------------|----------------------------|
+| Valeur         | 400                 | La valeur 400 est utilisée directement |
+| Checksum       | 4                   | La somme 4+0+0 = 4 est utilisée |
+| Checksum réduit| 4                   | Le checksum est déjà réduit (4) |
+| Longueur       | 3                   | La longueur de "400" (3 caractères) est utilisée | 

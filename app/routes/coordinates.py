@@ -9,6 +9,7 @@ from pyproj import Geod
 
 coordinates_bp = Blueprint('coordinates', __name__)
 
+# A PRIORI PLUS UTILISé..... Ne pas l'utiliser.... A supprimer....
 @coordinates_bp.route('/api/geocaches/save/<int:geocache_id>/coordinates', methods=['POST'])
 def save_geocache_coordinates(geocache_id):
     """
@@ -49,6 +50,11 @@ def calculate_coordinates():
     """
     Calcule les coordonnées à partir d'une formule.
     Peut calculer partiellement les coordonnées même si toutes les variables ne sont pas définies.
+    
+    Vérifie également que les coordonnées sont au format standard de géocaching:
+    - Exactement 3 chiffres après le point pour les décimales des minutes
+    - Si plus de 3 chiffres, erreur indiquée (valeurs incorrectes)
+    - Si moins de 3 chiffres, complète avec des zéros (ex: 94 devient 094)
     
     Exemple de données attendues:
     {
@@ -122,11 +128,24 @@ def calculate_coordinates():
         
         # Statuts individuels
         def part_status(val, label):
+            # Vérifie si la valeur contient encore des lettres (résolution partielle)
             if isinstance(val, str) and re.search(r'[A-Z]', val):
                 return ("partial", f"La partie {label} contient encore des lettres")
+            
+            # Vérifie si la valeur est négative
             if isinstance(val, (int, float)):
                 if int(val) < 0:
                     return ("error", f"La partie {label} est négative")
+                
+                # Vérification spécifique pour la partie décimale des minutes (format de géocaching)
+                if "décimales" in label:
+                    # Convertir en chaîne pour vérifier le nombre de chiffres
+                    val_str = str(val)
+                    
+                    # Si on a plus de 3 chiffres, c'est une erreur en géocaching
+                    if len(val_str) > 3:
+                        return ("error", f"La partie {label} a plus de 3 chiffres ({val_str}). Ceci indique une erreur dans vos valeurs, car en géocaching, il faut exactement 3 chiffres après le point.")
+            
             return ("complete", "")
         
         lat_deg_status, lat_deg_msg = part_status(lat_deg, "degrés latitude")
@@ -164,7 +183,23 @@ def calculate_coordinates():
         # Formatage final
         def format_part(val, digits):
             if isinstance(val, (int, float)):
-                return str(val).zfill(digits)
+                # Convertir en chaîne
+                val_str = str(val)
+                
+                # Pour les décimales (quand digits=3), on s'assure d'avoir au moins 3 chiffres
+                # mais on ne tronque pas s'il y en a plus (pour afficher l'erreur)
+                if digits == 3:
+                    # Pour des valeurs avec moins de 3 chiffres, on complète avec des zéros
+                    if len(val_str) < 3:
+                        val_str = val_str.zfill(digits)
+                    # Si plus de 3 chiffres, on laisse tel quel pour montrer l'erreur
+                else:
+                    # Pour les autres parties (degrés, minutes), on utilise simplement zfill
+                    val_str = val_str.zfill(digits)
+                
+                return val_str
+            
+            # Si ce n'est pas un nombre, le retourner tel quel
             return str(val)
         
         lat_formatted = f"{lat_dir}{format_part(lat_deg,2)}° {format_part(lat_min,2)}.{format_part(lat_decimal,3)}"

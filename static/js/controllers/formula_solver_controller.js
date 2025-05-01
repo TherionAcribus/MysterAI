@@ -1025,6 +1025,29 @@
                     container.appendChild(notificationDiv);
                 }
                 
+                // Vérifier si une erreur concernant le nombre de décimales est présente
+                const hasDecimalIssue = (data.lat_status && data.lat_status.message && data.lat_status.message.includes('décimales')) || 
+                                       (data.lon_status && data.lon_status.message && data.lon_status.message.includes('décimales'));
+                
+                if (hasDecimalIssue) {
+                    const container = this.calculatedCoordinatesTarget;
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'mt-2 p-2 bg-red-100 border border-red-300 rounded text-red-900 text-sm';
+                    warningDiv.innerHTML = `
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <strong>Erreur de coordonnées :</strong> Les coordonnées affichées ont plus de 3 chiffres après le point.
+                        <br>
+                        En géocaching, les coordonnées correctes doivent avoir exactement 3 chiffres après le point.
+                        <br>
+                        Cette erreur indique probablement que certaines valeurs utilisées sont incorrectes.
+                    `;
+                    
+                    // Supprimer les avertissements existants
+                    container.querySelectorAll('.bg-amber-100, .bg-red-100').forEach(el => el.remove());
+                    // Ajouter le nouvel avertissement
+                    container.appendChild(warningDiv);
+                }
+                
                 // Ajouter des infobulles pour les messages d'erreur
                 if (data.lat_status && data.lat_status.status === 'error' && data.lat_status.message) {
                     console.log("Message d'erreur pour latitude:", data.lat_status.message);
