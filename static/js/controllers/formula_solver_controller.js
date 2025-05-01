@@ -40,6 +40,10 @@
             // Initialiser le dictionnaire pour stocker les données des lettres
             this.letterData = new Map();
             
+            // Initialiser le type de valeur par défaut à 'value'
+            this.selectedValueType = 'value';
+            console.log("Type de valeur par défaut initialisé à:", this.selectedValueType);
+            
             // Déclencher l'extraction des lettres si une formule est déjà présente
             const formula = this.formulaInputTarget.value.trim();
             if (formula) {
@@ -345,16 +349,23 @@
             let html = '';
             letters.forEach(letter => {
                 if (!existingLetters.has(letter)) {
+                    // Initialiser les données pour cette lettre si elles n'existent pas déjà
+                    if (!this.letterData.has(letter)) {
+                        this.letterData.set(letter, {
+                            word: '',
+                            checksum: 0,
+                            'reduced-checksum': 0,
+                            length: 0,
+                            selectedType: this.selectedValueType || 'value'
+                        });
+                        console.log(`Données initialisées pour la lettre ${letter} avec type=${this.selectedValueType || 'value'}`);
+                    }
+                    
                     html += this.createLetterFieldHTML(letter);
                 }
             });
             
-            // Ajouter les nouveaux champs
-            if (html) {
-                this.letterFieldsTarget.insertAdjacentHTML('beforeend', html);
-            }
-            
-            // Supprimer les champs pour les lettres qui ne sont plus dans la formule
+            // Supprimer les lettres qui ne sont plus dans la formule
             Array.from(this.letterFieldsTarget.querySelectorAll('.letter-container')).forEach(container => {
                 const letter = container.dataset.letter;
                 if (!letters.includes(letter)) {
@@ -362,32 +373,51 @@
                     this.letterData.delete(letter);
                 }
             });
+            
+            // Ajouter les nouveaux champs à l'interface
+            if (html) {
+                this.letterFieldsTarget.insertAdjacentHTML('beforeend', html);
+            }
+            
+            // Afficher l'état actuel de letterData après la création des champs
+            console.log("État de letterData après createLetterInputFields:");
+            this.letterData.forEach((data, key) => {
+                console.log(`Lettre ${key}:`, data);
+            });
         }
         
         // Créer le HTML pour un champ de lettre
         createLetterFieldHTML(letter) {
+            // Déterminer le type de valeur par défaut (utiliser 'value' si rien n'est défini)
+            const defaultValueType = this.selectedValueType || 'value';
+            console.log(`Création du champ pour la lettre ${letter} avec type de valeur par défaut: ${defaultValueType}`);
+            
             return `
                 <div class="bg-gray-700 p-4 rounded letter-container" data-letter="${letter}">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-lg font-bold text-white">Lettre ${letter}</h3>
                         <div class="flex items-center space-x-4">
                             <label class="flex items-center space-x-1 text-gray-300 text-sm">
-                                <input type="radio" name="value-type-${letter}" value="value" checked 
+                                <input type="radio" name="value-type-${letter}" value="value" 
+                                       ${defaultValueType === 'value' ? 'checked' : ''}
                                        data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
                                 <span>Valeur</span>
                             </label>
                             <label class="flex items-center space-x-1 text-gray-300 text-sm">
                                 <input type="radio" name="value-type-${letter}" value="checksum" 
+                                       ${defaultValueType === 'checksum' ? 'checked' : ''}
                                        data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
                                 <span>Checksum</span>
                             </label>
                             <label class="flex items-center space-x-1 text-gray-300 text-sm">
                                 <input type="radio" name="value-type-${letter}" value="reduced-checksum" 
+                                       ${defaultValueType === 'reduced-checksum' ? 'checked' : ''}
                                        data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
                                 <span>Réduit</span>
                             </label>
                             <label class="flex items-center space-x-1 text-gray-300 text-sm">
                                 <input type="radio" name="value-type-${letter}" value="length" 
+                                       ${defaultValueType === 'length' ? 'checked' : ''}
                                        data-letter="${letter}" data-action="change->formula-solver#setLetterValueType">
                                 <span>Longueur</span>
                             </label>
@@ -497,33 +527,45 @@
                     checksum: 0,
                     'reduced-checksum': 0,
                     length: 0,
-                    selectedType: this.selectedValueType
+                    selectedType: this.selectedValueType || 'value' // Assurer qu'on a toujours un type
                 };
                 
                 // Mettre à jour le mot
                 letterData.word = value;
                 
-                // Calculer le checksum (somme des valeurs des lettres A=1, B=2, etc.)
+                // Toujours calculer le checksum correctement, même pour les valeurs numériques
                 letterData.checksum = this.calculateChecksum(value);
                 
-                // Calculer le checksum réduit (réduire à un seul chiffre)
+                // Calculer le checksum réduit
                 letterData['reduced-checksum'] = this.reduceChecksum(letterData.checksum);
                 
                 // Calculer la longueur
                 letterData.length = value.length;
                 
+                // S'assurer que selectedType est défini
+                if (!letterData.selectedType) {
+                    letterData.selectedType = this.selectedValueType || 'value';
+                }
+                
                 // Mettre à jour la map des données
                 this.letterData.set(letter, letterData);
+                
+                console.log(`Données mises à jour pour ${letter}:`, letterData);
+                console.log(`Type de valeur sélectionné pour ${letter}: ${letterData.selectedType}`);
                 
                 // Mettre à jour les champs d'affichage
                 this.updateLetterFields(letter, letterData);
                 
-                console.log(`Données mises à jour pour ${letter}:`, letterData);
-                
                 // Forcer la mise à jour avec un petit délai pour s'assurer que tout est bien traité
-                // Pour éviter des problèmes potentiels de timing ou de mise en cache
                 setTimeout(() => {
-                    console.log("Mise à jour forcée après délai");
+                    // Déboguer la map letterData complète
+                    console.log("État actuel de letterData:");
+                    this.letterData.forEach((data, key) => {
+                        console.log(`Lettre ${key}:`, data);
+                    });
+                    
+                    // Afficher les types de valeur sélectionnés
+                    console.log(`Type de valeur global: ${this.selectedValueType}`);
                     
                     // Mettre à jour la formule substituée
                     this.updateSubstitutedFormula();
@@ -583,6 +625,10 @@
             
             switch (valueType) {
                 case 'value':
+                    // Si la valeur est numérique, retourner directement la valeur numérique
+                    if (data.word && this.isNumeric(data.word)) {
+                        return data.word;
+                    }
                     return data.word || '';
                 case 'checksum':
                     return data.checksum.toString();
@@ -634,10 +680,35 @@
                         
                         // Remplacer chaque lettre par sa valeur
                         for (const letter of letters) {
-                            const value = this.getLetterValue(letter);
+                            if (!this.letterData.has(letter)) continue;
                             
-                            // Ne remplacer que si la valeur est numérique ou si c'est un mot/expression
-                            if (value !== '') {
+                            const data = this.letterData.get(letter);
+                            const valueType = data.selectedType || this.selectedValueType;
+                            
+                            let value;
+                            // Obtenir la valeur en fonction du type sélectionné
+                            switch (valueType) {
+                                case 'value':
+                                    // Si c'est un nombre, l'utiliser directement
+                                    if (data.word && this.isNumeric(data.word)) {
+                                        value = data.word;
+                                    } else {
+                                        value = data.word || '';
+                                    }
+                                    break;
+                                case 'checksum':
+                                    value = data.checksum.toString();
+                                    break;
+                                case 'reduced-checksum':
+                                    value = data['reduced-checksum'].toString();
+                                    break;
+                                case 'length':
+                                    value = data.length.toString();
+                                    break;
+                            }
+                            
+                            // Ne remplacer que si la valeur existe
+                            if (value !== undefined && value !== '') {
                                 // Créer une expression régulière pour cette lettre spécifique
                                 const regex = new RegExp(letter, 'g');
                                 
@@ -717,18 +788,78 @@
             const formula = this.formulaInputTarget.value.trim();
             if (!formula) return;
 
+            console.log("État de letterData avant collecte des variables:");
+            this.letterData.forEach((data, letter) => {
+                console.log(`Lettre ${letter}:`, data);
+            });
+
             // Collecter les variables et leurs valeurs
             const allLetters = this.extractUniqueLetters(formula);
+            console.log("Lettres extraites:", allLetters);
+            
             const variables = {};
 
+            // Collecter les valeurs pour chaque lettre en fonction du type sélectionné
             for (const letter of allLetters) {
-                const value = this.getLetterValue(letter);
-                if (value !== '' && this.isNumeric(value)) {
-                    variables[letter] = parseFloat(value);
+                if (!this.letterData.has(letter)) {
+                    console.log(`Lettre ${letter} non trouvée dans letterData`);
+                    continue;
+                }
+                
+                const data = this.letterData.get(letter);
+                console.log(`Traitement de la lettre ${letter}:`, data);
+                
+                // Déterminer le type de valeur à utiliser (valeur spécifique à la lettre ou globale)
+                const valueType = data.selectedType || this.selectedValueType || 'value';
+                console.log(`Type de valeur pour ${letter}: ${valueType}`);
+                
+                let value;
+                
+                // Obtenir la valeur en fonction du type
+                switch (valueType) {
+                    case 'value':
+                        // Si la valeur est numérique, l'utiliser directement
+                        if (data.word && this.isNumeric(data.word)) {
+                            value = parseFloat(data.word);
+                            console.log(`Lettre ${letter}: Valeur numérique détectée: ${value}`);
+                            // Ajouter immédiatement à variables
+                            variables[letter] = value;
+                        } else {
+                            console.log(`Lettre ${letter}: Valeur non numérique: "${data.word}"`);
+                        }
+                        break;
+                    case 'checksum':
+                        value = data.checksum;
+                        console.log(`Lettre ${letter}: Utilisation du checksum: ${value}`);
+                        if (this.isNumeric(value)) {
+                            variables[letter] = parseFloat(value);
+                        }
+                        break;
+                    case 'reduced-checksum':
+                        value = data['reduced-checksum'];
+                        console.log(`Lettre ${letter}: Utilisation du checksum réduit: ${value}`);
+                        if (this.isNumeric(value)) {
+                            variables[letter] = parseFloat(value);
+                        }
+                        break;
+                    case 'length':
+                        value = data.length;
+                        console.log(`Lettre ${letter}: Utilisation de la longueur: ${value}`);
+                        if (this.isNumeric(value)) {
+                            variables[letter] = parseFloat(value);
+                        }
+                        break;
+                    default:
+                        console.log(`Lettre ${letter}: Type de valeur inconnu: ${valueType}`);
                 }
             }
 
-            console.log("Variables collectées:", variables);
+            console.log("Variables collectées pour API:", variables);
+            
+            // Vérifier si des variables ont été collectées
+            if (Object.keys(variables).length === 0) {
+                console.warn("ATTENTION: Aucune variable numérique n'a été collectée!");
+            }
             
             // Récupérer les coordonnées d'origine de la géocache si disponible
             let originData = {};
@@ -759,7 +890,7 @@
                 timestamp: new Date().getTime() // Pour éviter le cache
             };
             
-            console.log("Données envoyées à l'API:", requestData);
+            console.log("Données envoyées à l'API:", JSON.stringify(requestData));
 
             // Appeler directement l'API qui fonctionne
             fetch('/api/calculate_coordinates', {
