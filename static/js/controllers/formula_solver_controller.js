@@ -25,7 +25,9 @@
             "copyCoordinatesButton",
             "addWaypointButton",
             "createWaypointAutoButton",
-            "openGeoCheckButton"
+            "openGeoCheckButton",
+            "openGeocachingCheckerButton",
+            "openCertitudeCheckerButton"
         ]
         static values = {
             geocacheId: String,
@@ -2857,129 +2859,156 @@
          */
         openGeoCheck(event) {
             event.preventDefault();
+            console.log("openGeoCheck appelé");
             
-            // Récupérer les coordonnées calculées
-            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
-            if (!coordinatesText) {
-                this.showOpenGeoCheckError("Aucune coordonnée calculée");
+            // Récupérer l'ID de la géocache actuelle
+            const geocacheId = this.geocacheIdValue;
+            const gcCode = this.gcCodeValue;
+            if (!geocacheId) {
+                this.showOpenGeoCheckError("ID de géocache manquant");
                 return;
             }
             
-            // Vérifier si les coordonnées sont complètes (pas de variables non résolues)
-            if (coordinatesText.match(/[A-Z]{2,}/)) {
-                this.showOpenGeoCheckError("Coordonnées incomplètes");
+            console.log("ID de géocache:", geocacheId, "Code GC:", gcCode);
+            
+            // Afficher l'état de chargement sur le bouton
+            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
+            if (button) {
+                button._originalHTML = button.innerHTML;
+                button.innerHTML = `
+                    <div class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
+                    <span>Chargement...</span>
+                `;
+                button.disabled = true;
+            }
+            
+            // Chercher d'abord les liens GeoCheck dans le HTML de la page actuelle
+            const geoCheckLinks = document.querySelectorAll('a[href*="geotjek.dk/geo_inputchkcoord.php"], a[href*="geocheck.org/geo_inputchkcoord.php"], a[href*="inputchkcoord.php?gid="]');
+            
+            if (geoCheckLinks.length > 0) {
+                const geoCheckUrl = geoCheckLinks[0].getAttribute('href');
+                console.log("URL GeoCheck trouvée dans le DOM:", geoCheckUrl);
+                
+                // Utiliser l'URL trouvée
+                this.openGeoCheckUrlInLayout(geoCheckUrl);
                 return;
             }
             
-            // Extraire les coordonnées au format N/E
-            // Format attendu: N 47° 12.345 E 006° 12.345
-            const regex = /([NS])[\s]*(\d+)°[\s]*(\d+)\.(\d+)[\s]*([EW])[\s]*(\d+)°[\s]*(\d+)\.(\d+)/;
-            const match = coordinatesText.match(regex);
+            // Si aucun lien n'est trouvé dans le DOM, essayer avec l'API
+            console.log("Aucun lien GeoCheck trouvé dans le DOM, tentative via API...");
             
-            if (!match || match.length < 9) {
-                this.showOpenGeoCheckError("Format non reconnu");
-                return;
-            }
-            
-            // Extraire les composants des coordonnées
-            const latHemisphere = match[1];  // N ou S
-            const latDegrees = match[2];     // degrés latitude
-            const latMinutes = match[3];     // minutes latitude
-            const latDecimals = match[4];    // décimales minutes latitude
-            
-            const lonHemisphere = match[5];  // E ou W
-            const lonDegrees = match[6];     // degrés longitude
-            const lonMinutes = match[7];     // minutes longitude
-            const lonDecimals = match[8];    // décimales minutes longitude
-            
-            // URL de base pour GeoCheck
-            const geoCheckUrl = 'https://geotjek.dk/geo_inputchkcoord.php';
-            
-            // Créer un script qui sera exécuté dans l'iframe pour remplir automatiquement les champs du formulaire
-            const autoFillScript = `
-                // Exécuter quand la page est chargée
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Sélectionner le bon hémisphère pour la latitude (N/S)
-                    const latRadios = document.querySelectorAll('input[name="lat"]');
-                    for(let radio of latRadios) {
-                        if(radio.value === '${latHemisphere}') {
-                            radio.checked = true;
-                        }
+            // Essayer d'abord avec l'API specifique pour les checkers
+            fetch(`/api/geocaches/${geocacheId}/checkers?type=GeoCheck`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Réponse de l'API checkers:", data);
+                    
+                    // Vérifier si un checker GeoCheck a été trouvé
+                    if (!data.checkers || data.checkers.length === 0) {
+                        throw new Error("Aucun checker GeoCheck trouvé pour cette géocache");
                     }
                     
-                    // Sélectionner le bon hémisphère pour la longitude (E/W)
-                    const lonRadios = document.querySelectorAll('input[name="lon"]');
-                    for(let radio of lonRadios) {
-                        if(radio.value === '${lonHemisphere}') {
-                            radio.checked = true;
-                        }
-                    }
+                    // Utiliser la première URL de checker GeoCheck trouvée
+                    const geoCheckUrl = data.checkers[0].url;
+                    console.log("URL GeoCheck trouvée via API:", geoCheckUrl);
                     
-                    // Remplir les champs de degrés, minutes et décimales
-                    document.querySelector('input[name="latdeg"]').value = '${latDegrees}';
-                    document.querySelector('input[name="latmin"]').value = '${latMinutes}';
-                    document.querySelector('input[name="latdec"]').value = '${latDecimals}';
+                    // Ouvrir l'URL dans GoldenLayout
+                    this.openGeoCheckUrlInLayout(geoCheckUrl);
+                })
+                .catch(error => {
+                    console.error("Erreur via API spécifique:", error);
                     
-                    document.querySelector('input[name="londeg"]').value = '${lonDegrees}';
-                    document.querySelector('input[name="lonmin"]').value = '${lonMinutes}';
-                    document.querySelector('input[name="londec"]').value = '${lonDecimals}';
-                    
-                    console.log('GeoCheck Form Autofilled!');
+                    // Essayer avec l'API de détails de la géocache 
+                    console.log("Tentative via API de détails de la géocache...");
+                    fetch(`/api/geocaches/${geocacheId}/details`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Erreur HTTP: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Données de la géocache:", data);
+                            
+                            // Chercher le checker GeoCheck dans les données
+                            if (data.checkers && data.checkers.length > 0) {
+                                const geoCheck = data.checkers.find(c => 
+                                    c.name === "GeoCheck" || 
+                                    (c.url && (c.url.includes("geocheck.org") || c.url.includes("geotjek.dk") || c.url.includes("inputchkcoord.php")))
+                                );
+                                
+                                if (geoCheck) {
+                                    console.log("GeoCheck trouvé dans les détails:", geoCheck);
+                                    this.openGeoCheckUrlInLayout(geoCheck.url);
+                                    return;
+                                }
+                            }
+                            
+                            // Si aucun lien n'est trouvé, afficher un message d'erreur
+                            throw new Error("Aucun checker GeoCheck trouvé dans les détails");
+                        })
+                        .catch(finalError => {
+                            console.error("Toutes les tentatives ont échoué:", finalError);
+                            
+                            // Dernière tentative: construire une URL générique en se basant sur le GC code
+                            if (gcCode) {
+                                // Générer un UUID pour le paramètre gid (simulé)
+                                const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                                    return v.toString(16);
+                                });
+                                
+                                // Créer une URL générique GeoCheck basée sur le GC code
+                                const fallbackUrl = `https://geotjek.dk/geo_inputchkcoord.php?gid=${gcCode}-${uuid}`;
+                                console.log("Utilisation d'une URL générique:", fallbackUrl);
+                                
+                                // Ouvrir l'URL générique
+                                this.openGeoCheckUrlInLayout(fallbackUrl);
+                                return;
+                            }
+                            
+                            // En dernier recours, ouvrir simplement la page d'accueil de GeoCheck
+                            this.showOpenGeoCheckError("Checker non trouvé");
+                            this.openGeoCheckUrlInLayout('https://geotjek.dk/geo_inputchkcoord.php');
+                        });
                 });
-            `;
+        }
+        
+        /**
+         * Ouvre l'URL du GeoCheck dans un nouvel onglet du navigateur
+         * @param {string} geoCheckUrl - L'URL complète du checker GeoCheck
+         */
+        openGeoCheckUrlInLayout(geoCheckUrl) {
+            console.log("Ouverture de l'URL GeoCheck dans un nouvel onglet:", geoCheckUrl);
             
-            // Vérifier si GoldenLayout est disponible
-            if (window.mainLayout) {
-                try {
-                    // Créer le nouvel onglet dans GoldenLayout
-                    window.mainLayout.root.contentItems[0].addChild({
-                        type: 'component',
-                        componentName: 'external-url',
-                        title: 'GeoCheck Verification',
-                        componentState: {
-                            url: geoCheckUrl,
-                            autoFillScript: autoFillScript,
-                            icon: 'check-circle'
-                        }
-                    });
-                    
-                    // Afficher un message de succès
-                    this.showOpenGeoCheckSuccess();
-                } catch (error) {
-                    console.error("Erreur lors de l'ouverture de GeoCheck:", error);
-                    this.showOpenGeoCheckError("Erreur d'affichage");
-                    
-                    // Fallback: ouvrir dans un nouvel onglet du navigateur
-                    window.open(geoCheckUrl, '_blank');
-                }
-            } else if (window.parent && window.parent.mainLayout) {
-                // Si nous sommes dans un iframe, utiliser le layout parent
-                try {
-                    window.parent.mainLayout.root.contentItems[0].addChild({
-                        type: 'component',
-                        componentName: 'external-url',
-                        title: 'GeoCheck Verification',
-                        componentState: {
-                            url: geoCheckUrl,
-                            autoFillScript: autoFillScript,
-                            icon: 'check-circle'
-                        }
-                    });
-                    
-                    // Afficher un message de succès
-                    this.showOpenGeoCheckSuccess();
-                } catch (error) {
-                    console.error("Erreur lors de l'ouverture de GeoCheck depuis l'iframe:", error);
-                    this.showOpenGeoCheckError("Erreur d'affichage");
-                    
-                    // Fallback: ouvrir dans un nouvel onglet du navigateur
-                    window.open(geoCheckUrl, '_blank');
-                }
-            } else {
-                // Fallback: ouvrir dans un nouvel onglet du navigateur si GoldenLayout n'est pas disponible
-                console.warn("GoldenLayout n'est pas disponible, ouverture dans un nouvel onglet navigateur");
-                window.open(geoCheckUrl, '_blank');
-                this.showOpenGeoCheckSuccess();
+            // Vérifier si l'URL est complète
+            if (!geoCheckUrl.startsWith('http')) {
+                // Ajouter le protocole si nécessaire
+                geoCheckUrl = 'http://' + geoCheckUrl;
+                console.log("URL complétée avec http://:", geoCheckUrl);
+            }
+            
+            // IMPORTANT: Toujours ouvrir GeoCheck dans un nouvel onglet du navigateur
+            // pour éviter les problèmes liés aux restrictions de sécurité des iframes
+            // et permettre au CAPTCHA de fonctionner correctement
+            window.open(geoCheckUrl, '_blank');
+            console.log("GeoCheck ouvert dans un nouvel onglet du navigateur");
+            
+            // Afficher un message de succès
+            this.showOpenGeoCheckSuccess();
+            
+            // Restaurer le bouton
+            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
+            if (button && button._originalHTML) {
+                setTimeout(() => {
+                    button.innerHTML = button._originalHTML;
+                    button.disabled = false;
+                }, 1000);
             }
         }
         
@@ -3036,6 +3065,239 @@
                 button.classList.remove("bg-red-600", "hover:bg-red-700");
                 button.classList.add("bg-indigo-600", "hover:bg-indigo-700");
             }, 3000);
+        }
+
+        /**
+         * Ouvre les coordonnées calculées dans le checker de Geocaching.com pour vérification
+         */
+        openGeocachingChecker(event) {
+            event.preventDefault();
+            console.log("openGeocachingChecker appelé");
+            
+            // Récupérer le GC Code de la géocache actuelle
+            const gcCode = this.gcCodeValue;
+            if (!gcCode) {
+                this.showOpenGeocachingCheckerError("GC Code manquant");
+                return;
+            }
+            
+            console.log("GC Code récupéré:", gcCode);
+            
+            // Construire l'URL pour le checker de Geocaching.com
+            const geocachingUrl = `https://www.geocaching.com/geocache/${gcCode}`;
+            console.log("URL Geocaching.com utilisée:", geocachingUrl);
+            
+            // Changer l'apparence du bouton pendant le chargement
+            const button = this.element.querySelector('[data-formula-solver-target="openGeocachingCheckerButton"]');
+            if (button) {
+                button._originalHTML = button.innerHTML;
+                button.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ouverture...</span>
+                    </div>
+                `;
+                button.disabled = true;
+            }
+            
+            // Ouvrir l'URL dans un nouvel onglet du navigateur
+            window.open(geocachingUrl, '_blank');
+            console.log("Geocaching.com ouvert dans un nouvel onglet du navigateur");
+            
+            // Afficher un message de succès
+            this.showOpenGeocachingCheckerSuccess();
+            
+            // Restaurer le bouton
+            if (button && button._originalHTML) {
+                setTimeout(() => {
+                    button.innerHTML = button._originalHTML;
+                    button.disabled = false;
+                }, 1000);
+            }
+        }
+
+        /**
+         * Affiche un message de succès après l'ouverture du checker Geocaching.com
+         */
+        showOpenGeocachingCheckerSuccess() {
+            const container = this.element.querySelector('[data-formula-solver-target="calculatedCoordinates"]');
+            if (!container) return;
+            
+            // Supprimer les messages existants
+            const existingMessages = container.querySelectorAll('.geocaching-checker-message');
+            existingMessages.forEach(el => el.remove());
+            
+            // Créer et ajouter le message de succès
+            const successDiv = document.createElement('div');
+            successDiv.className = 'mt-3 bg-green-700/30 border border-green-500 rounded p-3 text-sm text-green-200 geocaching-checker-message';
+            successDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Geocaching.com ouvert dans un nouvel onglet pour vérification.</span>
+                </div>
+            `;
+            
+            container.appendChild(successDiv);
+            
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                successDiv.remove();
+            }, 5000);
+        }
+
+        /**
+         * Affiche un message d'erreur si l'ouverture du checker Geocaching.com échoue
+         */
+        showOpenGeocachingCheckerError(message) {
+            const container = this.element.querySelector('[data-formula-solver-target="calculatedCoordinates"]');
+            if (!container) return;
+            
+            // Supprimer les messages existants
+            const existingMessages = container.querySelectorAll('.geocaching-checker-message');
+            existingMessages.forEach(el => el.remove());
+            
+            // Créer et ajouter le message d'erreur
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mt-3 bg-red-700/30 border border-red-500 rounded p-3 text-sm text-red-200 geocaching-checker-message';
+            errorDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>${message || "Erreur lors de l'ouverture de Geocaching.com"}</span>
+                </div>
+            `;
+            
+            container.appendChild(errorDiv);
+            
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        /**
+         * Ouvre les coordonnées calculées dans le checker Certitude pour vérification
+         */
+        openCertitudeChecker(event) {
+            event.preventDefault();
+            console.log("openCertitudeChecker appelé");
+            
+            // Récupérer le GC Code de la géocache actuelle
+            const gcCode = this.gcCodeValue;
+            if (!gcCode) {
+                this.showOpenCertitudeCheckerError("GC Code manquant");
+                return;
+            }
+            
+            console.log("GC Code récupéré:", gcCode);
+            
+            // Changer l'apparence du bouton pendant le chargement
+            const button = this.element.querySelector('[data-formula-solver-target="openCertitudeCheckerButton"]');
+            if (button) {
+                button._originalHTML = button.innerHTML;
+                button.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ouverture...</span>
+                    </div>
+                `;
+                button.disabled = true;
+            }
+            
+            // Construire l'URL pour Certitude directement à partir du GC Code
+            const certitudeUrl = `https://www.certitudes.org/certitude?wp=${gcCode}`;
+            console.log("URL Certitude construite:", certitudeUrl);
+            
+            try {
+                // Ouvrir l'URL dans un nouvel onglet
+                window.open(certitudeUrl, '_blank');
+                console.log("Certitude ouvert dans un nouvel onglet du navigateur");
+                
+                // Afficher un message de succès
+                this.showOpenCertitudeCheckerSuccess();
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de Certitude:", error);
+                this.showOpenCertitudeCheckerError(error.message);
+            } finally {
+                // Restaurer le bouton
+                if (button && button._originalHTML) {
+                    setTimeout(() => {
+                        button.innerHTML = button._originalHTML;
+                        button.disabled = false;
+                    }, 1000);
+                }
+            }
+        }
+
+        /**
+         * Affiche un message de succès après l'ouverture du checker Certitude
+         */
+        showOpenCertitudeCheckerSuccess() {
+            const container = this.element.querySelector('[data-formula-solver-target="calculatedCoordinates"]');
+            if (!container) return;
+            
+            // Supprimer les messages existants
+            const existingMessages = container.querySelectorAll('.certitude-checker-message');
+            existingMessages.forEach(el => el.remove());
+            
+            // Créer et ajouter le message de succès
+            const successDiv = document.createElement('div');
+            successDiv.className = 'mt-3 bg-green-700/30 border border-green-500 rounded p-3 text-sm text-green-200 certitude-checker-message';
+            successDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Certitude ouvert dans un nouvel onglet pour vérification.</span>
+                </div>
+            `;
+            
+            container.appendChild(successDiv);
+            
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                successDiv.remove();
+            }, 5000);
+        }
+
+        /**
+         * Affiche un message d'erreur si l'ouverture du checker Certitude échoue
+         */
+        showOpenCertitudeCheckerError(message) {
+            const container = this.element.querySelector('[data-formula-solver-target="calculatedCoordinates"]');
+            if (!container) return;
+            
+            // Supprimer les messages existants
+            const existingMessages = container.querySelectorAll('.certitude-checker-message');
+            existingMessages.forEach(el => el.remove());
+            
+            // Créer et ajouter le message d'erreur
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mt-3 bg-red-700/30 border border-red-500 rounded p-3 text-sm text-red-200 certitude-checker-message';
+            errorDiv.innerHTML = `
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>${message || "Erreur lors de l'ouverture de Certitude"}</span>
+                </div>
+            `;
+            
+            container.appendChild(errorDiv);
+            
+            // Auto-suppression après 5 secondes
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
         }
     }
 

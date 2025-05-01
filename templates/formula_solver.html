@@ -261,6 +261,7 @@
                             </svg>
                             <span>Créer WP auto</span>
                         </button>
+                        {% if has_geocheck %}
                         <button 
                             class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded flex items-center"
                             data-action="click->formula-solver#openGeoCheck"
@@ -271,6 +272,33 @@
                             </svg>
                             <span>Vérifier (GeoCheck)</span>
                         </button>
+                        {% endif %}
+                        
+                        {% if gc_code %}
+                        <button 
+                            class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded flex items-center"
+                            data-action="click->formula-solver#openGeocachingChecker"
+                            data-formula-solver-target="openGeocachingCheckerButton"
+                            title="Vérifier les coordonnées sur Geocaching.com">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Vérifier (Geocaching)</span>
+                        </button>
+                        {% endif %}
+                        
+                        {% if has_certitude %}
+                        <button 
+                            class="bg-teal-600 hover:bg-teal-700 text-white text-xs px-3 py-1 rounded flex items-center"
+                            data-action="click->formula-solver#openCertitudeChecker"
+                            data-formula-solver-target="openCertitudeCheckerButton"
+                            title="Vérifier les coordonnées avec Certitude">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Vérifier (Certitude)</span>
+                        </button>
+                        {% endif %}
                         <button 
                             class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-1 rounded flex items-center"
                             data-action="click->formula-solver#saveGeocacheCoordinates"

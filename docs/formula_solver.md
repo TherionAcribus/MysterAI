@@ -150,6 +150,10 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
    - **Bouton "Copier"** permettant de copier rapidement les coordonnées dans le presse-papier avec confirmation visuelle
    - **Bouton "Ajouter WP"** pour ajouter les coordonnées calculées comme waypoint à la géocache
    - **Bouton "Créer WP auto"** pour créer directement un waypoint sans passer par le formulaire
+   - **Bouton "Vérifier (GeoCheck)"** pour vérifier les coordonnées avec le service GeoCheck (affiché seulement si disponible)
+   - **Bouton "Vérifier (Geocaching)"** pour vérifier les coordonnées sur le site Geocaching.com (affiché si GC Code disponible)
+   - **Bouton "Vérifier (Certitude)"** pour vérifier les coordonnées avec le service Certitude (affiché seulement si disponible)
+   - **Bouton "Mettre à jour coordonnées"** pour mettre à jour les coordonnées officielles de la géocache
    - Affichage de la distance par rapport aux coordonnées d'origine de la géocache (utile pour vérifier les règles de distance maximale de 2 miles)
 
 8. **Données de la Géocache**
@@ -645,6 +649,128 @@ Le Formula Solver offre quatre options pour traiter les valeurs associées à ch
 | Checksum       | 4                   | La somme 4+0+0 = 4 est utilisée |
 | Checksum réduit| 4                   | Le checksum est déjà réduit (4) |
 | Longueur       | 3                   | La longueur de "400" (3 caractères) est utilisée | 
+
+## Vérification des coordonnées calculées
+
+Le Formula Solver propose deux méthodes de vérification des coordonnées calculées, accessibles via des boutons dédiés dans l'interface utilisateur.
+
+### Vérification avec GeoCheck
+
+GeoCheck est un service externe couramment utilisé pour vérifier les coordonnées des géocaches de type Mystery.
+
+#### Fonctionnement
+
+1. **Bouton "Vérifier (GeoCheck)"**
+   - Situé à côté du bouton "Mettre à jour coordonnées" dans la section des coordonnées calculées
+   - Permet d'ouvrir rapidement le service GeoCheck associé à la géocache actuelle
+
+2. **Ouverture dans un Nouvel Onglet du Navigateur**
+   - Au clic sur le bouton, un nouvel onglet du navigateur s'ouvre (et non un onglet GoldenLayout)
+   - Cette approche contourne les restrictions de sécurité associées aux iframes
+   - Elle permet un fonctionnement correct des CAPTCHAs et autres éléments interactifs
+
+3. **Pré-selection de la Géocache**
+   - L'URL ouverte est celle spécifique à la géocache en cours d'analyse
+   - Le système utilise automatiquement l'URL du checker stockée dans la base de données
+
+#### Avantages
+
+- **Compatibilité avec les CAPTCHAs** : Les CAPTCHAs de GeoCheck fonctionnent correctement dans un nouvel onglet navigateur
+- **Expérience utilisateur améliorée** : Évite les erreurs 500 ou autres problèmes de chargement liés aux restrictions iframes
+- **Interface complète** : Accès à toutes les fonctionnalités de GeoCheck sans limitations
+
+### Vérification avec Geocaching.com
+
+Vérificateur officiel de Geocaching.com, intégré à la page de la géocache.
+
+#### Fonctionnement
+
+1. **Bouton "Vérifier (Geocaching)"**
+   - Situé à côté du bouton "Vérifier (GeoCheck)" dans la barre d'actions
+   - De couleur orange pour se distinguer visuellement
+
+2. **Ouverture du site Geocaching.com**
+   - Ouvre directement la page de la géocache sur Geocaching.com dans un nouvel onglet
+   - Utilise automatiquement le GC Code associé à la géocache courante
+   - Permet d'accéder au checker intégré dans la page de la géocache
+
+3. **Vérification sur le site Officiel**
+   - Une fois sur la page de Geocaching.com, vous pouvez utiliser leur "Solution Checker" officiel
+   - Ce système est généralement disponible sur les caches de type Mystery/Unknown
+
+#### Avantages
+
+- **Vérification officielle** : Utilise le système de vérification maintenu par Geocaching.com
+- **Intégration complète** : Accès à toutes les fonctionnalités du site officiel (logs, gallery, etc.)
+- **Compatibilité maximale** : Fonctionne avec toutes les Mystery caches qui utilisent le checker natif
+
+#### Quand l'Utiliser
+
+- Quand la géocache utilise le checker natif de Geocaching.com
+- Si vous souhaitez accéder directement à d'autres fonctionnalités du site (comme consulter les logs)
+- En cas de problème avec le checker GeoCheck
+
+### Vérification avec Certitude
+
+Certitude est un service tiers populaire qui offre une vérification fiable des solutions pour les géocaches mystery.
+
+#### Fonctionnement
+
+1. **Bouton "Vérifier (Certitude)"**
+   - De couleur bleu-vert distinctive dans la barre d'actions
+   - Placé entre les boutons GeoCheck et Geocaching.com
+
+2. **Recherche de l'URL du Checker**
+   - Le système récupère automatiquement l'URL du checker Certitude associée à la géocache
+   - L'API interne identifie le checker par son nom ("Certitude") et l'URL qui contient "certitudes.org"
+
+3. **Ouverture dans un Nouvel Onglet**
+   - Comme pour les autres checkers, Certitude s'ouvre dans un nouvel onglet du navigateur
+   - Cette approche garantit la compatibilité optimale avec les fonctionnalités du service
+
+#### Avantages
+
+- **Interface Moderne et Intuitive** : Le service Certitude offre une interface claire et facile à utiliser
+- **Statistiques de Résolution** : Certitude affiche souvent le nombre de succès et d'échecs pour chaque puzzle
+- **Multilingue** : Supporte de nombreuses langues et propose une interface traduite
+- **Rapide et Fiable** : Validation instantanée sans nécessité de CAPTCHA dans la plupart des cas
+
+#### Quand l'Utiliser
+
+- Quand la géocache utilise spécifiquement Certitude pour la vérification
+- Si vous préférez une interface plus moderne que GeoCheck
+- Lorsque vous souhaitez voir les statistiques de résolution du puzzle
+
+### Remarques Importantes
+
+- Les trois types de checkers (GeoCheck, Geocaching.com et Certitude) s'ouvrent dans un nouvel onglet du navigateur (vous devrez les fermer manuellement)
+- Cette approche garantit le fonctionnement avec tous les types de checkers, y compris ceux ayant des mesures de sécurité avancées
+- Selon le type de géocache, un, deux ou les trois types de checkers peuvent être disponibles
+- Chaque checker a une couleur distinctive pour faciliter son identification :
+  - **GeoCheck** : couleur indigo (bleu foncé)
+  - **Geocaching** : couleur orange
+  - **Certitude** : couleur teal (bleu-vert)
+
+### Affichage Conditionnel des Boutons de Vérification
+
+Le Formula Solver optimise l'interface utilisateur en n'affichant que les boutons de vérification pertinents pour chaque géocache :
+
+1. **Vérification Automatique des Checkers Disponibles**
+   - L'application détecte automatiquement les checkers associés à la géocache courante
+   - Seuls les boutons pour les checkers existants sont affichés
+   - Cette détection se fait côté serveur lors du chargement de la page
+
+2. **Conditions d'Affichage des Boutons**
+   - **Bouton GeoCheck** : Affiché uniquement si un checker de type "GeoCheck" est associé à la géocache
+   - **Bouton Geocaching** : Affiché uniquement si un GC Code valide est disponible pour la géocache
+   - **Bouton Certitude** : Affiché uniquement si un checker de type "Certitude" est associé à la géocache
+
+3. **Avantages de cette Approche**
+   - **Interface Plus Claire** : Réduction de l'encombrement visuel en n'affichant que les options pertinentes
+   - **Prévention des Erreurs** : Évite de proposer des checkers qui ne fonctionneraient pas pour cette géocache
+   - **Expérience Personnalisée** : L'interface s'adapte automatiquement aux caractéristiques de chaque géocache
+
+Cette fonctionnalité garantit une expérience utilisateur optimale en ne présentant que les options de vérification qui sont effectivement disponibles et fonctionnelles pour la géocache en cours d'analyse.
 
 ## Validation des Coordonnées et Calculs Mathématiques
 

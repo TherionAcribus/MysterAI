@@ -40,6 +40,14 @@ from app.gpx_generator import create_gpx_file, generate_filename, create_gpx_zip
 from app.utils.tools import rot13
 from app.services.formula_questions_service import formula_questions_service
 from app.services.formula_solver_service import formula_solver_service
+import os
+import re
+import json
+import uuid
+import time
+import datetime
+import traceback
+from datetime import datetime, timedelta, timezone
 
 logger = setup_logger()
 
@@ -2490,14 +2498,28 @@ def formula_solver_panel():
     detected_formulas = []
     origin_lat = None
     origin_lon = None
+    has_geocheck = False
+    has_certitude = False
+    has_geocaching_checker = False
     
     if geocache_id:
         try:
             geocache = Geocache.query.options(
-                db.joinedload(Geocache.additional_waypoints)
+                db.joinedload(Geocache.additional_waypoints),
+                db.joinedload(Geocache.checkers)  # S'assurer que les checkers sont chargés
             ).get(geocache_id)
             
             if geocache:
+                # Vérifier les types de checkers disponibles
+                if geocache.checkers:
+                    for checker in geocache.checkers:
+                        if checker.name == 'GeoCheck':
+                            has_geocheck = True
+                        elif checker.name == 'Certitude':
+                            has_certitude = True
+                        elif checker.name == 'Geocaching':
+                            has_geocaching_checker = True
+                
                 # Récupérer les coordonnées d'origine
                 origin_lat = geocache.gc_lat
                 origin_lon = geocache.gc_lon
@@ -2560,7 +2582,10 @@ def formula_solver_panel():
                            geocache=geocache,
                            origin_lat=origin_lat,
                            origin_lon=origin_lon,
-                           detected_formulas=detected_formulas)
+                           detected_formulas=detected_formulas,
+                           has_geocheck=has_geocheck,
+                           has_certitude=has_certitude,
+                           has_geocaching_checker=has_geocaching_checker)
 
 @geocaches_bp.route('/multi-solver', methods=['GET'])
 def multi_solver_panel():
