@@ -2432,40 +2432,186 @@
         }
         
         showCreateWaypointAutoError(message) {
-            console.error('Erreur lors de la création automatique du waypoint:', message);
+            const button = this.createWaypointAutoButtonTarget;
             
-            // Déterminer le message à afficher
-            let displayMessage = "Erreur";
-            if (message === "Variables non résolues") {
-                displayMessage = "Variables non résolues";
-            } else if (message === "Format de coordonnées non reconnu") {
-                displayMessage = "Format invalide";
-            } else if (message === "Erreur API") {
-                displayMessage = "Erreur API";
-            }
+            // Sauvegarder le contenu original du bouton
+            const originalButtonHTML = button.innerHTML;
             
-            // Afficher un message d'erreur
-            const originalButtonHTML = this.createWaypointAutoButtonTarget.innerHTML;
-            this.createWaypointAutoButtonTarget.innerHTML = `
+            // Mettre à jour le bouton avec un message d'erreur
+            button.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>${displayMessage}</span>
+                <span>${message}</span>
             `;
-            this.createWaypointAutoButtonTarget.disabled = false;
-            this.createWaypointAutoButtonTarget.classList.remove("opacity-75");
-            this.createWaypointAutoButtonTarget.classList.remove("bg-purple-600", "hover:bg-purple-700");
-            this.createWaypointAutoButtonTarget.classList.add("bg-red-600", "hover:bg-red-700");
+            button.classList.remove("bg-purple-600", "hover:bg-purple-700");
+            button.classList.add("bg-red-600", "hover:bg-red-700");
             
             // Rétablir le bouton après un délai
             setTimeout(() => {
-                this.createWaypointAutoButtonTarget.innerHTML = originalButtonHTML;
-                this.createWaypointAutoButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
-                this.createWaypointAutoButtonTarget.classList.add("bg-purple-600", "hover:bg-purple-700");
+                button.innerHTML = originalButtonHTML;
+                button.classList.remove("bg-red-600", "hover:bg-red-700");
+                button.classList.add("bg-purple-600", "hover:bg-purple-700");
+            }, 3000);
+        }
+        
+        /**
+         * Sauvegarde les coordonnées corrigées de la géocache
+         */
+        saveGeocacheCoordinates() {
+            // Vérifier si on a un ID de géocache
+            const geocacheId = this.geocacheIdValue;
+            if (!geocacheId) {
+                this.showSaveCoordinatesError("ID de géocache manquant");
+                return;
+            }
+            
+            // Récupérer les coordonnées calculées
+            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+            if (!coordinatesText) {
+                this.showSaveCoordinatesError("Aucune coordonnée calculée");
+                return;
+            }
+            
+            // Vérifier si les coordonnées sont complètes (pas de variables non résolues)
+            if (coordinatesText.match(/[A-Z]{2,}/)) {
+                this.showSaveCoordinatesError("Coordonnées incomplètes");
+                return;
+            }
+            
+            // Extraire les coordonnées au format N/E
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+            const match = coordinatesText.match(regex);
+            
+            if (!match || match.length < 3) {
+                this.showSaveCoordinatesError("Format non reconnu");
+                return;
+            }
+            
+            // Extraire la latitude et la longitude
+            const gcLat = match[1].trim();
+            const gcLon = match[2].trim();
+            
+            // Préparer les données à envoyer
+            const formData = new FormData();
+            formData.append('gc_lat', gcLat);
+            formData.append('gc_lon', gcLon);
+            
+            // Afficher l'état de chargement
+            this.showSaveCoordinatesLoading();
+            
+            // Appel à l'API pour sauvegarder les coordonnées
+            fetch(`/geocaches/${geocacheId}/coordinates`, {
+                method: 'PUT',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                console.log("Coordonnées mises à jour avec succès");
+                this.showSaveCoordinatesSuccess();
+                
+                // Vérifier si la page doit être rechargée pour afficher les coordonnées mises à jour
+                if (html.includes('coordinatesUpdated')) {
+                    // Si on utilise HTMX, déclencher un événement personnalisé
+                    document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la mise à jour des coordonnées:", error);
+                this.showSaveCoordinatesError("Erreur de communication");
+            });
+        }
+        
+        /**
+         * Affiche l'état de chargement pour la sauvegarde des coordonnées
+         */
+        showSaveCoordinatesLoading() {
+            const button = this.element.querySelector('[data-formula-solver-target="saveGeocacheButton"]');
+            if (!button) return;
+            
+            // Sauvegarder le contenu original du bouton
+            button._originalHTML = button.innerHTML;
+            
+            // Mettre à jour le bouton avec une animation de chargement
+            button.innerHTML = `
+                <div class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
+                <span>Sauvegarde...</span>
+            `;
+            button.disabled = true;
+        }
+        
+        /**
+         * Affiche un message de succès pour la sauvegarde des coordonnées
+         */
+        showSaveCoordinatesSuccess() {
+            const button = this.element.querySelector('[data-formula-solver-target="saveGeocacheButton"]');
+            if (!button) return;
+            
+            // Mettre à jour le bouton avec un message de succès
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Sauvegardé!</span>
+            `;
+            button.classList.remove("bg-amber-600", "hover:bg-amber-700");
+            button.classList.add("bg-green-600", "hover:bg-green-700");
+            button.disabled = false;
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = button._originalHTML || `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                    <span>Mettre à jour coordonnées</span>
+                `;
+                button.classList.remove("bg-green-600", "hover:bg-green-700");
+                button.classList.add("bg-amber-600", "hover:bg-amber-700");
+            }, 3000);
+        }
+        
+        /**
+         * Affiche un message d'erreur pour la sauvegarde des coordonnées
+         * @param {string} message - Le message d'erreur à afficher
+         */
+        showSaveCoordinatesError(message) {
+            const button = this.element.querySelector('[data-formula-solver-target="saveGeocacheButton"]');
+            if (!button) return;
+            
+            // Mettre à jour le bouton avec un message d'erreur
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${message}</span>
+            `;
+            button.classList.remove("bg-amber-600", "hover:bg-amber-700");
+            button.classList.add("bg-red-600", "hover:bg-red-700");
+            button.disabled = false;
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = button._originalHTML || `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                    <span>Mettre à jour coordonnées</span>
+                `;
+                button.classList.remove("bg-red-600", "hover:bg-red-700");
+                button.classList.add("bg-amber-600", "hover:bg-amber-700");
             }, 3000);
         }
 
-        // Ajouter cette nouvelle méthode après createWaypointAuto
+        /**
+         * Met à jour la liste des waypoints de la géocache
+         * @param {number} geocacheId - L'ID de la géocache
+         */
         async updateWaypointsList(geocacheId) {
             try {
                 console.log("Mise à jour de la liste des waypoints...");
