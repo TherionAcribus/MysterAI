@@ -459,16 +459,45 @@ def add_geocache():
             lat = float(geocache_data['latitude'])
             lon = float(geocache_data['longitude'])
             
-            # Convertir en format Geocaching.com
-            lat_deg = int(lat)
-            lat_min = abs(lat - lat_deg) * 60
-            lon_deg = int(lon)
-            lon_min = abs(lon - lon_deg) * 60
-            
-            gc_lat = f"N {abs(lat_deg)}° {lat_min:.3f}"
-            gc_lon = f"E {abs(lon_deg)}° {lon_min:.3f}"
-            
-            geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+            # Utiliser les coordonnées brutes si disponibles
+            if 'coordinates_raw' in geocache_data:
+                coords_raw = geocache_data['coordinates_raw']
+                # Diviser les coordonnées brutes en parties latitude et longitude
+                parts = coords_raw.split()
+                if len(parts) >= 6:
+                    gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"  # "N 48° 43.147"
+                    gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"  # "W 003° 47.663"
+                    geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                else:
+                    # Fallback au cas où les coordonnées brutes ne sont pas dans le format attendu
+                    # Convertir en format Geocaching.com en respectant la direction (N/S/E/W)
+                    lat_deg = int(abs(lat))
+                    lat_min = (abs(lat) - lat_deg) * 60
+                    lon_deg = int(abs(lon))
+                    lon_min = (abs(lon) - lon_deg) * 60
+                    
+                    # Déterminer les directions en fonction du signe
+                    lat_dir = "N" if lat >= 0 else "S"
+                    lon_dir = "E" if lon >= 0 else "W"
+                    
+                    gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                    gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                    geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+            else:
+                # Fallback si les coordonnées brutes ne sont pas disponibles
+                # Convertir en format Geocaching.com en respectant la direction (N/S/E/W)
+                lat_deg = int(abs(lat))
+                lat_min = (abs(lat) - lat_deg) * 60
+                lon_deg = int(abs(lon))
+                lon_min = (abs(lon) - lon_deg) * 60
+                
+                # Déterminer les directions en fonction du signe
+                lat_dir = "N" if lat >= 0 else "S"
+                lon_dir = "E" if lon >= 0 else "W"
+                
+                gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
 
         # Ajouter les waypoints additionnels
         if geocache_data.get('additional_waypoints'):
@@ -489,29 +518,37 @@ def add_geocache():
                         if gc_coords:
                             # Extraire lat et lon du format GC
                             parts = gc_coords.split()
-                            if len(parts) == 4:  # Format: "N 48° 51.402 E 002° 21.048"
-                                gc_lat = f"{parts[0]} {parts[1]}"  # "N 48° 51.402"
-                                gc_lon = f"{parts[2]} {parts[3]}"  # "E 002° 21.048"
+                            if len(parts) >= 6:  # Format: "N 48° 51.402 E 002° 21.048"
+                                gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"  # "N 48° 51.402"
+                                gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"  # "E 002° 21.048"
                                 waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
                             else:
                                 # Fallback : convertir les coordonnees decimales
-                                lat_deg = int(lat)
-                                lat_min = abs(lat - lat_deg) * 60
-                                lon_deg = int(lon)
-                                lon_min = abs(lon - lon_deg) * 60
+                                lat_deg = int(abs(lat))
+                                lat_min = (abs(lat) - lat_deg) * 60
+                                lon_deg = int(abs(lon))
+                                lon_min = (abs(lon) - lon_deg) * 60
                                 
-                                gc_lat = f"N {abs(lat_deg)}° {lat_min:.3f}"
-                                gc_lon = f"E {abs(lon_deg)}° {lon_min:.3f}"
+                                # Déterminer les directions en fonction du signe
+                                lat_dir = "N" if lat >= 0 else "S"
+                                lon_dir = "E" if lon >= 0 else "W"
+                                
+                                gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                                gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
                                 waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
                         else:
                             # Pas de format GC, on convertit les coordonnees decimales
-                            lat_deg = int(lat)
-                            lat_min = abs(lat - lat_deg) * 60
-                            lon_deg = int(lon)
-                            lon_min = abs(lon - lon_deg) * 60
+                            lat_deg = int(abs(lat))
+                            lat_min = (abs(lat) - lat_deg) * 60
+                            lon_deg = int(abs(lon))
+                            lon_min = (abs(lon) - lon_deg) * 60
                             
-                            gc_lat = f"N {abs(lat_deg)}° {lat_min:.3f}"
-                            gc_lon = f"E {abs(lon_deg)}° {lon_min:.3f}"
+                            # Déterminer les directions en fonction du signe
+                            lat_dir = "N" if lat >= 0 else "S"
+                            lon_dir = "E" if lon >= 0 else "W"
+                            
+                            gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                            gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
                             waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
                     geocache.additional_waypoints.append(waypoint)
 
@@ -1801,7 +1838,7 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                             stats['waypoints'] += waypoints_added
                         
                         # Traiter les attributs de la géocache existante
-                        attributes_elem = cache_data.find('groundspeak:attributes', ns)
+                        attributes_elem = waypoint.find('groundspeak:attributes', ns)
                         if attributes_elem is not None:
                             current_app.logger.debug(f"Mise à jour des attributs pour la géocache existante {gc_code}")
                             # Commencer par effacer les attributs existants si demandé
@@ -2031,7 +2068,7 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                     geocache.checkers.append(checker)
                 
                 # Traiter les attributs de la géocache
-                attributes_elem = cache_data.find('groundspeak:attributes', ns)
+                attributes_elem = waypoint.find('groundspeak:attributes', ns)
                 if attributes_elem is not None:
                     current_app.logger.debug(f"Traitement des attributs pour {gc_code}")
                     attr_elements = attributes_elem.findall('groundspeak:attribute', ns)

@@ -450,7 +450,15 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
         name = extract_name(soup)
         owner = extract_owner(soup)
         cache_type = extract_cache_type(soup)
-        lat, lon = extract_coordinates(soup)
+        
+        # Extraire les coordonnées brutes et converties
+        coords_elem = soup.find('span', {'id': 'uxLatLon'})
+        if not coords_elem:
+            raise Exception("Impossible de trouver les coordonnées. Êtes-vous connecté sur geocaching.com ?")
+        
+        coords_raw = coords_elem.text.strip()
+        lat, lon = parse_coordinates(coords_raw)
+        
         difficulty, terrain = extract_difficulty_terrain(soup)
         size = extract_size(soup)
         description = extract_description(soup)
@@ -470,6 +478,7 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
             'name': name,
             'owner': owner,
             'cache_type': cache_type,
+            'coordinates_raw': coords_raw,  # Ajout des coordonnées originales
             'latitude': lat,
             'longitude': lon,
             'difficulty': difficulty,
@@ -504,21 +513,31 @@ def parse_coordinates(coords_text: str) -> tuple[float, float]:
         # Séparation des parties latitude et longitude
         parts = coords_text.split()
         
+        # Vérifier que nous avons assez de parties (format standard attendu)
+        if len(parts) < 6:
+            raise Exception(f"Format de coordonnées non reconnu: {coords_text}")
+        
         # Traitement de la latitude
+        lat_direction = parts[0].upper()  # N ou S
         lat_deg = float(parts[1].replace('°', ''))
         lat_min = float(parts[2])
         lat = lat_deg + (lat_min / 60)
-        if parts[0] == 'S':
+        if lat_direction == 'S':
             lat = -lat
+        elif lat_direction != 'N':
+            logger.warning(f"Direction de latitude inconnue: {lat_direction}, on suppose N")
             
         # Traitement de la longitude
+        lon_direction = parts[3].upper()  # E ou W
         lon_deg = float(parts[4].replace('°', ''))
         lon_min = float(parts[5])
         lon = lon_deg + (lon_min / 60)
-        if parts[3] == 'W':
+        if lon_direction == 'W':
             lon = -lon
+        elif lon_direction != 'E':
+            logger.warning(f"Direction de longitude inconnue: {lon_direction}, on suppose E")
             
-        logger.debug(f"Coordonnées parsées: {lat}, {lon}")
+        logger.debug(f"Coordonnées parsées: {lat}, {lon} (direction lat: {lat_direction}, direction lon: {lon_direction})")
         return lat, lon
     except Exception as e:
         logger.error(f"Erreur lors du parsing des coordonnées '{coords_text}': {str(e)}")
