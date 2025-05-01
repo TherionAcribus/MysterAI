@@ -2348,6 +2348,9 @@
                         bubbles: true
                     });
                     document.dispatchEvent(event);
+                    
+                    // Mettre à jour la liste des waypoints dans l'interface
+                    this.updateWaypointsList(geocacheId);
                 } else {
                     throw new Error("Structure de données invalide ou incomplète");
                 }
@@ -2460,6 +2463,48 @@
                 this.createWaypointAutoButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
                 this.createWaypointAutoButtonTarget.classList.add("bg-purple-600", "hover:bg-purple-700");
             }, 3000);
+        }
+
+        // Ajouter cette nouvelle méthode après createWaypointAuto
+        async updateWaypointsList(geocacheId) {
+            try {
+                console.log("Mise à jour de la liste des waypoints...");
+                
+                // Trouver le conteneur de la liste des waypoints
+                const waypointsListContainer = document.querySelector('[data-waypoint-form-target="waypointsList"]');
+                
+                if (!waypointsListContainer) {
+                    console.warn("Conteneur de la liste des waypoints non trouvé");
+                    return;
+                }
+                
+                // Récupérer la liste mise à jour des waypoints
+                const listResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
+                
+                if (listResponse.ok) {
+                    const listHtml = await listResponse.text();
+                    waypointsListContainer.innerHTML = listHtml;
+                    console.log("Liste des waypoints mise à jour avec succès");
+                } else {
+                    console.warn(`Échec de la récupération de la liste des waypoints: ${listResponse.status} ${listResponse.statusText}`);
+                    
+                    // Tentative alternative: recharger la section complète de waypoints
+                    const fullListResponse = await fetch(`/geocaches/${geocacheId}/details-panel`);
+                    if (fullListResponse.ok) {
+                        const fullHtml = await fullListResponse.text();
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = fullHtml;
+                        
+                        const newWaypointList = tempDiv.querySelector('#waypoints-list-container');
+                        if (newWaypointList) {
+                            waypointsListContainer.innerHTML = newWaypointList.innerHTML;
+                            console.log("Liste des waypoints récupérée à partir des détails complets");
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Erreur lors de la mise à jour de la liste des waypoints:", error);
+            }
         }
     }
 

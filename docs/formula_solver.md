@@ -147,6 +147,10 @@ L'outil Formula Solver est un système intégré à MysteryAI qui permet de dét
 7. **Coordonnées Calculées**
    - Résultat final du calcul avec format standard GPS
    - Respect du format avec 2 chiffres pour les minutes et 3 pour les décimales
+   - **Bouton "Copier"** permettant de copier rapidement les coordonnées dans le presse-papier avec confirmation visuelle
+   - **Bouton "Ajouter WP"** pour ajouter les coordonnées calculées comme waypoint à la géocache
+   - **Bouton "Créer WP auto"** pour créer directement un waypoint sans passer par le formulaire
+   - Affichage de la distance par rapport aux coordonnées d'origine de la géocache (utile pour vérifier les règles de distance maximale de 2 miles)
 
 8. **Données de la Géocache**
    - Description complète
@@ -527,4 +531,61 @@ mainLayout.registerComponent('WebSearch', function(container, state) {
 - **Visualisation instantanée** : Pas besoin de chercher manuellement les coordonnées sur une carte externe.
 - **Conversion précise** : Utilisation de pyproj côté serveur pour une conversion précise du format DMM au format décimal.
 - **Sans action utilisateur** : Affichage automatique dès que les coordonnées sont complètes et valides.
-- **Expérience unifiée** : Reste dans l'application sans ouvrir d'autres outils ou services. 
+- **Expérience unifiée** : Reste dans l'application sans ouvrir d'autres outils ou services.
+
+## Gestion des Coordonnées Calculées
+
+### Copie des Coordonnées
+- Bouton "Copier" à côté des coordonnées calculées
+- Copie les coordonnées au format standard dans le presse-papier
+- Feedback visuel indiquant la réussite de l'opération (animation et changement de texte temporaire)
+- Facilite le transfert vers d'autres applications ou appareils GPS
+
+### Ajout comme Waypoint
+- Bouton "Ajouter WP" pour créer un waypoint à partir des coordonnées calculées
+- Affiche un formulaire permettant de personnaliser le waypoint:
+  - Préfixe
+  - Nom
+  - Note (incluant automatiquement les informations de distance si disponibles)
+- Évite le rechargement complet de la page en utilisant la manipulation directe du DOM
+
+### Création Automatique de Waypoints
+- Bouton "Créer WP auto" pour créer instantanément un waypoint sans formulaire
+- Utilise un appel API direct vers `/api/geocaches/{id}/waypoints`
+- Crée un waypoint avec des valeurs par défaut:
+  - Préfixe: "S" (pour Solved)
+  - Nom: "Coordonnées calculées"
+  - Note: Inclut les informations de distance si disponibles
+- Affichage des états de chargement, succès et erreur avec feedback visuel
+- Gestion des erreurs de parsing JSON lors des réponses non-attendues
+- **Mise à jour automatique de l'interface**: La liste des waypoints dans l'onglet des détails de la géocache est automatiquement rafraîchie après la création du waypoint, sans nécessiter de rechargement de page
+
+### Calcul de Distance
+- Lorsque les coordonnées d'origine de la géocache sont disponibles, calcul automatique de la distance entre:
+  - Les coordonnées d'origine de la géocache (listées)
+  - Les coordonnées calculées par le Formula Solver
+- Affichage de cette distance en kilomètres et miles pour vérifier la conformité avec les règles (limite de 2 miles)
+- Inclusion automatique de ces informations dans les notes des waypoints créés
+
+### Gestion des Erreurs de Parsing JSON
+- Vérification du Content-Type des réponses API
+- Gestion appropriée des réponses non-JSON (comme les pages HTML d'erreur)
+- Conversion manuelle des coordonnées de format GC vers décimales en cas de besoin
+
+## Avantages techniques
+
+### Performance
+- Utilisation optimisée des appels API
+- Minimisation des rechargements de page
+- Maintien de l'état de la carte entre les opérations
+
+### Expérience utilisateur améliorée
+- Feedback visuel pour toutes les actions (chargement, succès, erreur)
+- Intégration fluide entre le Formula Solver et les autres composants de l'application
+- Options multiples pour l'utilisation des coordonnées calculées (copie, ajout comme waypoint standard ou création automatique)
+
+### Robustesse
+- Gestion des erreurs de parsing JSON
+- Vérification du format des coordonnées
+- Conversion de formats entre différents systèmes de coordonnées
+- Traitement approprié des réponses HTTP inattendues 
