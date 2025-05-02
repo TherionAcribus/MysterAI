@@ -226,7 +226,7 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         
         event.preventDefault()
 
-        fetch(`/geocaches/${this.geocacheIdValue}/coordinates/edit`, {
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates`, {
             headers: {
                 'X-Layout-Component': 'true',
                 'Accept': 'text/html'
@@ -246,7 +246,7 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             })
             this.containerTarget.innerHTML = html
             // Dispatch event for GoldenLayout
-            window.dispatchEvent(new CustomEvent('coordinatesFormLoaded'))
+            window.dispatchEvent(new CustomEvent('coordinatesUpdated'))
         })
         .catch(error => {
             console.error("Cancel request failed:", error)

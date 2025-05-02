@@ -247,6 +247,22 @@ def get_geocache_coordinates(geocache_id):
     return jsonify(coordinates)
 
 
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates', methods=['GET', 'PUT'])
+def get_or_update_coordinates(geocache_id):
+    """Récupère ou met à jour les coordonnées d'une géocache."""
+    if request.method == 'PUT':
+        return update_coordinates(geocache_id)
+    else:  # GET
+        logger.debug(f"Affichage des coordonnées demandé pour la géocache {geocache_id}")
+        logger.debug(f"Headers de la requête: {dict(request.headers)}")
+        
+        geocache = Geocache.query.get_or_404(geocache_id)
+        response = make_response(render_template('partials/coordinates_display.html', geocache=geocache))
+        
+        logger.debug(f"Envoi de la réponse avec headers: {dict(response.headers)}")
+        return response
+
+
 @geocaches_bp.route('/geocaches/<int:geocache_id>/details', methods=['GET'])
 def get_geocache_details(geocache_id):
     """Recupere les details d'une geocache."""
