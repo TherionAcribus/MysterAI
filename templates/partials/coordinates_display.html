@@ -14,9 +14,15 @@
                     <div class="text-green-400">{{ geocache.gc_coords_corrected }}</div>
                 </div>
                 <div class="flex space-x-2">
-                    <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                            data-action="click->geocache-coordinates#edit">
-                        Modifier
+                    <button class="p-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md" 
+                            data-action="click->geocache-coordinates#edit"
+                            title="Modifier">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button class="p-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
+                            data-action="click->geocache-coordinates#reset"
+                            title="Supprimer">
+                        <i class="fas fa-trash"></i>
                     </button>
                     <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
                             data-action="click->geocache-coordinates#sendToGeocaching"

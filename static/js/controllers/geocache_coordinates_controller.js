@@ -253,6 +253,48 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
         })
     }
 
+    reset(event) {
+        console.log("Reset button clicked", {
+            event,
+            currentTarget: event.currentTarget,
+            geocacheId: this.geocacheIdValue
+        })
+        
+        event.preventDefault()
+        
+        if (!confirm("Voulez-vous vraiment supprimer les coordonnées corrigées et revenir aux coordonnées d'origine?")) {
+            return
+        }
+
+        fetch(`/geocaches/${this.geocacheIdValue}/coordinates/reset`, {
+            method: 'POST',
+            headers: {
+                'X-Layout-Component': 'true',
+                'Accept': 'text/html',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            console.log("Reset response received:", {
+                status: response.status,
+                headers: Object.fromEntries(response.headers.entries())
+            })
+            return response.text()
+        })
+        .then(html => {
+            console.log("Received HTML content:", {
+                length: html.length,
+                preview: html.substring(0, 100)
+            })
+            this.containerTarget.innerHTML = html
+            // Dispatch event for GoldenLayout
+            window.dispatchEvent(new CustomEvent('coordinatesUpdated'))
+        })
+        .catch(error => {
+            console.error("Reset request failed:", error)
+        })
+    }
+
     // Event handlers for GoldenLayout events
     formLoaded() {
         console.log("Coordinates form loaded event received")

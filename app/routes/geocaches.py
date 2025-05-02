@@ -1002,6 +1002,39 @@ def update_coordinates(geocache_id):
     return response
 
 
+@geocaches_bp.route('/geocaches/<int:geocache_id>/coordinates/reset', methods=['POST'])
+def reset_geocache_coordinates(geocache_id):
+    """Réinitialise les coordonnées corrigées d'une géocache."""
+    logger.debug(f"Reset coordinates requested for geocache {geocache_id}")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    
+    try:
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Réinitialisation des coordonnées corrigées
+        geocache.gc_lat_corrected = None
+        geocache.gc_lon_corrected = None
+        geocache.location_corrected = None
+        
+        # Réinitialisation du statut et de la date de résolution
+        geocache.solved = 'not_solved'
+        geocache.solved_date = None
+        
+        db.session.commit()
+        logger.debug(f"Coordonnées réinitialisées pour la géocache {geocache_id}")
+        
+        response = make_response(render_template('partials/coordinates_display.html', geocache=geocache))
+        response.headers['HX-Trigger'] = 'coordinatesUpdated'
+        
+        logger.debug(f"Sending response with headers: {dict(response.headers)}")
+        return response
+    
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors de la réinitialisation des coordonnées: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 @geocaches_bp.route('/map_panel/<int:zone_id>')
 def get_map_panel(zone_id):
     """Renvoie le template du panneau de carte pour une zone."""
