@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, render_template
 from app.database import db
 from app.models import Note, Geocache, GeocacheNote
-from app.geocaching_client import GeocachingClient, PersonalNotes
+from app.geocaching_client import GeocachingClient, PersonalNotes, GeocachingLogs
 import logging
 
 logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
@@ -201,3 +201,109 @@ def manage_note(note_id):
                         geocache_id=geocache_id,
                         geocache=geocache,
                         geocache_name=geocache.name)
+
+@logs_bp.route('/refresh', methods=['POST'])
+def refresh_logs():
+    """Récupère les logs frais depuis Geocaching.com et les enregistre en base de données."""
+    geocache_id = request.args.get('geocacheId')
+    logging.info(f"Tentative de rafraîchissement des logs pour la géocache ID: {geocache_id}")
+    
+    if not geocache_id:
+        logging.error("Aucun ID de géocache fourni")
+        return "Identifiant de géocache manquant", 400
+    
+    # Récupérer la géocache
+    geocache = Geocache.query.get_or_404(geocache_id)
+    gc_code = geocache.gc_code
+    logging.info(f"Géocache trouvée: {gc_code} - {geocache.name}")
+    
+    # Créer une instance du client Geocaching
+    client = GeocachingClient()
+    
+    # Vérifier si le client est connecté
+    if not client.ensure_login():
+        logging.error("Impossible de se connecter à Geocaching.com via Firefox")
+        return render_template('logs_panel.html', 
+                            logs=geocache.logs,
+                            geocache_id=geocache_id,
+                            geocache_name=geocache.name,
+                            error="Impossible de se connecter à Geocaching.com. Assurez-vous d'être connecté dans Firefox.")
+    
+    # Récupérer les logs depuis l'API
+    logs_api = GeocachingLogs(client)
+    try:
+        logging.info(f"Récupération des logs pour {gc_code}")
+        gc_logs = logs_api.get_logs(gc_code, log_type="ALL", count=20)
+        logging.info(f"Nombre de logs récupérés: {len(gc_logs) if gc_logs else 0}")
+        
+        if not gc_logs:
+            logging.warning(f"Aucun log trouvé pour {gc_code}")
+            return render_template('logs_panel.html', 
+                                logs=geocache.logs,
+                                geocache_id=geocache_id,
+                                geocache_name=geocache.name,
+                                error="Aucun log trouvé pour cette géocache sur Geocaching.com")
+        
+        # Supprimer les anciens logs
+        from app.models.geocache import Log, Owner
+        from app import db
+        
+        # Enregistrer les nouveaux logs
+        existing_logs_by_id = {log.id: log for log in geocache.logs if hasattr(log, 'id')}
+        
+        for gc_log in gc_logs:
+            # Vérifier si le log existe déjà par son ID
+            log_id = gc_log.get('id')
+            
+            if log_id in existing_logs_by_id:
+                # Mettre à jour le log existant
+                log = existing_logs_by_id[log_id]
+                logging.info(f"Mise à jour du log existant: {log_id}")
+            else:
+                # Créer un nouveau log
+                log = Log()
+                log.id = log_id
+                logging.info(f"Création d'un nouveau log: {log_id}")
+                
+                # Trouver ou créer l'auteur du log
+                author_name = gc_log.get('author')
+                if author_name:
+                    author = Owner.query.filter_by(name=author_name).first()
+                    if not author:
+                        # Pas besoin du paramètre guid qui n'existe pas dans le modèle Owner
+                        author = Owner(name=author_name)
+                        db.session.add(author)
+                        logging.info(f"Création d'un nouvel auteur: {author_name}")
+                    log.author = author
+                
+                geocache.logs.append(log)
+            
+            # Mettre à jour les champs du log
+            log.text = gc_log.get('text', '')
+            log.date = gc_log.get('date')
+            log.log_type = gc_log.get('type', 'unknown').lower()
+            
+        # Enregistrer les modifications
+        db.session.commit()
+        logging.info(f"Logs enregistrés en base de données pour {gc_code}")
+        
+        # Mettre à jour le nombre de logs
+        geocache.logs_count = len(geocache.logs)
+        db.session.commit()
+        
+        return render_template('logs_panel.html', 
+                            logs=geocache.logs,
+                            geocache_id=geocache_id,
+                            geocache_name=geocache.name,
+                            success="Logs rafraîchis avec succès")
+    
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Erreur lors du rafraîchissement des logs: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return render_template('logs_panel.html', 
+                            logs=geocache.logs,
+                            geocache_id=geocache_id,
+                            geocache_name=geocache.name,
+                            error=f"Erreur lors du rafraîchissement des logs: {str(e)}")

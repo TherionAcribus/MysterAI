@@ -3,6 +3,7 @@ import { Application } from '@hotwired/stimulus';
 import WaypointFormController from './waypoint_form_controller';
 import ZoneMapController from './zone_map_controller';
 import AlphabetDisplayController from './alphabet_display_controller';
+import LogsController from './logs_controller';
 
 // Initialiser l'application Stimulus si elle n'existe pas déjà
 window.StimulusApp = window.StimulusApp || Application.start();
@@ -11,5 +12,6 @@ window.StimulusApp = window.StimulusApp || Application.start();
 window.StimulusApp.register('waypoint-form', WaypointFormController);
 window.StimulusApp.register('zone-map', ZoneMapController);
 window.StimulusApp.register('alphabet-display', AlphabetDisplayController);
+window.StimulusApp.register('logs', LogsController);
 
 console.log('Contrôleurs Stimulus enregistrés depuis index.js');

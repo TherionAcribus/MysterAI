@@ -1,8 +1,41 @@
-<div id="logs-content" class="space-y-4 p-4">
+<div id="logs-content" class="space-y-4 p-4" data-controller="logs">
     {% if geocache_id %}
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-gray-200">Logs pour {{ geocache_name }}</h3>
+            <button 
+                id="refresh-logs-btn" 
+                class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                hx-post="/api/logs/refresh?geocacheId={{ geocache_id }}"
+                hx-target="#logs-panel"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-indicator">
+                <i class="fas fa-sync-alt mr-1"></i> Rafraîchir
+            </button>
         </div>
+        
+        <!-- Indicateur de chargement -->
+        <div id="loading-indicator" class="htmx-indicator flex items-center justify-center p-4 my-4 bg-gray-700 rounded">
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            <span>Récupération des logs depuis Geocaching.com...</span>
+        </div>
+        
+        {% if error %}
+            <div class="bg-red-700 text-white p-3 rounded mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>{{ error }}</span>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if success %}
+            <div class="bg-green-700 text-white p-3 rounded mb-4">
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    <span>{{ success }}</span>
+                </div>
+            </div>
+        {% endif %}
         
         {% if logs %}
             {% for log in logs %}
@@ -59,4 +92,17 @@
     {% else %}
         <p class="text-gray-400">Sélectionnez une géocache pour voir ses logs.</p>
     {% endif %}
-</div> 
+</div>
+
+<style>
+    /* Style pour l'indicateur de chargement HTMX */
+    .htmx-indicator {
+        display: none;
+    }
+    .htmx-request .htmx-indicator {
+        display: flex;
+    }
+    .htmx-request.htmx-indicator {
+        display: flex;
+    }
+</style> 
