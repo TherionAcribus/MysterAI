@@ -22,6 +22,9 @@
             this.geocacheId = this.geocacheIdValue;
             this.geocacheCode = this.geocacheCodeValue;
             
+            // Initialiser le tableau pour stocker les IDs des points calculés
+            this.calculatedPoints = [];
+            
             this.initializeMap()
                 .then(() => {
                     console.log('Map initialized successfully');
@@ -31,6 +34,15 @@
                     console.error('Failed to initialize map:', error);
                 });
             
+            // Écouter l'événement pour ajouter un point calculé
+            document.addEventListener('addCalculatedPointToMap', this.addCalculatedPointToMap.bind(this));
+            
+            // Écouter l'événement pour ajouter plusieurs points calculés
+            document.addEventListener('addMultipleCalculatedPointsToMap', this.addMultipleCalculatedPointsToMap.bind(this));
+            
+            // Écouter l'événement pour effacer tous les points calculés
+            document.addEventListener('clearCalculatedPoints', this.clearCalculatedPoints.bind(this));
+            
             // Écouter l'événement de waypoint sauvegardé
             this.waypointSavedHandler = this.handleWaypointSaved.bind(this);
             document.addEventListener('waypointSaved', this.waypointSavedHandler);
@@ -38,6 +50,14 @@
             // === AJOUT : écouteur pour point calculé ===
             this.addCalculatedPointHandler = this.handleAddCalculatedPoint.bind(this);
             document.addEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
+            
+            // === NOUVEL AJOUT : écouteur pour plusieurs points calculés ===
+            this.addMultipleCalculatedPointsHandler = this.handleAddMultipleCalculatedPoints.bind(this);
+            document.addEventListener('addMultipleCalculatedPointsToMap', this.addMultipleCalculatedPointsHandler);
+            
+            // === NOUVEL AJOUT : écouteur pour effacer les points calculés ===
+            this.clearCalculatedPointsHandler = this.handleClearCalculatedPoints.bind(this);
+            document.addEventListener('clearCalculatedPoints', this.clearCalculatedPointsHandler);
             
             // Écouter l'événement d'ajout de point calculé depuis d'autres composants
             window.addEventListener('addCalculatedPointToMap', this.handleAddCalculatedPoint.bind(this));
@@ -101,6 +121,9 @@
 
             // === AJOUT : retire les écouteurs d'événements ===
             document.removeEventListener('addCalculatedPointToMap', this.addCalculatedPointHandler);
+            // === NOUVEL AJOUT : supprimer les nouveaux écouteurs ===
+            document.removeEventListener('addMultipleCalculatedPointsToMap', this.addMultipleCalculatedPointsHandler);
+            document.removeEventListener('clearCalculatedPoints', this.clearCalculatedPointsHandler);
             window.removeEventListener('addCalculatedPointToMap', this.handleAddCalculatedPoint.bind(this));
             window.removeEventListener('openWaypointFormWithData', this.handleOpenWaypointFormWithData.bind(this));
         }
@@ -1031,13 +1054,26 @@
                 
                 // Style spécial pour les points calculés (différent des marqueurs temporaires standards)
                 if (properties.calculatedPoint === true) {
-                    cacheColor = 'rgba(0, 90, 220, 0.8)'; // Bleu
-                    strokeColor = '#ffffff'; // Bordure blanche
-                    strokeWidth = 2;
-                    cacheRadius = 8;
-                    shapePoints = 4; // Carré
-                    shapeAngle = 0; // Pas de rotation (carré droit)
-                    cacheIcon = '!'; // Point d'exclamation
+                    // Point calculé individuel (par défaut) - bleu
+                    if (!properties.isMultiPoint) {
+                        cacheColor = 'rgba(0, 90, 220, 0.8)'; // Bleu comme les points multiples
+                        strokeColor = '#ffffff'; // Bordure blanche
+                        strokeWidth = 2;
+                        cacheRadius = 10; // Plus grand
+                        shapePoints = 4; // Carré
+                        shapeAngle = Math.PI / 4; // Rotation de 45 degrés (losange)
+                        cacheIcon = '?'; // Point d'interrogation
+                    } 
+                    // Point calculé multiple - bleu
+                    else {
+                        cacheColor = 'rgba(0, 90, 220, 0.8)'; // Bleu
+                        strokeColor = properties.strokeColor || '#ffffff'; // Bordure personnalisable
+                        strokeWidth = 2;
+                        cacheRadius = 10; // Plus grand
+                        shapePoints = 4; // Carré
+                        shapeAngle = Math.PI / 4; // Rotation de 45 degrés (losange)
+                        cacheIcon = (properties.pointIndex || '').toString(); // Numéro du point
+                    }
                 }
             } else if (cacheType === 'Waypoint') {
                 cacheColor = 'rgba(51, 136, 255, 0.8)'; // Bleu pour waypoint
@@ -1839,6 +1875,12 @@
                 this.vectorSource.removeFeature(feature);
             });
         }
+        
+        // Gestionnaire pour effacer explicitement les points calculés
+        handleClearCalculatedPoints() {
+            console.log('[MAP] Demande explicite de suppression des points calculés');
+            this.clearCalculatedPoints();
+        }
 
         // === MÉTHODE AMÉLIORÉE : gérer l'ajout d'un point calculé ===
         handleAddCalculatedPoint(event) {
@@ -1863,7 +1905,7 @@
                 calculatedPoint: true, // Marqueur pour identifier ce point
                 latitude,
                 longitude,
-                color: 'rgba(0, 90, 220, 0.8)',
+                color: color || 'rgba(0, 90, 220, 0.8)', // Bleu par défaut
                 // Coordonnées formatées pour l'infobulle
                 gc_lat: ddmCoords.latitude,
                 gc_lon: ddmCoords.longitude,
@@ -1888,26 +1930,131 @@
                 this.map.getView().setZoom(15);
             }
         }
-
-        // Fonction pour convertir les coordonnées décimales en format DDM (degrés, minutes décimales)
-        decimalToDDM(lat, lon) {
-            // Gérer la latitude
-            const latDir = lat >= 0 ? 'N' : 'S';
-            const latAbs = Math.abs(lat);
+        
+        // === NOUVELLE MÉTHODE : gérer l'ajout de plusieurs points calculés ===
+        handleAddMultipleCalculatedPoints(event) {
+            console.log('[MAP] Réception d\'un événement pour ajouter plusieurs points calculés');
+            const { points, batchId } = event.detail;
+            
+            if (!points || points.length === 0) {
+                console.log('[MAP] Aucun point valide à ajouter');
+                return;
+            }
+            
+            console.log(`[MAP] Préparation de l'ajout de ${points.length} points (batchId: ${batchId})`);
+            
+            // Supprimer d'abord tous les points calculés précédents
+            this.clearCalculatedPoints();
+            
+            // Créer un marqueur invisible dans le DOM pour indiquer que les points de ce lot ont été ajoutés
+            const marker = document.createElement('div');
+            marker.style.display = 'none';
+            marker.dataset.batchId = batchId;
+            document.body.appendChild(marker);
+            
+            // Collecter toutes les coordonnées pour centrer la carte
+            const allCoords = [];
+            
+            // Ajouter chaque point
+            points.forEach((point, index) => {
+                const { latitude, longitude, label, color, index: pointIndex } = point;
+                
+                // Convertir les coordonnées décimales en format DDM
+                const ddmCoords = this.decimalToDDM(latitude, longitude);
+                
+                // Créer un ID unique pour ce point
+                const pointId = `calculated-point-${batchId}-${index}`;
+                
+                // Collecter les coordonnées pour le centrage
+                allCoords.push([longitude, latitude]);
+                
+                // Ajouter le nouveau point avec un marqueur spécial et un ID unique
+                const feature = this.addFeature(longitude, latitude, {
+                    name: label || `Point calculé ${pointIndex || (index + 1)}`,
+                    cache_type: "TempPoint",
+                    temp_marker: true,
+                    calculatedPoint: true,
+                    isMultiPoint: true, // Marquer comme faisant partie d'un ensemble de points
+                    latitude,
+                    longitude,
+                    color: color || 'rgba(0, 90, 220, 0.8)', // Bleu pour les points multiples
+                    gc_lat: ddmCoords.latitude,
+                    gc_lon: ddmCoords.longitude,
+                    isCalculatedPoint: true,
+                    calculatedAt: new Date().toLocaleTimeString(),
+                    batchId: batchId,
+                    pointIndex: pointIndex || (index + 1),
+                    strokeColor: point.strokeColor || this.getColorForIndex(index) // Couleur de bordure unique
+                });
+                
+                // Définir les propriétés directement sur la feature
+                if (feature) {
+                    feature.setId(pointId);
+                    feature.set('calculatedPoint', true);
+                    feature.set('gc_lat', ddmCoords.latitude);
+                    feature.set('gc_lon', ddmCoords.longitude);
+                    feature.set('isCalculatedPoint', true);
+                    feature.set('batchId', batchId);
+                    console.log(`[MAP] Point calculé #${index + 1} ajouté avec ID: ${pointId}`);
+                }
+            });
+            
+            // Centrer et zoomer la carte pour montrer tous les points
+            if (this.map && allCoords.length > 0) {
+                // Si un seul point, centrer dessus
+                if (allCoords.length === 1) {
+                    this.map.getView().setCenter(ol.proj.fromLonLat(allCoords[0]));
+                    this.map.getView().setZoom(15);
+                } else {
+                    // Créer une étendue englobant tous les points
+                    const extent = ol.extent.createEmpty();
+                    allCoords.forEach(coord => {
+                        ol.extent.extend(extent, [
+                            ...ol.proj.fromLonLat(coord),
+                            ...ol.proj.fromLonLat(coord)
+                        ]);
+                    });
+                    
+                    // Ajouter une marge à l'étendue
+                    const padding = [50, 50, 50, 50]; // Marge en pixels
+                    this.map.getView().fit(extent, {
+                        padding: padding,
+                        maxZoom: 15
+                    });
+                }
+            }
+            
+            console.log(`[MAP] ${points.length} points ajoutés avec succès (batchId: ${batchId})`);
+        }
+        
+        // Convertir des coordonnées décimales en format DDM (degrés, minutes décimales)
+        decimalToDDM(latitude, longitude) {
+            // Fonction pour formater un nombre avec un nombre fixe de décimales
+            const formatDec = (num, decimals) => {
+                return num.toFixed(decimals);
+            };
+            
+            // Fonction pour ajouter des zéros en préfixe
+            const padZero = (num, length) => {
+                return String(num).padStart(length, '0');
+            };
+            
+            // Convertir la latitude
+            const latAbs = Math.abs(latitude);
             const latDeg = Math.floor(latAbs);
             const latMin = (latAbs - latDeg) * 60;
-            const latMinFormatted = latMin.toFixed(3);
+            const latDir = latitude >= 0 ? 'N' : 'S';
             
-            // Gérer la longitude
-            const lonDir = lon >= 0 ? 'E' : 'W';
-            const lonAbs = Math.abs(lon);
+            // Convertir la longitude
+            const lonAbs = Math.abs(longitude);
             const lonDeg = Math.floor(lonAbs);
             const lonMin = (lonAbs - lonDeg) * 60;
-            const lonMinFormatted = lonMin.toFixed(3);
+            const lonDir = longitude >= 0 ? 'E' : 'W';
             
+            // Formater selon le standard DD° MM.MMM
             return {
-                latitude: `${latDir}${latDeg.toString().padStart(2, '0')}° ${latMinFormatted.padStart(6, '0')}`,
-                longitude: `${lonDir}${lonDeg.toString().padStart(3, '0')}° ${lonMinFormatted.padStart(6, '0')}`
+                latitude: `${latDir}${padZero(latDeg, 2)}° ${padZero(formatDec(latMin, 3), 2)}.${formatDec(latMin, 3).split('.')[1]}`,
+                longitude: `${lonDir}${padZero(lonDeg, 3)}° ${padZero(formatDec(lonMin, 3), 2)}.${formatDec(lonMin, 3).split('.')[1]}`
             };
         }
 
@@ -2027,6 +2174,279 @@
                 console.error("Erreur lors de la conversion des coordonnées:", error);
                 throw error;
             }
+        }
+
+        addCalculatedPointToMap(event) {
+            console.log('[MAP] Réception d\'un événement pour ajouter un point calculé');
+            
+            // Supprimer les points calculés précédents
+            this.removeCalculatedPoints();
+            
+            const detail = event.detail;
+            
+            if (!detail || !detail.latitude || !detail.longitude) {
+                console.error('[MAP] Erreur: Coordonnées calculées manquantes dans l\'événement');
+                return;
+            }
+            
+            // Convertir les coordonnées dans le format attendu par MapLibre
+            const convertedCoords = this.convertLatLongToDMS(detail.latitude, detail.longitude);
+            console.log('[MAP] Coordonnées converties:', convertedCoords);
+            
+            // Créer un ID unique pour ce point calculé
+            const pointId = 'calculated-point-' + Date.now();
+            
+            // Ajouter une feature pour le point calculé
+            this.map.addSource(pointId, {
+                'type': 'geojson',
+                'data': {
+                    'type': 'Feature',
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': [detail.longitude, detail.latitude]
+                    },
+                    'properties': {
+                        'id': pointId,
+                        'label': detail.label || 'Coordonnées calculées'
+                    }
+                }
+            });
+            
+            // Vérifier si nous avons des propriétés de style étendues
+            const fillColor = detail.fillColor || detail.color || 'rgba(0, 90, 220, 0.7)'; // Bleu par défaut
+            const strokeColor = detail.strokeColor || '#FFFFFF'; // Blanc par défaut
+            const strokeWidth = detail.strokeWidth || 2; // Largeur par défaut
+            
+            // Ajouter une couche pour le point avec les styles personnalisés
+            this.map.addLayer({
+                'id': pointId,
+                'type': 'circle',
+                'source': pointId,
+                'paint': {
+                    'circle-radius': 12, // Rayon plus grand
+                    'circle-color': fillColor,
+                    'circle-stroke-width': strokeWidth,
+                    'circle-stroke-color': strokeColor,
+                    'circle-opacity': 0.8
+                }
+            });
+            
+            // Ajouter une couche de texte pour l'étiquette si elle existe
+            if (detail.label) {
+                this.map.addLayer({
+                    'id': pointId + '-label',
+                    'type': 'symbol',
+                    'source': pointId,
+                    'layout': {
+                        'text-field': detail.label,
+                        'text-font': ['Open Sans Regular'],
+                        'text-size': 12,
+                        'text-offset': [0, 1.5],
+                        'text-anchor': 'top'
+                    },
+                    'paint': {
+                        'text-color': '#000000',
+                        'text-halo-color': '#FFFFFF',
+                        'text-halo-width': 2
+                    }
+                });
+            }
+            
+            // Enregistrer l'ID du point calculé
+            this.calculatedPoints.push(pointId);
+            if (detail.label) {
+                this.calculatedPoints.push(pointId + '-label');
+            }
+            
+            console.log('[MAP] Nouveau point calculé ajouté avec ID:', pointId);
+            
+            // Centrer la carte sur le nouveau point
+            this.map.flyTo({
+                center: [detail.longitude, detail.latitude],
+                zoom: 15,
+                duration: 1000
+            });
+        }
+        
+        // Gestionnaire pour ajouter plusieurs points calculés sans effacer les précédents
+        addMultipleCalculatedPointsToMap(event) {
+            console.log('[MAP] Réception d\'un événement pour ajouter plusieurs points calculés');
+            
+            const detail = event.detail;
+            if (!detail || !detail.points || !Array.isArray(detail.points) || detail.points.length === 0) {
+                console.error('[MAP] Erreur: Aucun point valide dans l\'événement');
+                return;
+            }
+            
+            // Récupérer les points et l'ID de lot
+            const points = detail.points;
+            const batchId = detail.batchId || Date.now();
+            
+            console.log(`[MAP] Ajout de ${points.length} points (batchId: ${batchId})`);
+            
+            // Nettoyer les points calculés précédents
+            this.clearCalculatedPoints();
+            
+            // Créer une étendue vide pour le cadrage automatique
+            const extent = ol.extent.createEmpty();
+            
+            // Pour chaque point, créer une feature OpenLayers
+            points.forEach((point, index) => {
+                if (!point.latitude || !point.longitude) {
+                    console.warn(`[MAP] Point ${index} invalide, ignoré`);
+                    return;
+                }
+                
+                // Créer un ID unique pour ce point
+                const pointId = `calculated-point-${batchId}-${index}`;
+                
+                // Convertir les coordonnées en format OpenLayers
+                const coordinates = ol.proj.fromLonLat([point.longitude, point.latitude]);
+                
+                // Étendre les limites pour inclure ce point
+                ol.extent.extend(extent, [...coordinates, ...coordinates]);
+                
+                // Créer la feature
+                const feature = new ol.Feature({
+                    geometry: new ol.geom.Point(coordinates)
+                });
+                
+                // Ajouter les propriétés à la feature
+                feature.setProperties({
+                    id: pointId,
+                    gc_code: `Point ${index + 1}`,
+                    name: point.label || `Point ${index + 1}`,
+                    cache_type: 'TempPoint',
+                    difficulty: null,
+                    terrain: null,
+                    size: null,
+                    solved: null,
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                    temp_marker: true,
+                    calculatedPoint: true,
+                    isMultiPoint: true,
+                    fillColor: point.fillColor,
+                    strokeColor: point.strokeColor || this.getColorForIndex(index),
+                    strokeWidth: point.strokeWidth,
+                    pointIndex: point.index || (index + 1),
+                    batchId: batchId,
+                    label: point.label
+                });
+                
+                // Définir un style personnalisé pour cette feature
+                feature.setStyle(new ol.style.Style({
+                    image: new ol.style.RegularShape({
+                        radius: 10, // Plus grand rayon
+                        points: 4, // Carré pour faire un losange avec l'angle
+                        angle: Math.PI / 4, // 45 degrés pour faire un losange
+                        fill: new ol.style.Fill({
+                            color: point.fillColor || 'rgba(0, 90, 220, 0.8)' // Bleu pour les points multiples
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: point.strokeColor || this.getColorForIndex(index),
+                            width: point.strokeWidth || 2
+                        })
+                    }),
+                    text: point.label ? new ol.style.Text({
+                        text: (point.index || (index + 1)).toString(), // Numéro du point comme icône
+                        font: 'bold 12px sans-serif',
+                        fill: new ol.style.Fill({color: '#ffffff'}),
+                        stroke: new ol.style.Stroke({color: '#000000', width: 1}),
+                        offsetY: 0
+                    }) : new ol.style.Text({
+                        text: (point.index || (index + 1)).toString(), // Toujours afficher le numéro
+                        font: 'bold 10px sans-serif',
+                        fill: new ol.style.Fill({color: '#ffffff'}),
+                        stroke: new ol.style.Stroke({color: '#000000', width: 1}),
+                        offsetY: 0
+                    })
+                }));
+                
+                // Ajouter la feature à la source vectorielle
+                this.vectorSource.addFeature(feature);
+                console.log(`[MAP] Point calculé #${index + 1} ajouté avec ID: ${pointId}`);
+                
+                // Stocker l'ID pour la gestion future
+                this.calculatedPoints.push(feature);
+            });
+            
+            // Ajuster la vue pour voir tous les points si l'étendue n'est pas vide
+            if (!ol.extent.isEmpty(extent)) {
+                this.map.getView().fit(extent, {
+                    padding: [50, 50, 50, 50],
+                    duration: 1000
+                });
+            }
+            
+            console.log(`[MAP] ${points.length} points ajoutés avec succès (batchId: ${batchId})`);
+        }
+        
+        // Nettoyer les points calculés
+        clearCalculatedPoints() {
+            console.log('[MAP] Nettoyage des points calculés');
+            
+            // Récupérer toutes les features
+            const features = this.vectorSource.getFeatures();
+            
+            // Filtrer les features pour obtenir uniquement les points calculés
+            const calculatedFeatures = features.filter(feature => 
+                feature.get('calculatedPoint') === true
+            );
+            
+            console.log(`[MAP] ${calculatedFeatures.length} points calculés trouvés pour suppression`);
+            
+            // Supprimer chaque feature calculée
+            calculatedFeatures.forEach(feature => {
+                this.vectorSource.removeFeature(feature);
+            });
+            
+            // Vider le tableau des points calculés
+            this.calculatedPoints = [];
+        }
+
+        // Méthode pour supprimer les points calculés précédents
+        removeCalculatedPoints() {
+            console.log('[MAP] Suppression des points calculés précédents');
+            
+            // Vérifier si la liste des points calculés existe
+            if (!this.calculatedPoints) {
+                this.calculatedPoints = [];
+                return;
+            }
+            
+            // Supprimer chaque couche et source associée aux points calculés
+            this.calculatedPoints.forEach(id => {
+                if (this.map.getLayer(id)) {
+                    this.map.removeLayer(id);
+                }
+                if (this.map.getSource(id)) {
+                    this.map.removeSource(id);
+                }
+            });
+            
+            // Vider la liste des points calculés
+            this.calculatedPoints = [];
+        }
+
+        // Génère une couleur unique basée sur l'index du point
+        getColorForIndex(index) {
+            // Palette de couleurs pour différencier les points
+            const colors = [
+                '#FF0000', // Rouge
+                '#00FF00', // Vert
+                '#0000FF', // Bleu
+                '#FFFF00', // Jaune
+                '#FF00FF', // Magenta
+                '#00FFFF', // Cyan
+                '#FF8000', // Orange
+                '#8000FF', // Violet
+                '#0080FF', // Bleu clair
+                '#FF0080', // Rose
+            ];
+            
+            // Utiliser l'index pour sélectionner une couleur, avec bouclage si nécessaire
+            return colors[index % colors.length];
         }
     }
 

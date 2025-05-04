@@ -1,5 +1,44 @@
 // Formula Solver Controller
 (() => {
+    // Définir la fonction d'aide pour ouvrir les détails de la géocache à partir de n'importe quel contexte
+    if (!window.openGeocacheDetailsTab) {
+        window.openGeocacheDetailsTab = function(geocacheId) {
+            // Éviter d'ouvrir plusieurs fois le même onglet
+            if (document.querySelector(`[data-geocache-details="${geocacheId}"]`)) {
+                console.log(`L'onglet des détails de la géocache ${geocacheId} est déjà ouvert.`);
+                return;
+            }
+            
+            console.log(`Ouverture de l'onglet des détails de la géocache ${geocacheId}...`);
+            
+            // Construire l'URL des détails de la géocache
+            const detailsUrl = `/geocaches/${geocacheId}/details-panel`;
+            
+            // Déterminer le conteneur parent le plus approprié
+            const container = document.querySelector('.lm_goldenlayout');
+            const parentContainer = container ? container.closest('.lm_item') : null;
+            const containerId = parentContainer ? parentContainer.id : null;
+            
+            // Si on trouve un conteneur parent, envoyons un message pour ouvrir les détails
+            if (containerId) {
+                const message = {
+                    type: 'openGeocacheDetails',
+                    geocacheId: geocacheId,
+                    containerId: containerId,
+                    detailsUrl: detailsUrl
+                };
+                
+                // Envoyer le message à la fenêtre principale
+                window.postMessage(message, '*');
+                console.log("Message envoyé pour ouvrir les détails de la géocache:", message);
+                return true;
+            } else {
+                console.error("Impossible de trouver un conteneur parent pour ouvrir les détails de la géocache.");
+                return false;
+            }
+        };
+    }
+
     class FormulaSolverController extends Stimulus.Controller {
         static targets = [
             "formulaInput", 
@@ -619,6 +658,36 @@
             return this.reduceChecksum(sum);
         }
         
+        // Vérifier si une valeur est numérique
+        isNumeric(value) {
+            return !isNaN(parseFloat(value)) && isFinite(value);
+        }
+        
+        // Analyser les valeurs multiples dans une chaîne de texte
+        parseMultipleValues(text) {
+            if (!text || typeof text !== 'string') return null;
+            
+            // Format @1->5 pour une plage de valeurs
+            const rangeMatch = text.match(/^@(\d+)->(\d+)$/);
+            if (rangeMatch) {
+                const start = parseInt(rangeMatch[1]);
+                const end = parseInt(rangeMatch[2]);
+                if (start <= end) {
+                    return Array.from({length: end - start + 1}, (_, i) => start + i);
+                }
+                return Array.from({length: start - end + 1}, (_, i) => start - i);
+            }
+            
+            // Format @1&3&5 pour des valeurs spécifiques
+            const specificMatch = text.match(/^@(.+)$/);
+            if (specificMatch) {
+                const values = specificMatch[1].split('&');
+                return values.map(v => parseInt(v)).filter(v => !isNaN(v));
+            }
+            
+            return null;
+        }
+        
         // Obtenir la valeur à utiliser pour une lettre donnée
         getLetterValue(letter) {
             if (!this.letterData.has(letter)) return '';
@@ -628,6 +697,12 @@
             
             switch (valueType) {
                 case 'value':
+                    // Vérifier s'il s'agit d'un format de valeurs multiples
+                    const multiValues = this.parseMultipleValues(data.word);
+                    if (multiValues) {
+                        return multiValues;
+                    }
+                    
                     // Si la valeur est numérique, retourner directement la valeur numérique
                     if (data.word && this.isNumeric(data.word)) {
                         return data.word;
@@ -644,11 +719,6 @@
             }
         }
         
-        // Vérifier si une valeur est numérique
-        isNumeric(value) {
-            return !isNaN(parseFloat(value)) && isFinite(value);
-        }
-        
         // Mettre à jour la formule avec les substitutions
         updateSubstitutedFormula() {
             console.log("updateSubstitutedFormula appelé");
@@ -660,6 +730,49 @@
             
             // 1. Séparer les parties Nord/Sud et Est/Ouest
             const parts = this.splitCoordinates(formula);
+            
+            // Vérifier si nous avons des valeurs multiples
+            let hasMultipleValues = false;
+            const letterValues = {};
+            
+            // Collecter toutes les valeurs de lettre pour vérifier les valeurs multiples
+            for (const part of parts) {
+                if (part.type === 'content') {
+                    const matches = part.value.match(/\(([^()]*[A-Z][^()]*)\)/g) || [];
+                    for (const match of matches) {
+                        const letters = match.match(/[A-Z]/g) || [];
+                        for (const letter of letters) {
+                            if (!letterValues[letter]) {
+                                const value = this.getLetterValue(letter);
+                                letterValues[letter] = value;
+                                if (Array.isArray(value)) {
+                                    hasMultipleValues = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Si nous avons des valeurs multiples, afficher un message spécial
+            if (hasMultipleValues) {
+                let multipleValuesMessage = "Formule avec valeurs multiples:\n";
+                
+                for (const letter in letterValues) {
+                    if (Array.isArray(letterValues[letter])) {
+                        multipleValuesMessage += `${letter}: [${letterValues[letter].join(', ')}]\n`;
+                    }
+                }
+                
+                this.substitutedFormulaTextTarget.innerHTML = `
+                    <div class="text-yellow-300">
+                        ${multipleValuesMessage}<br>
+                        Les combinaisons seront calculées automatiquement.
+                    </div>
+                `;
+                this.substitutedFormulaTarget.classList.remove('hidden');
+                return;
+            }
             
             // 2. Appliquer les substitutions uniquement sur les portions appropriées
             let substitutedFormula = '';
@@ -692,8 +805,13 @@
                             // Obtenir la valeur en fonction du type sélectionné
                             switch (valueType) {
                                 case 'value':
+                                    // Vérifier s'il s'agit d'un format de valeurs multiples
+                                    const multiValues = this.parseMultipleValues(data.word);
+                                    if (multiValues) {
+                                        value = `[${multiValues.join(',')}]`;
+                                    }
                                     // Si c'est un nombre, l'utiliser directement
-                                    if (data.word && this.isNumeric(data.word)) {
+                                    else if (data.word && this.isNumeric(data.word)) {
                                         value = data.word;
                                     } else {
                                         value = data.word || '';
@@ -717,6 +835,9 @@
                                 
                                 // Si la valeur est numérique, remplacer directement
                                 if (this.isNumeric(value)) {
+                                    substituted = substituted.replace(regex, value);
+                                } else if (value.startsWith('[') && value.endsWith(']')) {
+                                    // Si c'est un tableau de valeurs, le conserver tel quel
                                     substituted = substituted.replace(regex, value);
                                 } else {
                                     // Si c'est un mot/expression, remplacer par "value"
@@ -801,6 +922,7 @@
             console.log("Lettres extraites:", allLetters);
             
             const variables = {};
+            let hasMultipleValues = false;
 
             // Collecter les valeurs pour chaque lettre en fonction du type sélectionné
             for (const letter of allLetters) {
@@ -821,8 +943,15 @@
                 // Obtenir la valeur en fonction du type
                 switch (valueType) {
                     case 'value':
+                        // Vérifier s'il s'agit d'un format de valeurs multiples
+                        const multiValues = this.parseMultipleValues(data.word);
+                        if (multiValues) {
+                            console.log(`Lettre ${letter}: Valeurs multiples détectées: [${multiValues.join(', ')}]`);
+                            variables[letter] = multiValues;
+                            hasMultipleValues = true;
+                        }
                         // Si la valeur est numérique, l'utiliser directement
-                        if (data.word && this.isNumeric(data.word)) {
+                        else if (data.word && this.isNumeric(data.word)) {
                             value = parseFloat(data.word);
                             console.log(`Lettre ${letter}: Valeur numérique détectée: ${value}`);
                             // Ajouter immédiatement à variables
@@ -857,7 +986,7 @@
                 }
             }
 
-            console.log("Variables collectées pour API:", variables);
+            console.log("Variables collectées:", variables);
             
             // Vérifier si des variables ont été collectées
             if (Object.keys(variables).length === 0) {
@@ -883,6 +1012,328 @@
                 console.log("Coordonnées d'origine trouvées:", originData);
             } else {
                 console.log("ATTENTION: Aucune coordonnée d'origine trouvée!");
+            }
+            
+            // Si nous avons des valeurs multiples, générer toutes les combinaisons
+            if (hasMultipleValues) {
+                console.log("Détection de valeurs multiples, génération des combinaisons...");
+                const allCombinations = this.generateAllCombinations(variables);
+                console.log(`${allCombinations.length} combinaisons générées:`, allCombinations);
+                
+                // Limite pour éviter de surcharger le serveur (max 50 combinaisons)
+                const maxCombinations = 50;
+                const combinationsToProcess = allCombinations.slice(0, maxCombinations);
+                
+                // Affichage d'un message si certaines combinaisons sont ignorées
+                if (allCombinations.length > maxCombinations) {
+                    console.warn(`ATTENTION: Seules les ${maxCombinations} premières combinaisons seront traitées sur un total de ${allCombinations.length}`);
+                }
+                
+                // Réinitialiser l'affichage des coordonnées
+                this.calculatedCoordinatesTextTarget.innerHTML = '';
+                this.calculatedCoordinatesTarget.classList.remove('hidden');
+                
+                // Ajouter un message indiquant le traitement en cours
+                const processingMsg = document.createElement('div');
+                processingMsg.className = 'text-blue-400 mb-2';
+                processingMsg.textContent = `Traitement de ${combinationsToProcess.length} combinaisons...`;
+                this.calculatedCoordinatesTextTarget.appendChild(processingMsg);
+                
+                // Créer un conteneur pour toutes les coordonnées calculées
+                const resultsContainer = document.createElement('div');
+                resultsContainer.className = 'bg-gray-800 p-3 rounded max-h-96 overflow-y-auto';
+                this.calculatedCoordinatesTextTarget.appendChild(resultsContainer);
+                
+                // Collecter les données pour tous les points
+                const mapPoints = [];
+                
+                // Traiter chaque combinaison
+                Promise.all(combinationsToProcess.map(combination => {
+                    // Créer les données à envoyer à l'API
+                    const requestData = {
+                        formula: formula,
+                        variables: combination,
+                        ...originData,
+                        timestamp: new Date().getTime() // Pour éviter le cache
+                    };
+                    
+                    // Appeler l'API pour calculer les coordonnées
+                    return fetch('/api/calculate_coordinates', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify(requestData),
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    });
+                }))
+                .then(results => {
+                    // Supprimer le message de traitement
+                    processingMsg.remove();
+                    
+                    // Ajouter un titre pour les résultats
+                    const titleElement = document.createElement('div');
+                    titleElement.className = 'text-white font-medium mb-2';
+                    titleElement.textContent = `${results.length} combinaisons calculées:`;
+                    resultsContainer.appendChild(titleElement);
+                    
+                    // Préparer les données pour l'affichage sur la carte
+                    const validPoints = [];
+                    
+                    // Afficher chaque résultat et collecter les points valides
+                    results.forEach((data, index) => {
+                        if (data.error) {
+                            // Ignorer les erreurs pour simplifier l'affichage
+                            return;
+                        }
+                        
+                        // Créer un élément pour ce résultat
+                        const resultElement = document.createElement('div');
+                        resultElement.className = 'p-2 border-b border-gray-700';
+                        
+                        // Construire la description des variables utilisées
+                        const variablesUsed = Object.entries(combinationsToProcess[index])
+                            .map(([letter, value]) => `${letter}=${value}`)
+                            .join(', ');
+                        
+                        // Calculer la distance si disponible
+                        let distanceHTML = '';
+                        if (data.distance_from_origin) {
+                            const distance = data.distance_from_origin;
+                            let distanceClass = '';
+                            let distanceMessage = '';
+                            
+                            switch (distance.status) {
+                                case 'ok':
+                                    distanceClass = 'text-green-400';
+                                    distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Conforme aux règles du géocaching`;
+                                    break;
+                                case 'warning':
+                                    distanceClass = 'text-amber-300';
+                                    distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Attention, proche de la limite de 2 miles!`;
+                                    break;
+                                case 'far':
+                                    distanceClass = 'text-red-500';
+                                    distanceMessage = `Distance: ${distance.meters} m (${distance.miles} miles) - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.`;
+                                    break;
+                            }
+                            
+                            distanceHTML = `<div class="mt-1 ${distanceClass} text-xs" title="Distance par rapport au point d'origine">${distanceMessage}</div>`;
+                        }
+                        
+                        // Coordonnées calculées
+                        const coordsText = `${data.latitude} ${data.longitude}`;
+                        const coordinatesHTML = `
+                            <div class="text-xs text-gray-400 mb-1">${variablesUsed}</div>
+                            <div class="flex justify-between items-center">
+                                <div class="text-green-400">${coordsText}</div>
+                                <div class="flex space-x-1">
+                                    <button class="text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded copy-coords" 
+                                            data-coords="${coordsText}">
+                                        Copier
+                                    </button>
+                                </div>
+                            </div>
+                            ${distanceHTML}
+                        `;
+                        
+                        resultElement.innerHTML = coordinatesHTML;
+                        resultsContainer.appendChild(resultElement);
+                        
+                        // Ajouter un gestionnaire d'événements pour le bouton Copier
+                        const copyButton = resultElement.querySelector('.copy-coords');
+                        copyButton.addEventListener('click', (e) => {
+                            const coords = e.target.dataset.coords;
+                            navigator.clipboard.writeText(coords).then(() => {
+                                const originalText = e.target.textContent;
+                                e.target.textContent = 'Copié!';
+                                e.target.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                                e.target.classList.add('bg-green-500');
+                                
+                                setTimeout(() => {
+                                    e.target.textContent = originalText;
+                                    e.target.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                                    e.target.classList.remove('bg-green-500');
+                                }, 1500);
+                            });
+                        });
+                        
+                        // Collecter les points pour la carte si des coordonnées décimales sont disponibles
+                        if (data.decimal_latitude && data.decimal_longitude) {
+                            console.log(`Préparation du point ${index+1}: ${data.decimal_latitude}, ${data.decimal_longitude}`);
+                            
+                            // Créer un tableau de couleurs pour différencier les bordures des points
+                            const strokeColors = [
+                                '#FF0000',     // Rouge vif
+                                '#00AAFF',     // Bleu clair
+                                '#00CC00',     // Vert vif
+                                '#FF9500',     // Orange vif
+                                '#9900FF',     // Violet vif
+                                '#FF00FF',     // Magenta
+                                '#00FFFF',     // Cyan
+                                '#FFDD00',     // Or
+                                '#CC3300',     // Marron rougeâtre
+                                '#AAAAAA'      // Gris
+                            ];
+                            
+                            // Choisir une couleur de bordure basée sur l'index (en boucle si plus de 10 points)
+                            const colorIndex = index % strokeColors.length;
+                            const strokeColor = strokeColors[colorIndex];
+                            
+                            // Couleur de fond uniforme pour tous les points
+                            const fillColor = 'rgba(0, 90, 220, 0.7)'; // Bleu semi-transparent
+                            
+                            // Ajouter ce point à notre collection
+                            validPoints.push({
+                                latitude: data.decimal_latitude,
+                                longitude: data.decimal_longitude,
+                                label: `Option ${index+1}: ${variablesUsed}`,
+                                // Spécifier la couleur de remplissage et de bordure séparément
+                                fillColor: fillColor,
+                                strokeColor: strokeColor,
+                                strokeWidth: 3, // Bordure plus épaisse pour un meilleur contraste
+                                index: index + 1,
+                                // Ajouter les données complètes pour les actions
+                                fullData: data,
+                                coordinates: coordsText
+                            });
+                            
+                            // Ajouter une indication visuelle que le point a été préparé
+                            const mapIndicator = document.createElement('div');
+                            mapIndicator.className = 'mt-1 text-xs flex items-center';
+                            
+                            // Créer un petit cercle coloré pour représenter le point
+                            mapIndicator.innerHTML = `
+                                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; 
+                                    background-color:${fillColor}; border:2px solid ${strokeColor}; margin-right:5px;"></span>
+                                Point ${index+1} sur la carte
+                            `;
+                            resultElement.appendChild(mapIndicator);
+                            
+                            // Ajouter les boutons d'action pour ce point
+                            const actionsContainer = document.createElement('div');
+                            actionsContainer.className = 'mt-2 flex flex-wrap gap-1';
+                            
+                            // Bouton "Ajouter WP"
+                            if (this.geocacheIdValue) {
+                                const addWpButton = document.createElement('button');
+                                addWpButton.className = 'text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded';
+                                addWpButton.textContent = 'Ajouter WP';
+                                addWpButton.dataset.index = index;
+                                addWpButton.addEventListener('click', () => {
+                                    this.addAsWaypoint(validPoints[index]);
+                                });
+                                actionsContainer.appendChild(addWpButton);
+                                
+                                // Bouton "Créer WP auto"
+                                const createWpButton = document.createElement('button');
+                                createWpButton.className = 'text-xs bg-green-700 hover:bg-green-800 text-white py-1 px-2 rounded';
+                                createWpButton.textContent = 'Créer WP auto';
+                                createWpButton.dataset.index = index;
+                                createWpButton.addEventListener('click', () => {
+                                    this.createWaypointAuto(validPoints[index]);
+                                });
+                                actionsContainer.appendChild(createWpButton);
+                                
+                                // Bouton "Mettre à jour coordonnées"
+                                const updateCoordsButton = document.createElement('button');
+                                updateCoordsButton.className = 'text-xs bg-amber-600 hover:bg-amber-700 text-white py-1 px-2 rounded';
+                                updateCoordsButton.textContent = 'Mettre à jour coordonnées';
+                                updateCoordsButton.dataset.index = index;
+                                updateCoordsButton.addEventListener('click', () => {
+                                    this.saveGeocacheCoordinates(validPoints[index]);
+                                });
+                                actionsContainer.appendChild(updateCoordsButton);
+                            }
+                            
+                            // Bouton "Vérifier (GeoCheck)" si disponible
+                            if (this.hasOpenGeoCheckButtonTarget && !this.openGeoCheckButtonTarget.classList.contains('hidden')) {
+                                const geoCheckButton = document.createElement('button');
+                                geoCheckButton.className = 'text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded';
+                                geoCheckButton.textContent = 'Vérifier (GeoCheck)';
+                                geoCheckButton.dataset.index = index;
+                                geoCheckButton.addEventListener('click', () => {
+                                    this.openGeoCheck(null, validPoints[index]);
+                                });
+                                actionsContainer.appendChild(geoCheckButton);
+                            }
+                            
+                            // Bouton "Vérifier (Geocaching)" si disponible
+                            if (this.hasOpenGeocachingCheckerButtonTarget && !this.openGeocachingCheckerButtonTarget.classList.contains('hidden')) {
+                                const geocachingButton = document.createElement('button');
+                                geocachingButton.className = 'text-xs bg-orange-600 hover:bg-orange-700 text-white py-1 px-2 rounded';
+                                geocachingButton.textContent = 'Vérifier (Geocaching)';
+                                geocachingButton.dataset.index = index;
+                                geocachingButton.addEventListener('click', () => {
+                                    this.openGeocachingChecker(null, validPoints[index]);
+                                });
+                                actionsContainer.appendChild(geocachingButton);
+                            }
+                            
+                            // Bouton "Vérifier (Certitude)" si disponible
+                            if (this.hasOpenCertitudeCheckerButtonTarget && !this.openCertitudeCheckerButtonTarget.classList.contains('hidden')) {
+                                const certitudeButton = document.createElement('button');
+                                certitudeButton.className = 'text-xs bg-teal-600 hover:bg-teal-700 text-white py-1 px-2 rounded';
+                                certitudeButton.textContent = 'Vérifier (Certitude)';
+                                certitudeButton.dataset.index = index;
+                                certitudeButton.addEventListener('click', () => {
+                                    this.openCertitudeChecker(null, validPoints[index]);
+                                });
+                                actionsContainer.appendChild(certitudeButton);
+                            }
+                            
+                            resultElement.appendChild(actionsContainer);
+                        }
+                    });
+                    
+                    // Afficher automatiquement les points sur la carte s'il y en a
+                    if (validPoints.length > 0) {
+                        // Ajouter une légende informative
+                        const legendElement = document.createElement('div');
+                        legendElement.className = 'mt-4 p-3 bg-gray-900 rounded text-sm';
+                        legendElement.innerHTML = `
+                            <div class="font-medium text-white mb-2">Points affichés sur la carte</div>
+                            <div class="text-gray-300">
+                                ${validPoints.length} point(s) affiché(s) automatiquement sur la carte avec des couleurs différentes.
+                                <div class="mt-1 text-xs text-blue-300">Si les points ne sont pas visibles, <button id="refresh-points-button" class="underline">cliquez ici</button> pour les réafficher.</div>
+                            </div>
+                        `;
+                        resultsContainer.appendChild(legendElement);
+                        
+                        // Ajouter un gestionnaire d'événements pour le bouton de rafraîchissement
+                        const refreshButton = legendElement.querySelector('#refresh-points-button');
+                        refreshButton.addEventListener('click', () => {
+                            this.displayMultiplePointsOnMap(validPoints);
+                            refreshButton.textContent = 'points réaffichés';
+                            refreshButton.disabled = true;
+                            setTimeout(() => {
+                                refreshButton.textContent = 'cliquez ici';
+                                refreshButton.disabled = false;
+                            }, 2000);
+                        });
+                        
+                        // Afficher les points immédiatement
+                        this.displayMultiplePointsOnMap(validPoints);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors du calcul des combinaisons:", error);
+                    
+                    // Afficher un message d'erreur
+                    this.calculatedCoordinatesTextTarget.innerHTML = `
+                        <div class="text-red-500">
+                            Erreur lors du calcul des combinaisons: ${error.message}
+                        </div>
+                    `;
+                });
+                
+                return; // Sortir de la fonction pour ne pas exécuter le code standard
             }
 
             // Créer les données à envoyer à l'API
@@ -2195,187 +2646,170 @@
         }
 
         copyCalculatedCoordinates() {
-            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
-            
-            if (!coordinatesText) {
-                return;
+            const coordinatesText = this.calculatedCoordinatesTextTarget.textContent.trim();
+            if (coordinatesText) {
+                navigator.clipboard.writeText(coordinatesText)
+                    .then(() => {
+                        // Changer le texte du bouton pour indiquer que la copie a réussi
+                        const originalText = this.copyCoordinatesButtonTarget.textContent;
+                        this.copyCoordinatesButtonTarget.textContent = 'Copié!';
+                        this.copyCoordinatesButtonTarget.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                        this.copyCoordinatesButtonTarget.classList.add('bg-green-500');
+                        
+                        // Revenir au texte original après un délai
+                        setTimeout(() => {
+                            this.copyCoordinatesButtonTarget.textContent = originalText;
+                            this.copyCoordinatesButtonTarget.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                            this.copyCoordinatesButtonTarget.classList.remove('bg-green-500');
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('Erreur lors de la copie des coordonnées:', err);
+                        alert('Impossible de copier les coordonnées. Veuillez réessayer.');
+                    });
             }
-            
-            // Copier le texte dans le presse-papier
-            navigator.clipboard.writeText(coordinatesText)
-                .then(() => {
-                    // Changer temporairement le texte du bouton pour indiquer le succès
-                    const originalButtonHTML = this.copyCoordinatesButtonTarget.innerHTML;
-                    this.copyCoordinatesButtonTarget.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Copié!</span>
-                    `;
-                    this.copyCoordinatesButtonTarget.classList.remove("bg-blue-600", "hover:bg-blue-700");
-                    this.copyCoordinatesButtonTarget.classList.add("bg-green-600", "hover:bg-green-700");
-                    
-                    // Rétablir le bouton après un délai
-                    setTimeout(() => {
-                        this.copyCoordinatesButtonTarget.innerHTML = originalButtonHTML;
-                        this.copyCoordinatesButtonTarget.classList.remove("bg-green-600", "hover:bg-green-700");
-                        this.copyCoordinatesButtonTarget.classList.add("bg-blue-600", "hover:bg-blue-700");
-                    }, 2000);
-                })
-                .catch(err => {
-                    console.error('Erreur lors de la copie des coordonnées:', err);
-                    
-                    // Afficher un message d'erreur
-                    this.copyCoordinatesButtonTarget.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Erreur</span>
-                    `;
-                    this.copyCoordinatesButtonTarget.classList.remove("bg-blue-600", "hover:bg-blue-700");
-                    this.copyCoordinatesButtonTarget.classList.add("bg-red-600", "hover:bg-red-700");
-                    
-                    // Rétablir le bouton après un délai
-                    setTimeout(() => {
-                        this.copyCoordinatesButtonTarget.innerHTML = originalButtonHTML;
-                        this.copyCoordinatesButtonTarget.classList.remove("bg-red-600", "hover:bg-red-700");
-                        this.copyCoordinatesButtonTarget.classList.add("bg-blue-600", "hover:bg-blue-700");
-                    }, 2000);
-                });
         }
-
-        addAsWaypoint() {
-            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
-            
-            if (!coordinatesText) {
-                return;
+        
+        // Ajouter les coordonnées calculées comme waypoint
+        addAsWaypoint(pointData = null) {
+            // Récupérer les coordonnées (soit du point spécifique, soit de l'affichage général)
+            let coordinates;
+            if (pointData && pointData.coordinates) {
+                coordinates = pointData.coordinates;
+            } else {
+                coordinates = this.calculatedCoordinatesTextTarget.textContent.trim();
             }
             
-            // Vérifier si les coordonnées contiennent des variables non résolues (lettres A-Z)
-            const containsVariables = /[A-Z]{2,}/.test(coordinatesText);
-            if (containsVariables) {
-                console.error("Les coordonnées contiennent des variables non résolues");
-                this.showAddWaypointError("Variables non résolues");
+            // Vérifier si des coordonnées sont disponibles
+            if (!coordinates) {
+                alert('Aucune coordonnée calculée disponible.');
                 return;
             }
             
             // Récupérer l'ID de la géocache
             const geocacheId = this.geocacheIdValue;
-            
-            // Extraire les coordonnées calculées
-            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
-            const match = coordinatesText.match(regex);
-            
-            if (!match || match.length < 3) {
-                console.error("Format de coordonnées non reconnu");
-                this.showAddWaypointError("Format de coordonnées non reconnu");
+            if (!geocacheId) {
+                alert('ID de géocache non disponible.');
                 return;
             }
             
-            const gcLat = match[1].trim();
-            const gcLon = match[2].trim();
+            console.log(`Ajout d'un waypoint avec coordonnées: ${coordinates}`);
+            
+            // Récupérer les informations de distance si disponibles
+            let distanceInfo = '';
+            if (pointData && pointData.fullData && pointData.fullData.distance_from_origin) {
+                const distance = pointData.fullData.distance_from_origin;
+                distanceInfo = `Distance: ${distance.meters} m (${distance.miles} miles)`;
+            }
+            
+            // Détecter si les coordonnées sont au format décimal ou au format standard
+            let decimalLat, decimalLon;
+            if (pointData && pointData.latitude && pointData.longitude) {
+                // Utiliser directement les coordonnées décimales du point si disponibles
+                decimalLat = pointData.latitude;
+                decimalLon = pointData.longitude;
+            } else {
+                // Sinon, essayer de convertir les coordonnées standard en décimales
+                const coordinatesParts = coordinates.split(' ');
+                if (coordinatesParts.length === 2) {
+                    const lat = this.convertGCToDecimal(coordinatesParts[0], 'lat');
+                    const lon = this.convertGCToDecimal(coordinatesParts[1], 'lon');
+                    if (lat !== null && lon !== null) {
+                        decimalLat = lat;
+                        decimalLon = lon;
+                    }
+                }
+            }
+            
+            // Trouver le panneau de détails de la géocache et le formulaire de waypoint
+            let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
+            
+            if (!waypointForm) {
+                console.error("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+                
+                // Proposer d'ouvrir automatiquement les détails de la géocache
+                const shouldOpenDetails = confirm(
+                    'Le panneau des détails de la géocache n\'est pas ouvert.\n\n' +
+                    'Pour ajouter un waypoint, vous devez ouvrir l\'onglet des détails de la géocache.\n\n' +
+                    'Souhaitez-vous ouvrir l\'onglet des détails de la géocache maintenant?'
+                );
+                
+                if (shouldOpenDetails && window.openGeocacheDetailsTab) {
+                    // Tenter d'ouvrir l'onglet des détails de la géocache
+                    window.openGeocacheDetailsTab(geocacheId);
+                    
+                    // Afficher un message informant l'utilisateur de réessayer après l'ouverture
+                    setTimeout(() => {
+                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer d\'ajouter le waypoint dans quelques secondes.');
+                    }, 500);
+                }
+                
+                return;
+            }
             
             // Générer un nom de waypoint par défaut basé sur la formule
             const formulaText = this.formulaInputTarget.value.trim();
             let waypointName = "Point calculé";
             
-            if (formulaText) {
+            if (pointData && pointData.index) {
+                waypointName = `Point calculé ${pointData.index}`;
+            } else if (formulaText) {
                 // Utiliser les 20 premiers caractères de la formule pour le nom du waypoint
                 waypointName = "Calc: " + (formulaText.length > 20 ? formulaText.substring(0, 20) + "..." : formulaText);
             }
             
-            try {
-                // Approche alternative: ouvrir directement le panneau de waypoint
-                // Trouver l'onglet actif avec les détails de la géocache
-                let detailsTab = null;
-                if (window.mainLayout) {
-                    const components = window.mainLayout.root.getItemsByType('component');
-                    for (const comp of components) {
-                        if (comp.config.componentName === 'geocache-details' && 
-                            comp.container && 
-                            comp.container.getState().geocacheId == geocacheId) {
-                            detailsTab = comp;
-                            break;
-                        }
-                    }
-                    
-                    // Si on trouve un onglet de détails, l'activer
-                    if (detailsTab) {
-                        detailsTab.parent.setActiveContentItem(detailsTab);
-                        
-                        // Créer une fonction pour continuer après que l'onglet soit activé
-                        const continueWithWaypointForm = () => {
-                            // Trouver la section waypoint dans le détail
-                            const container = detailsTab.container.getElement()[0];
-                            if (!container) {
-                                console.error("Container du panneau de détails non trouvé");
-                                this.showAddWaypointError("Erreur panneau");
-                                return;
-                            }
-                            
-                            // Trouver le bouton pour ajouter un waypoint
-                            const waypointSection = container.querySelector('.waypoints-section');
-                            if (!waypointSection) {
-                                console.error("Section waypoints non trouvée");
-                                this.showAddWaypointError("Erreur section");
-                                return;
-                            }
-                            
-                            // Trouver le bouton et simuler un clic
-                            const addButton = waypointSection.querySelector('button');
-                            if (!addButton) {
-                                console.error("Bouton d'ajout de waypoint non trouvé");
-                                this.showAddWaypointError("Erreur bouton");
-                                return;
-                            }
-                            
-                            // Cliquer sur le bouton pour ouvrir le formulaire
-                            addButton.click();
-                            
-                            // Attendre l'ouverture du formulaire puis remplir les champs
-                            setTimeout(() => {
-                                // Chercher le formulaire ouvert
-                                const form = waypointSection.querySelector('form');
-                                if (!form) {
-                                    console.error("Formulaire de waypoint non trouvé");
-                                    this.showAddWaypointError("Erreur form");
-                                    return;
-                                }
-                                
-                                // Remplir les champs
-                                const gcLatInput = form.querySelector('[name="gc_lat"]');
-                                const gcLonInput = form.querySelector('[name="gc_lon"]');
-                                const nameInput = form.querySelector('[name="name"]');
-                                const prefixInput = form.querySelector('[name="prefix"]');
-                                const noteInput = form.querySelector('[name="note"]');
-                                
-                                if (gcLatInput) gcLatInput.value = gcLat;
-                                if (gcLonInput) gcLonInput.value = gcLon;
-                                if (nameInput) nameInput.value = waypointName;
-                                if (prefixInput) prefixInput.value = "FS"; // Formula Solver
-                                if (noteInput) noteInput.value = `Point calculé avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinatesText}`;
-                                
-                                // Faire défiler jusqu'au formulaire
-                                form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                
-                                // Afficher message de succès
-                                this.showAddWaypointSuccess();
-                            }, 500);
-                        };
-                        
-                        // Exécuter après un court délai pour laisser l'onglet s'activer
-                        setTimeout(continueWithWaypointForm, 200);
-                    } else {
-                        console.error("Aucun panneau de détails de géocache trouvé");
-                        this.showAddWaypointError("Aucun panneau");
-                    }
-                } else {
-                    console.error("window.mainLayout n'est pas disponible");
-                    this.showAddWaypointError("Erreur Layout");
-                }
-            } catch (error) {
-                console.error("Erreur lors de l'ajout du waypoint:", error);
-                this.showAddWaypointError("Erreur");
+            // Préparer les notes avec les informations disponibles
+            let notes = `Point calculé avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinates}`;
+            
+            if (distanceInfo) {
+                notes += `\n${distanceInfo}`;
+            }
+            
+            // Récupérer les éléments du formulaire
+            const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+            const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+            const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+            const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+            const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+            const formToggleButton = waypointForm.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+            const form = waypointForm.querySelector('[data-waypoint-form-target="form"]');
+            
+            // Extraire les coordonnées au format standard
+            let gcLat, gcLon;
+            if (coordinates.includes(' ')) {
+                [gcLat, gcLon] = coordinates.split(' ');
+            } else if (decimalLat !== undefined && decimalLon !== undefined) {
+                // Convertir les coordonnées décimales en format standard
+                const latDegrees = Math.floor(Math.abs(decimalLat));
+                const latMinutes = (Math.abs(decimalLat) - latDegrees) * 60;
+                const lonDegrees = Math.floor(Math.abs(decimalLon));
+                const lonMinutes = (Math.abs(decimalLon) - lonDegrees) * 60;
+                
+                const latDir = decimalLat >= 0 ? 'N' : 'S';
+                const lonDir = decimalLon >= 0 ? 'E' : 'W';
+                
+                gcLat = `${latDir}${latDegrees}° ${latMinutes.toFixed(3)}`;
+                gcLon = `${lonDir}${lonDegrees}° ${lonMinutes.toFixed(3)}`;
+            }
+            
+            // Afficher un message de succès pour le bouton "Ajouter WP"
+            this.showAddWaypointSuccess();
+            
+            // Vérifier si le formulaire est actuellement caché et l'afficher si nécessaire
+            if (form && form.classList.contains('hidden') && formToggleButton) {
+                formToggleButton.click();
+            }
+            
+            // Remplir le formulaire avec les données calculées
+            if (prefixInput) prefixInput.value = "FS"; // Formula Solver
+            if (nameInput) nameInput.value = waypointName;
+            if (gcLatInput && gcLat) gcLatInput.value = gcLat;
+            if (gcLonInput && gcLon) gcLonInput.value = gcLon;
+            if (noteInput) noteInput.value = notes;
+            
+            // Faire défiler jusqu'au formulaire pour que l'utilisateur puisse le voir
+            if (form) {
+                form.scrollIntoView({behavior: 'smooth', block: 'center'});
             }
         }
         
@@ -2427,15 +2861,58 @@
             }, 3000); // Augmenter le délai pour donner à l'utilisateur plus de temps pour lire le message
         }
 
-        createWaypointAuto() {
-            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+        /**
+         * Crée automatiquement un waypoint avec les coordonnées calculées
+         * @param {Object} pointData - Données optionnelles du point, pour les points multiples
+         */
+        createWaypointAuto(pointData = null) {
+            // Récupérer les coordonnées (soit du point spécifique, soit de l'affichage général)
+            let coordinates, gcLat, gcLon;
             
-            if (!coordinatesText) {
+            if (pointData) {
+                console.log("createWaypointAuto: Utilisation des coordonnées du point spécifique", pointData);
+                
+                if (pointData.coordinates) {
+                    coordinates = pointData.coordinates;
+                    
+                    // Extraire les coordonnées au format N/E
+                    const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+                    const match = coordinates.match(regex);
+                    
+                    if (match && match.length >= 3) {
+                        gcLat = match[1].trim();
+                        gcLon = match[2].trim();
+                    }
+                }
+                else if (pointData.latitude && pointData.longitude) {
+                    // Convertir les coordonnées décimales en format standard
+                    const latDegrees = Math.floor(Math.abs(pointData.latitude));
+                    const latMinutes = (Math.abs(pointData.latitude) - latDegrees) * 60;
+                    const lonDegrees = Math.floor(Math.abs(pointData.longitude));
+                    const lonMinutes = (Math.abs(pointData.longitude) - lonDegrees) * 60;
+                    
+                    const latDir = pointData.latitude >= 0 ? 'N' : 'S';
+                    const lonDir = pointData.longitude >= 0 ? 'E' : 'W';
+                    
+                    gcLat = `${latDir}${latDegrees}° ${latMinutes.toFixed(3)}`;
+                    gcLon = `${lonDir}${lonDegrees}° ${lonMinutes.toFixed(3)}`;
+                    coordinates = `${gcLat} ${gcLon}`;
+                }
+            } else {
+                coordinates = this.calculatedCoordinatesTextTarget.innerText.trim();
+            }
+            
+            if (!coordinates) {
+                console.error("Aucune coordonnée disponible");
+                this.showCreateWaypointAutoError("Aucune coordonnée");
                 return;
             }
             
-            // Vérifier si les coordonnées contiennent des variables non résolues (lettres A-Z)
-            const containsVariables = /[A-Z]{2,}/.test(coordinatesText);
+            // Vérification améliorée pour les variables non résolues
+            // On recherche un motif comme "AB" ou "XYZ" qui seraient des lettres non résolues
+            // Mais on évite de détecter les directions "N", "S", "E", "W" comme des variables
+            const containsVariables = /[A-Z]{2,}/.test(coordinates) && !/^([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)$/.test(coordinates.trim());
+            
             if (containsVariables) {
                 console.error("Les coordonnées contiennent des variables non résolues");
                 this.showCreateWaypointAutoError("Variables non résolues");
@@ -2444,34 +2921,48 @@
             
             // Récupérer l'ID de la géocache
             const geocacheId = this.geocacheIdValue;
-            
-            // Extraire les coordonnées calculées
-            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
-            const match = coordinatesText.match(regex);
-            
-            if (!match || match.length < 3) {
-                console.error("Format de coordonnées non reconnu");
-                this.showCreateWaypointAutoError("Format de coordonnées non reconnu");
+            if (!geocacheId) {
+                console.error("ID de géocache manquant");
+                this.showCreateWaypointAutoError("ID géocache manquant");
                 return;
             }
             
-            const gcLat = match[1].trim();
-            const gcLon = match[2].trim();
+            // Si nous n'avons pas encore extrait les coordonnées, le faire maintenant
+            if (!gcLat || !gcLon) {
+                const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+                const match = coordinates.match(regex);
+                
+                if (!match || match.length < 3) {
+                    console.error("Format de coordonnées non reconnu");
+                    this.showCreateWaypointAutoError("Format de coordonnées non reconnu");
+                    return;
+                }
+                
+                gcLat = match[1].trim();
+                gcLon = match[2].trim();
+            }
             
             // Générer un nom de waypoint par défaut basé sur la formule
             const formulaText = this.formulaInputTarget.value.trim();
             let waypointName = "Point calculé";
             
-            if (formulaText) {
+            if (pointData && pointData.index) {
+                waypointName = `Point calculé ${pointData.index}`;
+            } else if (formulaText) {
                 // Utiliser les 20 premiers caractères de la formule pour le nom du waypoint
                 waypointName = "Calc: " + (formulaText.length > 20 ? formulaText.substring(0, 20) + "..." : formulaText);
             }
             
             // Ajouter la distance si des coordonnées d'origine sont disponibles
-            let note = `Point calculé automatiquement avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinatesText}`;
+            let note = `Point calculé automatiquement avec Formula Solver.\nFormule: ${formulaText}\nRésultat: ${coordinates}`;
             
-            // Vérifier si on a des éléments de distance pour les ajouter à la note
-            if (document.querySelector('#debug-origin-lat') && document.querySelector('#debug-origin-lon')) {
+            // Ajouter les informations de distance si disponibles dans pointData
+            if (pointData && pointData.fullData && pointData.fullData.distance_from_origin) {
+                const distance = pointData.fullData.distance_from_origin;
+                note += `\nDistance: ${distance.meters} m (${distance.miles} miles)`;
+            } 
+            // Sinon vérifier si on a des éléments de distance dans l'interface
+            else if (document.querySelector('#debug-origin-lat') && document.querySelector('#debug-origin-lon')) {
                 const originLat = document.querySelector('#debug-origin-lat').textContent;
                 const originLon = document.querySelector('#debug-origin-lon').textContent;
                 
@@ -2479,7 +2970,7 @@
                     // Si on a des données de distance, les ajouter à la note
                     const distanceElement = document.querySelector('[data-formula-solver-target="distanceInfo"]');
                     if (distanceElement && distanceElement.textContent) {
-                        note += `\nDistance: ${distanceElement.textContent}`;
+                        note += `\n${distanceElement.textContent}`;
                     }
                 }
             }
@@ -2494,8 +2985,17 @@
                 note: note
             };
             
+            // Pour les points multiples, utiliser un message différent
+            const buttonText = pointData ? `Création WP ${pointData.index || ''}...` : 'Création...';
+            
             // Afficher l'indicateur de chargement
-            this.showCreateWaypointAutoLoading();
+            if (pointData) {
+                // Pour les points multiples, utiliser une notification simple
+                this.showNotification('Création du waypoint en cours...', 'info');
+            } else {
+                // Pour les points uniques, mettre à jour le bouton
+                this.showCreateWaypointAutoLoading(buttonText);
+            }
             
             // Appeler l'API pour créer le waypoint
             fetch(`/api/geocaches/${geocacheId}/waypoints`, {
@@ -2537,7 +3037,14 @@
                 // Vérifier si on a une structure de données valide
                 if (data && (data.id || data._success)) {
                     console.log("Waypoint créé avec succès:", data);
-                    this.showCreateWaypointAutoSuccess();
+                    
+                    if (pointData) {
+                        // Pour les points multiples, afficher une notification
+                        this.showNotification(`Waypoint "${waypointName}" créé avec succès!`, 'success');
+                    } else {
+                        // Pour les points uniques, mettre à jour le bouton
+                        this.showCreateWaypointAutoSuccess();
+                    }
                     
                     // Annoncer la création du waypoint pour mettre à jour la carte
                     const event = new CustomEvent('waypointSaved', {
@@ -2558,8 +3065,56 @@
             })
             .catch(error => {
                 console.error("Erreur lors de la création du waypoint:", error);
-                this.showCreateWaypointAutoError("Erreur API");
+                
+                if (pointData) {
+                    // Pour les points multiples, afficher une notification
+                    this.showNotification(`Erreur lors de la création du waypoint: ${error.message}`, 'error');
+                } else {
+                    // Pour les points uniques, mettre à jour le bouton
+                    this.showCreateWaypointAutoError("Erreur API");
+                }
             });
+        }
+        
+        /**
+         * Affiche une notification temporaire
+         * @param {string} message - Le message à afficher
+         * @param {string} type - Le type de notification ('success', 'error', 'info')
+         */
+        showNotification(message, type = 'info') {
+            // Créer la notification
+            const notification = document.createElement('div');
+            
+            // Déterminer la classe CSS en fonction du type
+            let cssClass = 'fixed bottom-4 right-4 p-4 rounded shadow-lg text-white z-50 ';
+            switch (type) {
+                case 'success':
+                    cssClass += 'bg-green-600';
+                    break;
+                case 'error':
+                    cssClass += 'bg-red-600';
+                    break;
+                case 'info':
+                default:
+                    cssClass += 'bg-blue-600';
+                    break;
+            }
+            
+            notification.className = cssClass;
+            notification.textContent = message;
+            
+            // Ajouter la notification au DOM
+            document.body.appendChild(notification);
+            
+            // La faire disparaître après 3 secondes
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 500);
+            }, 3000);
         }
         
         // Méthode utilitaire pour convertir les coordonnées GC en coordonnées décimales
@@ -2596,7 +3151,7 @@
             }
         }
         
-        showCreateWaypointAutoLoading() {
+        showCreateWaypointAutoLoading(buttonText) {
             // Changer temporairement le texte du bouton pour indiquer le chargement
             const originalButtonHTML = this.createWaypointAutoButtonTarget.innerHTML;
             this.createWaypointAutoButtonTarget.innerHTML = `
@@ -2604,7 +3159,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <span>Création...</span>
+                <span>${buttonText}</span>
             `;
             this.createWaypointAutoButtonTarget.disabled = true;
             this.createWaypointAutoButtonTarget.classList.add("opacity-75");
@@ -2659,7 +3214,7 @@
         /**
          * Sauvegarde les coordonnées corrigées de la géocache
          */
-        saveGeocacheCoordinates() {
+        saveGeocacheCoordinates(pointData = null) {
             // Vérifier si on a un ID de géocache
             const geocacheId = this.geocacheIdValue;
             if (!geocacheId) {
@@ -2667,31 +3222,79 @@
                 return;
             }
             
-            // Récupérer les coordonnées calculées
-            const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
-            if (!coordinatesText) {
-                this.showSaveCoordinatesError("Aucune coordonnée calculée");
-                return;
+            // Variables pour stocker les coordonnées à envoyer
+            let gcLat, gcLon;
+            
+            if (pointData) {
+                console.log(`Utilisation des coordonnées du point ${pointData.index || ''}`);
+                
+                // Si le point a des coordonnées au format standard
+                if (pointData.coordinates) {
+                    const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+                    const match = pointData.coordinates.match(regex);
+                    
+                    if (match && match.length >= 3) {
+                        gcLat = match[1].trim();
+                        gcLon = match[2].trim();
+                    }
+                } 
+                // Si le point a des coordonnées décimales, les convertir au format GC
+                else if (pointData.latitude && pointData.longitude) {
+                    console.log(`Conversion des coordonnées décimales: ${pointData.latitude}, ${pointData.longitude}`);
+                    
+                    // Calculer les degrés et minutes
+                    const latDegrees = Math.floor(Math.abs(pointData.latitude));
+                    const latMinutes = (Math.abs(pointData.latitude) - latDegrees) * 60;
+                    const lonDegrees = Math.floor(Math.abs(pointData.longitude));
+                    const lonMinutes = (Math.abs(pointData.longitude) - lonDegrees) * 60;
+                    
+                    // Formater les coordonnées au format standard GC
+                    const latDir = pointData.latitude >= 0 ? 'N' : 'S';
+                    const lonDir = pointData.longitude >= 0 ? 'E' : 'W';
+                    
+                    gcLat = `${latDir}${latDegrees}° ${latMinutes.toFixed(3)}`;
+                    gcLon = `${lonDir}${lonDegrees}° ${lonMinutes.toFixed(3)}`;
+                    
+                    console.log(`Coordonnées converties: ${gcLat} ${gcLon}`);
+                }
             }
             
-            // Vérifier si les coordonnées sont complètes (pas de variables non résolues)
-            if (coordinatesText.match(/[A-Z]{2,}/)) {
-                this.showSaveCoordinatesError("Coordonnées incomplètes");
-                return;
+            // Si nous n'avons pas obtenu de coordonnées du point, utiliser celles de l'interface
+            if (!gcLat || !gcLon) {
+                console.log('Utilisation des coordonnées de l\'interface');
+                
+                // Récupérer les coordonnées calculées
+                const coordinatesText = this.calculatedCoordinatesTextTarget.innerText.trim();
+                if (!coordinatesText) {
+                    this.showSaveCoordinatesError("Aucune coordonnée calculée");
+                    return;
+                }
+                
+                // Vérifier si les coordonnées sont complètes (pas de variables non résolues)
+                if (coordinatesText.match(/[A-Z]{2,}/)) {
+                    this.showSaveCoordinatesError("Coordonnées incomplètes");
+                    return;
+                }
+                
+                // Extraire les coordonnées au format N/E
+                const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+                const match = coordinatesText.match(regex);
+                
+                if (!match || match.length < 3) {
+                    this.showSaveCoordinatesError("Format non reconnu");
+                    return;
+                }
+                
+                // Extraire la latitude et la longitude
+                gcLat = match[1].trim();
+                gcLon = match[2].trim();
             }
             
-            // Extraire les coordonnées au format N/E
-            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
-            const match = coordinatesText.match(regex);
-            
-            if (!match || match.length < 3) {
-                this.showSaveCoordinatesError("Format non reconnu");
+            // Vérification finale que nous avons bien des coordonnées à envoyer
+            if (!gcLat || !gcLon) {
+                this.showSaveCoordinatesError("Format de coordonnées non valide");
                 return;
             }
-            
-            // Extraire la latitude et la longitude
-            const gcLat = match[1].trim();
-            const gcLon = match[2].trim();
             
             // Préparer les données à envoyer
             const formData = new FormData();
@@ -2817,21 +3420,32 @@
             try {
                 console.log("Mise à jour de la liste des waypoints...");
                 
-                // Trouver le conteneur de la liste des waypoints
-                const waypointsListContainer = document.querySelector('[data-waypoint-form-target="waypointsList"]');
+                // Trouver tous les conteneurs de liste de waypoints dans tous les onglets ouverts
+                const waypointsListContainers = document.querySelectorAll('[data-waypoint-form-target="waypointsList"]');
                 
-                if (!waypointsListContainer) {
-                    console.warn("Conteneur de la liste des waypoints non trouvé");
+                if (waypointsListContainers.length === 0) {
+                    console.warn("Aucun conteneur de liste de waypoints trouvé dans l'interface");
                     return;
                 }
+                
+                console.log(`Trouvé ${waypointsListContainers.length} conteneur(s) de liste de waypoints`);
                 
                 // Récupérer la liste mise à jour des waypoints
                 const listResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
                 
                 if (listResponse.ok) {
                     const listHtml = await listResponse.text();
-                    waypointsListContainer.innerHTML = listHtml;
-                    console.log("Liste des waypoints mise à jour avec succès");
+                    
+                    // Mettre à jour tous les conteneurs trouvés
+                    waypointsListContainers.forEach((container, index) => {
+                        container.innerHTML = listHtml;
+                        console.log(`Liste des waypoints #${index+1} mise à jour avec succès`);
+                    });
+                    
+                    // Déclencher un événement pour informer que les waypoints ont été mis à jour
+                    document.dispatchEvent(new CustomEvent('waypointsListUpdated', {
+                        detail: { geocacheId: geocacheId }
+                    }));
                 } else {
                     console.warn(`Échec de la récupération de la liste des waypoints: ${listResponse.status} ${listResponse.statusText}`);
                     
@@ -2844,8 +3458,10 @@
                         
                         const newWaypointList = tempDiv.querySelector('#waypoints-list-container');
                         if (newWaypointList) {
-                            waypointsListContainer.innerHTML = newWaypointList.innerHTML;
-                            console.log("Liste des waypoints récupérée à partir des détails complets");
+                            waypointsListContainers.forEach((container, index) => {
+                                container.innerHTML = newWaypointList.innerHTML;
+                                console.log(`Liste des waypoints #${index+1} récupérée à partir des détails complets`);
+                            });
                         }
                     }
                 }
@@ -2855,165 +3471,200 @@
         }
         
         /**
-         * Ouvre les coordonnées calculées dans GeoCheck pour vérification
+         * Ouvre GeoCheck pour vérifier les coordonnées
          */
-        openGeoCheck(event) {
-            event.preventDefault();
-            console.log("openGeoCheck appelé");
+        openGeoCheck(event, pointData = null) {
+            // Empêcher le comportement par défaut si c'est un événement
+            if (event) {
+                event.preventDefault();
+            }
             
-            // Récupérer l'ID de la géocache actuelle
-            const geocacheId = this.geocacheIdValue;
+            // Récupérer le GC Code
             const gcCode = this.gcCodeValue;
-            if (!geocacheId) {
-                this.showOpenGeoCheckError("ID de géocache manquant");
+            if (!gcCode) {
+                alert('GC Code non disponible pour cette géocache.');
                 return;
             }
             
-            console.log("ID de géocache:", geocacheId, "Code GC:", gcCode);
+            console.log(`Ouverture de GeoCheck pour le GC Code: ${gcCode}`);
             
-            // Afficher l'état de chargement sur le bouton
-            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
+            // Changer l'apparence du bouton pendant le chargement
+            const button = event ? event.currentTarget : this.openGeoCheckButtonTarget;
             if (button) {
                 button._originalHTML = button.innerHTML;
                 button.innerHTML = `
-                    <div class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
-                    <span>Chargement...</span>
+                    <div class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ouverture...</span>
+                    </div>
                 `;
                 button.disabled = true;
             }
             
-            // Chercher d'abord les liens GeoCheck dans le HTML de la page actuelle
-            const geoCheckLinks = document.querySelectorAll('a[href*="geotjek.dk/geo_inputchkcoord.php"], a[href*="geocheck.org/geo_inputchkcoord.php"], a[href*="inputchkcoord.php?gid="]');
-            
-            if (geoCheckLinks.length > 0) {
-                const geoCheckUrl = geoCheckLinks[0].getAttribute('href');
-                console.log("URL GeoCheck trouvée dans le DOM:", geoCheckUrl);
-                
-                // Utiliser l'URL trouvée
-                this.openGeoCheckUrlInLayout(geoCheckUrl);
-                return;
-            }
-            
-            // Si aucun lien n'est trouvé dans le DOM, essayer avec l'API
-            console.log("Aucun lien GeoCheck trouvé dans le DOM, tentative via API...");
-            
-            // Essayer d'abord avec l'API specifique pour les checkers
-            fetch(`/api/geocaches/${geocacheId}/checkers?type=GeoCheck`)
+            // Récupérer l'URL du checker GeoCheck
+            fetch(`/api/geocaches/${gcCode}/checker?type=geocheck`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`Erreur HTTP: ${response.status}`);
+                        throw new Error(`Erreur HTTP ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log("Réponse de l'API checkers:", data);
-                    
-                    // Vérifier si un checker GeoCheck a été trouvé
-                    if (!data.checkers || data.checkers.length === 0) {
-                        throw new Error("Aucun checker GeoCheck trouvé pour cette géocache");
+                    if (data.success && data.url) {
+                        console.log(`URL GeoCheck récupérée: ${data.url}`);
+                        
+                        try {
+                            // Ouvrir l'URL dans un nouvel onglet du navigateur
+                            window.open(data.url, '_blank');
+                            console.log("Ouverture réussie de GeoCheck dans un nouvel onglet du navigateur");
+                            this.showOpenGeoCheckSuccess();
+                        } catch (error) {
+                            console.error("Erreur lors de l'ouverture de GeoCheck:", error);
+                            this.showOpenGeoCheckError(error.message || "Impossible d'ouvrir GeoCheck");
+                        }
+                    } else {
+                        console.error("URL du checker GeoCheck non disponible ou invalide");
+                        this.showOpenGeoCheckError("URL du checker non disponible");
                     }
-                    
-                    // Utiliser la première URL de checker GeoCheck trouvée
-                    const geoCheckUrl = data.checkers[0].url;
-                    console.log("URL GeoCheck trouvée via API:", geoCheckUrl);
-                    
-                    // Ouvrir l'URL dans GoldenLayout
-                    this.openGeoCheckUrlInLayout(geoCheckUrl);
                 })
                 .catch(error => {
-                    console.error("Erreur via API spécifique:", error);
-                    
-                    // Essayer avec l'API de détails de la géocache 
-                    console.log("Tentative via API de détails de la géocache...");
-                    fetch(`/api/geocaches/${geocacheId}/details`)
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`Erreur HTTP: ${response.status}`);
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            console.log("Données de la géocache:", data);
-                            
-                            // Chercher le checker GeoCheck dans les données
-                            if (data.checkers && data.checkers.length > 0) {
-                                const geoCheck = data.checkers.find(c => 
-                                    c.name === "GeoCheck" || 
-                                    (c.url && (c.url.includes("geocheck.org") || c.url.includes("geotjek.dk") || c.url.includes("inputchkcoord.php")))
-                                );
-                                
-                                if (geoCheck) {
-                                    console.log("GeoCheck trouvé dans les détails:", geoCheck);
-                                    this.openGeoCheckUrlInLayout(geoCheck.url);
-                                    return;
-                                }
-                            }
-                            
-                            // Si aucun lien n'est trouvé, afficher un message d'erreur
-                            throw new Error("Aucun checker GeoCheck trouvé dans les détails");
-                        })
-                        .catch(finalError => {
-                            console.error("Toutes les tentatives ont échoué:", finalError);
-                            
-                            // Dernière tentative: construire une URL générique en se basant sur le GC code
-                            if (gcCode) {
-                                // Générer un UUID pour le paramètre gid (simulé)
-                                const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                                    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                                    return v.toString(16);
-                                });
-                                
-                                // Créer une URL générique GeoCheck basée sur le GC code
-                                const fallbackUrl = `https://geotjek.dk/geo_inputchkcoord.php?gid=${gcCode}-${uuid}`;
-                                console.log("Utilisation d'une URL générique:", fallbackUrl);
-                                
-                                // Ouvrir l'URL générique
-                                this.openGeoCheckUrlInLayout(fallbackUrl);
-                                return;
-                            }
-                            
-                            // En dernier recours, ouvrir simplement la page d'accueil de GeoCheck
-                            this.showOpenGeoCheckError("Checker non trouvé");
-                            this.openGeoCheckUrlInLayout('https://geotjek.dk/geo_inputchkcoord.php');
-                        });
+                    console.error(`Erreur lors de la récupération de l'URL du checker:`, error);
+                    this.showOpenGeoCheckError(error.message || "Erreur lors de la récupération du checker");
+                })
+                .finally(() => {
+                    // Restaurer le bouton
+                    if (button && button._originalHTML) {
+                        setTimeout(() => {
+                            button.innerHTML = button._originalHTML;
+                            button.disabled = false;
+                        }, 1000);
+                    }
                 });
         }
         
         /**
-         * Ouvre l'URL du GeoCheck dans un nouvel onglet du navigateur
-         * @param {string} geoCheckUrl - L'URL complète du checker GeoCheck
+         * Ouvre le checker Geocaching.com
          */
-        openGeoCheckUrlInLayout(geoCheckUrl) {
-            console.log("Ouverture de l'URL GeoCheck dans un nouvel onglet:", geoCheckUrl);
-            
-            // Vérifier si l'URL est complète
-            if (!geoCheckUrl.startsWith('http')) {
-                // Ajouter le protocole si nécessaire
-                geoCheckUrl = 'http://' + geoCheckUrl;
-                console.log("URL complétée avec http://:", geoCheckUrl);
+        openGeocachingChecker(event, pointData = null) {
+            // Empêcher le comportement par défaut si c'est un événement
+            if (event) {
+                event.preventDefault();
             }
             
-            // IMPORTANT: Toujours ouvrir GeoCheck dans un nouvel onglet du navigateur
-            // pour éviter les problèmes liés aux restrictions de sécurité des iframes
-            // et permettre au CAPTCHA de fonctionner correctement
-            window.open(geoCheckUrl, '_blank');
-            console.log("GeoCheck ouvert dans un nouvel onglet du navigateur");
+            // Récupérer le GC Code
+            const gcCode = this.gcCodeValue;
+            if (!gcCode) {
+                alert('GC Code non disponible pour cette géocache.');
+                return;
+            }
             
-            // Afficher un message de succès
-            this.showOpenGeoCheckSuccess();
+            console.log(`Ouverture du checker Geocaching.com pour le GC Code: ${gcCode}`);
             
-            // Restaurer le bouton
-            const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
-            if (button && button._originalHTML) {
-                setTimeout(() => {
-                    button.innerHTML = button._originalHTML;
-                    button.disabled = false;
-                }, 1000);
+            // Changer l'apparence du bouton pendant le chargement
+            const button = event ? event.currentTarget : this.openGeocachingCheckerButtonTarget;
+            if (button) {
+                button._originalHTML = button.innerHTML;
+                button.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ouverture...</span>
+                    </div>
+                `;
+                button.disabled = true;
+            }
+            
+            try {
+                // Construire l'URL de la géocache sur Geocaching.com
+                const geocachingUrl = `https://www.geocaching.com/geocache/${gcCode}`;
+                console.log("URL Geocaching.com construite:", geocachingUrl);
+                
+                // Ouvrir l'URL dans un nouvel onglet
+                window.open(geocachingUrl, '_blank');
+                console.log("Geocaching.com ouvert dans un nouvel onglet du navigateur");
+                
+                // Afficher un message de succès
+                this.showOpenGeocachingCheckerSuccess();
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de Geocaching.com:", error);
+                this.showOpenGeocachingCheckerError(error.message || "Impossible d'ouvrir Geocaching.com");
+            } finally {
+                // Restaurer le bouton
+                if (button && button._originalHTML) {
+                    setTimeout(() => {
+                        button.innerHTML = button._originalHTML;
+                        button.disabled = false;
+                    }, 1000);
+                }
             }
         }
         
         /**
-         * Affiche un message de succès pour l'ouverture de GeoCheck
+         * Ouvre le checker Certitude
+         */
+        openCertitudeChecker(event, pointData = null) {
+            // Empêcher le comportement par défaut si c'est un événement
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Récupérer le GC Code
+            const gcCode = this.gcCodeValue;
+            if (!gcCode) {
+                alert('GC Code non disponible pour cette géocache.');
+                return;
+            }
+            
+            console.log(`Ouverture du checker Certitude pour le GC Code: ${gcCode}`);
+            
+            // Changer l'apparence du bouton pendant le chargement
+            const button = event ? event.currentTarget : this.openCertitudeCheckerButtonTarget;
+            if (button) {
+                button._originalHTML = button.innerHTML;
+                button.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ouverture...</span>
+                    </div>
+                `;
+                button.disabled = true;
+            }
+            
+            // Construire l'URL pour Certitude directement à partir du GC Code
+            const certitudeUrl = `https://www.certitudes.org/certitude?wp=${gcCode}`;
+            console.log("URL Certitude construite:", certitudeUrl);
+            
+            try {
+                // Ouvrir l'URL dans un nouvel onglet
+                window.open(certitudeUrl, '_blank');
+                console.log("Certitude ouvert dans un nouvel onglet du navigateur");
+                
+                // Afficher un message de succès
+                this.showOpenCertitudeCheckerSuccess();
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de Certitude:", error);
+                this.showOpenCertitudeCheckerError(error.message || "Impossible d'ouvrir Certitude");
+            } finally {
+                // Restaurer le bouton
+                if (button && button._originalHTML) {
+                    setTimeout(() => {
+                        button.innerHTML = button._originalHTML;
+                        button.disabled = false;
+                    }, 1000);
+                }
+            }
+        }
+
+        /**
+         * Affiche un message de succès après l'ouverture de GeoCheck
          */
         showOpenGeoCheckSuccess() {
             const button = this.element.querySelector('[data-formula-solver-target="openGeoCheckButton"]');
@@ -3065,58 +3716,6 @@
                 button.classList.remove("bg-red-600", "hover:bg-red-700");
                 button.classList.add("bg-indigo-600", "hover:bg-indigo-700");
             }, 3000);
-        }
-
-        /**
-         * Ouvre les coordonnées calculées dans le checker de Geocaching.com pour vérification
-         */
-        openGeocachingChecker(event) {
-            event.preventDefault();
-            console.log("openGeocachingChecker appelé");
-            
-            // Récupérer le GC Code de la géocache actuelle
-            const gcCode = this.gcCodeValue;
-            if (!gcCode) {
-                this.showOpenGeocachingCheckerError("GC Code manquant");
-                return;
-            }
-            
-            console.log("GC Code récupéré:", gcCode);
-            
-            // Construire l'URL pour le checker de Geocaching.com
-            const geocachingUrl = `https://www.geocaching.com/geocache/${gcCode}`;
-            console.log("URL Geocaching.com utilisée:", geocachingUrl);
-            
-            // Changer l'apparence du bouton pendant le chargement
-            const button = this.element.querySelector('[data-formula-solver-target="openGeocachingCheckerButton"]');
-            if (button) {
-                button._originalHTML = button.innerHTML;
-                button.innerHTML = `
-                    <div class="flex items-center">
-                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Ouverture...</span>
-                    </div>
-                `;
-                button.disabled = true;
-            }
-            
-            // Ouvrir l'URL dans un nouvel onglet du navigateur
-            window.open(geocachingUrl, '_blank');
-            console.log("Geocaching.com ouvert dans un nouvel onglet du navigateur");
-            
-            // Afficher un message de succès
-            this.showOpenGeocachingCheckerSuccess();
-            
-            // Restaurer le bouton
-            if (button && button._originalHTML) {
-                setTimeout(() => {
-                    button.innerHTML = button._originalHTML;
-                    button.disabled = false;
-                }, 1000);
-            }
         }
 
         /**
@@ -3182,63 +3781,6 @@
         }
 
         /**
-         * Ouvre les coordonnées calculées dans le checker Certitude pour vérification
-         */
-        openCertitudeChecker(event) {
-            event.preventDefault();
-            console.log("openCertitudeChecker appelé");
-            
-            // Récupérer le GC Code de la géocache actuelle
-            const gcCode = this.gcCodeValue;
-            if (!gcCode) {
-                this.showOpenCertitudeCheckerError("GC Code manquant");
-                return;
-            }
-            
-            console.log("GC Code récupéré:", gcCode);
-            
-            // Changer l'apparence du bouton pendant le chargement
-            const button = this.element.querySelector('[data-formula-solver-target="openCertitudeCheckerButton"]');
-            if (button) {
-                button._originalHTML = button.innerHTML;
-                button.innerHTML = `
-                    <div class="flex items-center">
-                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Ouverture...</span>
-                    </div>
-                `;
-                button.disabled = true;
-            }
-            
-            // Construire l'URL pour Certitude directement à partir du GC Code
-            const certitudeUrl = `https://www.certitudes.org/certitude?wp=${gcCode}`;
-            console.log("URL Certitude construite:", certitudeUrl);
-            
-            try {
-                // Ouvrir l'URL dans un nouvel onglet
-                window.open(certitudeUrl, '_blank');
-                console.log("Certitude ouvert dans un nouvel onglet du navigateur");
-                
-                // Afficher un message de succès
-                this.showOpenCertitudeCheckerSuccess();
-            } catch (error) {
-                console.error("Erreur lors de l'ouverture de Certitude:", error);
-                this.showOpenCertitudeCheckerError(error.message);
-            } finally {
-                // Restaurer le bouton
-                if (button && button._originalHTML) {
-                    setTimeout(() => {
-                        button.innerHTML = button._originalHTML;
-                        button.disabled = false;
-                    }, 1000);
-                }
-            }
-        }
-
-        /**
          * Affiche un message de succès après l'ouverture du checker Certitude
          */
         showOpenCertitudeCheckerSuccess() {
@@ -3298,6 +3840,251 @@
             setTimeout(() => {
                 errorDiv.remove();
             }, 5000);
+        }
+
+        // Générer toutes les combinaisons possibles de valeurs
+        generateAllCombinations(variables) {
+            const letters = Object.keys(variables);
+            const allCombinations = [];
+            
+            // Fonction récursive pour générer toutes les combinaisons
+            const generateCombinations = (currentIndex, currentCombination) => {
+                // Si nous avons traité toutes les lettres, ajouter la combinaison actuelle
+                if (currentIndex === letters.length) {
+                    allCombinations.push({...currentCombination});
+                    return;
+                }
+                
+                const letter = letters[currentIndex];
+                const values = variables[letter];
+                
+                // Si c'est un tableau, essayer chaque valeur
+                if (Array.isArray(values)) {
+                    for (const value of values) {
+                        currentCombination[letter] = value;
+                        generateCombinations(currentIndex + 1, currentCombination);
+                    }
+                } else {
+                    // Sinon, utiliser la valeur unique
+                    currentCombination[letter] = values;
+                    generateCombinations(currentIndex + 1, currentCombination);
+                }
+            };
+            
+            generateCombinations(0, {});
+            return allCombinations;
+        }
+        
+        // Afficher plusieurs points sur la carte sans effacer les précédents
+        displayMultiplePointsOnMap(points) {
+            if (!points || points.length === 0) return;
+            
+            console.log(`Préparation à l'affichage de ${points.length} points sur la carte`);
+            
+            // Créer un ID unique pour ce groupe de points (basé sur un timestamp)
+            const batchId = Date.now();
+            
+            // Mapper les points pour s'assurer qu'ils ont toutes les propriétés requises
+            const formattedPoints = points.map((point, index) => ({
+                latitude: point.latitude,
+                longitude: point.longitude,
+                label: point.label || `Option ${index+1}`,
+                fillColor: point.fillColor || 'rgba(0, 90, 220, 0.7)',
+                strokeColor: point.strokeColor || '#FF0000',
+                strokeWidth: point.strokeWidth || 3,
+                index: point.index || (index + 1),
+                fullData: point.fullData || null,
+                coordinates: point.coordinates || null
+            }));
+            
+            // Créer un événement personnalisé avec tous les points
+            const event = new CustomEvent('addMultipleCalculatedPointsToMap', {
+                detail: {
+                    points: formattedPoints,
+                    batchId: batchId,
+                    controller: this // Référence au contrôleur pour accéder aux méthodes
+                }
+            });
+            
+            // Dispatcher l'événement
+            document.dispatchEvent(event);
+            console.log(`Événement envoyé pour afficher ${points.length} points sur la carte (batchId: ${batchId})`);
+            
+            // Écouter les clics sur les points pour activer les boutons d'action
+            document.addEventListener('calculatedPointClick', (event) => {
+                const pointDetail = event.detail;
+                if (pointDetail && pointDetail.index !== undefined) {
+                    console.log(`Point ${pointDetail.index} cliqué sur la carte`);
+                    
+                    // Trouver le point correspondant
+                    const clickedPoint = formattedPoints.find(p => p.index === pointDetail.index);
+                    if (clickedPoint) {
+                        console.log('Point trouvé dans la liste:', clickedPoint);
+                        
+                        // Créer une popup avec les boutons d'action
+                        this.showPointActionButtons(clickedPoint);
+                    }
+                }
+            });
+        }
+        
+        // Afficher les boutons d'action pour un point spécifique
+        showPointActionButtons(point) {
+            // Créer un conteneur pour la popup
+            const popupContainer = document.createElement('div');
+            popupContainer.className = 'fixed inset-0 flex items-center justify-center z-50';
+            popupContainer.id = 'point-action-popup';
+            
+            // Créer un fond semi-transparent
+            const overlay = document.createElement('div');
+            overlay.className = 'absolute inset-0 bg-black bg-opacity-50';
+            overlay.addEventListener('click', () => {
+                document.body.removeChild(popupContainer);
+            });
+            
+            // Créer la popup
+            const popup = document.createElement('div');
+            popup.className = 'bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4 relative z-10';
+            
+            // En-tête avec le numéro du point et bouton de fermeture
+            const header = document.createElement('div');
+            header.className = 'flex justify-between items-center mb-4';
+            
+            const title = document.createElement('h3');
+            title.className = 'text-xl text-white font-semibold';
+            title.textContent = `Point ${point.index}`;
+            
+            const closeButton = document.createElement('button');
+            closeButton.className = 'text-gray-400 hover:text-white';
+            closeButton.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(popupContainer);
+            });
+            
+            header.appendChild(title);
+            header.appendChild(closeButton);
+            
+            // Coordonnées
+            const coordsContainer = document.createElement('div');
+            coordsContainer.className = 'mb-4';
+            
+            const coordsLabel = document.createElement('p');
+            coordsLabel.className = 'text-gray-400 text-sm';
+            coordsLabel.textContent = 'Coordonnées:';
+            
+            const coordsValue = document.createElement('p');
+            coordsValue.className = 'text-green-400 text-lg font-medium';
+            coordsValue.textContent = point.coordinates || `${point.latitude}, ${point.longitude}`;
+            
+            coordsContainer.appendChild(coordsLabel);
+            coordsContainer.appendChild(coordsValue);
+            
+            // Boutons d'action
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'grid grid-cols-2 gap-3';
+            
+            // Bouton "Copier"
+            const copyButton = document.createElement('button');
+            copyButton.className = 'bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded flex items-center justify-center';
+            copyButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg> Copier';
+            copyButton.addEventListener('click', () => {
+                const coordText = point.coordinates || `${point.latitude}, ${point.longitude}`;
+                navigator.clipboard.writeText(coordText)
+                    .then(() => {
+                        copyButton.textContent = 'Copié!';
+                        copyButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                        copyButton.classList.add('bg-green-600');
+                        setTimeout(() => {
+                            copyButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg> Copier';
+                            copyButton.classList.remove('bg-green-600');
+                            copyButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('Erreur lors de la copie:', err);
+                    });
+            });
+            actionsContainer.appendChild(copyButton);
+            
+            // Bouton "Ajouter WP"
+            if (this.geocacheIdValue) {
+                const addWpButton = document.createElement('button');
+                addWpButton.className = 'bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded flex items-center justify-center';
+                addWpButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Ajouter WP';
+                addWpButton.addEventListener('click', () => {
+                    this.addAsWaypoint(point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(addWpButton);
+                
+                // Bouton "Créer WP auto"
+                const createWpButton = document.createElement('button');
+                createWpButton.className = 'bg-green-700 hover:bg-green-800 text-white py-2 px-4 rounded flex items-center justify-center';
+                createWpButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Créer WP auto';
+                createWpButton.addEventListener('click', () => {
+                    this.createWaypointAuto(point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(createWpButton);
+                
+                // Bouton "Mettre à jour coordonnées"
+                const updateCoordsButton = document.createElement('button');
+                updateCoordsButton.className = 'bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded flex items-center justify-center';
+                updateCoordsButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg> Màj coordonnées';
+                updateCoordsButton.addEventListener('click', () => {
+                    this.saveGeocacheCoordinates(point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(updateCoordsButton);
+            }
+            
+            // Bouton "Vérifier (GeoCheck)" si disponible
+            if (this.hasOpenGeoCheckButtonTarget && !this.openGeoCheckButtonTarget.classList.contains('hidden')) {
+                const geoCheckButton = document.createElement('button');
+                geoCheckButton.className = 'bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded flex items-center justify-center';
+                geoCheckButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg> Vérifier (GeoCheck)';
+                geoCheckButton.addEventListener('click', () => {
+                    this.openGeoCheck(null, point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(geoCheckButton);
+            }
+            
+            // Bouton "Vérifier (Geocaching)" si disponible
+            if (this.hasOpenGeocachingCheckerButtonTarget && !this.openGeocachingCheckerButtonTarget.classList.contains('hidden')) {
+                const geocachingButton = document.createElement('button');
+                geocachingButton.className = 'bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded flex items-center justify-center';
+                geocachingButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Vérifier (Geocaching)';
+                geocachingButton.addEventListener('click', () => {
+                    this.openGeocachingChecker(null, point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(geocachingButton);
+            }
+            
+            // Bouton "Vérifier (Certitude)" si disponible
+            if (this.hasOpenCertitudeCheckerButtonTarget && !this.openCertitudeCheckerButtonTarget.classList.contains('hidden')) {
+                const certitudeButton = document.createElement('button');
+                certitudeButton.className = 'bg-teal-600 hover:bg-teal-700 text-white py-2 px-4 rounded flex items-center justify-center';
+                certitudeButton.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Vérifier (Certitude)';
+                certitudeButton.addEventListener('click', () => {
+                    this.openCertitudeChecker(null, point);
+                    document.body.removeChild(popupContainer);
+                });
+                actionsContainer.appendChild(certitudeButton);
+            }
+            
+            // Assembler la popup
+            popup.appendChild(header);
+            popup.appendChild(coordsContainer);
+            popup.appendChild(actionsContainer);
+            
+            // Assembler la popup et le fond
+            popupContainer.appendChild(overlay);
+            popupContainer.appendChild(popup);
+            
+            // Ajouter la popup au body
+            document.body.appendChild(popupContainer);
         }
     }
 
