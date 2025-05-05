@@ -373,7 +373,7 @@ class GeocachingLogs:
                 log = {
                     'id': log_data.get('LogID'),
                     'code': f"GL{log_data.get('LogID')}",
-                    'type': log_data.get('LogType'),
+                    'type': self._normalize_log_type(log_data.get('LogType')),
                     'author': log_data.get('UserName'),
                     'author_guid': log_data.get('AccountGuid'),
                     'date': self._parse_date(log_data.get('Visited')),
@@ -414,3 +414,18 @@ class GeocachingLogs:
             }
             images.append(image)
         return images
+
+    def _normalize_log_type(self, log_type):
+        """Normalize the log type"""
+        if log_type == "Found":
+            return "Found"
+        elif log_type == "DNF":
+            return "Did Not Find"
+        elif log_type == "Webcam":
+            return "Webcam"
+        elif log_type == "Note":
+            return "Note"
+        elif log_type == "Other":
+            return "Other"
+        else:
+            return log_type

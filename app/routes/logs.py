@@ -281,7 +281,13 @@ def refresh_logs():
             # Mettre à jour les champs du log
             log.text = gc_log.get('text', '')
             log.date = gc_log.get('date')
-            log.log_type = gc_log.get('type', 'unknown').lower()
+            
+            # Normaliser le type de log pour avoir une cohérence
+            log_type = gc_log.get('type', 'unknown')
+            
+            # Importer la fonction de normalisation des types de logs
+            from app.routes.geocaches import normalize_log_type
+            log.log_type = normalize_log_type(log_type)
             
         # Enregistrer les modifications
         db.session.commit()

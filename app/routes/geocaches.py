@@ -2210,52 +2210,105 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
         current_app.logger.error(f"Erreur lors du traitement du fichier GPX: {str(e)}")
         raise
 
+def normalize_log_type(log_type):
+    """Normalise le type de log pour avoir une cohérence dans la base de données"""
+    if not log_type:
+        return "Other"
+    
+    # Version normalisée des types de logs pour la base de données
+    # Majuscule pour la première lettre uniquement, reste en minuscules
+    if log_type.lower() == "found it":
+        return "Found"
+    elif log_type.lower() == "didn't find it":
+        return "Did Not Find"
+    elif log_type.lower() == "write note":
+        return "Note"
+    elif log_type.lower() == "webcam photo taken":
+        return "Webcam"
+    else:
+        # Pour tous les autres types, on conserve juste la première lettre en majuscule
+        return log_type.capitalize()
+
 def process_logs(geocache, cache_data, ns):
     """Traite les logs pour une géocache à partir des données GPX."""
-    logs_added = 0
-    
     try:
-        # Récupérer les logs existants pour cette géocache
-        existing_log_dates = {log.date.strftime('%Y-%m-%d'): log for log in geocache.logs}
-        
-        # Rechercher les logs dans les données de la cache
+        logs_added = 0
         logs_elem = cache_data.find('groundspeak:logs', ns)
-        if logs_elem is None:
-            return logs_added
-            
-        logs = logs_elem.findall('groundspeak:log', ns)
         
+        if logs_elem is None:
+            return 0
+            
+        # Obtenir les logs existants pour cette géocache
+        existing_logs = Log.query.filter_by(geocache_id=geocache.id).all()
+        
+        # Créer un dictionnaire pour une recherche plus rapide des logs existants
+        # Clé : date + auteur pour identifier les logs uniques
+        existing_log_dates = {}
+        for log in existing_logs:
+            if log.date and log.author:
+                log_date_key = f"{log.date.strftime('%Y-%m-%d')}_{log.author.name}"
+                existing_log_dates[log_date_key] = True
+        
+        # Traiter chaque log
+        logs = logs_elem.findall('groundspeak:log', ns)
         for log in logs:
             try:
                 # Extraire la date du log
-                date_elem = log.find('groundspeak:date', ns)
-                if date_elem is None or not date_elem.text:
+                log_date_elem = log.find('groundspeak:date', ns)
+                if log_date_elem is None or not log_date_elem.text:
                     continue
-                    
-                # Format de date ISO: 2025-03-08T20:00:00Z
-                log_date_str = date_elem.text
-                log_date = datetime.fromisoformat(log_date_str.replace('Z', '+00:00'))
-                log_date_key = log_date.strftime('%Y-%m-%d')
                 
-                # Extraire le type de log (Found it, DNF, etc.)
-                type_elem = log.find('groundspeak:type', ns)
-                log_type = type_elem.text if type_elem is not None else "Unknown"
+                # Format de date : 2023-03-15T00:00:00Z
+                log_date_str = log_date_elem.text
+                log_date = None
+                
+                try:
+                    # Essayer différents formats de date
+                    for date_format in ['%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S']:
+                        try:
+                            log_date = datetime.strptime(log_date_str, date_format)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # Si aucun format ne correspond, utiliser une approche plus générique
+                    if not log_date and 'T' in log_date_str:
+                        date_part = log_date_str.split('T')[0]
+                        log_date = datetime.strptime(date_part, '%Y-%m-%d')
+                
+                except Exception as e:
+                    current_app.logger.warning(f"Erreur lors du parsing de la date du log {log_date_str}: {str(e)}")
+                    continue
+                
+                if not log_date:
+                    continue
+                
+                # Extraire le type de log
+                log_type_elem = log.find('groundspeak:type', ns)
+                log_type = "Other"
+                if log_type_elem is not None and log_type_elem.text:
+                    log_type = normalize_log_type(log_type_elem.text)
                 
                 # Extraire l'auteur du log
-                finder_elem = log.find('groundspeak:finder', ns)
-                if finder_elem is None:
-                    continue
-                    
-                author_name = finder_elem.text
+                log_finder_elem = log.find('groundspeak:finder', ns)
+                author_name = "Unknown"
+                if log_finder_elem is not None:
+                    author_name = log_finder_elem.text
                 
                 # Extraire le texte du log
-                text_elem = log.find('groundspeak:text', ns)
-                log_text = text_elem.text if text_elem is not None else ""
+                log_text_elem = log.find('groundspeak:text', ns)
+                log_text = ""
+                if log_text_elem is not None and log_text_elem.text:
+                    log_text = log_text_elem.text
                 
-                # Vérifier si ce log a un favori
+                # Vérifier si le log contient un favori
                 is_favorite = False
-                if 'favorite_points' in log.attrib and int(log.attrib.get('favorite_points', '0')) > 0:
-                    is_favorite = True
+                if 'favorite_points' in log.attrib:
+                    favorite_points = int(log.attrib['favorite_points'])
+                    is_favorite = favorite_points > 0
+                
+                # Créer une clé unique pour ce log
+                log_date_key = f"{log_date.strftime('%Y-%m-%d')}_{author_name}"
                 
                 # Vérifier si ce log existe déjà (même date et auteur)
                 if log_date_key in existing_log_dates:

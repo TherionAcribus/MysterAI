@@ -40,22 +40,22 @@
         {% if logs %}
             {% for log in logs %}
                 <div class="log-item bg-gray-800 rounded-lg p-4 mb-3 border-l-4 
-                    {% if log.log_type == 'found' %}border-green-500
-                    {% elif log.log_type == 'not_found' %}border-red-500
-                    {% elif log.log_type == 'note' %}border-blue-500
+                    {% if log.log_type == 'Found' or log.log_type == 'Found it' or log.log_type == 'found' %}border-green-500
+                    {% elif log.log_type == 'Did Not Find' or log.log_type == 'DNF' or log.log_type == 'not_found' %}border-red-500
+                    {% elif log.log_type == 'Note' or log.log_type == 'Write Note' or log.log_type == 'note' %}border-blue-500
                     {% else %}border-gray-500{% endif %}">
                     <div class="flex justify-between items-start mb-2">
                         <div class="flex items-center">
                             <span class="inline-flex items-center justify-center h-8 w-8 rounded-full mr-2
-                                {% if log.log_type == 'found' %}bg-green-600
-                                {% elif log.log_type == 'not_found' %}bg-red-600
-                                {% elif log.log_type == 'note' %}bg-blue-600
+                                {% if log.log_type == 'Found' or log.log_type == 'Found it' or log.log_type == 'found' %}bg-green-600
+                                {% elif log.log_type == 'Did Not Find' or log.log_type == 'DNF' or log.log_type == 'not_found' %}bg-red-600
+                                {% elif log.log_type == 'Note' or log.log_type == 'Write Note' or log.log_type == 'note' %}bg-blue-600
                                 {% else %}bg-gray-600{% endif %}">
-                                {% if log.log_type == 'found' %}
+                                {% if log.log_type == 'Found' or log.log_type == 'Found it' or log.log_type == 'found' %}
                                     <i class="fas fa-check"></i>
-                                {% elif log.log_type == 'not_found' %}
+                                {% elif log.log_type == 'Did Not Find' or log.log_type == 'DNF' or log.log_type == 'not_found' %}
                                     <i class="fas fa-times"></i>
-                                {% elif log.log_type == 'note' %}
+                                {% elif log.log_type == 'Note' or log.log_type == 'Write Note' or log.log_type == 'note' %}
                                     <i class="fas fa-sticky-note"></i>
                                 {% else %}
                                     <i class="fas fa-question"></i>

@@ -87,6 +87,47 @@ Le panneau des logs est rendu dans le template `templates/logs_panel.html`. Il c
 5. Le template `logs_panel.html` est rendu avec les logs mis à jour et retourné
 6. HTMX remplace le contenu du panneau avec la réponse
 
+## Normalisation des types de logs
+
+Le système utilise une normalisation des types de logs pour assurer la cohérence entre les différentes sources (API Geocaching, importation GPX, etc.).
+
+### Types de logs normalisés
+
+| Type original | Type normalisé |
+|---------------|----------------|
+| found it, Found It | Found |
+| didn't find it, DNF | Did Not Find |
+| write note | Note |
+| webcam photo taken | Webcam |
+| *autres* | Première lettre en majuscule |
+
+### Implémentation de la normalisation
+
+La normalisation est implémentée via une fonction `normalize_log_type` qui est appelée lors :
+- De la récupération des logs depuis l'API Geocaching
+- De l'importation des logs depuis les fichiers GPX
+- Du rafraîchissement des logs via le bouton "Rafraîchir"
+
+```python
+def normalize_log_type(log_type):
+    """Normalise le type de log pour avoir une cohérence dans la base de données"""
+    if not log_type:
+        return "Other"
+    
+    if log_type.lower() == "found it":
+        return "Found"
+    elif log_type.lower() == "didn't find it":
+        return "Did Not Find"
+    elif log_type.lower() == "write note":
+        return "Note"
+    elif log_type.lower() == "webcam photo taken":
+        return "Webcam"
+    else:
+        return log_type.capitalize()
+```
+
+Le template d'affichage des logs prend en compte les différentes possibilités pour assurer une rétrocompatibilité avec les logs existants.
+
 ## Implémentation technique
 
 ### Affichage des logs
@@ -135,9 +176,9 @@ Lors du rafraîchissement, le système :
 ## Interface graphique
 
 Les logs sont présentés dans une liste, avec un code couleur selon leur type :
-- **Vert** : "Found it" (cache trouvée)
-- **Rouge** : "Didn't find it" (cache non trouvée)
-- **Bleu** : "Write note" (note)
+- **Vert** : "Found" (cache trouvée)
+- **Rouge** : "Did Not Find" (cache non trouvée)
+- **Bleu** : "Note" (note)
 
 Chaque log affiche :
 - L'auteur du log
