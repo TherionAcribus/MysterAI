@@ -294,6 +294,13 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         executeButton.setAttribute('data-plugin-zone-id', pluginZoneId);
                         console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution:", pluginZoneId);
                     }
+                    
+                    // Ajouter l'attribut data-plugin-input="true" à tous les textareas du plugin
+                    const textareas = pluginZone.querySelectorAll('textarea');
+                    textareas.forEach(textarea => {
+                        textarea.setAttribute('data-plugin-input', 'true');
+                        console.log("Attribut data-plugin-input ajouté à un textarea");
+                    });
                 } else {
                     this.pluginsPanelTarget.innerHTML = html;
                     
@@ -308,6 +315,13 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         executeButton.setAttribute('data-plugin-zone-id', mainPanelId);
                         console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution principal:", mainPanelId);
                     }
+                    
+                    // Ajouter l'attribut data-plugin-input="true" à tous les textareas du plugin
+                    const textareas = this.pluginsPanelTarget.querySelectorAll('textarea');
+                    textareas.forEach(textarea => {
+                        textarea.setAttribute('data-plugin-input', 'true');
+                        console.log("Attribut data-plugin-input ajouté à un textarea");
+                    });
                 }
                 
                 // Mettre à jour le plugin sélectionné
@@ -378,26 +392,24 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             // Déterminer si le plugin est déjà exécuté dans cette zone (réexécution)
             const isReexecution = pluginZoneId && document.getElementById(`result-for-${pluginZoneId}`);
             
-            if (isReexecution) {
-                // En cas de réexécution, on utilise toujours le texte original (soit de la description, soit du plugin précédent)
-                // On cherche la source originale du texte pour cette zone
-                const pluginZone = document.getElementById(pluginZoneId);
-                
-                // Si ce plugin fait partie d'une chaîne, on utilise l'entrée originale qui a été fournie à cette zone
-                if (pluginZone && pluginZone.dataset.originalInput) {
-                    textToProcess = pluginZone.dataset.originalInput;
-                    console.log("Réexécution: utilisation de l'entrée originale stockée pour cette zone:", textToProcess);
-                } else {
-                    // Si pas d'entrée originale stockée, on revient au texte de base
-                    textToProcess = this.descriptionTextTarget.value;
-                    console.log("Réexécution: retour au texte de base:", textToProcess);
-                }
-            } else if (!this.lastPluginOutputValue) {
-                // Première exécution: utiliser le texte de la description
+            // Trouver la source d'entrée actuelle - toujours prendre l'entrée la plus récente
+            const pluginZone = pluginZoneId ? document.getElementById(pluginZoneId) : null;
+            
+            // Vérifier si une zone d'entrée de texte existe dans la zone du plugin
+            const pluginInputTextarea = pluginZone ? 
+                pluginZone.querySelector('textarea[data-plugin-input="true"]') : null;
+            
+            if (pluginInputTextarea) {
+                // Utiliser le texte de la zone d'entrée du plugin (priorité absolue)
+                textToProcess = pluginInputTextarea.value;
+                console.log("Utilisation du texte saisi dans le plugin:", textToProcess);
+            } else if (!this.lastPluginOutputValue || isReexecution) {
+                // Si c'est la première exécution ou une réexécution sans zone d'entrée spécifique,
+                // utiliser le texte de la description principale
                 textToProcess = this.descriptionTextTarget.value;
-                console.log("Utilisation du texte de la description:", textToProcess);
+                console.log("Utilisation du texte de la description principale:", textToProcess);
             } else {
-                // Dans une chaîne de plugins: utiliser le résultat du plugin précédent
+                // Dans une chaîne de plugins, utiliser le résultat du plugin précédent
                 textToProcess = this.lastPluginOutputValue;
                 console.log("Utilisation du résultat du plugin précédent:", textToProcess);
             }
@@ -412,8 +424,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 
                 if (pluginZoneId) {
                     // Cas d'un plugin dans une zone spécifique
-                    const pluginZone = document.getElementById(pluginZoneId);
-                    
                     if (!pluginZone) {
                         console.error("Zone de plugin non trouvée:", pluginZoneId);
                         throw new Error("Zone de plugin non trouvée");
@@ -421,11 +431,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     
                     console.log("Zone de plugin trouvée:", pluginZone);
                     
-                    // Stocker l'entrée originale pour cette zone si ce n'est pas déjà fait
-                    if (!pluginZone.hasAttribute('data-original-input')) {
-                        pluginZone.setAttribute('data-original-input', textToProcess);
-                        console.log("Entrée originale stockée pour la zone:", textToProcess);
-                    }
+                    // Mettre à jour l'entrée originale pour cette zone à chaque exécution
+                    pluginZone.setAttribute('data-original-input', textToProcess);
+                    console.log("Entrée mise à jour pour la zone:", textToProcess);
                     
                     // Supprimer tout résultat précédent associé à ce plugin
                     const existingResult = document.getElementById(`result-for-${pluginZoneId}`);
