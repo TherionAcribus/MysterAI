@@ -1,4 +1,5 @@
 import re
+import time
 from plugins.official.projection_calculation.main import ProjectionPlugin
 
 class WherigoReverseDecoderPlugin:
@@ -25,102 +26,79 @@ class WherigoReverseDecoderPlugin:
         """
         Exécute le décodage.
         :param inputs: dict contenant les paramètres d'entrée.
-        :return: dict avec les coordonnées ou un message d'erreur.
+        :return: dict au format standardisé.
         """
-        print('INPUTS WHERIGO REVERSE DECODER', inputs)
+        start_time = time.time()
         numbers_text = inputs.get("text", "").strip()
         strict_mode = inputs.get("strict", True)
         embedded_mode = inputs.get("embedded", False)
         
-        if not numbers_text:
-            return {
-                "result": {
-                    "error": "Aucun texte fourni pour l'analyse.",
-                    "decoded_text": "Erreur: Aucun texte fourni pour l'analyse."
-                }
+        # Initialisation du format standardisé
+        result = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": inputs,
+            "results": [],
+            "summary": {
+                "total_results": 0
             }
+        }
+
+        if not numbers_text:
+            result["status"] = "error"
+            result["summary"]["message"] = "Aucun texte fourni pour l'analyse."
+            return result
 
         try:
-            # En fonction du mode, on cherche différemment les nombres
-            if embedded_mode:
-                # Mode embedded: on cherche 3 nombres de 6 chiffres dans le texte
-                fragments = self.find_fragments(numbers_text, strict_mode)
-                if not fragments or len(fragments) < 3:
-                    return {
-                        "result": {
-                            "error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée.",
-                            "decoded_text": "Erreur: Impossible de trouver trois nombres de 6 chiffres dans l'entrée."
-                        }
-                    }
-                
-                # Utiliser les 3 premiers nombres trouvés
-                a, b, c = fragments[:3]
-                latitude, longitude = self._decode_coordinates(a, b, c)
-                formatted_coords = self._convert_to_wgs84(latitude, longitude)
-                
-                # Retourner les résultats avec les fragments identifiés dans le format attendu par metadetection
-                return {
-                    "result": {
-                        "decoded_text": formatted_coords,
-                        "text": {
-                            "text_output": formatted_coords,
-                            "text_input": numbers_text,
-                            "mode": "decode"
-                        },
-                        "fragments": fragments,
-                        "is_match": True,
-                        "score": 1.0
-                    }
+            # Recherche des fragments
+            fragments = self.find_fragments(numbers_text, strict_mode)
+            is_match = len(fragments) >= 3
+            score = min(1.0, len(fragments) / 3.0) if is_match else 0.0
+
+            if not is_match:
+                result["status"] = "error"
+                result["summary"]["message"] = "Impossible de trouver trois nombres de 6 chiffres dans l'entrée."
+                result["results"] = []
+                return result
+
+            # Utiliser les 3 premiers nombres trouvés
+            a, b, c = fragments[:3]
+            latitude, longitude = self._decode_coordinates(a, b, c)
+            formatted_coords = self._convert_to_wgs84(latitude, longitude)
+
+            # Calcul de la confiance
+            confidence = 1.0 if strict_mode else score
+
+            # Ajout du résultat au format standardisé
+            result["results"].append({
+                "id": "result_1",
+                "text_output": formatted_coords,
+                "confidence": confidence,
+                "parameters": {
+                    "mode": "decode",
+                    "strict": strict_mode,
+                    "embedded": embedded_mode
+                },
+                "metadata": {
+                    "fragments": fragments,
+                    "score": score
                 }
-            else:
-                # Mode non-embedded: analyser tout le texte
-                if strict_mode:
-                    # En mode strict, on vérifie exactement 3 nombres de 6 chiffres
-                    numbers = re.findall(r'\b\d{6}\b', numbers_text)
-                    if len(numbers) != 3:
-                        return {
-                            "result": {
-                                "error": "Le texte doit contenir exactement trois nombres de 6 chiffres.",
-                                "decoded_text": "Erreur: Le texte doit contenir exactement trois nombres de 6 chiffres."
-                            }
-                        }
-                else:
-                    # En mode smooth, on extrait au moins 3 nombres de 6 chiffres si possible
-                    numbers = re.findall(r'\b\d{6}\b', numbers_text)
-                    if len(numbers) < 3:
-                        return {
-                            "result": {
-                                "error": "Impossible de trouver trois nombres de 6 chiffres dans l'entrée.",
-                                "decoded_text": "Erreur: Impossible de trouver trois nombres de 6 chiffres dans l'entrée."
-                            }
-                        }
-                
-                # Appliquer l'algorithme de décodage
-                a, b, c = numbers[:3]
-                latitude, longitude = self._decode_coordinates(a, b, c)
-                formatted_coords = self._convert_to_wgs84(latitude, longitude)
-                
-                print('FORMATTED COORDS WIG', formatted_coords)
-                
-                # Format de retour compatible avec metadetection
-                return {
-                    "result": {
-                        "decoded_text": formatted_coords,
-                        "text": {
-                            "text_output": formatted_coords,
-                            "text_input": numbers_text,
-                            "mode": "decode"
-                        }
-                    }
-                }
-                
+            })
+            result["summary"]["total_results"] = 1
+            result["summary"]["best_result_id"] = "result_1"
+            result["summary"]["message"] = "Décodage réussi."
+
         except Exception as e:
-            return {
-                "result": {
-                    "error": f"Erreur lors du décodage : {str(e)}",
-                    "decoded_text": f"Erreur lors du décodage : {str(e)}"
-                }
-            }
+            result["status"] = "error"
+            result["summary"]["message"] = f"Erreur lors du décodage : {str(e)}"
+            result["results"] = []
+
+        result["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        return result
 
     def find_fragments(self, text, strict=True):
         """

@@ -1,4 +1,5 @@
 import re
+import time
 
 class KennyCodePlugin:
     """
@@ -12,16 +13,20 @@ class KennyCodePlugin:
         self.name = "kenny_code"
         self.description = "Plugin pour encoder/décoder du texte avec le code Kenny"
 
-        # Table de conversion pour l'encodage
+        # Tables d'encodage/décodage pour le code Kenny
+        # Le code Kenny utilise des triplets de lettres: mmm, mmp, mmf, etc.
         self.encode_table = {
             'a': 'mmm', 'b': 'mmp', 'c': 'mmf', 'd': 'mpm', 'e': 'mpp',
             'f': 'mpf', 'g': 'mfm', 'h': 'mfp', 'i': 'mff', 'j': 'pmm',
             'k': 'pmp', 'l': 'pmf', 'm': 'ppm', 'n': 'ppp', 'o': 'ppf',
             'p': 'pfm', 'q': 'pfp', 'r': 'pff', 's': 'fmm', 't': 'fmp',
             'u': 'fmf', 'v': 'fpm', 'w': 'fpp', 'x': 'fpf', 'y': 'ffm',
-            'z': 'ffp'
+            'z': 'ffp', '0': 'fff', '1': 'mmm', '2': 'mmp', '3': 'mmf',
+            '4': 'mpm', '5': 'mpp', '6': 'mpf', '7': 'mfm', '8': 'mfp',
+            '9': 'mff'
         }
-        # Table de conversion pour le décodage (inversion de encode_table)
+        
+        # Table de décodage (inverser la table d'encodage)
         self.decode_table = {v: k for k, v in self.encode_table.items()}
 
     def check_code(self, text: str, strict: bool = False, allowed_chars=None, embedded: bool = False) -> dict:
@@ -231,8 +236,11 @@ class KennyCodePlugin:
                 - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 
         Returns:
-            Dictionnaire contenant le résultat de l'opération
+            Dictionnaire au format standardisé contenant le résultat de l'opération
         """
+        # Mesurer le temps d'exécution
+        start_time = time.time()
+        
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
         
@@ -240,61 +248,147 @@ class KennyCodePlugin:
         strict_mode = inputs.get("strict", "").lower() == "strict"
         
         # Récupération de la liste des caractères autorisés sous la clé "allowed_chars"
-        allowed_chars = inputs.get("allowed_chars", None)
+        allowed_chars = inputs.get("allowed_chars", " ,.;:!?-_")
         
         # Récupération du mode embedded
         embedded = inputs.get("embedded", False)
+        
+        # Initialiser la structure standardisée
+        result = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.2.0",
+                "execution_time": 0  # Sera mis à jour à la fin
+            },
+            "inputs": inputs,
+            "results": [],
+            "summary": {
+                "total_results": 0
+            }
+        }
 
         if not text:
-            return {"error": "Aucun texte fourni à traiter."}
+            result["status"] = "error"
+            result["summary"]["message"] = "Aucun texte fourni à traiter."
+            return result
 
         try:
             if mode == "encode":
                 encoded = self.encode(text)
-                return {
-                    "result": {
-                        "text": {
-                            "text_output": encoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
-                    }
-                }
+                
+                # Ajouter le résultat au format standardisé
+                result["results"].append({
+                    "id": "result_1",
+                    "text_output": encoded,
+                    "confidence": 1.0,  # Confiance maximale pour l'encodage
+                    "parameters": {
+                        "mode": mode
+                    },
+                    "metadata": {}
+                })
+                
+                result["summary"]["total_results"] = 1
+                result["summary"]["best_result_id"] = "result_1"
+                result["summary"]["message"] = "Encodage en Kenny Code réussi"
                 
             elif mode == "decode":
                 if strict_mode:
                     check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        return {"error": "Code Kenny invalide en mode strict"}
-                    # Concatène les fragments valides et effectue le décodage classique.
+                        result["status"] = "error"
+                        result["summary"]["message"] = "Code Kenny invalide en mode strict"
+                        return result
+                        
+                    # Concatène les fragments valides et effectue le décodage
                     decoded = self.decode_fragments(text, check["fragments"])
+                    
+                    # Ajouter le résultat avec une confiance élevée (mode strict)
+                    result["results"].append({
+                        "id": "result_1",
+                        "text_output": decoded,
+                        "confidence": 0.9,  # Haute confiance en mode strict
+                        "parameters": {
+                            "mode": mode,
+                            "strict": "strict",
+                            "embedded": embedded
+                        },
+                        "metadata": {
+                            "fragments_count": len(check["fragments"]),
+                            "full_match": len(check["fragments"]) == 1 and check["fragments"][0]["start"] == 0 and check["fragments"][0]["end"] == len(text)
+                        }
+                    })
+                    
+                    result["summary"]["total_results"] = 1
+                    result["summary"]["best_result_id"] = "result_1"
+                    result["summary"]["message"] = "Décodage réussi en mode strict"
+                    
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         # Si aucun fragment n'a été trouvé, on retourne une erreur
-                        return {"error": "Aucun code Kenny détecté dans le texte"}
+                        result["status"] = "error"
+                        result["summary"]["message"] = "Aucun code Kenny détecté dans le texte"
+                        return result
                     
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
                     
                     # Vérifier si le texte décodé est différent du texte d'origine
                     if decoded == text:
-                        return {"error": "Aucun code Kenny n'a pu être décodé"}
-
-                # Format de retour compatible avec metadetection
-                return {
-                    "result": {
-                        "decoded_text": decoded,
-                        "text": {
-                            "text_output": decoded,
-                            "text_input": text,
-                            "mode": mode
+                        result["status"] = "error"
+                        result["summary"]["message"] = "Aucun code Kenny n'a pu être décodé"
+                        return result
+                        
+                    # Calculer la confiance en fonction de la couverture et du nombre de fragments
+                    fragments_text_length = sum(len(frag["value"]) for frag in check["fragments"])
+                    coverage_ratio = fragments_text_length / len(text) if text else 0
+                    
+                    # Plus la couverture est grande, plus la confiance est élevée
+                    confidence = 0.5 + (coverage_ratio * 0.4)
+                    
+                    # Pénaliser légèrement si trop de fragments (indique possiblement du bruit)
+                    if len(check["fragments"]) > 3:
+                        confidence -= 0.1
+                        
+                    # Limiter à [0.1, 0.9]
+                    confidence = max(0.1, min(0.9, confidence))
+                    
+                    # Ajouter le résultat au format standardisé
+                    result["results"].append({
+                        "id": "result_1",
+                        "text_output": decoded,
+                        "confidence": confidence,
+                        "parameters": {
+                            "mode": mode,
+                            "strict": "smooth",
+                            "embedded": embedded
+                        },
+                        "metadata": {
+                            "fragments_count": len(check["fragments"]),
+                            "coverage_ratio": coverage_ratio,
+                            "fragments": [{"start": f["start"], "end": f["end"], "value": f["value"]} for f in check["fragments"]]
                         }
-                    }
-                }
+                    })
+                    
+                    result["summary"]["total_results"] = 1
+                    result["summary"]["best_result_id"] = "result_1"
+                    result["summary"]["message"] = f"Décodage réussi en mode souple ({len(check['fragments'])} fragments trouvés)"
                 
             else:
-                return {"error": f"Mode inconnu : {mode}"}
+                result["status"] = "error"
+                result["summary"]["message"] = f"Mode inconnu : {mode}"
+                return result
                 
         except Exception as e:
-            return {"error": f"Erreur pendant le traitement : {e}"}
+            result["status"] = "error"
+            result["summary"]["message"] = f"Erreur pendant le traitement : {e}"
+            return result
+            
+        # Mettre à jour le temps d'exécution
+        result["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        return result
+
+# Point d'entrée pour le plugin
+def init():
+    return KennyCodePlugin()
