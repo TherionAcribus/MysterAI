@@ -19,6 +19,10 @@
         }
     </style>
     
+    <!-- Scripts principaux -->
+    <script src="{{ url_for('static', filename='js/controllers/index.js') }}" type="module"></script>
+    <script src="{{ url_for('static', filename='js/plugin_golden_layout_integration.js') }}"></script>
+    
     {% block head %}{% endblock %}
 </head>
 <body class="min-h-screen">
@@ -78,5 +82,32 @@
     
     <!-- Scripts JavaScript -->
     {% block scripts %}{% endblock %}
+
+    <!-- Script d'initialisation de GoldenLayout -->
+    <script>
+        // Initialiser l'intégration des plugins avec GoldenLayout
+        document.addEventListener('DOMContentLoaded', function() {
+            // Si GoldenLayout est initialisé
+            if (window.goldenLayout) {
+                // Enregistrer le composant plugin-interface
+                window.PluginGoldenLayoutIntegration.registerPluginInterfaceComponent(window.goldenLayout);
+                console.log("Intégration des plugins avec GoldenLayout initialisée");
+            } else {
+                console.warn("GoldenLayout n'est pas disponible");
+            }
+            
+            // S'assurer que le contrôleur PluginInterface est globalement disponible
+            if (window.StimulusApp && !window.PluginInterfaceController) {
+                const controllers = window.StimulusApp.controllers;
+                for (let i = 0; i < controllers.length; i++) {
+                    if (controllers[i].context.identifier === 'plugin-interface') {
+                        window.PluginInterfaceController = controllers[i].constructor;
+                        console.log("PluginInterfaceController exposé globalement");
+                        break;
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

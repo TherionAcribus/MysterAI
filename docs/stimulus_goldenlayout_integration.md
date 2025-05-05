@@ -223,3 +223,94 @@ updateStatus(event) {
 2. Ajouter des logs détaillés dans les méthodes clés
 3. Nettoyer les écouteurs d'événements dans `disconnect()`
 4. Utiliser les data attributes pour le passage de données
+
+## 8. Stratégies de secours
+
+Dans certains cas, les contrôleurs Stimulus peuvent ne pas se connecter correctement lors du chargement dynamique dans GoldenLayout. Il est recommandé d'implémenter une stratégie de secours pour assurer un fonctionnement fiable de l'application.
+
+### Détection et gestion des contrôleurs non connectés
+
+```javascript
+(function() {
+    // Permettre au DOM de se charger complètement
+    setTimeout(function() {
+        // Trouver les éléments concernés dans la page
+        const elements = document.querySelectorAll('[data-controller="mon-controller"]');
+        if (!elements || elements.length === 0) return;
+        
+        // Identifier l'élément spécifique (par exemple, le dernier ajouté au DOM)
+        const targetElement = elements[elements.length - 1];
+        
+        // Ajouter un identifiant unique pour le débogage
+        const uniqueId = 'el-' + Date.now().toString().slice(-4) + '-' + Math.floor(Math.random() * 1000);
+        targetElement.dataset.debugId = uniqueId;
+        
+        console.log(`Élément [${targetElement.id || uniqueId}] détecté`);
+        
+        // Chercher l'élément interactif (bouton, etc.)
+        const actionButton = targetElement.querySelector('.action-button');
+        if (!actionButton) return;
+        
+        // Ajouter un gestionnaire d'événement alternatif
+        actionButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            
+            // Tenter d'utiliser le contrôleur Stimulus si disponible
+            if (window.StimulusApp && window.StimulusApp.controllers) {
+                const controller = window.StimulusApp.controllers.find(
+                    c => c.context.identifier === 'mon-controller' && c.element === targetElement
+                );
+                
+                if (controller) {
+                    console.log(`Utilisation du contrôleur Stimulus`);
+                    controller.actionMethod(event);
+                    return;
+                }
+            }
+            
+            // Si pas de contrôleur Stimulus, utiliser une solution alternative
+            console.log(`Implémentation alternative activée`);
+            
+            // Exemple de solution alternative avec appel API direct
+            fetch('/api/endpoint', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    // Données nécessaires
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Traitement des données
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+        });
+    }, 100); // Délai court pour laisser le DOM se charger
+})();
+```
+
+### Bonnes pratiques pour les stratégies de secours
+
+1. **Implémenter la solution de secours comme code auto-exécuté**
+   - Utiliser une fonction auto-exécutée pour isoler la portée
+   - Ajouter un délai court pour permettre le chargement complet du DOM
+
+2. **Tenter d'abord d'utiliser le contrôleur Stimulus**
+   - Vérifier la présence de l'application Stimulus
+   - Rechercher le contrôleur spécifique pour l'élément
+
+3. **N'activer la solution de secours qu'en cas d'échec**
+   - Éviter les conflits potentiels avec Stimulus
+   - Consigner les cas d'utilisation de la solution de secours pour le débogage
+
+4. **Maintenir la synchronisation entre les deux implémentations**
+   - S'assurer que la solution de secours se comporte comme le contrôleur Stimulus
+   - Centraliser la logique métier autant que possible
+
+5. **Afficher des messages de débogage clairs**
+   - Inclure des identifiants uniques pour suivre les instances
+   - Consigner les étapes clés pour faciliter le débogage

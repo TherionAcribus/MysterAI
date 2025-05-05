@@ -1,6 +1,8 @@
 <!-- Template pour l'interface d'un plugin -->
 <div class="w-full h-full bg-gray-900 p-6" 
      data-controller="plugin-interface"
+     data-plugin-interface-id-value="{{ plugin.params.get('geocacheId', 'default') }}"
+     data-plugin-name="{{ plugin.name }}"
      hx-ext="json-enc">
     <div class="max-w-4xl mx-auto">
         <!-- En-tête du plugin -->
@@ -29,7 +31,7 @@
         <!-- Formulaire des inputs -->
         {% if not plugin.params.get('geocacheId') %}
         <form class="bg-gray-800 rounded-lg p-6 mb-6"
-              id="plugin-form-{{ plugin.params.get('geocacheId', 'default') }}">
+              data-plugin-interface-target="form">
             
             {% for input_name, input_config in plugin.input_types.items() %}
                 {% if input_name == 'mode' and 'solver' in plugin.categories %}
@@ -117,8 +119,8 @@
                     </button>
                 {% else %}
                     <button type="button" 
-                            onclick="executePlugin()"
-                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            data-action="plugin-interface#execute"
+                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 debug-button">
                         Exécuter
                     </button>
                 {% endif %}
@@ -127,7 +129,7 @@
         {% endif %}
 
         <!-- Zone de résultat -->
-        <div id="plugin-output-{{ plugin.params.get('geocacheId', 'default') }}" 
+        <div data-plugin-interface-target="output" 
              class="bg-gray-800 rounded-lg p-6 {% if not plugin.params.get('geocacheId') %}hidden{% endif %} {% if 'solver' in plugin.categories %}hidden{% endif %}">
             <!-- La zone sera remplie dynamiquement par le JavaScript -->
         </div>
@@ -143,370 +145,250 @@
 </div>
 
 <script>
-    function executePlugin() {
-        const geocacheId = '{{ plugin.params.get('geocacheId', 'default') }}';
-        const data = {};
-
-        // Si on a un formulaire, récupérer ses données
-        const form = document.getElementById('plugin-form-' + geocacheId);
-        if (form) {
-            const formData = new FormData(form);
-            // Convertir FormData en objet
-            for (let [key, value] of formData.entries()) {
-                data[key] = value;
-            }
+    // Script optimisé pour exécuter les plugins dans GoldenLayout
+    (function() {
+        // Permettre au DOM de se charger complètement
+        setTimeout(function() {
+            // Trouver tous les éléments racine de plugin dans la page
+            const allPluginRoots = document.querySelectorAll('[data-controller="plugin-interface"]');
+            if (!allPluginRoots || allPluginRoots.length === 0) return;
             
-            // Pour le mode, récupérer la valeur du select s'il existe
-            const modeSelect = document.getElementById('mode');
-            if (modeSelect) {
-                data.mode = modeSelect.value;
-            }
+            // Identifier notre élément (le dernier ajouté au DOM)
+            const rootElement = allPluginRoots[allPluginRoots.length - 1];
             
-            // Vérifier l'option brute_force s'il est présent
-            const bruteForceCheckbox = document.getElementById('brute_force');
-            if (bruteForceCheckbox) {
-                data.brute_force = bruteForceCheckbox.checked;
-            }
-        } else {
-            // Si pas de formulaire, utiliser les paramètres passés au plugin
-            data.geocache_id = geocacheId;
-        }
-        
-        // Montrer le chargement
-        const output = document.getElementById('plugin-output-' + geocacheId);
-        if (output) {
-            output.classList.remove('hidden');
-            output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
-        }
-        
-        // Exécuter le plugin
-        fetch(`/api/plugins/{{ plugin.name }}/execute`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+            // Récupérer le nom du plugin
+            const pluginName = rootElement.dataset.pluginName || 
+                               rootElement.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim() || 
+                               'inconnu';
             
-            // Vérifier le type de contenu
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return response.json().then(data => ({
-                    isJson: true,
-                    content: data
-                }));
-            } else {
-                return response.text().then(text => ({
-                    isJson: false,
-                    content: text
-                }));
-            }
-        })
-        .then(result => {
-            const output = document.getElementById('plugin-output-' + geocacheId);
-            if (!output) return;
+            // Identifiant unique pour le débogage
+            const uniqueId = 'p-' + Date.now().toString().slice(-4) + '-' + Math.floor(Math.random() * 1000);
+            rootElement.dataset.debugId = uniqueId;
             
-            // Si c'est du HTML (ancien format)
-            if (!result.isJson) {
-                output.innerHTML = result.content;
-                return;
-            }
+            console.log(`Plugin [${pluginName}] chargé (${uniqueId})`);
             
-            // C'est du JSON, utiliser le contenu pour l'affichage formaté
-            const data = result.content;
-            window.lastPluginResult = data; // Sauvegarder le résultat pour l'édition
+            // Chercher le bouton d'exécution
+            const executeButton = rootElement.querySelector('.debug-button');
+            if (!executeButton) return;
             
-            // Vérifier et normaliser la structure du résultat
-            let normalizedData = { ...data };
-            
-            // Gérer les formats de résultat variables des différents plugins
-            // Cas 1: Format standard avec text_output directement sur l'objet racine
-            // Cas 2: Format {result: {text: {text_output: ...}}} comme pour Morse
-            // Cas 3: Format avec 'output' au lieu de 'text_output'
-            if (data.result && data.result.text && data.result.text.text_output !== undefined) {
-                normalizedData.text_output = data.result.text.text_output;
-            } else if (data.output !== undefined) {
-                normalizedData.text_output = data.output;
-            }
-            
-            // Extraire le log s'il existe
-            if (data.result && data.result.log !== undefined) {
-                normalizedData.log = data.result.log;
-            } else if (data.original_result && data.original_result.result && data.original_result.result.log !== undefined) {
-                normalizedData.log = data.original_result.result.log;
-            }
-            
-            // Toujours mettre normalizedData dans window.lastPluginResult
-            window.lastPluginResult = normalizedData;
-            
-            // Nouvelle façon d'afficher les résultats
-            let outputHtml = '<div class="space-y-4">';
-            
-            // Afficher le texte output s'il existe
-            if (normalizedData.text_output !== undefined) {
-                outputHtml += `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-medium text-gray-300 mb-2">Résultat</h3>
-                        <div class="bg-gray-800 p-4 rounded">
-                            <textarea id="text_output_field" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
-                            oninput="updatePluginResult('text_output', this.value)">${normalizedData.text_output || ''}</textarea>
-                        </div>
-                    </div>
-                `;
-            } else if (normalizedData.output !== undefined) {
-                // Compatibilité avec les plugins qui retournent "output" au lieu de "text_output"
-                outputHtml += `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-medium text-gray-300 mb-2">Résultat</h3>
-                        <div class="bg-gray-800 p-4 rounded">
-                            <textarea id="text_output_field" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
-                            oninput="updatePluginResult('output', this.value)">${normalizedData.output || ''}</textarea>
-                        </div>
-                    </div>
-                `;
-                // Copier dans text_output pour uniformité
-                normalizedData.text_output = normalizedData.output;
-                window.lastPluginResult.text_output = normalizedData.output;
-            }
-            
-            // Afficher le log s'il existe
-            if (normalizedData.log) {
-                outputHtml += `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-medium text-gray-300 mb-2">Détails de la projection</h3>
-                        <div class="bg-gray-800 p-4 rounded">
-                            <pre id="log_field" class="w-full bg-gray-800 text-gray-300 font-mono text-sm whitespace-pre-wrap">${normalizedData.log || ''}</pre>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Afficher les coordonnées si elles existent
-            if (normalizedData.coordinates) {
-                const coords = normalizedData.coordinates;
-                const exists = coords.exist === true;
+            // Ajouter un gestionnaire d'événement directement
+            executeButton.addEventListener('click', function(event) {
+                event.preventDefault(); // Empêcher toute action par défaut
                 
-                outputHtml += `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-medium text-gray-300 mb-2">Coordonnées détectées</h3>
-                        
-                        <div class="mb-3">
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" id="coords_exist_checkbox" class="form-checkbox h-5 w-5 text-blue-600" 
-                                       ${exists ? 'checked' : ''} onchange="updateCoordsExist(this.checked)">
-                                <span class="ml-2 text-gray-300">Coordonnées présentes</span>
-                            </label>
-                        </div>
-                        
-                        <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4 ${exists ? '' : 'opacity-50'}">
-                            <div>
-                                <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                                <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                       value="${coords.ddm || ''}" ${exists ? '' : 'disabled'}
-                                       oninput="updatePluginResult('coordinates.ddm', this.value)">
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                    <input type="text" id="coords_lat" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                           value="${coords.ddm_lat || ''}" ${exists ? '' : 'disabled'}
-                                           oninput="updatePluginResult('coordinates.ddm_lat', this.value)">
-                                </div>
-                                <div>
-                                    <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                    <input type="text" id="coords_lon" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                           value="${coords.ddm_lon || ''}" ${exists ? '' : 'disabled'}
-                                           oninput="updatePluginResult('coordinates.ddm_lon', this.value)">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Ajouter l'option pour afficher le format brut
-            outputHtml += `
-                <div class="mt-4">
-                    <button onclick="toggleRawOutput()" class="text-sm text-blue-400 hover:text-blue-300">
-                        Afficher le format brut
-                    </button>
-                    <div id="raw-output" class="hidden mt-2 bg-gray-700 rounded-lg p-4">
-                        <textarea id="raw_output_field" class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
-                                 oninput="updateRawJson(this.value)">${JSON.stringify(normalizedData, null, 2)}</textarea>
-                    </div>
-                </div>
-            `;
-            
-            // Ajouter le bouton pour copier la sortie
-            outputHtml += `
-                <div class="mt-4 flex justify-end">
-                    <button onclick="copyOutputToClipboard()" class="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        Copier la sortie
-                    </button>
-                </div>
-            `;
-            
-            outputHtml += '</div>';
-            output.innerHTML = outputHtml;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            const output = document.getElementById('plugin-output-' + geocacheId);
-            if (output) {
-                output.innerHTML = `<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur: ${error.message}</div>`;
-            }
-        });
-    }
-    
-    // Stockage global pour le dernier résultat
-    window.lastPluginResult = null;
-    
-    // Mise à jour des valeurs dans le résultat
-    function updatePluginResult(path, value) {
-        if (!window.lastPluginResult) return;
-        
-        // Gérer les chemins imbriqués comme 'coordinates.ddm'
-        const parts = path.split('.');
-        let current = window.lastPluginResult;
-        
-        for (let i = 0; i < parts.length - 1; i++) {
-            if (!current[parts[i]]) {
-                current[parts[i]] = {};
-            }
-            current = current[parts[i]];
-        }
-        
-        // Mettre à jour la valeur
-        current[parts[parts.length - 1]] = value;
-        
-        // Mettre à jour l'affichage JSON brut s'il est visible
-        const rawOutput = document.getElementById('raw_output_field');
-        if (rawOutput && !document.getElementById('raw-output').classList.contains('hidden')) {
-            rawOutput.value = JSON.stringify(window.lastPluginResult, null, 2);
-        }
-    }
-    
-    // Mise à jour de l'existence des coordonnées
-    function updateCoordsExist(exists) {
-        if (!window.lastPluginResult || !window.lastPluginResult.coordinates) return;
-        
-        window.lastPluginResult.coordinates.exist = exists;
-        
-        // Activer/désactiver les champs de coordonnées
-        const fields = ['coords_ddm', 'coords_lat', 'coords_lon'];
-        fields.forEach(id => {
-            const field = document.getElementById(id);
-            if (field) {
-                field.disabled = !exists;
-                field.parentElement.parentElement.classList.toggle('opacity-50', !exists);
-            }
-        });
-        
-        // Mettre à jour l'affichage JSON brut
-        const rawOutput = document.getElementById('raw_output_field');
-        if (rawOutput) {
-            rawOutput.value = JSON.stringify(window.lastPluginResult, null, 2);
-        }
-    }
-    
-    // Mise à jour à partir du JSON brut
-    function updateRawJson(jsonStr) {
-        try {
-            const rawData = JSON.parse(jsonStr);
-            // Créer une version normalisée des données pour l'interface
-            let normalizedData = { ...rawData };
-            
-            // Normaliser les structures de résultat
-            if (rawData.result && rawData.result.text && rawData.result.text.text_output !== undefined) {
-                normalizedData.text_output = rawData.result.text.text_output;
-            } else if (rawData.output !== undefined) {
-                normalizedData.text_output = rawData.output;
-            }
-            
-            // Extraire le log s'il existe
-            if (rawData.result && rawData.result.log !== undefined) {
-                normalizedData.log = rawData.result.log;
-            } else if (rawData.original_result && rawData.original_result.result && rawData.original_result.result.log !== undefined) {
-                normalizedData.log = rawData.original_result.result.log;
-            }
-            
-            window.lastPluginResult = normalizedData;
-            
-            // Mettre à jour les champs d'interface
-            if (normalizedData.text_output !== undefined) {
-                const textField = document.getElementById('text_output_field');
-                if (textField) textField.value = normalizedData.text_output;
-            } else if (normalizedData.output !== undefined) {
-                // Compatibilité avec les plugins qui retournent "output" au lieu de "text_output"
-                const textField = document.getElementById('text_output_field');
-                if (textField) textField.value = normalizedData.output;
-                // Synchroniser text_output et output
-                normalizedData.text_output = normalizedData.output;
-                window.lastPluginResult.text_output = normalizedData.output;
-            }
-            
-            // Mettre à jour le log s'il existe
-            if (normalizedData.log !== undefined) {
-                const logField = document.getElementById('log_field');
-                if (logField) logField.textContent = normalizedData.log;
-            }
-            
-            if (normalizedData.coordinates) {
-                const coords = normalizedData.coordinates;
-                const existsCheckbox = document.getElementById('coords_exist_checkbox');
-                if (existsCheckbox) {
-                    existsCheckbox.checked = coords.exist === true;
-                    updateCoordsExist(coords.exist === true);
+                // Tenter d'utiliser le contrôleur Stimulus si disponible
+                if (window.StimulusApp && window.StimulusApp.controllers) {
+                    const controller = window.StimulusApp.controllers.find(
+                        c => c.context.identifier === 'plugin-interface' && c.element === rootElement
+                    );
+                    
+                    if (controller) {
+                        console.log(`Utilisation du contrôleur Stimulus pour [${pluginName}]`);
+                        controller.execute(event);
+                        return;
+                    }
                 }
                 
-                const ddmField = document.getElementById('coords_ddm');
-                if (ddmField) ddmField.value = coords.ddm || '';
+                // Si pas de contrôleur Stimulus, utiliser l'appel API direct
+                console.log(`Exécution directe pour [${pluginName}]`);
                 
-                const latField = document.getElementById('coords_lat');
-                if (latField) latField.value = coords.ddm_lat || '';
+                // Préparer l'affichage
+                const output = rootElement.querySelector('[data-plugin-interface-target="output"]');
+                if (output) {
+                    output.classList.remove('hidden');
+                    output.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>';
+                }
                 
-                const lonField = document.getElementById('coords_lon');
-                if (lonField) lonField.value = coords.ddm_lon || '';
-            }
-        } catch (e) {
-            console.error('Invalid JSON:', e);
-        }
-    }
-    
-    // Fonction pour afficher/masquer le format brut
-    function toggleRawOutput() {
-        const rawOutput = document.getElementById('raw-output');
-        if (rawOutput) {
-            rawOutput.classList.toggle('hidden');
-            const button = rawOutput.previousElementSibling;
-            if (button) {
-                button.textContent = rawOutput.classList.contains('hidden') 
-                    ? 'Afficher le format brut'
-                    : 'Masquer le format brut';
-            }
-        }
-    }
-    
-    // Fonction pour copier la sortie dans le presse-papier
-    function copyOutputToClipboard() {
-        if (!window.lastPluginResult) return;
-        
-        const textToCopy = JSON.stringify(window.lastPluginResult, null, 2);
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            alert('Résultat copié dans le presse-papier');
-        }).catch(err => {
-            console.error('Erreur lors de la copie:', err);
-        });
-    }
-
-    // Si on a un ID de géocache, exécuter automatiquement
-    {% if plugin.params.get('geocacheId') %}
-        executePlugin();
-    {% endif %}
+                // Récupérer les données du formulaire
+                let data = {};
+                const form = rootElement.querySelector('[data-plugin-interface-target="form"]');
+                if (form) {
+                    // Collecter tous les champs
+                    const formData = new FormData(form);
+                    for (let [key, value] of formData.entries()) {
+                        data[key] = value;
+                    }
+                    
+                    // Traitement spécial pour certains champs
+                    const modeSelect = form.querySelector('#mode');
+                    if (modeSelect) data.mode = modeSelect.value;
+                    
+                    const bruteForceCheckbox = form.querySelector('#brute_force');
+                    if (bruteForceCheckbox) data.brute_force = bruteForceCheckbox.checked;
+                } else {
+                    // Si pas de formulaire, utiliser l'ID géocache
+                    const geocacheId = rootElement.dataset.pluginInterfaceIdValue;
+                    if (geocacheId && geocacheId !== 'default') {
+                        data.geocache_id = geocacheId;
+                    }
+                }
+                
+                // Appel API
+                fetch(`/api/plugins/${pluginName}/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    
+                    // Déterminer le type de contenu
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        return response.json().then(data => ({
+                            isJson: true,
+                            content: data
+                        }));
+                    } else {
+                        return response.text().then(text => ({
+                            isJson: false,
+                            content: text
+                        }));
+                    }
+                })
+                .then(result => {
+                    if (!output) return;
+                    
+                    // Traiter les résultats HTML (ancien format)
+                    if (!result.isJson) {
+                        output.innerHTML = result.content;
+                        return;
+                    }
+                    
+                    // Traiter les résultats JSON
+                    const data = result.content;
+                    let normalizedData = { ...data };
+                    
+                    // Normaliser la structure
+                    if (data.result && data.result.text && data.result.text.text_output !== undefined) {
+                        normalizedData.text_output = data.result.text.text_output;
+                    } else if (data.output !== undefined) {
+                        normalizedData.text_output = data.output;
+                    }
+                    
+                    // Extraire le log
+                    if (data.result && data.result.log !== undefined) {
+                        normalizedData.log = data.result.log;
+                    } else if (data.original_result && data.original_result.result && data.original_result.result.log) {
+                        normalizedData.log = data.original_result.result.log;
+                    }
+                    
+                    // Afficher les résultats
+                    output.innerHTML = `
+                        <div class="space-y-4">
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h3 class="text-lg font-medium text-gray-300 mb-2">Résultat</h3>
+                                <div class="bg-gray-800 p-4 rounded">
+                                    <textarea class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${normalizedData.text_output || ''}</textarea>
+                                </div>
+                            </div>
+                            ${normalizedData.log ? `
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h3 class="text-lg font-medium text-gray-300 mb-2">Détails de la projection</h3>
+                                <div class="bg-gray-800 p-4 rounded">
+                                    <pre class="w-full bg-gray-800 text-gray-300 font-mono text-sm whitespace-pre-wrap">${normalizedData.log}</pre>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <!-- Affichage des coordonnées GPS si elles existent -->
+                            ${normalizedData.coordinates ? `
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h3 class="text-lg font-medium text-gray-300 mb-2">Coordonnées détectées</h3>
+                                
+                                <div class="mb-3">
+                                    <label class="inline-flex items-center">
+                                        <input type="checkbox" class="coords-exist-checkbox form-checkbox h-5 w-5 text-blue-600" 
+                                               ${normalizedData.coordinates.exist === true ? 'checked' : ''}
+                                               id="coords-exist-${uniqueId}">
+                                        <span class="ml-2 text-gray-300">Coordonnées présentes</span>
+                                    </label>
+                                </div>
+                                
+                                <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4 ${normalizedData.coordinates.exist === true ? '' : 'opacity-50'} coords-container-${uniqueId}">
+                                    <div>
+                                        <label for="coords-ddm-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                                        <input type="text" id="coords-ddm-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                               value="${normalizedData.coordinates.ddm || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="coords-lat-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                                            <input type="text" id="coords-lat-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                                   value="${normalizedData.coordinates.ddm_lat || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                        </div>
+                                        <div>
+                                            <label for="coords-lon-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                                            <input type="text" id="coords-lon-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                                   value="${normalizedData.coordinates.ddm_lon || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <!-- Ajout de l'affichage du format brut -->
+                            <div class="mt-4">
+                                <button class="text-sm text-blue-400 hover:text-blue-300" id="toggle-raw-${uniqueId}">
+                                    Afficher le format brut
+                                </button>
+                                <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
+                                    <textarea class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(normalizedData, null, 2)}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Ajouter l'événement pour afficher/masquer le format brut
+                    const toggleButton = output.querySelector(`#toggle-raw-${uniqueId}`);
+                    const rawOutput = output.querySelector('.raw-output');
+                    
+                    if (toggleButton && rawOutput) {
+                        toggleButton.addEventListener('click', function() {
+                            rawOutput.classList.toggle('hidden');
+                            toggleButton.textContent = rawOutput.classList.contains('hidden') 
+                                ? 'Afficher le format brut'
+                                : 'Masquer le format brut';
+                        });
+                    }
+                    
+                    // Ajouter les événements pour la gestion des coordonnées
+                    const coordsExistCheckbox = output.querySelector(`#coords-exist-${uniqueId}`);
+                    const coordsContainer = output.querySelector(`.coords-container-${uniqueId}`);
+                    
+                    if (coordsExistCheckbox && coordsContainer) {
+                        coordsExistCheckbox.addEventListener('change', function() {
+                            const exists = this.checked;
+                            coordsContainer.classList.toggle('opacity-50', !exists);
+                            
+                            // Activer/désactiver les champs de saisie
+                            const inputs = coordsContainer.querySelectorAll('input[type="text"]');
+                            inputs.forEach(input => {
+                                input.disabled = !exists;
+                            });
+                            
+                            // Mettre à jour la valeur dans les données normalisées
+                            if (normalizedData.coordinates) {
+                                normalizedData.coordinates.exist = exists;
+                                
+                                // Mettre à jour le textarea du format brut si visible
+                                const rawTextarea = output.querySelector('.raw-output textarea');
+                                if (rawTextarea && !output.querySelector('.raw-output').classList.contains('hidden')) {
+                                    rawTextarea.value = JSON.stringify(normalizedData, null, 2);
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    if (output) {
+                        output.innerHTML = `<div class="bg-red-900 text-red-100 p-4 rounded-lg">Erreur: ${error.message}</div>`;
+                    }
+                });
+            });
+        }, 100);
+    })();
 </script>
