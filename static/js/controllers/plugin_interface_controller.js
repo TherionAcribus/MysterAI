@@ -104,7 +104,13 @@ class PluginInterfaceController extends Controller {
             const data = result.content
             this.pluginResult = data // Sauvegarder le résultat pour l'édition
             
-            // Vérifier et normaliser la structure du résultat
+            // Nouveau format standardisé
+            if (data.results && Array.isArray(data.results)) {
+                this._renderStandardizedResults(data)
+                return
+            }
+            
+            // Gérer les formats de résultat variables des différents plugins (ancien format)
             let normalizedData = { ...data }
             
             // Gérer les formats de résultat variables des différents plugins
@@ -247,6 +253,155 @@ class PluginInterfaceController extends Controller {
         })
     }
 
+    // Rendu des résultats au format standardisé
+    _renderStandardizedResults(data) {
+        let resultsHtml = '<div class="space-y-4">'
+        
+        // Afficher d'abord le résumé s'il existe
+        if (data.summary) {
+            resultsHtml += `
+            <div class="bg-gray-700 rounded-lg p-4 mb-4">
+                <h3 class="text-lg font-medium text-blue-400 mb-2">Résumé</h3>
+                <div class="bg-gray-800 p-4 rounded">
+                    <p class="text-gray-300">${data.summary.message || `${data.summary.total_results} résultat(s)`}</p>
+                    ${data.status === 'error' ? `<p class="text-red-400 mt-2">Erreur: ${data.summary.message || 'Une erreur est survenue'}</p>` : ''}
+                    ${data.plugin_info ? `<p class="text-gray-400 text-sm mt-2">Temps d'exécution: ${data.plugin_info.execution_time || 0} ms</p>` : ''}
+                </div>
+            </div>`;
+        }
+        
+        // Afficher chaque résultat
+        data.results.forEach((result, index) => {
+            const isBest = data.summary && data.summary.best_result_id === result.id;
+            
+            resultsHtml += `
+            <div class="bg-gray-700 rounded-lg p-4 mb-4 ${isBest ? 'border-2 border-blue-500' : ''}">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="text-lg font-medium ${isBest ? 'text-blue-400' : 'text-gray-300'}">
+                        Résultat ${index + 1} ${isBest ? '(Meilleur résultat)' : ''}
+                    </h3>
+                    <div class="bg-gray-900 px-2 py-1 rounded text-sm">
+                        Confiance: <span class="font-bold ${this._getConfidenceColor(result.confidence)}">${Math.round(result.confidence * 100)}%</span>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 p-4 rounded mb-3">
+                    <textarea class="result-output w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
+                    data-action="input->plugin-interface#updateResultOutput"
+                    data-result-id="${result.id}" data-index="${index}">${result.text_output || ''}</textarea>
+                </div>`;
+                
+            // Afficher les paramètres utilisés si présents
+            if (result.parameters && Object.keys(result.parameters).length > 0) {
+                resultsHtml += `
+                <div class="mt-2 p-2 bg-gray-800 rounded">
+                    <h4 class="text-sm font-medium text-gray-400 mb-1">Paramètres utilisés:</h4>
+                    <div class="text-xs text-gray-300 grid grid-cols-2 gap-1">
+                        ${Object.entries(result.parameters).map(([key, value]) => 
+                            `<div><span class="text-gray-500">${key}:</span> ${value}</div>`
+                        ).join('')}
+                    </div>
+                </div>`;
+            }
+            
+            // Afficher les métadonnées si présentes
+            if (result.metadata && Object.keys(result.metadata).length > 0) {
+                resultsHtml += `
+                <div class="mt-2 p-2 bg-gray-800 rounded">
+                    <h4 class="text-sm font-medium text-gray-400 mb-1">Métadonnées:</h4>
+                    <div class="text-xs text-gray-300">
+                        ${Object.entries(result.metadata).map(([key, value]) => {
+                            if (typeof value === 'object') {
+                                return `<div class="mb-1"><span class="text-gray-500">${key}:</span> ${JSON.stringify(value)}</div>`;
+                            } else {
+                                return `<div class="mb-1"><span class="text-gray-500">${key}:</span> ${value}</div>`;
+                            }
+                        }).join('')}
+                    </div>
+                </div>`;
+            }
+            
+            // Afficher les coordonnées GPS si présentes
+            if (result.coordinates && result.coordinates.exist) {
+                resultsHtml += `
+                <div class="mt-3 p-3 bg-gray-800 rounded">
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">Coordonnées GPS:</h4>
+                    <div class="grid grid-cols-1 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Format DDM:</label>
+                            <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                   value="${result.coordinates.ddm || ''}" readonly>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Latitude:</label>
+                                <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                       value="${result.coordinates.ddm_lat || ''}" readonly>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Longitude:</label>
+                                <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                       value="${result.coordinates.ddm_lon || ''}" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            resultsHtml += `</div>`;
+        });
+        
+        // Ajouter l'option pour afficher le JSON brut
+        resultsHtml += `
+        <div class="mt-4">
+            <button data-action="plugin-interface#toggleRawOutput" class="text-sm text-blue-400 hover:text-blue-300">
+                Afficher le format brut
+            </button>
+            <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
+                <textarea class="raw-output-field w-full h-60 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
+                         data-action="input->plugin-interface#updateRawJson">${JSON.stringify(data, null, 2)}</textarea>
+            </div>
+        </div>`;
+        
+        // Ajouter le bouton pour copier la sortie
+        resultsHtml += `
+        <div class="mt-4 flex justify-end">
+            <button data-action="plugin-interface#copyOutputToClipboard" class="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Copier la sortie
+            </button>
+        </div>`;
+        
+        resultsHtml += '</div>';
+        this.outputTarget.innerHTML = resultsHtml;
+    }
+
+    // Utilitaire pour déterminer la couleur en fonction du niveau de confiance
+    _getConfidenceColor(confidence) {
+        if (confidence >= 0.8) return 'text-green-400';
+        if (confidence >= 0.5) return 'text-yellow-400';
+        if (confidence >= 0.3) return 'text-orange-400';
+        return 'text-red-400';
+    }
+
+    // Mise à jour d'un résultat spécifique
+    updateResultOutput(event) {
+        if (!this.pluginResult || !this.pluginResult.results) return;
+        
+        const resultId = event.target.dataset.resultId;
+        const index = parseInt(event.target.dataset.index);
+        const value = event.target.value;
+        
+        if (resultId && !isNaN(index) && index >= 0 && index < this.pluginResult.results.length) {
+            this.pluginResult.results[index].text_output = value;
+            
+            // Mettre à jour l'affichage JSON brut s'il est visible
+            const rawOutput = this.element.querySelector('.raw-output-field');
+            if (rawOutput && !this.element.querySelector('.raw-output').classList.contains('hidden')) {
+                rawOutput.value = JSON.stringify(this.pluginResult, null, 2);
+            }
+        }
+    }
+
     // Mise à jour des valeurs dans le résultat
     updatePluginResult(event) {
         if (!this.pluginResult) return
@@ -302,8 +457,16 @@ class PluginInterfaceController extends Controller {
     updateRawJson(event) {
         try {
             const rawData = JSON.parse(event.target.value)
+            this.pluginResult = rawData;
             
-            // Créer une version normalisée des données pour l'interface
+            // Pour le nouveau format avec des résultats multiples
+            if (rawData.results && Array.isArray(rawData.results)) {
+                // Re-rendre toute l'interface pour les résultats multiples
+                this._renderStandardizedResults(rawData);
+                return;
+            }
+            
+            // Création d'une version normalisée pour l'ancien format
             let normalizedData = { ...rawData }
             
             // Normaliser les structures de résultat

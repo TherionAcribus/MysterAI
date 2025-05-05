@@ -261,126 +261,236 @@
                     const data = result.content;
                     let normalizedData = { ...data };
                     
-                    // Normaliser la structure
-                    if (data.result && data.result.text && data.result.text.text_output !== undefined) {
-                        normalizedData.text_output = data.result.text.text_output;
-                    } else if (data.output !== undefined) {
-                        normalizedData.text_output = data.output;
-                    }
-                    
-                    // Extraire le log
-                    if (data.result && data.result.log !== undefined) {
-                        normalizedData.log = data.result.log;
-                    } else if (data.original_result && data.original_result.result && data.original_result.result.log) {
-                        normalizedData.log = data.original_result.result.log;
-                    }
-                    
-                    // Afficher les résultats
-                    output.innerHTML = `
-                        <div class="space-y-4">
-                            <div class="bg-gray-700 rounded-lg p-4">
-                                <h3 class="text-lg font-medium text-gray-300 mb-2">Résultat</h3>
+                    // Gérer le nouveau format standardisé
+                    if (data.results && Array.isArray(data.results)) {
+                        // Nouveau format
+                        let resultsHtml = '';
+                        
+                        // Afficher d'abord le résumé s'il existe
+                        if (data.summary) {
+                            resultsHtml += `
+                            <div class="bg-gray-700 rounded-lg p-4 mb-4">
+                                <h3 class="text-lg font-medium text-blue-400 mb-2">Résumé</h3>
                                 <div class="bg-gray-800 p-4 rounded">
-                                    <textarea class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${normalizedData.text_output || ''}</textarea>
+                                    <p class="text-gray-300">${data.summary.message || `${data.summary.total_results} résultat(s)`}</p>
+                                    ${data.status === 'error' ? `<p class="text-red-400 mt-2">Erreur: ${data.summary.message || 'Une erreur est survenue'}</p>` : ''}
+                                    ${data.plugin_info ? `<p class="text-gray-400 text-sm mt-2">Temps d'exécution: ${data.plugin_info.execution_time || 0} ms</p>` : ''}
                                 </div>
-                            </div>
-                            ${normalizedData.log ? `
-                            <div class="bg-gray-700 rounded-lg p-4">
-                                <h3 class="text-lg font-medium text-gray-300 mb-2">Détails de la projection</h3>
-                                <div class="bg-gray-800 p-4 rounded">
-                                    <pre class="w-full bg-gray-800 text-gray-300 font-mono text-sm whitespace-pre-wrap">${normalizedData.log}</pre>
-                                </div>
-                            </div>
-                            ` : ''}
+                            </div>`;
+                        }
+                        
+                        // Afficher chaque résultat
+                        data.results.forEach((result, index) => {
+                            const isBest = data.summary && data.summary.best_result_id === result.id;
                             
-                            <!-- Affichage des coordonnées GPS si elles existent -->
-                            ${normalizedData.coordinates ? `
-                            <div class="bg-gray-700 rounded-lg p-4">
-                                <h3 class="text-lg font-medium text-gray-300 mb-2">Coordonnées détectées</h3>
-                                
-                                <div class="mb-3">
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" class="coords-exist-checkbox form-checkbox h-5 w-5 text-blue-600" 
-                                               ${normalizedData.coordinates.exist === true ? 'checked' : ''}
-                                               id="coords-exist-${uniqueId}">
-                                        <span class="ml-2 text-gray-300">Coordonnées présentes</span>
-                                    </label>
+                            resultsHtml += `
+                            <div class="bg-gray-700 rounded-lg p-4 mb-4 ${isBest ? 'border-2 border-blue-500' : ''}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-medium ${isBest ? 'text-blue-400' : 'text-gray-300'}">
+                                        Résultat ${index + 1} ${isBest ? '(Meilleur résultat)' : ''}
+                                    </h3>
+                                    <div class="bg-gray-900 px-2 py-1 rounded text-sm">
+                                        Confiance: <span class="font-bold ${getConfidenceColor(result.confidence)}">${Math.round(result.confidence * 100)}%</span>
+                                    </div>
                                 </div>
                                 
-                                <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4 ${normalizedData.coordinates.exist === true ? '' : 'opacity-50'} coords-container-${uniqueId}">
-                                    <div>
-                                        <label for="coords-ddm-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                                        <input type="text" id="coords-ddm-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                               value="${normalizedData.coordinates.ddm || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                <div class="bg-gray-800 p-4 rounded mb-3">
+                                    <textarea class="result-output w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y"
+                                    data-index="${index}" data-result-id="${result.id}">${result.text_output || ''}</textarea>
+                                </div>`;
+                                
+                            // Afficher les paramètres utilisés si présents
+                            if (result.parameters && Object.keys(result.parameters).length > 0) {
+                                resultsHtml += `
+                                <div class="mt-2 p-2 bg-gray-800 rounded">
+                                    <h4 class="text-sm font-medium text-gray-400 mb-1">Paramètres utilisés:</h4>
+                                    <div class="text-xs text-gray-300 grid grid-cols-2 gap-1">
+                                        ${Object.entries(result.parameters).map(([key, value]) => 
+                                            `<div><span class="text-gray-500">${key}:</span> ${value}</div>`
+                                        ).join('')}
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            // Afficher les coordonnées GPS si présentes
+                            if (result.coordinates && result.coordinates.exist) {
+                                resultsHtml += `
+                                <div class="mt-3 p-3 bg-gray-800 rounded">
+                                    <h4 class="text-sm font-medium text-gray-400 mb-2">Coordonnées GPS:</h4>
+                                    <div class="grid grid-cols-1 gap-2">
+                                        <div>
+                                            <label class="block text-xs text-gray-500 mb-1">Format DDM:</label>
+                                            <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                                   value="${result.coordinates.ddm || ''}" readonly>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Latitude:</label>
+                                                <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                                       value="${result.coordinates.ddm_lat || ''}" readonly>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Longitude:</label>
+                                                <input type="text" class="w-full bg-gray-900 text-gray-300 border border-gray-700 focus:border-blue-500 p-1 rounded text-sm"
+                                                       value="${result.coordinates.ddm_lon || ''}" readonly>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            resultsHtml += `</div>`;
+                        });
+                        
+                        // Ajouter l'option pour afficher le JSON brut
+                        resultsHtml += `
+                        <div class="mt-4">
+                            <button class="text-sm text-blue-400 hover:text-blue-300" id="toggle-raw-${uniqueId}">
+                                Afficher le format brut
+                            </button>
+                            <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
+                                <textarea class="w-full h-60 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(data, null, 2)}</textarea>
+                            </div>
+                        </div>`;
+                        
+                        output.innerHTML = resultsHtml;
+                        
+                        // Ajouter l'événement pour afficher/masquer le format brut
+                        const toggleButton = output.querySelector(`#toggle-raw-${uniqueId}`);
+                        const rawOutput = output.querySelector('.raw-output');
+                        
+                        if (toggleButton && rawOutput) {
+                            toggleButton.addEventListener('click', function() {
+                                rawOutput.classList.toggle('hidden');
+                                toggleButton.textContent = rawOutput.classList.contains('hidden') 
+                                    ? 'Afficher le format brut'
+                                    : 'Masquer le format brut';
+                            });
+                        }
+                    }
+                    // Gérer l'ancien format pour rétrocompatibilité
+                    else {
+                        // Normaliser la structure
+                        if (data.result && data.result.text && data.result.text.text_output !== undefined) {
+                            normalizedData.text_output = data.result.text.text_output;
+                        } else if (data.output !== undefined) {
+                            normalizedData.text_output = data.output;
+                        }
+                        
+                        // Extraire le log
+                        if (data.result && data.result.log !== undefined) {
+                            normalizedData.log = data.result.log;
+                        } else if (data.original_result && data.original_result.result && data.original_result.result.log) {
+                            normalizedData.log = data.original_result.result.log;
+                        }
+                        
+                        // Afficher les résultats (ancien format)
+                        output.innerHTML = `
+                            <div class="space-y-4">
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <h3 class="text-lg font-medium text-gray-300 mb-2">Résultat</h3>
+                                    <div class="bg-gray-800 p-4 rounded">
+                                        <textarea class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${normalizedData.text_output || ''}</textarea>
+                                    </div>
+                                </div>
+                                ${normalizedData.log ? `
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <h3 class="text-lg font-medium text-gray-300 mb-2">Détails de la projection</h3>
+                                    <div class="bg-gray-800 p-4 rounded">
+                                        <pre class="w-full bg-gray-800 text-gray-300 font-mono text-sm whitespace-pre-wrap">${normalizedData.log}</pre>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Affichage des coordonnées GPS si elles existent -->
+                                ${normalizedData.coordinates ? `
+                                <div class="bg-gray-700 rounded-lg p-4">
+                                    <h3 class="text-lg font-medium text-gray-300 mb-2">Coordonnées détectées</h3>
+                                    
+                                    <div class="mb-3">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" class="coords-exist-checkbox form-checkbox h-5 w-5 text-blue-600" 
+                                                   ${normalizedData.coordinates.exist === true ? 'checked' : ''}
+                                                   id="coords-exist-${uniqueId}">
+                                            <span class="ml-2 text-gray-300">Coordonnées présentes</span>
+                                        </label>
                                     </div>
                                     
-                                    <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4 ${normalizedData.coordinates.exist === true ? '' : 'opacity-50'} coords-container-${uniqueId}">
                                         <div>
-                                            <label for="coords-lat-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                            <input type="text" id="coords-lat-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                                   value="${normalizedData.coordinates.ddm_lat || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                            <label for="coords-ddm-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                                            <input type="text" id="coords-ddm-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                                   value="${normalizedData.coordinates.ddm || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
                                         </div>
-                                        <div>
-                                            <label for="coords-lon-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                            <input type="text" id="coords-lon-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
-                                                   value="${normalizedData.coordinates.ddm_lon || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                        
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label for="coords-lat-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                                                <input type="text" id="coords-lat-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                                       value="${normalizedData.coordinates.ddm_lat || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                            </div>
+                                            <div>
+                                                <label for="coords-lon-${uniqueId}" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                                                <input type="text" id="coords-lon-${uniqueId}" class="w-full bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded"
+                                                       value="${normalizedData.coordinates.ddm_lon || ''}" ${normalizedData.coordinates.exist === true ? '' : 'disabled'}>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            ` : ''}
-                            
-                            <!-- Ajout de l'affichage du format brut -->
-                            <div class="mt-4">
-                                <button class="text-sm text-blue-400 hover:text-blue-300" id="toggle-raw-${uniqueId}">
-                                    Afficher le format brut
-                                </button>
-                                <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
-                                    <textarea class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(normalizedData, null, 2)}</textarea>
+                                ` : ''}
+                                
+                                <!-- Ajout de l'affichage du format brut -->
+                                <div class="mt-4">
+                                    <button class="text-sm text-blue-400 hover:text-blue-300" id="toggle-raw-${uniqueId}">
+                                        Afficher le format brut
+                                    </button>
+                                    <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
+                                        <textarea class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(normalizedData, null, 2)}</textarea>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                    
-                    // Ajouter l'événement pour afficher/masquer le format brut
-                    const toggleButton = output.querySelector(`#toggle-raw-${uniqueId}`);
-                    const rawOutput = output.querySelector('.raw-output');
-                    
-                    if (toggleButton && rawOutput) {
-                        toggleButton.addEventListener('click', function() {
-                            rawOutput.classList.toggle('hidden');
-                            toggleButton.textContent = rawOutput.classList.contains('hidden') 
-                                ? 'Afficher le format brut'
-                                : 'Masquer le format brut';
-                        });
-                    }
-                    
-                    // Ajouter les événements pour la gestion des coordonnées
-                    const coordsExistCheckbox = output.querySelector(`#coords-exist-${uniqueId}`);
-                    const coordsContainer = output.querySelector(`.coords-container-${uniqueId}`);
-                    
-                    if (coordsExistCheckbox && coordsContainer) {
-                        coordsExistCheckbox.addEventListener('change', function() {
-                            const exists = this.checked;
-                            coordsContainer.classList.toggle('opacity-50', !exists);
-                            
-                            // Activer/désactiver les champs de saisie
-                            const inputs = coordsContainer.querySelectorAll('input[type="text"]');
-                            inputs.forEach(input => {
-                                input.disabled = !exists;
+                        `;
+                        
+                        // Ajouter l'événement pour afficher/masquer le format brut
+                        const toggleButton = output.querySelector(`#toggle-raw-${uniqueId}`);
+                        const rawOutput = output.querySelector('.raw-output');
+                        
+                        if (toggleButton && rawOutput) {
+                            toggleButton.addEventListener('click', function() {
+                                rawOutput.classList.toggle('hidden');
+                                toggleButton.textContent = rawOutput.classList.contains('hidden') 
+                                    ? 'Afficher le format brut'
+                                    : 'Masquer le format brut';
                             });
-                            
-                            // Mettre à jour la valeur dans les données normalisées
-                            if (normalizedData.coordinates) {
-                                normalizedData.coordinates.exist = exists;
+                        }
+                        
+                        // Ajouter les événements pour la gestion des coordonnées
+                        const coordsExistCheckbox = output.querySelector(`#coords-exist-${uniqueId}`);
+                        const coordsContainer = output.querySelector(`.coords-container-${uniqueId}`);
+                        
+                        if (coordsExistCheckbox && coordsContainer) {
+                            coordsExistCheckbox.addEventListener('change', function() {
+                                const exists = this.checked;
+                                coordsContainer.classList.toggle('opacity-50', !exists);
                                 
-                                // Mettre à jour le textarea du format brut si visible
-                                const rawTextarea = output.querySelector('.raw-output textarea');
-                                if (rawTextarea && !output.querySelector('.raw-output').classList.contains('hidden')) {
-                                    rawTextarea.value = JSON.stringify(normalizedData, null, 2);
+                                // Activer/désactiver les champs de saisie
+                                const inputs = coordsContainer.querySelectorAll('input[type="text"]');
+                                inputs.forEach(input => {
+                                    input.disabled = !exists;
+                                });
+                                
+                                // Mettre à jour la valeur dans les données normalisées
+                                if (normalizedData.coordinates) {
+                                    normalizedData.coordinates.exist = exists;
+                                    
+                                    // Mettre à jour le textarea du format brut si visible
+                                    const rawTextarea = output.querySelector('.raw-output textarea');
+                                    if (rawTextarea && !output.querySelector('.raw-output').classList.contains('hidden')) {
+                                        rawTextarea.value = JSON.stringify(normalizedData, null, 2);
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
                 })
                 .catch(error => {
@@ -391,4 +501,12 @@
             });
         }, 100);
     })();
+    
+    // Fonction utilitaire pour obtenir la couleur selon le niveau de confiance
+    function getConfidenceColor(confidence) {
+        if (confidence >= 0.8) return 'text-green-400';
+        if (confidence >= 0.5) return 'text-yellow-400';
+        if (confidence >= 0.3) return 'text-orange-400';
+        return 'text-red-400';
+    }
 </script>

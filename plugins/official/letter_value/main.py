@@ -1,5 +1,6 @@
 import re
 import string
+import time
 
 class LetterValuePlugin:
     def __init__(self):
@@ -308,6 +309,74 @@ class LetterValuePlugin:
         
         return text
     
+    def get_bruteforce_results(self, text, output_format, allowed_chars, embedded, strict_mode):
+        """
+        Génère plusieurs résultats avec différentes combinaisons de paramètres.
+        
+        Args:
+            text: Texte à traiter
+            output_format: Format de sortie
+            allowed_chars: Caractères autorisés
+            embedded: Si le texte peut contenir du code intégré
+            strict_mode: Mode de décodage strict ou non
+            
+        Returns:
+            Liste de dictionnaires contenant les différents résultats
+        """
+        results = []
+        
+        # Définir les paramètres à tester
+        test_params = [
+            {"use_checksum": False, "confidence": 0.9, "description": "Valeurs standard (A=1, B=2...)"},
+            {"use_checksum": True, "confidence": 0.7, "description": "Valeurs avec checksum"}
+        ]
+        
+        # Générer un résultat pour chaque combinaison de paramètres
+        for idx, params in enumerate(test_params):
+            use_checksum = params["use_checksum"]
+            confidence = params["confidence"]
+            description = params["description"]
+            
+            # Vérifier si le texte contient du code letter value
+            check_result = self.check_code(text, strict_mode, allowed_chars, embedded)
+            
+            if check_result["is_match"]:
+                # Dans le mode décodage, on encode les fragments avec les options données
+                result_text = text
+                sorted_fragments = sorted(check_result["fragments"], key=len, reverse=True)
+                
+                for fragment in sorted_fragments:
+                    encoded_fragment = self.encode(fragment, output_format, use_checksum, False)
+                    
+                    # Créer un pattern insensible à la casse pour ce fragment
+                    pattern = ''.join(f'[{c.upper()}{c.lower()}]' for c in fragment)
+                    
+                    # Remplacer dans le texte
+                    result_text = re.sub(pattern, encoded_fragment, result_text)
+                
+                # Tenter de formater comme des coordonnées GPS
+                formatted = self.format_coordinates(result_text)
+                
+                # Ajuster la confiance en fonction du score de détection
+                adjusted_confidence = confidence * check_result["score"]
+                
+                results.append({
+                    "id": f"result_{idx + 1}",
+                    "text_output": formatted,
+                    "confidence": adjusted_confidence,
+                    "parameters": {
+                        "use_checksum": use_checksum,
+                        "output_format": output_format
+                    },
+                    "metadata": {
+                        "fragments": check_result["fragments"],
+                        "description": description,
+                        "detection_score": check_result["score"]
+                    }
+                })
+            
+        return results
+    
     def execute(self, inputs):
         """
         Point d'entrée principal du plugin.
@@ -316,8 +385,10 @@ class LetterValuePlugin:
             inputs: Dictionnaire contenant les paramètres d'entrée
                 
         Returns:
-            Dictionnaire contenant le résultat de l'opération
+            Dictionnaire contenant le résultat de l'opération au format standardisé
         """
+        start_time = time.time()
+        
         mode = inputs.get("mode", "decode").lower()
         text = inputs.get("text", "")
         strict_mode = inputs.get("strict", "smooth").lower() == "strict"
@@ -333,121 +404,138 @@ class LetterValuePlugin:
         else:
             brute_force = brute_force_value.lower() == "true"
         
-        print("Mode LETTER VALUE:", inputs)
-        
-        if not text:
-            return {"error": "Le texte d'entrée est vide"}
-        
-        final_result = {
-            "coordinates": {
-                "ddm": None,
-                "ddm_lat": None,
-                "ddm_lon": None,
-                "exist": False
+        # Initialiser la structure de résultat standardisée
+        normalized_result = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "execution_time": int((time.time() - start_time) * 1000)
+            },
+            "inputs": inputs,
+            "results": [],
+            "summary": {
+                "total_results": 0
             }
         }
         
+        if not text:
+            normalized_result["status"] = "error"
+            normalized_result["summary"]["message"] = "Le texte d'entrée est vide"
+            return normalized_result
+        
+        # Mode bruteforce - générer plusieurs résultats
+        if brute_force and mode == "decode":
+            results = self.get_bruteforce_results(text, output_format, allowed_chars, embedded, strict_mode)
+            if results:
+                normalized_result["results"] = results
+                normalized_result["summary"]["total_results"] = len(results)
+                normalized_result["summary"]["best_result_id"] = results[0]["id"]
+                normalized_result["summary"]["message"] = f"{len(results)} résultats générés en mode bruteforce"
+            else:
+                normalized_result["status"] = "error"
+                normalized_result["summary"]["message"] = "Aucun code letter value détecté"
+            
+            return normalized_result
+        
+        # Mode standard - un seul résultat
         if mode == "encode":
-            encoded = self.encode(text, output_format, use_checksum, brute_force)
-            final_result["result"] = {
-                "text": {
-                    "text_output": encoded,
-                    "text_input": text,
-                    "mode": mode,
+            encoded = self.encode(text, output_format, use_checksum, False)
+            
+            normalized_result["results"].append({
+                "id": "result_1",
+                "text_output": encoded,
+                "confidence": 1.0,
+                "parameters": {
                     "use_checksum": use_checksum,
-                    "brute_force": brute_force
-                }
-            }
-            final_result["text_output"] = encoded
+                    "output_format": output_format
+                },
+                "metadata": {}
+            })
+            
+            normalized_result["summary"]["total_results"] = 1
+            normalized_result["summary"]["best_result_id"] = "result_1"
+            normalized_result["summary"]["message"] = "Encodage réussi"
             
         elif mode == "decode":
-            # On utilise toujours la logique de fragments, même en mode strict
             check_result = self.check_code(text, strict_mode, allowed_chars, embedded)
+            
             if check_result["is_match"]:
-                # Dans le mode décodage, on encode les fragments avec les options de checksum/brute force
-                decoded = ""
-                if check_result["fragments"]:
-                    result_text = text
-                    sorted_fragments = sorted(check_result["fragments"], key=len, reverse=True)
+                result_text = text
+                sorted_fragments = sorted(check_result["fragments"], key=len, reverse=True)
+                
+                for fragment in sorted_fragments:
+                    encoded_fragment = self.encode(fragment, output_format, use_checksum, False)
                     
-                    for fragment in sorted_fragments:
-                        encoded_fragment = self.encode(fragment, output_format, use_checksum, brute_force)
-                        
-                        # Créer un pattern insensible à la casse pour ce fragment
-                        pattern = ''.join(f'[{c.upper()}{c.lower()}]' for c in fragment)
-                        
-                        # Remplacer dans le texte
-                        result_text = re.sub(pattern, encoded_fragment, result_text)
+                    # Créer un pattern insensible à la casse pour ce fragment
+                    pattern = ''.join(f'[{c.upper()}{c.lower()}]' for c in fragment)
                     
-                    decoded = result_text
-                else:
-                    decoded = text
-                    
+                    # Remplacer dans le texte
+                    result_text = re.sub(pattern, encoded_fragment, result_text)
+                
                 # Tenter de formater comme des coordonnées GPS
-                formatted = self.format_coordinates(decoded)
-                final_result["result"] = {
-                    "text": {
-                        "text_output": formatted,
-                        "text_input": text,
-                        "fragments": check_result["fragments"],
-                        "mode": mode,
+                formatted = self.format_coordinates(result_text)
+                
+                normalized_result["results"].append({
+                    "id": "result_1",
+                    "text_output": formatted,
+                    "confidence": check_result["score"],
+                    "parameters": {
                         "use_checksum": use_checksum,
-                        "brute_force": brute_force
+                        "output_format": output_format
+                    },
+                    "metadata": {
+                        "fragments": check_result["fragments"]
                     }
-                }
-                final_result["text_output"] = formatted
+                })
+                
+                normalized_result["summary"]["total_results"] = 1
+                normalized_result["summary"]["best_result_id"] = "result_1"
+                normalized_result["summary"]["message"] = "Décodage réussi"
             else:
-                no_result = "Aucun code letter value détecté"
-                final_result["result"] = {
-                    "text": {
-                        "text_output": no_result,
-                        "text_input": text,
-                        "mode": mode
-                    }
-                }
-                final_result["text_output"] = no_result
+                normalized_result["status"] = "error"
+                normalized_result["summary"]["message"] = "Aucun code letter value détecté"
                 
         elif mode == "detect":
             detect_result = self.detect(text, strict_mode, allowed_chars, embedded)
+            
             if detect_result["is_match"]:
                 fragments_info = []
                 for fragment in detect_result.get("fragments", []):
                     if isinstance(fragment, dict):
-                        fragments_info.append(f"'{fragment['original']}' → '{fragment['decoded']}'")
-                    else:
-                        fragments_info.append(f"'{fragment}'")
+                        fragments_info.append({
+                            "original": fragment['original'],
+                            "decoded": fragment['decoded']
+                        })
                 
-                details = f"Score: {detect_result['score']:.2f}\n"
-                if fragments_info:
-                    details += f"Fragments détectés: {', '.join(fragments_info)}"
-                else:
-                    details += "Fragments détectés: aucun"
+                details = f"Code letter value détecté avec un score de {detect_result['score']:.2f}"
                 
-                output_text = f"Code letter value détecté!\n{details}"
-                final_result["result"] = {
-                    "text": {
-                        "text_output": output_text,
-                        "text_input": text,
-                        "mode": mode
+                normalized_result["results"].append({
+                    "id": "result_1",
+                    "text_output": details,
+                    "confidence": detect_result["score"],
+                    "parameters": {
+                        "strict_mode": strict_mode,
+                        "embedded": embedded
+                    },
+                    "metadata": {
+                        "fragments": fragments_info
                     }
-                }
-                final_result["text_output"] = output_text
+                })
+                
+                normalized_result["summary"]["total_results"] = 1
+                normalized_result["summary"]["best_result_id"] = "result_1"
+                normalized_result["summary"]["message"] = "Code letter value détecté"
             else:
-                output_text = f"Aucun code letter value détecté\nScore: {detect_result['score']:.2f}"
-                final_result["result"] = {
-                    "text": {
-                        "text_output": output_text,
-                        "text_input": text,
-                        "mode": mode
-                    }
-                }
-                final_result["text_output"] = output_text
+                normalized_result["status"] = "error"
+                normalized_result["summary"]["message"] = f"Aucun code letter value détecté (score: {detect_result['score']:.2f})"
         else:
-            error_msg = f"Mode inconnu : {mode}"
-            final_result["error"] = error_msg
-            final_result["text_output"] = error_msg
-            
-        return final_result
+            normalized_result["status"] = "error"
+            normalized_result["summary"]["message"] = f"Mode inconnu : {mode}"
+        
+        # Mettre à jour le temps d'exécution final
+        normalized_result["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return normalized_result
 
 
 # Point d'entrée pour le plugin    
