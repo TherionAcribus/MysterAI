@@ -167,10 +167,12 @@
                     <!-- Résultat du plugin -->
                     <div data-geocache-solver-target="pluginResult" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
                         <h2 class="text-lg font-semibold text-gray-100 mb-3">Résultat du plugin</h2>
-                        <textarea 
+                        <div 
                             data-geocache-solver-target="pluginResultText" 
-                            class="w-full min-h-[100px] bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap"
-                        ></textarea>
+                            class="w-full min-h-[100px] bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 space-y-3 overflow-auto"
+                        >
+                            <!-- Le contenu sera généré dynamiquement par le JS -->
+                        </div>
                     </div>
                 </div>
                 

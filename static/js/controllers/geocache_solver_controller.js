@@ -448,12 +448,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     resultContainer.className = 'bg-gray-800 rounded-lg p-4 mb-4 mt-4';
                     resultContainer.innerHTML = `
                         <h2 class="text-lg font-semibold text-gray-100 mb-3">Résultat du plugin ${pluginName}</h2>
-                        <textarea id="${resultZoneId}-text" class="w-full min-h-[100px] bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap">
+                        <div id="${resultZoneId}-text" class="w-full min-h-[100px] bg-gray-700 text-gray-200 p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 space-y-3 overflow-auto">
                             <div class="animate-pulse">
                                 <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
                                 <div class="h-4 bg-gray-700 rounded w-1/2"></div>
                             </div>
-                        </textarea>
+                        </div>
                     `;
                     
                     // Insérer la zone de résultat après la zone du plugin
@@ -501,36 +501,151 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 
                 // Extraire le résultat du plugin en fonction de la structure de la réponse
                 let resultText = '';
+                let resultHtml = '';
+                let coordinates = null;
                 
-                // Cas 1: Réponse avec text_output
-                if (data.text_output) {
-                    resultText = data.text_output;
-                    console.log("Cas 1: text_output trouvé:", resultText);
-                }
-                // Cas 2: Réponse avec result.text.text_output
-                else if (data.result && data.result.text && data.result.text.text_output) {
-                    resultText = data.result.text.text_output;
-                    console.log("Cas 2: result.text.text_output trouvé:", resultText);
-                }
-                // Cas 3: Réponse avec output
-                else if (data.output) {
-                    resultText = data.output;
-                    console.log("Cas 3: output trouvé:", resultText);
-                }
-                // Cas 4: Réponse avec result direct
-                else if (data.result) {
-                    resultText = data.result;
-                    console.log("Cas 4: result direct trouvé:", resultText);
-                }
-                // Cas 5: Réponse est une chaîne de caractères
-                else if (typeof data === 'string') {
-                    resultText = data;
-                    console.log("Cas 5: réponse est une chaîne:", resultText);
-                }
-                // Cas par défaut: Afficher la réponse complète
-                else {
-                    resultText = JSON.stringify(data, null, 2);
-                    console.log("Cas par défaut: affichage de la réponse complète");
+                // Vérifier si nous avons le nouveau format standardisé avec un tableau results
+                if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+                    console.log("Format standardisé détecté avec tableau results");
+                    
+                    // Entête avec le résumé si disponible
+                    if (data.summary) {
+                        resultHtml += `
+                            <div class="bg-gray-700 rounded-lg p-4 mb-3">
+                                <h3 class="text-md font-medium text-blue-400 mb-2">Résumé</h3>
+                                <div class="bg-gray-800 p-3 rounded">
+                                    <p class="text-gray-300">${data.summary.message || `${data.summary.total_results} résultat(s)`}</p>
+                                    ${data.plugin_info ? `<p class="text-gray-400 text-xs mt-1">Temps d'exécution: ${data.plugin_info.execution_time || 0} ms</p>` : ''}
+                                </div>
+                            </div>`;
+                    }
+                    
+                    // Traiter chaque résultat
+                    data.results.forEach((result, index) => {
+                        const isBest = data.summary && data.summary.best_result_id === result.id;
+                        
+                        // Classe de couleur basée sur le niveau de confiance
+                        const confidenceColor = this.getConfidenceColor(result.confidence);
+                        
+                        resultHtml += `
+                            <div class="bg-gray-700 rounded-lg p-3 mb-3 ${isBest ? 'border border-blue-500' : ''}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h4 class="text-md font-medium ${isBest ? 'text-blue-400' : 'text-gray-300'}">
+                                        Résultat ${index + 1} ${isBest ? '(Meilleur résultat)' : ''}
+                                    </h4>
+                                    <div class="bg-gray-900 px-2 py-1 rounded text-xs">
+                                        Confiance: <span class="font-bold ${confidenceColor}">${Math.round((result.confidence || 0) * 100)}%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gray-800 p-3 rounded mb-2">
+                                    <div class="text-sm text-gray-300 whitespace-pre-wrap">${result.text_output || ''}</div>
+                                </div>`;
+                        
+                        // Afficher les paramètres utilisés si présents
+                        if (result.parameters && Object.keys(result.parameters).length > 0) {
+                            resultHtml += `
+                                <div class="mt-2 p-2 bg-gray-800 rounded">
+                                    <h5 class="text-xs font-medium text-gray-400 mb-1">Paramètres utilisés:</h5>
+                                    <div class="text-xs text-gray-300 grid grid-cols-2 gap-1">
+                                        ${Object.entries(result.parameters).map(([key, value]) => 
+                                            `<div><span class="text-gray-500">${key}:</span> ${value}</div>`
+                                        ).join('')}
+                                    </div>
+                                </div>`;
+                        }
+                        
+                        // Afficher les coordonnées GPS si présentes
+                        if (result.coordinates && result.coordinates.exist) {
+                            coordinates = result.coordinates;
+                            resultHtml += `
+                                <div class="mt-2 p-2 bg-gray-800 rounded">
+                                    <h5 class="text-xs font-medium text-gray-400 mb-1">Coordonnées GPS:</h5>
+                                    <div class="text-xs text-gray-300">
+                                        <div class="mb-1"><span class="text-gray-500">Format DDM:</span> ${result.coordinates.ddm || ''}</div>
+                                        <div class="grid grid-cols-2 gap-1">
+                                            <div><span class="text-gray-500">Latitude:</span> ${result.coordinates.ddm_lat || ''}</div>
+                                            <div><span class="text-gray-500">Longitude:</span> ${result.coordinates.ddm_lon || ''}</div>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        }
+                        
+                        resultHtml += `</div>`;
+                        
+                        // Conserver le texte du meilleur résultat pour la chaîne de plugins
+                        if (isBest) {
+                            resultText = result.text_output || '';
+                        }
+                    });
+                    
+                    // Si aucun meilleur résultat n'a été défini, prendre le premier
+                    if (!resultText && data.results.length > 0) {
+                        resultText = data.results[0].text_output || '';
+                    }
+                    
+                } else {
+                    // Ancien format - maintenir la rétrocompatibilité
+                    console.log("Format ancien détecté, utilisation de la rétrocompatibilité");
+                    
+                    // Cas 1: Réponse avec text_output
+                    if (data.text_output) {
+                        resultText = data.text_output;
+                        console.log("Cas 1: text_output trouvé:", resultText);
+                    }
+                    // Cas 2: Réponse avec result.text.text_output
+                    else if (data.result && data.result.text && data.result.text.text_output) {
+                        resultText = data.result.text.text_output;
+                        console.log("Cas 2: result.text.text_output trouvé:", resultText);
+                    }
+                    // Cas 3: Réponse avec output
+                    else if (data.output) {
+                        resultText = data.output;
+                        console.log("Cas 3: output trouvé:", resultText);
+                    }
+                    // Cas 4: Réponse avec result direct
+                    else if (data.result) {
+                        resultText = typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2);
+                        console.log("Cas 4: result direct trouvé:", resultText);
+                    }
+                    // Cas 5: Réponse est une chaîne de caractères
+                    else if (typeof data === 'string') {
+                        resultText = data;
+                        console.log("Cas 5: réponse est une chaîne:", resultText);
+                    }
+                    // Cas par défaut: Afficher la réponse complète
+                    else {
+                        resultText = JSON.stringify(data, null, 2);
+                        console.log("Cas par défaut: affichage de la réponse complète");
+                    }
+                    
+                    // Vérifier si des coordonnées sont présentes dans l'ancien format
+                    if (data.coordinates && data.coordinates.exist) {
+                        coordinates = data.coordinates;
+                    } else if (data.result && data.result.coordinates && data.result.coordinates.exist) {
+                        coordinates = data.result.coordinates;
+                    }
+                    
+                    // Générer HTML pour l'affichage simple
+                    resultHtml = `
+                        <div class="bg-gray-900 rounded-lg p-3 border border-gray-700 mb-3">
+                            <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultText}</div>
+                        </div>`;
+                        
+                    // Ajouter les coordonnées si présentes
+                    if (coordinates) {
+                        resultHtml += `
+                            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700 mb-3">
+                                <h4 class="text-md font-medium text-green-400 mb-2">Coordonnées GPS détectées</h4>
+                                <div class="text-sm text-gray-300">
+                                    <div class="mb-1">Format DDM: ${coordinates.ddm || ''}</div>
+                                    <div class="grid grid-cols-2 gap-1">
+                                        <div>Latitude: ${coordinates.ddm_lat || ''}</div>
+                                        <div>Longitude: ${coordinates.ddm_lon || ''}</div>
+                                    </div>
+                                </div>
+                            </div>`;
+                    }
                 }
                 
                 // Si le résultat est vide, afficher un message
@@ -544,13 +659,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 // Afficher le résultat dans un conteneur formaté
                 if (resultTextContainer) {
                     if (resultTextContainer.tagName === 'TEXTAREA') {
+                        // Pour les textareas, on utilise simplement le texte
                         resultTextContainer.value = resultText;
                     } else {
-                        resultTextContainer.innerHTML = `
-                            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700 mb-3">
-                                <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultText}</div>
-                            </div>
-                        `;
+                        // Pour les éléments HTML, on utilise l'affichage riche
+                        resultTextContainer.innerHTML = resultHtml;
                     }
                     console.log("Résultat affiché dans le conteneur");
                     
@@ -1126,16 +1239,25 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             // Parcourir tous les résultats combinés
             Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
                 let resultText = "";
+                let confidenceText = "";
                 
                 // Extraire le texte décodé s'il existe
                 if (pluginResult.decoded_text) {
                     resultText = pluginResult.decoded_text;
                 }
                 
+                // Ajouter l'indicateur de confiance si disponible
+                if (pluginResult.confidence !== undefined) {
+                    const confidence = pluginResult.confidence;
+                    const confidenceColor = this.getConfidenceColor(confidence);
+                    confidenceText = `<div class="text-xs ${confidenceColor} font-medium">Confiance: ${Math.round(confidence * 100)}%</div>`;
+                }
+                
                 html += `
                     <div class="bg-gray-600 p-3 rounded">
                         <div class="flex justify-between items-center">
                             <span class="text-gray-200 font-medium">${pluginName}</span>
+                            ${confidenceText}
                         </div>
                         <div class="text-gray-200 mt-1">${resultText}</div>
                     </div>
@@ -1158,10 +1280,21 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 const fragments = code.fragments || [];
                 const fragmentsText = fragments.map(f => f.value).join(', ');
                 
+                // Ajouter l'indicateur de confiance si disponible
+                let confidenceText = "";
+                if (code.confidence !== undefined) {
+                    const confidence = code.confidence;
+                    const confidenceColor = this.getConfidenceColor(confidence);
+                    confidenceText = `<div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round(confidence * 100)}%</div>`;
+                }
+                
                 html += `
                     <div class="bg-gray-600 p-3 rounded">
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-200 font-medium">${code.plugin_name}</span>
+                            <div class="flex items-center">
+                                <span class="text-gray-200 font-medium">${code.plugin_name}</span>
+                                ${confidenceText}
+                            </div>
                             ${code.can_decode ? `<button 
                                 data-action="click->geocache-solver#decodeWithPlugin" 
                                 data-plugin="${code.plugin_name}" 
@@ -1187,9 +1320,20 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
             
             for (const decoded of decodedResults) {
+                // Ajouter l'indicateur de confiance si disponible
+                let confidenceText = "";
+                if (decoded.confidence !== undefined) {
+                    const confidence = decoded.confidence;
+                    const confidenceColor = this.getConfidenceColor(confidence);
+                    confidenceText = `<div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round(confidence * 100)}%</div>`;
+                }
+                
                 html += `
                     <div class="bg-gray-600 p-3 rounded">
-                        <div class="text-gray-300 font-medium">${decoded.plugin_name}</div>
+                        <div class="flex items-center">
+                            <div class="text-gray-300 font-medium">${decoded.plugin_name}</div>
+                            ${confidenceText}
+                        </div>
                         <div class="text-gray-200 mt-1">${decoded.decoded_text}</div>
                     </div>
                 `;
@@ -1220,6 +1364,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     addToPluginsHistory(entry) {
         this.pluginsHistoryValue.push(entry);
         this.displayPluginsHistory();
+    }
+
+    // Fonction utilitaire pour obtenir la couleur selon le niveau de confiance
+    getConfidenceColor(confidence) {
+        if (!confidence) return 'text-gray-300';
+        if (confidence >= 0.8) return 'text-green-400';
+        if (confidence >= 0.5) return 'text-yellow-400';
+        if (confidence >= 0.3) return 'text-orange-400';
+        return 'text-red-400';
     }
 
     // Méthode pour utiliser les coordonnées détectées

@@ -140,9 +140,10 @@ class MetaDetectionPlugin:
         
         # Liste des plugins à utiliser pour le test (phase de développement)
         included_plugins = [
-            "abaddon_code",
+            #"abaddon_code",
             "kenny_code",
-            "hexadecimal_encoder_decoder",
+            #"hexadecimal_encoder_decoder",
+            "letter_value",
             "roman_numerals",
             "wherigo_reverse_decoder"
         ]
@@ -225,9 +226,9 @@ class MetaDetectionPlugin:
         
         # Liste des plugins à utiliser pour le test (phase de développement)
         included_plugins = [
-            "abaddon_code",
+            #"abaddon_code",
+            "letter_value",
             "kenny_code",
-            "hexadecimal_encoder_decoder",
             "roman_numerals",
             "wherigo_reverse_decoder"
         ]
