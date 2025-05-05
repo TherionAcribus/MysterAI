@@ -372,15 +372,32 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         
         // Si on a un plugin sélectionné
         if (pluginId && pluginName) {
-            // Récupérer le texte à traiter (soit le résultat du plugin précédent, soit le texte de la description)
+            // Récupérer le texte à traiter
             let textToProcess = '';
             
-            if (!this.lastPluginOutputValue) {
-                // Utiliser le texte de la description
+            // Déterminer si le plugin est déjà exécuté dans cette zone (réexécution)
+            const isReexecution = pluginZoneId && document.getElementById(`result-for-${pluginZoneId}`);
+            
+            if (isReexecution) {
+                // En cas de réexécution, on utilise toujours le texte original (soit de la description, soit du plugin précédent)
+                // On cherche la source originale du texte pour cette zone
+                const pluginZone = document.getElementById(pluginZoneId);
+                
+                // Si ce plugin fait partie d'une chaîne, on utilise l'entrée originale qui a été fournie à cette zone
+                if (pluginZone && pluginZone.dataset.originalInput) {
+                    textToProcess = pluginZone.dataset.originalInput;
+                    console.log("Réexécution: utilisation de l'entrée originale stockée pour cette zone:", textToProcess);
+                } else {
+                    // Si pas d'entrée originale stockée, on revient au texte de base
+                    textToProcess = this.descriptionTextTarget.value;
+                    console.log("Réexécution: retour au texte de base:", textToProcess);
+                }
+            } else if (!this.lastPluginOutputValue) {
+                // Première exécution: utiliser le texte de la description
                 textToProcess = this.descriptionTextTarget.value;
                 console.log("Utilisation du texte de la description:", textToProcess);
             } else {
-                // Utiliser le résultat du plugin précédent
+                // Dans une chaîne de plugins: utiliser le résultat du plugin précédent
                 textToProcess = this.lastPluginOutputValue;
                 console.log("Utilisation du résultat du plugin précédent:", textToProcess);
             }
@@ -403,6 +420,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     }
                     
                     console.log("Zone de plugin trouvée:", pluginZone);
+                    
+                    // Stocker l'entrée originale pour cette zone si ce n'est pas déjà fait
+                    if (!pluginZone.hasAttribute('data-original-input')) {
+                        pluginZone.setAttribute('data-original-input', textToProcess);
+                        console.log("Entrée originale stockée pour la zone:", textToProcess);
+                    }
                     
                     // Supprimer tout résultat précédent associé à ce plugin
                     const existingResult = document.getElementById(`result-for-${pluginZoneId}`);
@@ -542,8 +565,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     console.error("Le conteneur de résultat n'existe pas!");
                 }
                 
-                // Stocker le résultat pour le prochain plugin
-                this.lastPluginOutputValue = resultText;
+                // Stocker le résultat pour le prochain plugin (uniquement si ce n'est pas une réexécution)
+                if (!isReexecution) {
+                    this.lastPluginOutputValue = resultText;
+                }
                 
                 // Ajouter le résultat à l'historique des plugins
                 this.pluginsHistoryValue.push({
@@ -579,13 +604,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     if (resultTextContainer.tagName === 'TEXTAREA') {
                         resultTextContainer.value = `Erreur: ${error.message}`;
                     } else {
-                        resultTextContainer.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
-                    }
-                } else if (this.hasPluginResultTextTarget) {
-                    if (this.pluginResultTextTarget.tagName === 'TEXTAREA') {
-                        this.pluginResultTextTarget.value = `Erreur: ${error.message}`;
-                    } else {
-                        this.pluginResultTextTarget.innerHTML = `<div class="text-red-400">Erreur: ${error.message}</div>`;
+                        resultTextContainer.innerHTML = `
+                            <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                                Erreur lors de l'exécution du plugin: ${error.message}
+                            </div>
+                        `;
                     }
                 }
             }
