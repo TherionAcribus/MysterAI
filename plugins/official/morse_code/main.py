@@ -1,4 +1,5 @@
 import re
+import time
 from loguru import logger
 
 class MorseCodePlugin:
@@ -121,54 +122,126 @@ class MorseCodePlugin:
     def execute(self, inputs: dict) -> dict:
         """
         Méthode d'exécution avec gestion des modes strict/smooth
+        
+        Args:
+            inputs: Dictionnaire contenant les paramètres d'entrée
+                - mode: "encode" ou "decode"
+                - text: Texte à traiter
+                - strict: Mode strict ou smooth
+                - allowed_punct: Caractères séparateurs autorisés
+                
+        Returns:
+            Dictionnaire au format standardisé contenant le résultat
         """
+        # Mesurer le temps d'exécution
+        start_time = time.time()
+        
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
-        strict_mode = inputs.get("strict", False)
+        strict_mode = inputs.get("strict", "").lower() == "strict"
         allowed_punct = inputs.get("allowed_punct", None)
 
+        # Structure de base pour la réponse au format standardisé
+        standardized_response = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": {
+                "mode": mode,
+                "text": text,
+                "strict": "strict" if strict_mode else "smooth"
+            },
+            "results": [],
+            "summary": {
+                "best_result_id": None,
+                "total_results": 0,
+                "message": ""
+            }
+        }
+
         if not text:
-            return {"error": "Aucun texte fourni à traiter."}
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "Aucun texte fourni à traiter."
+            return standardized_response
 
         try:
             if mode == "encode":
                 encoded = self.encrypt(text)
-                return {
-                    "result": {
-                        "text": {
-                            "text_output": encoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
+                
+                # Ajouter le résultat au format standardisé
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": encoded,
+                    "confidence": 1.0,
+                    "parameters": {
+                        "mode": "encode"
+                    },
+                    "metadata": {
+                        "input_chars": len([c for c in text.upper() if c in self.letter_to_morse])
                     }
-                }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = "Encodage en Morse réussi"
                 
             elif mode == "decode":
                 if strict_mode:
                     check = self.check_code(text, strict=True, allowed_punct=allowed_punct)
                     if not check["is_match"]:
-                        return {"error": "Code Morse invalide en mode strict"}
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Code Morse invalide en mode strict"
+                        return standardized_response
+                    
                     decoded = self.decrypt(text)
                 else:
                     check = self.check_code(text, strict=False, allowed_punct=allowed_punct)
-                    decoded = (
-                        self.decode_fragments(text, check["fragments"])
-                        if check["is_match"]
-                        else text
-                    )
+                    if not check["is_match"]:
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun code Morse valide détecté"
+                        return standardized_response
+                    
+                    decoded = self.decode_fragments(text, check["fragments"])
+                    
+                    # Vérifier si le décodage a effectivement modifié le texte
+                    if decoded == text:
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun code Morse n'a pu être décodé"
+                        return standardized_response
 
-                return {
-                    "result": {
-                        "text": {
-                            "text_output": decoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
+                # Ajouter le résultat au format standardisé
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": decoded,
+                    "confidence": 0.9,
+                    "parameters": {
+                        "mode": "decode",
+                        "strict": "strict" if strict_mode else "smooth"
+                    },
+                    "metadata": {
+                        "fragments_count": len(check["fragments"]),
+                        "fragments": [f["value"] for f in check["fragments"]]
                     }
-                }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = "Décodage Morse réussi"
                 
             else:
-                return {"error": f"Mode inconnu : {mode}"}
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = f"Mode inconnu : {mode}"
+                return standardized_response
                 
         except Exception as e:
-            return {"error": f"Erreur pendant le traitement : {e}"}
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = f"Erreur pendant le traitement : {str(e)}"
+            return standardized_response
+        
+        # Calculer le temps d'exécution
+        standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return standardized_response

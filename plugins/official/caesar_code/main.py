@@ -1,3 +1,5 @@
+import time
+
 class CaesarCodePlugin:
     """
     Plugin pour encoder/décoder du texte avec le code César.
@@ -54,6 +56,7 @@ class CaesarCodePlugin:
             list: Liste de solutions, chaque élément étant un dict 
                   { "shift": int, "decoded_text": str }
         """
+        print("Bruteforce")
         solutions = []
         for possible_shift in range(1, 26):
             decoded = self.decode(text, possible_shift)
@@ -65,72 +68,176 @@ class CaesarCodePlugin:
     
     def execute(self, inputs):
         """
-        Execute the plugin with the given inputs.
+        Exécute le plugin avec les entrées spécifiées.
+        
+        Args:
+            inputs: Dictionnaire des paramètres d'entrée
+                - mode: "encode", "decode" ou "bruteforce"
+                - text: Texte à traiter
+                - shift: Décalage à appliquer (entier, par défaut 13)
+        
         Returns:
-          - encode/decode => {"text_output": "...", "mode": "..."}
-          - bruteforce    => {"bruteforce_solutions": [ {shift, decoded_text}, ... ], "mode": "bruteforce"}
+            Dictionnaire au format standardisé contenant le résultat
         """
-        print("INPUT CAESAR", inputs)
+        # Mesurer le temps d'exécution
+        start_time = time.time()
+        
+        # Structure de base pour la réponse au format standardisé
+        standardized_response = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": inputs.copy(),
+            "results": [],
+            "summary": {
+                "best_result_id": None,
+                "total_results": 0,
+                "message": ""
+            }
+        }
+        
         mode = inputs.get('mode', 'encode')
         text_input = inputs.get('text', '')
-        shift = int(inputs.get('shift', 13))  # Décalage par défaut: 13
-
-        # Gérer le cas où l'entrée est déjà un résultat de bruteforce
-        if isinstance(text_input, dict) and 'bruteforce_solutions' in text_input:
-            if mode == 'bruteforce':
-                # Pour chaque solution précédente, on applique bruteforce
-                all_solutions = []
-                for prev_solution in text_input['bruteforce_solutions']:
-                    text_to_process = prev_solution['decoded_text']
-                    for new_shift in range(1, 26):
-                        decoded = self.decode(text_to_process, new_shift)
-                        all_solutions.append({
-                            'decoded_text': decoded,
-                            'shift': new_shift,
-                            'previous_shift': prev_solution['shift']
-                        })
-                return {
-                    'bruteforce_solutions': all_solutions,
-                    'mode': 'bruteforce'
-                }
-            else:
-                # Pour le mode encode/decode, on traite chaque solution précédente
-                solutions = []
-                for prev_solution in text_input['bruteforce_solutions']:
-                    text_to_process = prev_solution['decoded_text']
-                    if mode == 'encode':
-                        processed_text = self.encode(text_to_process, shift)
-                    else:  # decode
-                        processed_text = self.decode(text_to_process, shift)
-                    solutions.append({
-                        'decoded_text': processed_text,
-                        'shift': shift,
-                        'previous_shift': prev_solution['shift']
-                    })
-                return {
-                    'bruteforce_solutions': solutions,
-                    'mode': "bruteforce"
-                }
+        print("INPUTS", inputs)
         
-        # Comportement normal pour une entrée texte simple
-        if mode == 'bruteforce':
-            solutions = []
-            for test_shift in range(1, 26):
-                decoded = self.decode(text_input, test_shift)
-                solutions.append({
-                    'decoded_text': decoded,
-                    'shift': test_shift
-                })
-            return {
-                'bruteforce_solutions': solutions,
-                'mode': 'bruteforce'
-            }
-        else:
-            if mode == 'encode':
+        # Vérifier si le texte est vide
+        if not text_input:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "Aucun texte fourni à traiter."
+            return standardized_response
+        
+        try:
+            shift = int(inputs.get('shift', 13))  # Décalage par défaut: 13
+        except ValueError:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "La valeur du décalage doit être un nombre entier."
+            return standardized_response
+
+        # Vérifier si le mode bruteforce est activé (avec les deux styles de paramètre possibles)
+        bruteforce_param1 = inputs.get('bruteforce', False)
+        bruteforce_param2 = inputs.get('brute_force', False)
+        do_bruteforce = bruteforce_param1 or bruteforce_param2
+        
+        print(f"Bruteforce params: bruteforce={bruteforce_param1}, brute_force={bruteforce_param2}, final={do_bruteforce}")
+        
+        try:
+            # Mode bruteforce activé explicitement ou via le paramètre
+            if do_bruteforce or mode == 'bruteforce':
+                print("Mode bruteforce activé")
+                solutions = self.bruteforce(text_input)
+                
+                # Ajouter chaque solution comme un résultat distinct
+                for idx, solution in enumerate(solutions, 1):
+                    shift_value = solution["shift"]
+                    confidence = self._calculate_confidence(shift_value, solution["decoded_text"])
+                    
+                    standardized_response["results"].append({
+                        "id": f"result_{idx}",
+                        "text_output": solution["decoded_text"],
+                        "confidence": confidence,
+                        "parameters": {
+                            "mode": "decode",
+                            "shift": shift_value
+                        },
+                        "metadata": {
+                            "bruteforce_position": idx,
+                            "processed_chars": sum(1 for c in text_input.upper() if c in self.alphabet)
+                        }
+                    })
+                
+                # Trier les résultats par confiance décroissante
+                standardized_response["results"].sort(key=lambda x: x["confidence"], reverse=True)
+                
+                # Mettre à jour le résumé
+                if standardized_response["results"]:
+                    standardized_response["summary"]["best_result_id"] = standardized_response["results"][0]["id"]
+                    standardized_response["summary"]["total_results"] = len(standardized_response["results"])
+                    standardized_response["summary"]["message"] = f"Bruteforce César: {len(standardized_response['results'])} décalages testés"
+                else:
+                    standardized_response["status"] = "error"
+                    standardized_response["summary"]["message"] = "Aucune solution de bruteforce trouvée"
+            # Cas standard: encode avec une entrée de texte simple
+            elif mode == 'encode' and isinstance(text_input, str):
                 result = self.encode(text_input, shift)
-            else:  # decode
+                
+                # Ajouter le résultat au format standardisé
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": result,
+                    "confidence": 1.0,
+                    "parameters": {
+                        "mode": mode,
+                        "shift": shift
+                    },
+                    "metadata": {
+                        "processed_chars": sum(1 for c in text_input.upper() if c in self.alphabet)
+                    }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = f"{mode.capitalize()} César avec décalage {shift} réussi"
+            
+            # Mode decode simple
+            elif mode == 'decode' and isinstance(text_input, str):
+                # Mode decode simple avec un seul décalage
                 result = self.decode(text_input, shift)
-            return {
-                'text_output': result,
-                'mode': mode
-            }
+                
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": result,
+                    "confidence": 0.9,
+                    "parameters": {
+                        "mode": "decode",
+                        "shift": shift
+                    },
+                    "metadata": {
+                        "processed_chars": sum(1 for c in text_input.upper() if c in self.alphabet)
+                    }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = f"Décodage César avec décalage {shift} réussi"
+            
+            # Cas où l'entrée est déjà un résultat de bruteforce (format ancien)
+            elif isinstance(text_input, dict) and 'bruteforce_solutions' in text_input:
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = "Format d'entrée non compatible avec le format standardisé"
+                return standardized_response
+            
+            else:
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = f"Mode invalide ou incompatible : {mode}"
+                return standardized_response
+                
+        except Exception as e:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = f"Erreur pendant le traitement : {str(e)}"
+            return standardized_response
+        
+        # Calculer le temps d'exécution
+        standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return standardized_response
+        
+    def _calculate_confidence(self, shift, text):
+        """
+        Calcule un indice de confiance pour un résultat de bruteforce.
+        Les décalages les plus courants (ROT13, ROT1, etc.) reçoivent une confiance plus élevée.
+        """
+        # ROT13 est le plus courant, suivi par ROT1
+        common_shifts = {13: 0.95, 1: 0.9, 3: 0.85, 5: 0.8, 7: 0.75}
+        
+        if shift in common_shifts:
+            return common_shifts[shift]
+        
+        # Pour les autres, calculer en fonction de la position (plus proche de 13, plus probable)
+        base_confidence = 0.7
+        distance_from_13 = abs(shift - 13)
+        confidence_modifier = -0.01 * distance_from_13  # Réduire la confiance en s'éloignant de 13
+        
+        return max(0.5, base_confidence + confidence_modifier)  # Minimum 0.5
