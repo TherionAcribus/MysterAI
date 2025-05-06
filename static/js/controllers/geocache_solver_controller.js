@@ -980,6 +980,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 formData.append('allowed_chars', JSON.stringify(allowedChars));
             }
             
+            console.log("Paramètres envoyés à l'API:", {
+                text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
+                mode: mode,
+                strict: strict,
+                embedded: embedded,
+                enable_gps_detection: enableGpsDetection,
+                allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
+            });
+            
             // Appeler l'API pour exécuter le MetaSolver
             const response = await fetch('/api/plugins/metadetection/execute', {
                 method: 'POST',
@@ -991,6 +1000,13 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             const result = await response.json();
+            console.log("Réponse brute de l'API MetaSolver:", result);
+            console.log("Structure complète des résultats:", JSON.stringify(result, null, 2));
+            console.log("Présence de 'results':", !!result.results);
+            console.log("Type de 'results':", result.results ? typeof result.results : "non défini");
+            console.log("Nombre d'éléments dans 'results':", result.results && Array.isArray(result.results) ? result.results.length : 0);
+            console.log("Présence de 'combined_results':", !!result.combined_results);
+            console.log("Présence de 'primary_coordinates':", !!result.primary_coordinates);
             
             // Formater et afficher les résultats
             resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
@@ -1072,6 +1088,16 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 formData.append('allowed_chars', JSON.stringify(allowedChars));
             }
             
+            console.log("decodeWithPlugin - Paramètres envoyés à l'API:", {
+                text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
+                mode: "decode",
+                strict: strict,
+                embedded: embedded,
+                plugin_name: pluginName,
+                enable_gps_detection: enableGpsDetection,
+                allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
+            });
+            
             // Appeler l'API pour exécuter le MetaSolver avec le plugin spécifié
             const response = await fetch('/api/plugins/metadetection/execute', {
                 method: 'POST',
@@ -1083,6 +1109,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             const result = await response.json();
+            console.log("decodeWithPlugin - Réponse brute de l'API MetaSolver:", result);
+            console.log("decodeWithPlugin - Présence de 'results':", !!result.results);
+            console.log("decodeWithPlugin - Type de 'results':", result.results ? typeof result.results : "non défini");
+            console.log("decodeWithPlugin - Nombre d'éléments dans 'results':", result.results && Array.isArray(result.results) ? result.results.length : 0);
             
             // Afficher le résultat en utilisant la méthode de formatage
             resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
@@ -1110,7 +1140,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     }
     
     async formatMetaDetectionResults(result) {
+        console.log("formatMetaDetectionResults - Début du formatage des résultats");
+        
         if (result.error) {
+            console.log("formatMetaDetectionResults - Erreur détectée:", result.error);
             return `
                 <div class="bg-red-900 text-red-100 p-4 rounded-lg">
                     ${result.error}
@@ -1121,6 +1154,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
         let gpsCoordinatesHtml = '';
         if (result.primary_coordinates) {
+            console.log("formatMetaDetectionResults - Coordonnées primaires détectées:", result.primary_coordinates);
             // Stocker les coordonnées détectées pour une utilisation ultérieure
             this.lastDetectedCoordinatesValue = result.primary_coordinates;
             
@@ -1186,6 +1220,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 </div>
             `;
         } else if (result.coordinates && result.coordinates.exist) {
+            console.log("formatMetaDetectionResults - Coordonnées anciennes détectées (format rétrocompatible)");
             // Ancien format pour rétrocompatibilité
             this.lastDetectedCoordinatesValue = result.coordinates;
             
@@ -1228,8 +1263,79 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         }
 
+        // Vérifier si nous avons le nouveau format standardisé avec un tableau results
+        if (result.results && Array.isArray(result.results) && result.results.length > 0) {
+            console.log("formatMetaDetectionResults - Détecté format standardisé avec tableau results", result.results);
+            let html = '';
+            
+            // Afficher le résumé si disponible
+            if (result.summary) {
+                console.log("formatMetaDetectionResults - Résumé disponible:", result.summary);
+                html += `
+                    <div class="bg-gray-700 rounded-lg p-4 mb-3">
+                        <h3 class="text-md font-medium text-blue-400 mb-2">Résumé</h3>
+                        <div class="bg-gray-800 p-3 rounded">
+                            <p class="text-gray-300">${result.summary.message || `${result.summary.total_results} résultat(s)`}</p>
+                            ${result.plugin_info ? `<p class="text-gray-400 text-xs mt-1">Temps d'exécution: ${result.plugin_info.execution_time || 0} ms</p>` : ''}
+                        </div>
+                    </div>`;
+            }
+            
+            // Conteneur principal pour les résultats
+            html += `
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
+                    <div class="space-y-3">
+            `;
+            
+            // Traiter chaque résultat
+            result.results.forEach((resultEntry, index) => {
+                console.log("formatMetaDetectionResults - Traitement du résultat", index, resultEntry);
+                const isBest = result.summary && result.summary.best_result_id === resultEntry.id;
+                
+                // Classe de couleur basée sur le niveau de confiance
+                const confidenceColor = this.getConfidenceColor(resultEntry.confidence);
+                const parameterPlugin = resultEntry.parameters?.plugin || "";
+                
+                // Déterminer si ce résultat peut être décodé
+                const canDecode = resultEntry.metadata?.can_decode === true;
+                const isDetectMode = resultEntry.parameters?.mode === "detect";
+                const isNotMetadetection = !parameterPlugin.includes("metadetection");
+                const showDecodeButton = isDetectMode && isNotMetadetection && canDecode;
+                
+                console.log(`Résultat ${index} - Plugin: ${parameterPlugin}, Mode: ${resultEntry.parameters?.mode}, CanDecode: ${canDecode}, ShowButton: ${showDecodeButton}`);
+                
+                html += `
+                    <div class="bg-gray-600 p-3 rounded ${isBest ? 'border border-blue-500' : ''}">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center">
+                                <span class="text-gray-200 font-medium">${parameterPlugin}</span>
+                                <div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round((resultEntry.confidence || 0) * 100)}%</div>
+                            </div>
+                            ${showDecodeButton ? 
+                                `<button 
+                                    data-action="click->geocache-solver#decodeWithPlugin" 
+                                    data-plugin="${parameterPlugin}" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded">
+                                    Décoder
+                                </button>` : ''}
+                        </div>
+                        <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultEntry.text_output || ''}</div>
+                        
+                        ${resultEntry.metadata?.fragments?.length > 0 ? 
+                            `<div class="mt-2 text-xs text-gray-400">
+                                Fragments: ${resultEntry.metadata.fragments.join(', ')}
+                             </div>` : ''}
+                    </div>`;
+            });
+            
+            html += `</div></div>`;
+            console.log("formatMetaDetectionResults - HTML généré pour le format standardisé (longueur):", html.length);
+            return html + gpsCoordinatesHtml;
+        }
         // Afficher les résultats des plugins combinés (nouveau format)
-        if (result.combined_results && Object.keys(result.combined_results).length > 0) {
+        else if (result.combined_results && Object.keys(result.combined_results).length > 0) {
+            console.log("formatMetaDetectionResults - Utilisation du format combined_results", Object.keys(result.combined_results));
             let html = `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
@@ -1238,6 +1344,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             // Parcourir tous les résultats combinés
             Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
+                console.log("formatMetaDetectionResults - Plugin résultat:", pluginName, pluginResult);
                 let resultText = "";
                 let confidenceText = "";
                 
@@ -1265,10 +1372,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             });
             
             html += `</div></div>`;
+            console.log("formatMetaDetectionResults - HTML généré pour le format combined_results (longueur):", html.length);
             return html + gpsCoordinatesHtml;
         }
         // Gérer l'ancien format (mode détection)
         else if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
+            console.log("formatMetaDetectionResults - Utilisation du format possible_codes ancien", result.result.possible_codes);
             const codes = result.result.possible_codes;
             let html = `
                 <div class="bg-gray-700 p-4 rounded-lg">
@@ -1308,10 +1417,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             html += `</div></div>`;
+            console.log("formatMetaDetectionResults - HTML généré pour le format possible_codes (longueur):", html.length);
             return html + gpsCoordinatesHtml;
         }
         // Gérer l'ancien format (décodage spécifique)
         else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
+            console.log("formatMetaDetectionResults - Utilisation du format decoded_results ancien", result.result.decoded_results);
             const decodedResults = result.result.decoded_results;
             let html = `
                 <div class="bg-gray-700 p-4 rounded-lg">
@@ -1340,10 +1451,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             html += `</div></div>`;
+            console.log("formatMetaDetectionResults - HTML généré pour le format decoded_results (longueur):", html.length);
             return html + gpsCoordinatesHtml;
         } 
         // Gérer l'ancien format (décodage simple)
         else if (result.result && result.result.decoded_text) {
+            console.log("formatMetaDetectionResults - Utilisation du format decoded_text ancien", result.result.decoded_text);
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>
@@ -1352,6 +1465,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 </div>
             `;
         } else {
+            console.log("formatMetaDetectionResults - Aucun format reconnu, affichage du message par défaut", result);
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <div class="text-gray-400">Aucun code détecté dans le texte.</div>

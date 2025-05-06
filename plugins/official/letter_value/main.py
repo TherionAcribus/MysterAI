@@ -389,11 +389,14 @@ class LetterValuePlugin:
         """
         start_time = time.time()
         
+        print('inputs LetterValue', inputs)
+        
         mode = inputs.get("mode", "decode").lower()
         text = inputs.get("text", "")
         strict_mode = inputs.get("strict", "smooth").lower() == "strict"
         allowed_chars = inputs.get("allowed_chars", " ,.°")
-        embedded = inputs.get("embedded", "true") == True or inputs.get("embedded", "true").lower() == "true"
+        #embedded = inputs.get("embedded", "true") == True or inputs.get("embedded", "true").lower() == "true"
+        embedded = inputs.get("embedded")
         output_format = inputs.get("format", "combined").lower()
         use_checksum = inputs.get("checksum", "false").lower() == "true"
         

@@ -257,8 +257,12 @@ class RomanNumeralsPlugin:
                 - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 
         Returns:
-            Dictionnaire contenant le résultat de l'opération
+            Dictionnaire contenant le résultat de l'opération au format standardisé
         """
+        # Mesurer le temps d'exécution
+        import time
+        start_time = time.time()
+        
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
         
@@ -271,8 +275,32 @@ class RomanNumeralsPlugin:
         # Récupération du mode embedded
         embedded = inputs.get("embedded", False)
 
+        # Structure de base pour la réponse au format standardisé
+        standardized_response = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": {
+                "mode": mode,
+                "text": text,
+                "strict": "strict" if strict_mode else "smooth",
+                "embedded": embedded
+            },
+            "results": [],
+            "summary": {
+                "best_result_id": None,
+                "total_results": 0,
+                "message": ""
+            }
+        }
+
         if not text:
-            return {"error": "Aucun texte fourni à traiter."}
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "Aucun texte fourni à traiter."
+            return standardized_response
 
         try:
             if mode == "encode":
@@ -280,57 +308,91 @@ class RomanNumeralsPlugin:
                 try:
                     num = int(text)
                     if num <= 0:
-                        return {"error": "Le nombre doit être positif pour l'encodage en chiffres romains."}
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Le nombre doit être positif pour l'encodage en chiffres romains."
+                        return standardized_response
+                    
                     encoded = self.encode_roman(num)
-                    text_output = encoded
-                except ValueError:
-                    return {"error": "Le texte doit être un nombre entier pour l'encodage en chiffres romains."}
-                
-                return {
-                    "result": {
-                        "decoded_text": text_output,
-                        "text": {
-                            "text_output": text_output,
-                            "text_input": text,
-                            "mode": mode
+                    
+                    # Ajouter le résultat au format standardisé
+                    standardized_response["results"].append({
+                        "id": "result_1",
+                        "text_output": encoded,
+                        "confidence": 1.0,
+                        "parameters": {
+                            "mode": "encode"
+                        },
+                        "metadata": {
+                            "input_number": num
                         }
-                    }
-                }
-                
+                    })
+                    
+                    standardized_response["summary"]["best_result_id"] = "result_1"
+                    standardized_response["summary"]["total_results"] = 1
+                    standardized_response["summary"]["message"] = f"Encodage réussi: {num} => {encoded}"
+                    
+                except ValueError:
+                    standardized_response["status"] = "error"
+                    standardized_response["summary"]["message"] = "Le texte doit être un nombre entier pour l'encodage en chiffres romains."
+                    return standardized_response
+
             elif mode == "decode":
                 if strict_mode:
                     check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        return {"error": "Chiffres romains invalides en mode strict"}
-                    # Concatène les fragments valides et effectue le décodage classique.
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Chiffres romains invalides en mode strict"
+                        return standardized_response
+                    
+                    # Concatène les fragments valides et effectue le décodage
                     decoded = self.decode_fragments(text, check["fragments"])
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        # Si aucun fragment n'a été trouvé, on retourne une erreur
-                        return {"error": "Aucun chiffre romain détecté dans le texte"}
-                    
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun chiffre romain détecté dans le texte"
+                        return standardized_response
+
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
-                    
+
                     # Vérifier si le texte décodé est différent du texte d'origine
                     if decoded == text:
-                        return {"error": "Aucun chiffre romain n'a pu être décodé"}
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun chiffre romain n'a pu être décodé"
+                        return standardized_response
 
-                # Format de retour compatible avec metadetection
-                return {
-                    "result": {
-                        "decoded_text": decoded,
-                        "text": {
-                            "text_output": decoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
+                # Ajouter le résultat au format standardisé
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": decoded,
+                    "confidence": 0.8,
+                    "parameters": {
+                        "mode": "decode",
+                        "strict": "strict" if strict_mode else "smooth",
+                        "embedded": embedded
+                    },
+                    "metadata": {
+                        "fragments_count": len(check["fragments"]),
+                        "fragments": [f["value"] for f in check["fragments"]]
                     }
-                }
+                })
                 
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = "Décodage réussi"
+
             else:
-                return {"error": f"Mode inconnu : {mode}"}
-                
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = f"Mode inconnu : {mode}"
+                return standardized_response
+
         except Exception as e:
-            return {"error": f"Erreur pendant le traitement : {e}"}
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = f"Erreur pendant le traitement : {str(e)}"
+            return standardized_response
+        
+        # Calculer le temps d'exécution
+        standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return standardized_response
