@@ -1,4 +1,5 @@
 import re
+import time
 
 class AbaddonCodePlugin:
     """
@@ -224,13 +225,39 @@ class AbaddonCodePlugin:
                 - text: Texte à encoder ou décoder
                 - strict: "strict" ou "smooth" pour le mode de décodage
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
-                - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
+                - embedded: True si le texte peut contenir du code intégré
                 
         Returns:
-            Dictionnaire contenant le résultat de l'opération
+            Dictionnaire au format standardisé contenant le résultat de l'opération
         """
+        # Mesurer le temps d'exécution
+        start_time = time.time()
+        
+        # Structure de base pour la réponse au format standardisé
+        standardized_response = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": inputs.copy(),
+            "results": [],
+            "summary": {
+                "best_result_id": None,
+                "total_results": 0,
+                "message": ""
+            }
+        }
+        
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
+        
+        # Vérifier si le texte est vide
+        if not text:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "Aucun texte fourni à traiter."
+            return standardized_response
         
         # Considère le mode strict si la valeur du paramètre "strict" est exactement "strict"
         strict_mode = inputs.get("strict", "").lower() == "strict"
@@ -241,59 +268,87 @@ class AbaddonCodePlugin:
         # Récupération du mode embedded
         embedded = inputs.get("embedded", False)
 
-        if not text:
-            return {"error": "Aucun texte fourni à traiter."}
-
         # Normalisation : on remplace, par exemple, les mu grecs par le micro signe attendu.
         text = self.normalize_text(text)
 
         try:
             if mode == "encode":
                 encoded = self.encode(text)
-                return {
-                    "result": {
-                        "text": {
-                            "text_output": encoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
+                
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": encoded,
+                    "confidence": 1.0,
+                    "parameters": {
+                        "mode": "encode"
+                    },
+                    "metadata": {
+                        "processed_chars": len(text),
+                        "encoded_chars": sum(1 for c in text.upper() if c in self.letter_to_code)
                     }
-                }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = "Encodage Abaddon réussi"
                 
             elif mode == "decode":
                 if strict_mode:
                     check = self.check_code(text, strict=True, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
-                        return {"error": "Code Abaddon invalide en mode strict"}
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Code Abaddon invalide en mode strict"
+                        return standardized_response
+                    
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
+                    confidence = check["score"]
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
                         # Si aucun fragment n'a été trouvé, on retourne une erreur
-                        return {"error": "Aucun code Abaddon détecté dans le texte"}
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun code Abaddon détecté dans le texte"
+                        return standardized_response
                     
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
+                    confidence = check["score"] * 0.9  # Légèrement moins de confiance en mode smooth
                     
                     # Vérifier si le texte décodé est différent du texte d'origine
                     if decoded == text:
-                        return {"error": "Aucun code Abaddon n'a pu être décodé"}
-
-                # Format de retour compatible avec metadetection
-                return {
-                    "result": {
-                        "decoded_text": decoded,
-                        "text": {
-                            "text_output": decoded,
-                            "text_input": text,
-                            "mode": mode
-                        }
+                        standardized_response["status"] = "error"
+                        standardized_response["summary"]["message"] = "Aucun code Abaddon n'a pu être décodé"
+                        return standardized_response
+                
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": decoded,
+                    "confidence": confidence,
+                    "parameters": {
+                        "mode": "decode",
+                        "strict": strict_mode,
+                        "embedded": embedded
+                    },
+                    "metadata": {
+                        "fragments_count": len(check["fragments"]),
+                        "detection_score": check["score"]
                     }
-                }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = f"Décodage Abaddon réussi ({len(check['fragments'])} fragments trouvés)"
                 
             else:
-                return {"error": f"Mode inconnu : {mode}"}
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = f"Mode inconnu : {mode}"
                 
         except Exception as e:
-            return {"error": f"Erreur pendant le traitement : {e}"}
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = f"Erreur pendant le traitement: {str(e)}"
+        
+        # Calculer le temps d'exécution
+        standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return standardized_response

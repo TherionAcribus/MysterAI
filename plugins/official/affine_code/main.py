@@ -1,3 +1,5 @@
+import time
+
 class AffineCodePlugin:
     """
     Plugin pour encoder/décoder du texte avec le chiffre affine.
@@ -77,13 +79,43 @@ class AffineCodePlugin:
         solutions = []
         for a_candidate in self.possible_a:
             for b_candidate in range(self.alphabet_len):
-                decoded_text = self.decode(text, a_candidate, b_candidate)
-                solutions.append({
-                    "a": a_candidate,
-                    "b": b_candidate,
-                    "decoded_text": decoded_text
-                })
+                try:
+                    decoded_text = self.decode(text, a_candidate, b_candidate)
+                    solutions.append({
+                        "a": a_candidate,
+                        "b": b_candidate,
+                        "decoded_text": decoded_text
+                    })
+                except ValueError:
+                    # Ignorer les clés invalides (quand a n'a pas d'inverse modulo 26)
+                    continue
         return solutions
+    
+    def _calculate_confidence(self, a, b, text):
+        """
+        Calcule un indice de confiance pour un résultat de bruteforce.
+        Les valeurs communes (a=1) ont une confiance plus élevée.
+        """
+        # Les paramètres les plus courants
+        if a == 1:
+            # César est un cas particulier du chiffre affine avec a=1
+            if b in [1, 3, 13]:
+                return 0.9
+            else:
+                return 0.8
+        # Autres valeurs communes
+        if a == 3 and b == 1:
+            return 0.7
+        if a == 5 and b == 2:
+            return 0.65
+        
+        # Pour les autres combinaisons, calculer une valeur de base
+        base_confidence = 0.6
+        
+        # Réduire légèrement la confiance pour les valeurs de a et b plus élevées
+        confidence_modifier = -0.01 * (a + b)
+        
+        return max(0.3, base_confidence + confidence_modifier)
 
     def execute(self, inputs):
         """
@@ -94,48 +126,141 @@ class AffineCodePlugin:
           - "b" (int) -> facultatif si on est en bruteforce
           - "mode" ("encode", "decode", "bruteforce")
 
-        Les retours sont sous forme de dict JSON.
+        Les retours sont sous forme de dict JSON au format standardisé.
         """
+        # Mesurer le temps d'exécution
+        start_time = time.time()
+        
+        # Structure de base pour la réponse au format standardisé
+        standardized_response = {
+            "status": "success",
+            "plugin_info": {
+                "name": self.name,
+                "version": "1.0.0",
+                "execution_time": 0
+            },
+            "inputs": inputs.copy(),
+            "results": [],
+            "summary": {
+                "best_result_id": None,
+                "total_results": 0,
+                "message": ""
+            }
+        }
+        
         text = inputs.get('text', '')
         mode = inputs.get('mode', 'encode')
-        # a et b (typiquement 1, 0 par défaut)
-        a = int(inputs.get('a', 1))
-        b = int(inputs.get('b', 0))
-
-        # BRUTEFORCE
-        if mode == 'bruteforce':
-            solutions = self.bruteforce(text)
-            return {
-                'bruteforce_solutions': solutions,
-                'mode': 'bruteforce'
-            }
-
-        # ENCODE
-        elif mode == 'encode':
-            encoded = self.encode(text, a, b)
-            print(encoded)
-            return {
-                'text_output': encoded,
-                'mode': 'encode',
-                'a': a,
-                'b': b
-            }
-
-        # DECODE
-        else:  # mode == 'decode'
-            try:
-                decoded = self.decode(text, a, b)
-                return {
-                    'text_output': decoded,
-                    'mode': 'decode',
-                    'a': a,
-                    'b': b
-                }
-            except ValueError as e:
-                # Si a n'est pas premier avec 26, la mod inverse échoue
-                return {
-                    'error': str(e),
-                    'mode': 'decode',
-                    'a': a,
-                    'b': b
-                }
+        
+        # Vérifier si le texte est vide
+        if not text:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = "Aucun texte fourni à traiter."
+            return standardized_response
+        
+        # Vérifier si le mode bruteforce est activé (avec les deux styles de paramètre possibles)
+        bruteforce_param1 = inputs.get('bruteforce', False)
+        bruteforce_param2 = inputs.get('brute_force', False)
+        do_bruteforce = bruteforce_param1 or bruteforce_param2 or mode == 'bruteforce'
+        
+        try:
+            # Paramètres a et b (typiquement 1, 0 par défaut)
+            a = int(inputs.get('a', 1))
+            b = int(inputs.get('b', 0))
+            
+            # Mode bruteforce
+            if do_bruteforce:
+                solutions = self.bruteforce(text)
+                
+                # Ajouter chaque solution comme un résultat distinct
+                for idx, solution in enumerate(solutions, 1):
+                    a_value = solution["a"]
+                    b_value = solution["b"]
+                    confidence = self._calculate_confidence(a_value, b_value, solution["decoded_text"])
+                    
+                    standardized_response["results"].append({
+                        "id": f"result_{idx}",
+                        "text_output": solution["decoded_text"],
+                        "confidence": confidence,
+                        "parameters": {
+                            "mode": "decode",
+                            "a": a_value,
+                            "b": b_value
+                        },
+                        "metadata": {
+                            "bruteforce_position": idx,
+                            "processed_chars": sum(1 for c in text.upper() if c in self.alphabet)
+                        }
+                    })
+                
+                # Trier les résultats par confiance décroissante
+                standardized_response["results"].sort(key=lambda x: x["confidence"], reverse=True)
+                
+                # Mettre à jour le résumé
+                if standardized_response["results"]:
+                    standardized_response["summary"]["best_result_id"] = standardized_response["results"][0]["id"]
+                    standardized_response["summary"]["total_results"] = len(standardized_response["results"])
+                    standardized_response["summary"]["message"] = f"Bruteforce Affine: {len(standardized_response['results'])} combinaisons testées"
+                else:
+                    standardized_response["status"] = "error"
+                    standardized_response["summary"]["message"] = "Aucune solution de bruteforce trouvée"
+            
+            # Mode encode
+            elif mode == 'encode':
+                result = self.encode(text, a, b)
+                
+                standardized_response["results"].append({
+                    "id": "result_1",
+                    "text_output": result,
+                    "confidence": 1.0,
+                    "parameters": {
+                        "mode": "encode",
+                        "a": a,
+                        "b": b
+                    },
+                    "metadata": {
+                        "processed_chars": sum(1 for c in text.upper() if c in self.alphabet)
+                    }
+                })
+                
+                standardized_response["summary"]["best_result_id"] = "result_1"
+                standardized_response["summary"]["total_results"] = 1
+                standardized_response["summary"]["message"] = f"Encodage Affine avec a={a}, b={b} réussi"
+            
+            # Mode decode
+            elif mode == 'decode':
+                try:
+                    result = self.decode(text, a, b)
+                    
+                    standardized_response["results"].append({
+                        "id": "result_1",
+                        "text_output": result,
+                        "confidence": 0.9,
+                        "parameters": {
+                            "mode": "decode",
+                            "a": a,
+                            "b": b
+                        },
+                        "metadata": {
+                            "processed_chars": sum(1 for c in text.upper() if c in self.alphabet)
+                        }
+                    })
+                    
+                    standardized_response["summary"]["best_result_id"] = "result_1"
+                    standardized_response["summary"]["total_results"] = 1
+                    standardized_response["summary"]["message"] = f"Décodage Affine avec a={a}, b={b} réussi"
+                except ValueError as e:
+                    standardized_response["status"] = "error"
+                    standardized_response["summary"]["message"] = f"Erreur de décodage: {str(e)}"
+            
+            else:
+                standardized_response["status"] = "error"
+                standardized_response["summary"]["message"] = f"Mode invalide: {mode}"
+        
+        except Exception as e:
+            standardized_response["status"] = "error"
+            standardized_response["summary"]["message"] = f"Erreur pendant le traitement: {str(e)}"
+        
+        # Calculer le temps d'exécution
+        standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
+        
+        return standardized_response
