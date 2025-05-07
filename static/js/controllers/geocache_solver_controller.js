@@ -480,16 +480,51 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     }
                 }
                 
+                // Collecter tous les paramètres du plugin
+                const pluginInputs = {};
+                
+                // Toujours inclure le texte à traiter
+                pluginInputs.text = textToProcess;
+                
+                // Mode par défaut
+                pluginInputs.mode = 'decode';
+                
+                // Récupérer tous les champs de formulaire du plugin s'ils existent
+                if (pluginZone) {
+                    // Récupérer tous les inputs, selects et checkboxes
+                    const inputs = pluginZone.querySelectorAll('input, select');
+                    
+                    inputs.forEach(input => {
+                        const inputName = input.name || input.id;
+                        
+                        if (!inputName) return; // Ignorer les éléments sans nom
+                        
+                        // Traiter différemment selon le type d'input
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            pluginInputs[inputName] = input.checked;
+                        } else if (input.type === 'number') {
+                            pluginInputs[inputName] = parseFloat(input.value);
+                        } else {
+                            pluginInputs[inputName] = input.value;
+                        }
+                    });
+                }
+                
+                // Option brute-force si disponible
+                const bruteForceCheckbox = pluginZone ? pluginZone.querySelector('#brute_force') : null;
+                if (bruteForceCheckbox) {
+                    pluginInputs.brute_force = bruteForceCheckbox.checked;
+                }
+                
+                console.log("Paramètres collectés pour l'exécution du plugin:", pluginInputs);
+                
                 // Appeler l'API pour exécuter le plugin
                 const response = await fetch(`/api/plugins/${pluginName}/execute`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        text: textToProcess,
-                        mode: 'decode'
-                    }),
+                    body: JSON.stringify(pluginInputs),
                 });
                 
                 if (!response.ok) {
