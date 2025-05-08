@@ -135,6 +135,8 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Développer le mécanisme d'ajustement dynamique
   - [x] Implémenter la collecte de statistiques d'utilisation
   - [x] Créer un outil de génération de filtres de Bloom
+  - [x] Enrichir les filtres avec les mots les plus fréquents de wordfreq
+  - [x] Étendre le support à 14 langues européennes
 
 ## Interface Utilisateur Améliorée
 

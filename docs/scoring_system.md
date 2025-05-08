@@ -107,8 +107,11 @@ Mots à exclure avant le scoring pour éviter les faux positifs liés au domaine
 ### Méthode d'évaluation
 
 - **Bloom filter** par langue :
-  - 50 000 à 100 000 mots courants
-  - ~600 kB par langue
+  - Filtres générés à partir des mots les plus fréquents de wordfreq
+  - 20 000 mots pour les langues principales (fr, en, de, es, it)
+  - 10 000 mots pour les langues secondaires
+  - Support pour 14 langues européennes
+  - ~28 KB par langue prioritaire, ~14 KB par langue secondaire
   - Taux de faux positifs ≃ 1%
 
 - **Couverture** : proportion des mots trouvés dans le filtre de Bloom
