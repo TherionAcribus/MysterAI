@@ -1,5 +1,17 @@
 import re
 import time
+import requests
+import json
+import os
+
+# Import du service de scoring
+try:
+    from app.services.scoring_service import ScoringService
+    scoring_service_available = True
+    print("Module de scoring disponible")
+except ImportError:
+    scoring_service_available = False
+    print("Module de scoring non disponible, utilisation du scoring legacy uniquement")
 
 class AbaddonCodePlugin:
     """
@@ -22,6 +34,30 @@ class AbaddonCodePlugin:
         }
         # Inverse la table pour le décryptage
         self.code_to_letter = {v: k for k, v in self.letter_to_code.items()}
+        
+        # Récupérer la configuration depuis plugin.json
+        plugin_config_path = os.path.join(os.path.dirname(__file__), 'plugin.json')
+        try:
+            with open(plugin_config_path, 'r') as f:
+                config = json.load(f)
+                # Récupérer le paramètre enable_scoring
+                self.enable_scoring = config.get('enable_scoring', False)
+                print(f"Paramètre enable_scoring configuré: {self.enable_scoring}")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            self.enable_scoring = False  # Valeur par défaut
+            print(f"Erreur lors du chargement de la configuration: {str(e)}")
+        
+        # Initialiser le service de scoring local si disponible
+        self.scoring_service = None
+        if scoring_service_available:
+            try:
+                self.scoring_service = ScoringService()
+                print("Service de scoring initialisé avec succès")
+            except Exception as e:
+                print(f"Erreur lors de l'initialisation du service de scoring: {str(e)}")
+        
+        # Conserver l'URL API pour la rétrocompatibilité
+        self.scoring_api_url = "http://localhost:5000/api/plugins/score"
 
     def normalize_text(self, text: str) -> str:
         """
@@ -214,6 +250,85 @@ class AbaddonCodePlugin:
                 break
         
         return ''.join(result)
+        
+    def _clean_text_for_scoring(self, text: str) -> str:
+        """
+        Nettoie le texte décodé pour le scoring.
+        Supprime les espaces et caractères spéciaux pour une évaluation plus précise.
+        
+        Args:
+            text: Le texte décodé à nettoyer
+            
+        Returns:
+            Le texte nettoyé prêt pour le scoring
+        """
+        # Supprimer tout caractère non-alphanumérique (sauf espaces)
+        text = re.sub(r'[^\w\s]', '', text)
+        
+        # Supprimer les espaces multiples
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        print(f"Texte nettoyé pour scoring: {text}")
+        return text
+        
+    def _get_text_score(self, text, context=None):
+        """
+        Obtient le score de confiance d'un texte en utilisant le service de scoring.
+        
+        Args:
+            text: Le texte à évaluer
+            context: Contexte optionnel (coordonnées de géocache, etc.)
+        
+        Returns:
+            Dictionnaire contenant le résultat du scoring, ou None en cas d'erreur
+        """
+        # Nettoyer le texte avant le scoring
+        cleaned_text = self._clean_text_for_scoring(text)
+        
+        # Préparer les données
+        data = {
+            "text": cleaned_text
+        }
+        
+        # Ajouter le contexte s'il est fourni
+        if context:
+            data["context"] = context
+        
+        print(f"Évaluation du texte: {cleaned_text[:30]}...")
+        
+        # Utiliser le service local si disponible
+        if self.scoring_service:
+            try:
+                print("Appel direct au service de scoring local")
+                result = self.scoring_service.score_text(cleaned_text, context)
+                print(f"Résultat du scoring local: {result}")
+                return result
+            except Exception as e:
+                print(f"Erreur lors de l'évaluation locale: {str(e)}")
+                # On pourrait tomber en fallback sur l'API, mais pour simplifier,
+                # on va juste retourner None en cas d'erreur
+                return None
+        else:
+            # Fallback: utiliser l'API distante si le service local n'est pas disponible
+            try:
+                print(f"Appel à l'API de scoring: {self.scoring_api_url}")
+                response = requests.post(self.scoring_api_url, json=data)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("success"):
+                        api_result = result.get("result", {})
+                        print(f"Résultat de l'API: {api_result}")
+                        return api_result
+                    else:
+                        print(f"Erreur API: {result.get('error')}")
+                else:
+                    print(f"Erreur HTTP: {response.status_code}")
+                    
+                return None
+            except Exception as e:
+                print(f"Erreur lors de l'appel à l'API de scoring: {str(e)}")
+                return None
 
     def execute(self, inputs: dict) -> dict:
         """
@@ -226,6 +341,7 @@ class AbaddonCodePlugin:
                 - strict: "strict" ou "smooth" pour le mode de décodage
                 - allowed_chars: Liste de caractères autorisés pour le mode smooth
                 - embedded: True si le texte peut contenir du code intégré
+                - enable_scoring: Activation du scoring automatique
                 
         Returns:
             Dictionnaire au format standardisé contenant le résultat de l'opération
@@ -252,6 +368,13 @@ class AbaddonCodePlugin:
         
         mode = inputs.get("mode", "encode").lower()
         text = inputs.get("text", "")
+        
+        # Vérifier si le scoring automatique est activé
+        enable_scoring = inputs.get('enable_scoring', True)
+        print(f"État du scoring: param={enable_scoring}, type={type(enable_scoring)}")
+        
+        # Extraire le contexte pour le scoring (si présent)
+        context = inputs.get('context', {})
         
         # Vérifier si le texte est vide
         if not text:
@@ -302,7 +425,22 @@ class AbaddonCodePlugin:
                     
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
-                    confidence = check["score"]
+                    
+                    # Utiliser le service de scoring si activé, sinon conserver le score du check
+                    if enable_scoring:
+                        print(f"Texte décodé: {decoded}")
+                        scoring_result = self._get_text_score(decoded, context)
+                        if scoring_result and 'score' in scoring_result:
+                            confidence = scoring_result['score']
+                            print(f"Score utilisé: {confidence}")
+                        else:
+                            # Fallback sur le score de détection si le scoring échoue
+                            confidence = check["score"]
+                            print(f"Échec du scoring, utilisation du score de détection: {confidence}")
+                            scoring_result = None
+                    else:
+                        confidence = check["score"]
+                        scoring_result = None
                 else:
                     check = self.check_code(text, strict=False, allowed_chars=allowed_chars, embedded=embedded)
                     if not check["is_match"]:
@@ -313,15 +451,31 @@ class AbaddonCodePlugin:
                     
                     # Décode les fragments trouvés
                     decoded = self.decode_fragments(text, check["fragments"])
-                    confidence = check["score"] * 0.9  # Légèrement moins de confiance en mode smooth
                     
                     # Vérifier si le texte décodé est différent du texte d'origine
                     if decoded == text:
                         standardized_response["status"] = "error"
                         standardized_response["summary"]["message"] = "Aucun code Abaddon n'a pu être décodé"
                         return standardized_response
+                    
+                    # Utiliser le service de scoring si activé, sinon utiliser un score légèrement réduit
+                    if enable_scoring:
+                        print(f"Texte décodé: {decoded}")
+                        scoring_result = self._get_text_score(decoded, context)
+                        if scoring_result and 'score' in scoring_result:
+                            confidence = scoring_result['score']
+                            print(f"Score utilisé: {confidence}")
+                        else:
+                            # Fallback sur le score de détection si le scoring échoue
+                            confidence = check["score"] * 0.9  # Légèrement moins de confiance en mode smooth
+                            print(f"Échec du scoring, utilisation du score de détection réduit: {confidence}")
+                            scoring_result = None
+                    else:
+                        confidence = check["score"] * 0.9  # Légèrement moins de confiance en mode smooth
+                        scoring_result = None
                 
-                standardized_response["results"].append({
+                # Ajouter le résultat au format standardisé
+                result = {
                     "id": "result_1",
                     "text_output": decoded,
                     "confidence": confidence,
@@ -334,7 +488,13 @@ class AbaddonCodePlugin:
                         "fragments_count": len(check["fragments"]),
                         "detection_score": check["score"]
                     }
-                })
+                }
+                
+                # Ajouter les résultats du scoring s'ils sont disponibles
+                if scoring_result:
+                    result["scoring"] = scoring_result
+                
+                standardized_response["results"].append(result)
                 
                 standardized_response["summary"]["best_result_id"] = "result_1"
                 standardized_response["summary"]["total_results"] = 1
@@ -347,6 +507,9 @@ class AbaddonCodePlugin:
         except Exception as e:
             standardized_response["status"] = "error"
             standardized_response["summary"]["message"] = f"Erreur pendant le traitement: {str(e)}"
+            print(f"Exception lors de l'exécution: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
         
         # Calculer le temps d'exécution
         standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)

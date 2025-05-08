@@ -8,6 +8,14 @@
     "dependencies": [],
     "categories": ["AlphabetsDecryption"],
     "brute_force": true,
+    "enable_scoring": true,
+    "scoring_method": {
+      "type": "lexical",
+      "custom_weights": {
+        "lexical": 0.8,
+        "gps": 0.2
+      }
+    },
     "input_types": {
       "text": {
         "type": "string",
