@@ -10,14 +10,15 @@
     
     class GeneralSettingsController extends Stimulus.Controller {
         static targets = [
-            "autoMarkSolved", "autoCorrectCoordinates"
+            "autoMarkSolved", "autoCorrectCoordinates", "enableAutoScoring"
         ];
         
         connect() {
             console.log('=== DEBUG: GeneralSettingsController connecté ===');
             console.log('=== DEBUG: Cibles disponibles ===', {
                 autoMarkSolved: this.hasAutoMarkSolvedTarget,
-                autoCorrectCoordinates: this.hasAutoCorrectCoordinatesTarget
+                autoCorrectCoordinates: this.hasAutoCorrectCoordinatesTarget,
+                enableAutoScoring: this.hasEnableAutoScoringTarget
             });
             
             // Attendre un instant pour s'assurer que le DOM est complètement chargé
@@ -33,7 +34,7 @@
             console.log('=== DEBUG: Chargement des paramètres généraux ===');
             
             // Vérifier que les cibles sont disponibles
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
                 console.warn('=== WARN: Les cibles ne sont pas encore disponibles, réessai dans 100ms ===');
                 setTimeout(() => this.loadSettings(), 100);
                 return;
@@ -88,6 +89,14 @@
             } else {
                 console.warn('=== WARN: Cible autoCorrectCoordinates non disponible ===');
             }
+            
+            if (this.hasEnableAutoScoringTarget) {
+                // Utiliser true comme valeur par défaut si la propriété est absente
+                this.enableAutoScoringTarget.checked = settings.enable_auto_scoring !== undefined ? 
+                    settings.enable_auto_scoring : true;
+            } else {
+                console.warn('=== WARN: Cible enableAutoScoring non disponible ===');
+            }
         }
         
         /**
@@ -101,6 +110,10 @@
             if (this.hasAutoCorrectCoordinatesTarget) {
                 this.autoCorrectCoordinatesTarget.checked = true;
             }
+            
+            if (this.hasEnableAutoScoringTarget) {
+                this.enableAutoScoringTarget.checked = true;
+            }
         }
         
         /**
@@ -109,7 +122,7 @@
         saveSettings() {
             console.log('=== DEBUG: Enregistrement des paramètres ===');
             
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
                 console.error('=== ERREUR: Les cibles ne sont pas disponibles ===');
                 this.showNotification('Erreur: Impossible d\'accéder aux paramètres', true);
                 return;
@@ -117,7 +130,8 @@
             
             const settings = {
                 auto_mark_solved: this.autoMarkSolvedTarget.checked,
-                auto_correct_coordinates: this.autoCorrectCoordinatesTarget.checked
+                auto_correct_coordinates: this.autoCorrectCoordinatesTarget.checked,
+                enable_auto_scoring: this.enableAutoScoringTarget.checked
             };
             
             console.log('=== DEBUG: Paramètres à enregistrer ===', settings);
@@ -156,7 +170,7 @@
         resetDefaults() {
             console.log('=== DEBUG: Réinitialisation des paramètres ===');
             
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
                 console.error('=== ERREUR: Les cibles ne sont pas disponibles ===');
                 this.showNotification('Erreur: Impossible d\'accéder aux paramètres', true);
                 return;
@@ -165,6 +179,7 @@
             // Définir les valeurs par défaut (True)
             this.autoMarkSolvedTarget.checked = true;
             this.autoCorrectCoordinatesTarget.checked = true;
+            this.enableAutoScoringTarget.checked = true;
             
             // Enregistrer les valeurs par défaut
             this.saveSettings();

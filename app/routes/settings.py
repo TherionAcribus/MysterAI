@@ -45,7 +45,8 @@ def get_general_settings():
     try:
         settings = {
             'auto_mark_solved': AppConfig.get_value('auto_mark_solved', True),
-            'auto_correct_coordinates': AppConfig.get_value('auto_correct_coordinates', True)
+            'auto_correct_coordinates': AppConfig.get_value('auto_correct_coordinates', True),
+            'enable_auto_scoring': AppConfig.get_value('enable_auto_scoring', True)
         }
         
         logger.info(f"=== DEBUG: Paramètres récupérés: {settings} ===")
@@ -113,6 +114,13 @@ def save_general_settings():
             data.get('auto_correct_coordinates', True),
             category='general',
             description='Dans le Solver, corriger automatiquement les coordonnées quand on trouve des coordonnées valides'
+        )
+        
+        AppConfig.set_value(
+            'enable_auto_scoring', 
+            data.get('enable_auto_scoring', True),
+            category='general',
+            description='Activer le système de scoring automatique pour évaluer la pertinence des résultats de déchiffrement'
         )
         
         logger.info("=== DEBUG: Paramètres enregistrés avec succès ===")

@@ -4,6 +4,14 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
 
 ## API de Scoring Standardisée
 
+### Paramètres utilisateur
+
+- [x] **Ajouter un paramètre d'activation global**
+  - [x] Ajouter l'option "Activer le scoring automatique" dans la page des paramètres généraux
+  - [x] Mettre à jour le contrôleur JavaScript pour gérer le nouveau paramètre
+  - [x] Implémenter la gestion de ce paramètre côté serveur (routes et modèles)
+  - [ ] Ajouter la vérification de ce paramètre avant d'appliquer le scoring
+
 ### Endpoint `/api/plugins/score`
 
 - [ ] **Définir la spécification de l'API**
