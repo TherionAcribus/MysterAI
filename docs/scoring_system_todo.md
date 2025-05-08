@@ -24,6 +24,9 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Implémenter la logique de base du scoring
   - [x] Ajouter le système de validation des entrées
   - [ ] Développer les tests unitaires
+    - [ ] Tester la détection de langue
+    - [ ] Tester le calcul des scores Zipf
+    - [ ] Tester différentes combinaisons de paramètres
 
 - [x] **Intégration avec les plugins existants**
   - [x] Créer la route API `/api/plugins/score`
@@ -43,6 +46,33 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Implémenter la logique de fusion avec les paramètres par défaut
   - [ ] Ajouter la validation du nouveau schéma
 
+## Détection et Traitement du Texte
+
+- [x] **Normalisation de texte avancée**
+  - [x] Conversion majuscules → minuscules pour détection de langue
+  - [x] Traitement des espaces et caractères spéciaux
+  - [x] Génération de candidats avec différentes normalisations
+  - [ ] Gestion des caractères accentués et diacritiques
+
+- [x] **Détection de langue robuste**
+  - [x] Intégration de langdetect pour l'identification de langue
+  - [x] Implémentation de règles spécifiques français/anglais
+  - [x] Mécanisme de fallback quand le score est faible
+  - [ ] Optimisation pour textes courts
+
+- [x] **Segmentation de texte**
+  - [x] Intégration de wordninja pour segmenter les textes sans espaces
+  - [x] Optimisation des performances de segmentation
+  - [ ] Ajout de segmenteurs spécifiques pour langues agglutinantes
+
+- [x] **Analyse de fréquence Zipf**
+  - [x] Intégration de wordfreq pour calculer les fréquences des mots
+  - [x] Ajustement des scores pour éviter de survaloriser les mots très communs
+  - [x] Inclusion des statistiques Zipf dans les métadonnées
+  - [ ] Optimisation des performances avec mise en cache des fréquences
+  - [ ] Affinage des seuils d'ajustement par analyse statistique
+  - [ ] Extension du support Zipf à plus de langues
+
 ## Contextualisation par Géocache
 
 - [ ] **Structure des paramètres de contexte**
@@ -55,9 +85,9 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Définir les seuils de proximité et leur impact sur le score
   - [ ] Implémenter la pondération basée sur la distance
 
-- [ ] **Adaptation linguistique régionale**
+- [x] **Adaptation linguistique régionale**
   - [x] Créer une carte des langues par région géographique
-  - [ ] Développer la logique de priorisation des langues
+  - [x] Développer la logique de priorisation des langues
   - [ ] Tester avec des jeux de données multilingues
 
 ## Extension du Format de Sortie
@@ -66,6 +96,7 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Définir la structure complète des métadonnées de scoring
   - [x] Implémenter la collecte des mots reconnus
   - [x] Ajouter le calcul de confiance linguistique
+  - [x] Intégrer les métadonnées Zipf (min, max, moyenne, détails par mot)
   - [ ] Développer la génération d'explications automatiques
 
 - [ ] **Compatibilité avec l'API existante**
@@ -74,7 +105,7 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Mettre à jour la documentation API
 
 - [ ] **Tests d'intégration**
-  - [ ] Créer des scénarios de test couvrant différents formats
+  - [x] Créer des scénarios de test pour différentes langues et formats
   - [ ] Vérifier la cohérence des métadonnées générées
   - [ ] Comparer les performances avec l'ancien système
 
@@ -95,15 +126,15 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Développer la logique de préchargement prioritaire
   - [ ] Optimiser la gestion mémoire des modèles
 
-- [x] **Compilation JIT des expressions régulières**
-  - [x] Identifier toutes les regex utilisées dans le scoring
-  - [x] Implémenter le système de précompilation
-  - [ ] Mesurer les gains de performance
+- [x] **Expressions régulières optimisées**
+  - [x] Identifier tous les formats de coordonnées GPS à détecter
+  - [x] Implémenter des regex plus robustes et flexibles
+  - [x] Améliorer la détection des faux positifs (nord-est, etc.)
 
 - [x] **Filtres de Bloom adaptatifs**
   - [x] Développer le mécanisme d'ajustement dynamique
   - [x] Implémenter la collecte de statistiques d'utilisation
-  - [ ] Optimiser la taille des filtres selon l'usage
+  - [x] Créer un outil de génération de filtres de Bloom
 
 ## Interface Utilisateur Améliorée
 
@@ -125,9 +156,11 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
 ## Tests et Validation
 
 - [ ] **Jeux de données de test**
+  - [x] Créer des cas de test pour les différentes langues
   - [ ] Compiler une collection de textes cryptés avec solution connue
   - [ ] Créer des scénarios de test spécifiques au géocaching
   - [ ] Développer des benchmarks de performance
+  - [ ] Créer des tests de validation pour le scoring Zipf
 
 - [ ] **Tests A/B sur le scoring**
   - [ ] Mettre en place l'infrastructure de test
@@ -135,7 +168,8 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Analyser les résultats et ajuster les paramètres
 
 - [ ] **Documentation utilisateur**
-  - [ ] Créer un guide d'utilisation du système
+  - [x] Mettre à jour la documentation technique du système
+  - [ ] Créer un guide d'utilisation pour les utilisateurs finaux
   - [ ] Documenter l'interprétation des scores
   - [ ] Fournir des exemples pour les cas d'utilisation courants
 
@@ -147,7 +181,7 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Préparer les annonces aux utilisateurs
 
 - [ ] **Monitoring et logging**
-  - [ ] Implémenter la collecte de métriques de performance
+  - [x] Implémenter la journalisation détaillée du scoring
   - [ ] Configurer les alertes en cas d'anomalies
   - [ ] Développer les tableaux de bord d'analyse
 
@@ -155,3 +189,4 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Créer le mécanisme de collecte de feedback
   - [ ] Mettre en place l'analyse des résultats
   - [ ] Définir le processus d'amélioration continue 
+  - [ ] Collecter des données d'usage pour affiner les seuils Zipf 

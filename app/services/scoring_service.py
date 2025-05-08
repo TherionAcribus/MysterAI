@@ -16,6 +16,7 @@ import os
 import pickle
 from langdetect import DetectorFactory
 from langdetect.detector import LangDetectException
+import wordfreq
 
 # Configurer le logger
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class ScoringService:
     LEXICAL_WEIGHT = 0.7
     GPS_WEIGHT = 0.3
     ZIPF_NORMALIZATION = 7.0
+    ZIPF_MIN_VALUE = 0.5  # Valeur minimum pour les mots absents du dictionnaire Zipf
     
     # Seuils pour les niveaux de confiance
     CONFIDENCE_THRESHOLD_HIGH = 0.65
@@ -183,6 +185,12 @@ class ScoringService:
             "coordinates": {"exist": False},
             "language": None,
             "words_found": [],
+            "zipf_info": {
+                "average": 0.0,
+                "max": 0.0,
+                "min": 0.0,
+                "word_frequencies": {}
+            },
             "execution_time_ms": 0
         }
         
@@ -194,14 +202,28 @@ class ScoringService:
             # 3.1 Détection de langue et segmentation si nécessaire
             lang, segments = self._detect_and_segment(candidate_text)
             
-            # 3.2 Calculer le score lexical
+            # 3.2 Calculer le score lexical et collecter les fréquences Zipf
             lexical_score, found_words = self._compute_lexical_score(segments, lang)
+            
+            # Calculer les fréquences Zipf pour les métadonnées
+            word_freqs = {}
+            for word in found_words:
+                word_freqs[word] = wordfreq.zipf_frequency(word, lang)
             
             # 3.3 Vérifier la présence de coordonnées GPS
             coord_bonus, coordinates = self._check_gps_coordinates(candidate_text)
             
             # 3.4 Calculer le score global
             final_score = (self.LEXICAL_WEIGHT * lexical_score) + (self.GPS_WEIGHT * coord_bonus)
+            
+            # Calculer les statistiques Zipf
+            zipf_values = list(word_freqs.values())
+            zipf_stats = {
+                "average": sum(zipf_values) / max(len(zipf_values), 1),
+                "max": max(zipf_values) if zipf_values else 0,
+                "min": min(zipf_values) if zipf_values else 0,
+                "word_frequencies": word_freqs
+            }
             
             # Stocker les informations du candidat
             candidate_info = {
@@ -211,7 +233,8 @@ class ScoringService:
                 "gps_bonus": coord_bonus,
                 "language": lang,
                 "words_found": found_words[:10],  # Limiter à 10 mots pour la clarté
-                "coordinates": coordinates
+                "coordinates": coordinates,
+                "zipf_info": zipf_stats
             }
             
             result["candidates"].append(candidate_info)
@@ -227,6 +250,7 @@ class ScoringService:
             result["language"] = best_candidate["language"]
             result["words_found"] = best_candidate["words_found"]
             result["coordinates"] = best_candidate["coordinates"]
+            result["zipf_info"] = best_candidate["zipf_info"]
             
             # Définir le niveau de confiance
             if result["score"] >= self.CONFIDENCE_THRESHOLD_HIGH:
@@ -408,6 +432,39 @@ class ScoringService:
         
         return primary_score, primary_words
     
+    def _adjust_zipf_score(self, zipf_score: float) -> float:
+        """
+        Ajuste le score Zipf pour éviter de survaloriser les mots très communs ou très rares.
+        
+        Les scores Zipf typiques vont de 0 à 7+, où:
+        - 7+ = mots extrêmement courants (le, la, de, the, a, of...)
+        - 4-6 = mots courants du langage quotidien
+        - 2-4 = mots moins fréquents mais connus
+        - 0-2 = mots rares
+        
+        Cette fonction applique une courbe en cloche pour favoriser les mots de fréquence moyenne.
+        
+        Args:
+            zipf_score: Le score Zipf brut du mot
+            
+        Returns:
+            Le score Zipf ajusté
+        """
+        # Appliquer une fonction de pondération en forme de cloche
+        # Favoriser les mots entre 3 et 5.5 sur l'échelle Zipf
+        if zipf_score > 6.5:
+            # Mots extrêmement courants - réduire leur impact
+            return 4.5  
+        elif zipf_score > 5.5:
+            # Mots très courants - réduire légèrement
+            return 5.0
+        elif zipf_score < 1.5:
+            # Mots très rares - augmenter légèrement
+            return 2.0
+        else:
+            # Mots de fréquence normale - conserver
+            return zipf_score
+            
     def _compute_language_score(self, segments: List[str], language: str) -> Tuple[float, List[str]]:
         """
         Calcule le score pour une langue spécifique.
@@ -420,6 +477,7 @@ class ScoringService:
             Un tuple contenant le score lexical et la liste des mots reconnus
         """
         found_words = []
+        zipf_scores = []
         
         # Utiliser le filtre de Bloom s'il est disponible, sinon utiliser le dictionnaire en mémoire
         if language in self._bloom_filters:
@@ -428,6 +486,11 @@ class ScoringService:
             for segment in segments:
                 if segment in bloom_filter:
                     found_words.append(segment)
+                    # Calculer le score Zipf pour le mot reconnu
+                    zipf_score = wordfreq.zipf_frequency(segment, language)
+                    # Ajuster pour éviter de survaloriser les mots très communs
+                    adjusted_zipf = self._adjust_zipf_score(zipf_score)
+                    zipf_scores.append(adjusted_zipf)
                     
             logger.debug(f"Filtre de Bloom utilisé pour {language}, {len(found_words)}/{len(segments)} mots reconnus")
         else:
@@ -437,15 +500,24 @@ class ScoringService:
             for segment in segments:
                 if segment in common_words:
                     found_words.append(segment)
+                    # Calculer le score Zipf pour le mot reconnu
+                    zipf_score = wordfreq.zipf_frequency(segment, language)
+                    # Ajuster pour éviter de survaloriser les mots très communs
+                    adjusted_zipf = self._adjust_zipf_score(zipf_score)
+                    zipf_scores.append(adjusted_zipf)
                     
             logger.debug(f"Dictionnaire en mémoire utilisé pour {language}, {len(found_words)}/{len(segments)} mots reconnus")
         
         # Calculer la couverture
         coverage = len(found_words) / max(1, len(segments))
         
-        # Simuler un zipf moyen pour l'instant
-        # Dans une implémentation complète, nous calculerions des fréquences réelles
-        average_zipf = 3.5  # Valeur simulée entre 0 et 7
+        # Calculer la moyenne Zipf des mots reconnus
+        if zipf_scores:
+            average_zipf = sum(zipf_scores) / len(zipf_scores)
+            logger.debug(f"Score Zipf moyen pour {language}: {average_zipf:.2f}")
+        else:
+            # Aucun mot reconnu, utiliser une valeur par défaut basse
+            average_zipf = self.ZIPF_MIN_VALUE
         
         # Score lexical combiné
         lexical_score = (0.7 * coverage) + (0.3 * (average_zipf / self.ZIPF_NORMALIZATION))

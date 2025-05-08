@@ -15,7 +15,8 @@ Ce document décrit le système d'évaluation de confiance implémenté pour les
 - [7. Architecture pratique](#7-architecture-pratique)
 - [8. Optimisations & garde-fous](#8-optimisations--garde-fous)
 - [9. Cas particuliers et retours terrain](#9-cas-particuliers-et-retours-terrain)
-- [10. Améliorations futures](#10-améliorations-futures)
+- [10. Améliorations récentes](#10-améliorations-récentes)
+- [11. Améliorations futures](#11-améliorations-futures)
 
 ## Problématique
 
@@ -74,17 +75,27 @@ Lorsque les espaces sont absents, une segmentation est nécessaire pour identifi
 
 ## 4. Bonus "GPS"
 
-Une expression régulière dédiée identifie les formats de coordonnées GPS :
+Plusieurs expressions régulières dédiées identifient les formats de coordonnées GPS courants :
 
-```
-([NS]\s*\d{1,2}[° ]\d{1,2}\.\d+)|([EW]\s*\d{1,3}[° ]\d{1,2}\.\d+)
-```
+- Format standard : `N 48° 51.234 E 2° 21.567`
+- Format avec points cardinaux en texte : `nord 48° 51.234 est 2° 21.567`
+- Format sans espaces : `N48°51.234E2°21.567`
+- Format décimal : `48.123, 2.456`
+
+Toutes ces variantes sont détectées par un ensemble d'expressions régulières spécifiques.
 
 - Si correspondance trouvée → `coord_bonus = 0,3` (sur une échelle de 0 à 1)
 
-> **⚠️ Attention** : 70% des faux positifs contiennent la séquence « N E N E ». Un traitement spécifique de ce motif évite de surévaluer ces cas.
+> **⚠️ Attention** : Les faux positifs de type « N E N E » ou « nord est nord est » sont détectés par une liste de motifs et reçoivent un bonus réduit (0.1).
 
 ## 5. Score lexical
+
+### Détection de langue robuste
+
+- **Normalisation préalable** : Conversion en minuscules pour améliorer la précision
+- **Double vérification** pour les langues ambiguës :
+  - Liste de mots spécifiquement français pour détecter les cas ambigus français/anglais
+  - Fallback intelligent : si score < 0.2, essayer une autre langue et conserver le meilleur résultat
 
 ### Stop-list géocaching
 
@@ -103,8 +114,16 @@ Mots à exclure avant le scoring pour éviter les faux positifs liés au domaine
 - **Couverture** : proportion des mots trouvés dans le filtre de Bloom
 
 - **Zipf moyen** (avec wordfreq) :
-  - Pondération par fréquence d'usage
-  - Évite de survaloriser les mots très communs comme "le", "the", "de"...
+  - Calcul réel des fréquences d'usage via la bibliothèque wordfreq
+  - Ajustement sur une courbe en cloche pour éviter de survaloriser les mots très communs
+  - Score Zipf typique entre 0 et 7, où 7+ représente les mots les plus fréquents
+  - Fonction d'ajustement qui normalise les scores :
+    ```
+    Si score > 6.5 (mots extrêmement courants) → 4.5
+    Si score > 5.5 (mots très courants) → 5.0
+    Si score < 1.5 (mots très rares) → 2.0
+    Sinon → score inchangé
+    ```
 
 - **Formule du score lexical** :
   ```
@@ -187,7 +206,35 @@ UI GoldenLayout
 | ROT13 de directions (« A = N, N = A ») | Combiner regex GPS + stop-list pour éliminer la fausse piste |
 | Listes de nombres sans direction | Au lieu de "aucun résultat", proposer essai de Vigenère ou bruteforce d'offset numérique |
 
-## 10. Améliorations futures
+## 10. Améliorations récentes
+
+### Détection de langue robuste
+- **✅ Normalisation automatique** des textes en majuscules et suppression des variations typographiques
+- **✅ Détection améliorée français/anglais** grâce à une liste de mots spécifiquement français
+- **✅ Mécanisme de fallback intelligent** qui teste plusieurs langues quand le score est faible
+
+### Gestion de texte plus flexible
+- **✅ Segmentation intelligente** par wordninja pour les textes sans espaces
+- **✅ Filtres de Bloom** pour reconnaissance rapide des mots
+- **✅ Évaluation multi-candidats** avec différentes normalisations du texte
+
+### Détection GPS améliorée
+- **✅ Support multi-formats** avec expressions régulières enrichies
+- **✅ Détection de faux positifs** (nord-est, etc.) via une liste de motifs connus
+- **✅ Structure de données coordonnées** pour exploitation future
+
+### Structure de métadonnées enrichie
+- **✅ Liste des mots reconnus** dans le résultat
+- **✅ Niveau de confiance linguistique**
+- **✅ Détails des candidats évalués**
+
+### Analyse Zipf complète
+- **✅ Calcul réel des fréquences Zipf** avec la bibliothèque wordfreq
+- **✅ Ajustement intelligent des scores** pour valoriser les mots de fréquence moyenne
+- **✅ Métadonnées détaillées** incluant statistiques Zipf (min, max, moyenne)
+- **✅ Pondération équilibrée** entre couverture lexicale et pertinence des mots
+
+## 11. Améliorations futures
 
 Sur la base du système actuel, voici les améliorations planifiées pour enrichir notre système de scoring:
 
@@ -234,7 +281,16 @@ Enrichissement de la section `metadata` avec des informations détaillées sur l
     "language_detected": "fr",
     "language_confidence": 0.92,
     "word_coverage": 0.78,
-    "average_zipf": 4.3,
+    "zipf_info": {
+      "average": 4.3,
+      "max": 6.1,
+      "min": 2.2,
+      "word_frequencies": {
+        "mot1": 4.2,
+        "mot2": 6.1,
+        "mot3": 2.6
+      }
+    },
     "gps_patterns": ["N 49° 36.070'"],
     "explanation": "Haute confiance car 9 mots français reconnus et format GPS détecté"
   }
@@ -248,8 +304,8 @@ Enrichissement de la section `metadata` avec des informations détaillées sur l
 | ✅ Appel direct au service | Utilisation directe du service de scoring dans les plugins Python avec fallback API |
 | Cache distribué | Redis pour partager les modèles linguistiques entre instances |
 | Préchargement intelligent | Modèles pré-chargés selon géolocalisation de l'utilisateur |
-| Compilation JIT | Expressions régulières pré-compilées pour la détection GPS |
-| Bloom filter adaptatifs | Ajustement dynamique de la taille selon fréquence d'utilisation |
+| ✅ Expressions régulières GPS | Expressions régulières améliorées et optimisées pour la détection de coordonnées |
+| ✅ Filtres de Bloom adaptatifs | Implémentation et ajustement dynamique selon les besoins |
 
 ### Interface utilisateur améliorée
 
@@ -267,13 +323,14 @@ Ces améliorations seront déployées progressivement pour enrichir l'expérienc
 ## Résumé
 
 1. **Filtrer** rapidement (ratios, longueurs)
-2. **Normaliser** (suppression/condensation d'espaces)
-3. **Segmenter** si nécessaire, après détection de langue
-4. **Chercher** motifs GPS → bonus dédié
-5. **Calculer** score lexical (coverage Bloom + Zipf)
-6. **Combiner** : 70% lexical + 30% GPS
-7. **Ignorer** directions & jargon pour le scoring
-8. **Sélectionner** les meilleurs résultats
-9. **Journaliser** et apprendre des faux positifs
+2. **Normaliser** (suppression/condensation d'espaces, majuscules → minuscules)  
+3. **Détecter** la langue avec fiabilité et fallback intelligent
+4. **Segmenter** si nécessaire, après détection de langue
+5. **Chercher** motifs GPS → bonus dédié
+6. **Calculer** score lexical (coverage Bloom + Zipf)
+7. **Combiner** : 70% lexical + 30% GPS
+8. **Ignorer** directions & jargon pour le scoring
+9. **Sélectionner** les meilleurs résultats
+10. **Journaliser** et apprendre des faux positifs
 
 Cette approche multicritère permet une évaluation plus fiable des résultats de décryptage dans le contexte spécifique du géocaching. 

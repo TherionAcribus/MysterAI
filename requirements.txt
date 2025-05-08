@@ -1,0 +1,22 @@
+# MysteryAI - Dépendances Python
+# Pour l'installation: pip install -r requirements.txt
+
+# Web Framework
+Flask==2.2.3
+Flask-Cors==3.0.10
+
+# Base de données
+SQLAlchemy==1.4.46
+
+# Utilitaires
+requests==2.28.2
+python-dotenv==1.0.0
+
+# Traitement de texte et scoring
+langdetect==1.0.9
+wordninja==2.0.0
+wordfreq==3.0.3
+pybloom-live==3.1.0
+
+# Tests
+pytest==7.3.1 
