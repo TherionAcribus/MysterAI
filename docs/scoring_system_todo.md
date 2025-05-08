@@ -10,35 +10,37 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [x] Ajouter l'option "Activer le scoring automatique" dans la page des paramètres généraux
   - [x] Mettre à jour le contrôleur JavaScript pour gérer le nouveau paramètre
   - [x] Implémenter la gestion de ce paramètre côté serveur (routes et modèles)
-  - [ ] Ajouter la vérification de ce paramètre avant d'appliquer le scoring
+  - [x] Ajouter la vérification de ce paramètre avant d'appliquer le scoring
 
 ### Endpoint `/api/plugins/score`
 
-- [ ] **Définir la spécification de l'API**
-  - [ ] Documenter les paramètres d'entrée (texte, mode, contexte)
-  - [ ] Documenter le format de sortie (score, métadonnées, détails)
-  - [ ] Définir les codes d'erreur et messages associés
+- [x] **Définir la spécification de l'API**
+  - [x] Documenter les paramètres d'entrée (texte, mode, contexte)
+  - [x] Documenter le format de sortie (score, métadonnées, détails)
+  - [x] Définir les codes d'erreur et messages associés
 
-- [ ] **Développer le service backend**
-  - [ ] Créer le contrôleur Flask pour l'endpoint
-  - [ ] Implémenter la logique de base du scoring
-  - [ ] Ajouter le système de validation des entrées
+- [x] **Développer le service backend**
+  - [x] Créer le fichier de service `scoring_service.py`
+  - [x] Implémenter la logique de base du scoring
+  - [x] Ajouter le système de validation des entrées
   - [ ] Développer les tests unitaires
 
-- [ ] **Intégration avec les plugins existants**
-  - [ ] Modifier la classe `PluginManager` pour utiliser le nouveau service
-  - [ ] Mettre à jour les plugins existants qui utilisent le scoring
+- [x] **Intégration avec les plugins existants**
+  - [x] Créer la route API `/api/plugins/score`
+  - [x] Modifier la classe `PluginManager` pour utiliser le nouveau service
+  - [x] Mettre à jour les plugins existants qui utilisent le scoring
+    - [x] Modifier le plugin Caesar Code pour utiliser le nouveau système de scoring
 
 ### Extension `plugin.json`
 
-- [ ] **Spécification du schéma**
-  - [ ] Définir la structure du champ `scoring_method`
-  - [ ] Documenter les options et valeurs par défaut
+- [x] **Spécification du schéma**
+  - [x] Définir la structure du champ `scoring_method`
+  - [x] Documenter les options et valeurs par défaut
   - [ ] Créer un schéma JSON pour la validation
 
-- [ ] **Mise à jour du parser de configuration**
-  - [ ] Adapter le code qui charge les fichiers `plugin.json`
-  - [ ] Implémenter la logique de fusion avec les paramètres par défaut
+- [x] **Mise à jour du parser de configuration**
+  - [x] Adapter le code qui charge les fichiers `plugin.json`
+  - [x] Implémenter la logique de fusion avec les paramètres par défaut
   - [ ] Ajouter la validation du nouveau schéma
 
 ## Contextualisation par Géocache
@@ -77,6 +79,11 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Comparer les performances avec l'ancien système
 
 ## Optimisations Techniques
+
+- [x] **Appel direct au service de scoring**
+  - [x] Implémenter un appel direct au service de scoring dans le plugin Caesar Code 
+  - [x] Ajouter un système de fallback vers l'API en cas d'échec
+  - [ ] Étendre cette approche à tous les autres plugins
 
 - [ ] **Cache distribué**
   - [ ] Configurer Redis pour le stockage des modèles linguistiques

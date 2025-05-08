@@ -1,4 +1,14 @@
 import time
+import requests
+import json
+
+# Import du service de scoring (à ajuster selon l'emplacement réel du module)
+try:
+    from app.services.scoring_service import ScoringService
+    scoring_service_available = True
+except ImportError:
+    scoring_service_available = False
+    print("Module de scoring non disponible, utilisation du scoring legacy uniquement")
 
 class CaesarCodePlugin:
     """
@@ -14,6 +24,18 @@ class CaesarCodePlugin:
         # L'alphabet de référence (majuscules uniquement)
         self.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         self.alphabet_len = len(self.alphabet)
+        
+        # Initialiser le service de scoring local si disponible
+        self.scoring_service = None
+        if scoring_service_available:
+            try:
+                self.scoring_service = ScoringService()
+                print("Service de scoring initialisé avec succès")
+            except Exception as e:
+                print(f"Erreur lors de l'initialisation du service de scoring: {str(e)}")
+        
+        # Conserver l'URL API pour la rétrocompatibilité
+        self.scoring_api_url = "http://localhost:5000/api/plugins/score"
     
     def encode(self, text: str, shift: int) -> str:
         """
@@ -103,6 +125,12 @@ class CaesarCodePlugin:
         text_input = inputs.get('text', '')
         print("INPUTS", inputs)
         
+        # Vérifier si le scoring automatique est activé
+        enable_scoring = inputs.get('enable_scoring', True)
+        
+        # Extraire le contexte pour le scoring (si présent)
+        context = inputs.get('context', {})
+        
         # Vérifier si le texte est vide
         if not text_input:
             standardized_response["status"] = "error"
@@ -132,11 +160,20 @@ class CaesarCodePlugin:
                 # Ajouter chaque solution comme un résultat distinct
                 for idx, solution in enumerate(solutions, 1):
                     shift_value = solution["shift"]
-                    confidence = self._calculate_confidence(shift_value, solution["decoded_text"])
+                    decoded_text = solution["decoded_text"]
                     
-                    standardized_response["results"].append({
+                    # Utiliser le service de scoring si activé
+                    if enable_scoring:
+                        scoring_result = self._get_text_score(decoded_text, context)
+                        confidence = scoring_result.get("score", self._legacy_calculate_confidence(shift_value)) if scoring_result else self._legacy_calculate_confidence(shift_value)
+                    else:
+                        # Utiliser l'ancien système de confiance si le scoring est désactivé
+                        confidence = self._legacy_calculate_confidence(shift_value)
+                        scoring_result = None
+                    
+                    result = {
                         "id": f"result_{idx}",
-                        "text_output": solution["decoded_text"],
+                        "text_output": decoded_text,
                         "confidence": confidence,
                         "parameters": {
                             "mode": "decode",
@@ -146,7 +183,13 @@ class CaesarCodePlugin:
                             "bruteforce_position": idx,
                             "processed_chars": sum(1 for c in text_input.upper() if c in self.alphabet)
                         }
-                    })
+                    }
+                    
+                    # Ajouter les résultats du scoring s'ils sont disponibles
+                    if scoring_result:
+                        result["scoring"] = scoring_result
+                    
+                    standardized_response["results"].append(result)
                 
                 # Trier les résultats par confiance décroissante
                 standardized_response["results"].sort(key=lambda x: x["confidence"], reverse=True)
@@ -163,7 +206,7 @@ class CaesarCodePlugin:
             elif mode == 'encode' and isinstance(text_input, str):
                 result = self.encode(text_input, shift)
                 
-                # Ajouter le résultat au format standardisé
+                # Pour l'encodage, nous gardons une confiance de 1.0 (certitude)
                 standardized_response["results"].append({
                     "id": "result_1",
                     "text_output": result,
@@ -184,12 +227,21 @@ class CaesarCodePlugin:
             # Mode decode simple
             elif mode == 'decode' and isinstance(text_input, str):
                 # Mode decode simple avec un seul décalage
-                result = self.decode(text_input, shift)
+                decoded_text = self.decode(text_input, shift)
                 
-                standardized_response["results"].append({
+                # Utiliser le service de scoring si activé
+                if enable_scoring:
+                    scoring_result = self._get_text_score(decoded_text, context)
+                    confidence = scoring_result.get("score", self._legacy_calculate_confidence(shift)) if scoring_result else self._legacy_calculate_confidence(shift)
+                else:
+                    # Utiliser l'ancien système de confiance si le scoring est désactivé
+                    confidence = self._legacy_calculate_confidence(shift)
+                    scoring_result = None
+                
+                result = {
                     "id": "result_1",
-                    "text_output": result,
-                    "confidence": 0.9,
+                    "text_output": decoded_text,
+                    "confidence": confidence,
                     "parameters": {
                         "mode": "decode",
                         "shift": shift
@@ -197,7 +249,13 @@ class CaesarCodePlugin:
                     "metadata": {
                         "processed_chars": sum(1 for c in text_input.upper() if c in self.alphabet)
                     }
-                })
+                }
+                
+                # Ajouter les résultats du scoring s'ils sont disponibles
+                if scoring_result:
+                    result["scoring"] = scoring_result
+                
+                standardized_response["results"].append(result)
                 
                 standardized_response["summary"]["best_result_id"] = "result_1"
                 standardized_response["summary"]["total_results"] = 1
@@ -223,11 +281,62 @@ class CaesarCodePlugin:
         standardized_response["plugin_info"]["execution_time"] = int((time.time() - start_time) * 1000)
         
         return standardized_response
-        
-    def _calculate_confidence(self, shift, text):
+    
+    def _get_text_score(self, text, context=None):
         """
-        Calcule un indice de confiance pour un résultat de bruteforce.
-        Les décalages les plus courants (ROT13, ROT1, etc.) reçoivent une confiance plus élevée.
+        Obtient le score de confiance d'un texte en utilisant le service de scoring.
+        
+        Args:
+            text: Le texte à évaluer
+            context: Contexte optionnel (coordonnées de géocache, etc.)
+        
+        Returns:
+            Dictionnaire contenant le résultat du scoring, ou None en cas d'erreur
+        """
+        # Préparer les données
+        data = {
+            "text": text
+        }
+        
+        # Ajouter le contexte s'il est fourni
+        if context:
+            data["context"] = context
+        
+        print(f"Évaluation du texte: {text[:30]}...")
+        
+        # Utiliser le service local si disponible
+        if self.scoring_service:
+            try:
+                result = self.scoring_service.score_text(text, context)
+                return result
+            except Exception as e:
+                print(f"Erreur lors de l'évaluation locale: {str(e)}")
+                # On pourrait tomber en fallback sur l'API, mais pour simplifier,
+                # on va juste retourner None en cas d'erreur
+                return None
+        else:
+            # Fallback: utiliser l'API distante si le service local n'est pas disponible
+            try:
+                response = requests.post(self.scoring_api_url, json=data)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("success"):
+                        return result.get("result", {})
+                    else:
+                        print(f"Erreur API: {result.get('error')}")
+                else:
+                    print(f"Erreur HTTP: {response.status_code}")
+                    
+                return None
+            except Exception as e:
+                print(f"Erreur lors de l'appel à l'API de scoring: {str(e)}")
+                return None
+    
+    def _legacy_calculate_confidence(self, shift):
+        """
+        Ancien système de calcul de confiance basé uniquement sur le décalage.
+        Conservé pour rétrocompatibilité lorsque le scoring est désactivé.
         """
         # ROT13 est le plus courant, suivi par ROT1
         common_shifts = {13: 0.95, 1: 0.9, 3: 0.85, 5: 0.8, 7: 0.75}

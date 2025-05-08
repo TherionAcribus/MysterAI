@@ -129,6 +129,7 @@ score_global = 0,7 × score_lexical + 0,3 × coord_bonus
 
 ## 7. Architecture pratique
 
+### Architecture standard (appel API)
 ```
 Plugin JS/Electron
    ├─ pré-filtrage (1)
@@ -145,7 +146,27 @@ UI GoldenLayout
    └─ affiche top N + badges
 ```
 
-- **Cache LRU côté Flask** : dictionnaires Bloom chargés à la volée puis conservés
+### Architecture optimisée (appel direct)
+```
+Plugin Python
+   ├─ pré-filtrage (1)
+   ├─ normalisation (2)
+   └─► appel direct au service de scoring
+            │
+            ├─ fastText → langue
+            ├─ segmentation (3)
+            ├─ regex GPS (4)
+            ├─ Bloom + Zipf (5)
+            └─ retourne {texte, langue, score, détails}
+   └─► fallback sur API si service non disponible
+UI GoldenLayout
+   ├─ trie par score
+   └─ affiche top N + badges
+```
+
+- **Cache LRU côté service** : dictionnaires Bloom chargés à la volée puis conservés
+- **Fiabilité améliorée** : le système fonctionne même si le serveur Flask n'est pas disponible
+- **Performance optimisée** : élimination de la latence réseau pour les appels directs
 - Possibilité d'utiliser WebSocket pour obtenir le score en temps réel pendant la saisie
 
 ## 8. Optimisations & garde-fous
@@ -172,8 +193,8 @@ Sur la base du système actuel, voici les améliorations planifiées pour enrich
 
 ### API de scoring standardisée
 
-- Implémentation d'un endpoint dédié `/api/plugins/score` pour centraliser la logique d'évaluation
-- Ajout dans le `plugin.json` d'un champ `scoring_method` permettant aux plugins de spécifier leur méthode préférée:
+- ✅ Implémentation d'un endpoint dédié `/api/plugins/score` pour centraliser la logique d'évaluation
+- ✅ Ajout dans le `plugin.json` d'un champ `scoring_method` permettant aux plugins de spécifier leur méthode préférée:
   ```json
   "scoring_method": {
     "type": "lexical",
@@ -184,6 +205,7 @@ Sur la base du système actuel, voici les améliorations planifiées pour enrich
     }
   }
   ```
+- ✅ Ajout d'un accès direct au service de scoring dans les plugins Python pour améliorer la fiabilité et les performances
 
 ### Contextualisation par géocache
 
@@ -223,6 +245,7 @@ Enrichissement de la section `metadata` avec des informations détaillées sur l
 
 | Optimisation | Mise en œuvre |
 |--------------|---------------|
+| ✅ Appel direct au service | Utilisation directe du service de scoring dans les plugins Python avec fallback API |
 | Cache distribué | Redis pour partager les modèles linguistiques entre instances |
 | Préchargement intelligent | Modèles pré-chargés selon géolocalisation de l'utilisateur |
 | Compilation JIT | Expressions régulières pré-compilées pour la détection GPS |

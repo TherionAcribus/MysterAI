@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, current_app
 from app.models.plugin_model import Plugin
 import json
 import os
+from app.services.scoring_service import get_scoring_service
 
 plugins_bp = Blueprint('plugins', __name__)
 
@@ -608,3 +609,198 @@ def normalize_text(text: str) -> str:
     
     print(f"Texte normalisé: {normalized}")
     return normalized
+
+@plugins_bp.route('/api/plugins/score', methods=['POST'])
+def score_plugin_output():
+    """
+    Évalue la pertinence d'un texte déchiffré en lui attribuant un score de confiance.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Aucune donnée JSON reçue'
+            }), 400
+        
+        # Valider les données requises
+        if 'text' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Le paramètre "text" est requis'
+            }), 400
+        
+        # Extraire les paramètres
+        text = data.get('text', '')
+        context = data.get('context', {})
+        
+        # Obtenir le service de scoring
+        scoring_service = get_scoring_service()
+        
+        # Effectuer le scoring
+        result = scoring_service.score_text(text, context)
+        
+        # Ajouter les métadonnées de la requête au résultat
+        result['input'] = {
+            'text': text[:100] + ('...' if len(text) > 100 else ''),  # Tronquer pour la lisibilité
+            'context_provided': bool(context)
+        }
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        import traceback
+        print(f"Error in scoring: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@plugins_bp.route('/api/test/scoring', methods=['GET'])
+def test_scoring():
+    """
+    Route de test pour le système de scoring.
+    Utile pour tester rapidement le scoring sur différents textes.
+    """
+    try:
+        # Récupérer le texte à évaluer depuis les paramètres de requête
+        text = request.args.get('text', 'Voici un exemple de texte en français pour tester le scoring.')
+        
+        # Obtenir le service de scoring
+        scoring_service = get_scoring_service()
+        
+        # Effectuer le scoring
+        result = scoring_service.score_text(text)
+        
+        # Retourner les résultats sous forme HTML pour un affichage facile dans le navigateur
+        html_result = f"""
+        <html>
+        <head>
+            <title>Test du système de scoring</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
+                h1 {{ color: #333; }}
+                pre {{ background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }}
+                .score {{ font-size: 18px; font-weight: bold; }}
+                .high {{ color: green; }}
+                .medium {{ color: orange; }}
+                .low {{ color: red; }}
+                .words {{ margin-top: 10px; }}
+                .word {{ display: inline-block; background: #e0f0ff; padding: 3px 8px; margin: 3px; border-radius: 3px; }}
+                table {{ border-collapse: collapse; width: 100%; margin-top: 20px; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            </style>
+        </head>
+        <body>
+            <h1>Test du système de scoring</h1>
+            
+            <h2>Texte analysé</h2>
+            <pre>{text}</pre>
+            
+            <h2>Résultat du scoring</h2>
+        """
+        
+        if result.get("status") == "disabled":
+            html_result += f"""
+            <p>Le scoring automatique est désactivé dans les paramètres.</p>
+            """
+        elif result.get("status") == "rejected":
+            html_result += f"""
+            <p>Le texte a été rejeté par le pré-filtrage : {result.get("message")}</p>
+            """
+        else:
+            # Déterminer la classe CSS pour le score
+            score_class = "low"
+            if result.get("confidence_level") == "high":
+                score_class = "high"
+            elif result.get("confidence_level") == "medium":
+                score_class = "medium"
+                
+            html_result += f"""
+            <p>Score : <span class="score {score_class}">{result.get("score", 0):.2f}</span> ({result.get("confidence_level", "inconnu")})</p>
+            <p>Langue détectée : {result.get("language", "inconnue")}</p>
+            
+            <h3>Mots reconnus</h3>
+            <div class="words">
+            """
+            
+            for word in result.get("words_found", []):
+                html_result += f'<span class="word">{word}</span>'
+                
+            html_result += """
+            </div>
+            
+            <h3>Coordonnées GPS détectées</h3>
+            """
+            
+            coords = result.get("coordinates", {})
+            if coords.get("exist"):
+                html_result += f"""
+                <p>Coordonnées : {coords.get("ddm", "Non spécifié")}</p>
+                <p>Latitude : {coords.get("ddm_lat", "Non spécifié")}</p>
+                <p>Longitude : {coords.get("ddm_lon", "Non spécifié")}</p>
+                """
+                if "decimal" in coords and coords["decimal"]:
+                    html_result += f"""
+                    <p>Coordonnées décimales : {coords["decimal"].get("latitude", "?")} , {coords["decimal"].get("longitude", "?")}</p>
+                    """
+            else:
+                html_result += "<p>Aucune coordonnée GPS détectée</p>"
+                
+            # Ajouter des détails sur les candidats
+            html_result += """
+            <h3>Détails des candidats</h3>
+            <table>
+                <tr>
+                    <th>Texte</th>
+                    <th>Score</th>
+                    <th>Score lexical</th>
+                    <th>Bonus GPS</th>
+                </tr>
+            """
+            
+            for candidate in result.get("candidates", []):
+                html_result += f"""
+                <tr>
+                    <td>{candidate.get("text", "")}</td>
+                    <td>{candidate.get("score", 0):.2f}</td>
+                    <td>{candidate.get("lexical_score", 0):.2f}</td>
+                    <td>{candidate.get("gps_bonus", 0):.2f}</td>
+                </tr>
+                """
+                
+            html_result += """
+            </table>
+            """
+            
+        html_result += f"""
+            <h2>Données techniques</h2>
+            <p>Temps d'exécution : {result.get("execution_time_ms", 0)} ms</p>
+            <pre>{json.dumps(result, indent=2)}</pre>
+            
+            <h2>Tester un autre texte</h2>
+            <form action="/api/test/scoring" method="get">
+                <textarea name="text" rows="5" style="width: 100%;">{text}</textarea>
+                <input type="submit" value="Évaluer">
+            </form>
+        </body>
+        </html>
+        """
+        
+        return html_result
+        
+    except Exception as e:
+        return f"""
+        <html>
+        <head><title>Erreur</title></head>
+        <body>
+            <h1>Erreur lors du test de scoring</h1>
+            <p>{str(e)}</p>
+        </body>
+        </html>
+        """

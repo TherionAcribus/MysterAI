@@ -10,6 +10,7 @@ from loguru import logger
 # Importer votre modèle SQLAlchemy et votre session DB
 from app.models.plugin_model import Plugin
 from app import db  # Utiliser l'instance de db de l'application
+from app.services.scoring_service import get_scoring_service
 
 
 # ============================================================
@@ -358,6 +359,7 @@ class PluginManager:
     def execute_plugin(self, plugin_name: str, inputs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Exécute un plugin et ajoute une détection de coordonnées GPS si activée.
+        Applique également le système de scoring si activé.
         """
         plugin = self.get_plugin(plugin_name)
         if not plugin:
@@ -409,6 +411,32 @@ class PluginManager:
                 print(f"[DEBUG] execute_plugin: Coordonnées décimales ajoutées: {decimal_coords}")
             
             result["coordinates"] = gps_coordinates
+        
+        # Vérifier si le scoring automatique est activé
+        enable_scoring = inputs.get("enable_scoring", True)
+        print(f"[DEBUG] execute_plugin: Scoring automatique activé: {enable_scoring}")
+        
+        if enable_scoring and decoded_text:
+            print(f"[DEBUG] execute_plugin: Lancement du scoring sur le texte décodé")
+            # Obtenir le service de scoring et effectuer l'évaluation
+            scoring_service = get_scoring_service()
+            
+            # Récupérer le contexte (coordonnées de la géocache originale) si présent
+            context = inputs.get("context", {})
+            
+            # Effectuer le scoring
+            scoring_result = scoring_service.score_text(decoded_text, context)
+            print(f"[DEBUG] execute_plugin: Résultat du scoring: {scoring_result}")
+            
+            # Ajouter les métadonnées de scoring au résultat
+            result["scoring"] = scoring_result
+            
+            # Si le texte appartenait à un résultat décodé particulier, ajouter le score à ce résultat également
+            if "result" in result and "decoded_results" in result["result"] and isinstance(result["result"]["decoded_results"], list):
+                for decoded_result in result["result"]["decoded_results"]:
+                    if decoded_result.get("decoded_text") == decoded_text:
+                        decoded_result["scoring"] = scoring_result
+                        break
 
         return result
 
