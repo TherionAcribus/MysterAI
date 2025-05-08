@@ -103,6 +103,22 @@
                 </div>
             {% endif %}
 
+            <!-- Option enable-scoring si disponible -->
+            {% if plugin.enable_scoring %}
+                <div class="mb-4 mt-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" 
+                                id="enable_scoring"
+                                name="enable_scoring"
+                                class="h-4 w-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                                checked>
+                        <label for="enable_scoring" class="ml-2 text-sm font-medium text-gray-300">
+                            Activer le scoring automatique
+                        </label>
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="mt-6 flex justify-end space-x-4">
                 <button type="button" 
                         data-action="click->geocache-solver#cancelPlugin"
@@ -214,6 +230,9 @@
                     
                     const bruteForceCheckbox = form.querySelector('#brute_force');
                     if (bruteForceCheckbox) data.brute_force = bruteForceCheckbox.checked;
+                    
+                    const enableScoringCheckbox = form.querySelector('#enable_scoring');
+                    if (enableScoringCheckbox) data.enable_scoring = enableScoringCheckbox.checked;
                 } else {
                     // Si pas de formulaire, utiliser l'ID géocache
                     const geocacheId = rootElement.dataset.pluginInterfaceIdValue;

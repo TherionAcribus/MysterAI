@@ -274,7 +274,6 @@ Sur la base du système actuel, voici les améliorations planifiées pour enrich
   ```json
   "scoring_method": {
     "type": "lexical",
-    "language_priority": ["fr", "en", "de"],
     "custom_weights": {
       "lexical": 0.8,
       "gps": 0.2
