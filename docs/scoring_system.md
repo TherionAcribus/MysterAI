@@ -104,6 +104,24 @@ Mots à exclure avant le scoring pour éviter les faux positifs liés au domaine
 - est, nord, sud, ouest
 - geocache, cache, treasure...
 
+### Dictionnaire de termes géocaching
+
+- **Base de termes spécialisés** organisée par langue :
+  - Termes communs à toutes les langues (environ 40 termes)
+  - Termes par langue (40-50 termes par langue principale)
+  - Phrases complètes (15-20 phrases par langue)
+- **Valorisation des termes de géocaching** :
+  - Bonus de 50% sur le score Zipf pour les termes de géocaching
+  - Bonus supplémentaire proportionnel au nombre de termes géocaching trouvés
+  - Priorisation des termes de géocaching dans la liste des mots reconnus
+- **Optimisation multiculturelle** :
+  - Fallback vers l'anglais pour les langues sans dictionnaire dédié
+  - Reconnaissance des formes plurielles/singulières
+- **Traitement normalisé de la casse** :
+  - Conversion systématique de tous les termes en minuscules lors de la création des filtres
+  - Normalisation des segments analysés en minuscules pour assurer une comparaison cohérente
+  - Support des textes en majuscules, minuscules ou mixtes durant l'analyse
+
 ### Méthode d'évaluation
 
 - **Bloom filter** par langue :
@@ -213,6 +231,7 @@ UI GoldenLayout
 
 ### Détection de langue robuste
 - **✅ Normalisation automatique** des textes en majuscules et suppression des variations typographiques
+- **✅ Traitement cohérent de la casse** avec conversion systématique en minuscules pour l'analyse
 - **✅ Détection améliorée français/anglais** grâce à une liste de mots spécifiquement français
 - **✅ Mécanisme de fallback intelligent** qui teste plusieurs langues quand le score est faible
 
@@ -236,6 +255,13 @@ UI GoldenLayout
 - **✅ Ajustement intelligent des scores** pour valoriser les mots de fréquence moyenne
 - **✅ Métadonnées détaillées** incluant statistiques Zipf (min, max, moyenne)
 - **✅ Pondération équilibrée** entre couverture lexicale et pertinence des mots
+
+### Termes de géocaching enrichis
+- **✅ Dictionnaire spécialisé** avec plus de 100 termes pour le français et près de 200 pour l'anglais
+- **✅ Reconnaissance insensible à la casse** permettant de détecter les termes quelle que soit leur capitalisation
+- **✅ Support explicite pour des termes spécifiques** comme "moldus", "geocaching" adaptés au contexte
+- **✅ Valorisation renforcée** des termes de géocaching dans le calcul du score final
+- **✅ Traitement cohérent des termes** avec normalisation systématique en minuscules lors de la création des filtres
 
 ## 11. Améliorations futures
 

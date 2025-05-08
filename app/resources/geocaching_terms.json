@@ -1,0 +1,96 @@
+{
+  "common": [
+    "geocache", "cache", "caching", "geocaching", "waypoint", "multi", "mystery",
+    "puzzle", "traditional", "trackable", "travel bug", "tb", "cito", "earthcache", "earth",
+    "letterbox", "wherigo", "mega", "giga", "event", "ape", "gps", "coords", "coordinates",
+    "latitude", "longitude", "container", "log", "muggle", "spoiler", "dnf", "fave",
+    "fav", "favorite", "tftc", "tnln", "tnlnsl", "swag", "geochecker"
+  ],
+  "fr": {
+    "terms": [
+      "géocache", "geocaching", "moldu", "moldus", "indice", "indices", "trésor", "boîte", "boite", "chercheur", 
+      "chasseur", "multicache", "mystère", "énigme", "traditionnel", "géoart", "géoaventure", 
+      "loguer", "logger", "logbook", "carnet", "nano", "micro", "petit", "régulier", "large", 
+      "premium", "maintenance", "entretien", "trouvé", "introuvable", "échange", "signature", 
+      "signer", "bouteille", "film", "balise", "attribut", "caché", "caché", "métal", "magnétique", 
+      "message", "code", "chiffré", "déchiffrer", "crypté", "décrypter", "collection", "formuler"
+    ],
+    "phrases": [
+      "carnet de visite", "boîte aux lettres", "carnet de bord", "point d'intérêt", 
+      "point de passage", "étape intermédiaire", "terre à ciel ouvert", "indice de terrain", 
+      "indice de difficulté", "propriétaire de cache", "merci pour la cache", 
+      "rien pris rien laissé", "niveau de terrain", "niveau de difficulté", "signé le log", 
+      "pas trouvé", "journal de bord", "objets d'échange", "point zéro"
+    ]
+  },
+  "en": {
+    "terms": [
+      "muggle", "hint", "treasure", "box", "seeker", "hunter", "multicache", 
+      "mystery", "puzzle", "traditional", "geoart", "geoadventure", "log", "logger",
+      "logbook", "nano", "micro", "small", "regular", "large", "premium", "maintenance",
+      "found", "not found", "trade", "signature", "sign", "bottle", "film", "beacon", 
+      "attribute", "hidden", "metal", "magnetic", "message", "code", "cipher", "decipher",
+      "encrypted", "decrypt", "collection", "ponder"
+    ],
+    "phrases": [
+      "log book", "letter box", "point of interest", "waypoint", "intermediate step",
+      "earth to sky", "terrain rating", "difficulty rating", "cache owner", "thanks for the cache",
+      "took nothing left nothing", "terrain level", "difficulty level", "signed the log",
+      "did not find", "did not found", "trade items", "ground zero"
+    ]
+  },
+  "de": {
+    "terms": [
+      "muggel", "hinweis", "schatz", "dose", "sucher", "jäger", "multicache",
+      "mysterium", "rätsel", "traditionell", "geokunst", "geoabenteuer", "loggen",
+      "logbuch", "notizbuch", "nano", "mikro", "klein", "regulär", "groß", "premium",
+      "wartung", "gefunden", "nicht gefunden", "tauschen", "unterschrift", "unterschreiben",
+      "flasche", "film", "bake", "attribut", "versteckt", "metall", "magnetisch",
+      "nachricht", "code", "chiffre", "entschlüsseln", "verschlüsselt", "entschlüsseln",
+      "sammlung", "grübeln"
+    ],
+    "phrases": [
+      "logbuch", "briefkasten", "interessenpunkt", "wegpunkt", "zwischenschritt",
+      "erde zum himmel", "geländewertung", "schwierigkeitsbewertung", "cacheeigentümer",
+      "danke für den cache", "nichts genommen nichts hinterlassen", "geländestufe",
+      "schwierigkeitsstufe", "das logbuch unterschrieben", "nicht gefunden",
+      "tauschobjekte", "nullpunkt"
+    ]
+  },
+  "es": {
+    "terms": [
+      "muggle", "pista", "tesoro", "caja", "buscador", "cazador", "multicache",
+      "misterio", "rompecabezas", "tradicional", "geoarte", "geoaventura", "registrar",
+      "libro de registro", "cuaderno", "nano", "micro", "pequeño", "regular", "grande",
+      "premium", "mantenimiento", "encontrado", "no encontrado", "intercambio", "firma",
+      "firmar", "botella", "película", "baliza", "atributo", "escondido", "metal",
+      "magnético", "mensaje", "código", "cifrado", "descifrar", "encriptado", "descifrar",
+      "colección", "reflexionar"
+    ],
+    "phrases": [
+      "libro de visita", "buzón", "punto de interés", "punto de ruta", "paso intermedio",
+      "tierra al cielo", "calificación de terreno", "calificación de dificultad",
+      "propietario del caché", "gracias por el caché", "no tomé nada no dejé nada",
+      "nivel de terreno", "nivel de dificultad", "firmé el registro", "no encontrado",
+      "objetos de intercambio", "punto cero"
+    ]
+  },
+  "it": {
+    "terms": [
+      "babbano", "indizio", "tesoro", "scatola", "cercatore", "cacciatore", "multicache",
+      "mistero", "enigma", "tradizionale", "geoarte", "geoavventura", "loggare",
+      "registro", "quaderno", "nano", "micro", "piccolo", "regolare", "grande",
+      "premium", "manutenzione", "trovato", "non trovato", "scambio", "firma",
+      "firmare", "bottiglia", "pellicola", "faro", "attributo", "nascosto", "metallo",
+      "magnetico", "messaggio", "codice", "cifrato", "decifrare", "criptato", "decrittare",
+      "collezione", "riflettere"
+    ],
+    "phrases": [
+      "libro di visita", "cassetta postale", "punto di interesse", "waypoint", "tappa intermedia",
+      "terra al cielo", "valutazione del terreno", "valutazione della difficoltà",
+      "proprietario della cache", "grazie per la cache", "non ho preso nulla non ho lasciato nulla",
+      "livello del terreno", "livello di difficoltà", "firmato il registro", "non trovato",
+      "oggetti di scambio", "punto zero"
+    ]
+  }
+} 

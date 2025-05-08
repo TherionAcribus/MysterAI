@@ -8,11 +8,12 @@ de déchiffrement dans le contexte du géocaching.
 import re
 import logging
 import time
+import json
+import os
 from typing import Dict, List, Tuple, Union, Optional, Set
 from app.models.app_config import AppConfig
 import langdetect
 import wordninja
-import os
 import pickle
 from langdetect import DetectorFactory
 from langdetect.detector import LangDetectException
@@ -39,6 +40,7 @@ class ScoringService:
     GPS_WEIGHT = 0.3
     ZIPF_NORMALIZATION = 7.0
     ZIPF_MIN_VALUE = 0.5  # Valeur minimum pour les mots absents du dictionnaire Zipf
+    GEOCACHING_TERM_BONUS = 1.5  # Bonus pour les termes de géocaching (multiplicateur de Zipf)
     
     # Seuils pour les niveaux de confiance
     CONFIDENCE_THRESHOLD_HIGH = 0.65
@@ -46,6 +48,9 @@ class ScoringService:
     
     # Expression régulière pour les coordonnées GPS
     GPS_REGEX = r'([NS]\s*\d{1,2}[° ]\d{1,2}\.\d+)|([EW]\s*\d{1,3}[° ]\d{1,2}\.\d+)'
+    
+    # Cache pour les termes de géocaching
+    _geocaching_terms = None
     
     # Liste des mots à exclure (stop words spécifiques au géocaching)
     GEOCACHING_STOP_WORDS = {
@@ -128,6 +133,17 @@ class ScoringService:
                         logger.info(f"Filtre de Bloom chargé pour {name}")
                 except Exception as e:
                     logger.error(f"Erreur lors du chargement du filtre de Bloom pour {name}: {e}")
+        
+        # Charger les termes de géocaching
+        geocaching_terms_path = os.path.join(resources_dir, 'geocaching_terms.json')
+        if os.path.exists(geocaching_terms_path):
+            try:
+                with open(geocaching_terms_path, 'r', encoding='utf-8') as f:
+                    self._geocaching_terms = json.load(f)
+                logger.info("Termes de géocaching chargés avec succès")
+            except Exception as e:
+                logger.error(f"Erreur lors du chargement des termes de géocaching: {e}")
+                self._geocaching_terms = None
         
         logger.info("Ressources chargées avec succès")
     
@@ -465,6 +481,38 @@ class ScoringService:
             # Mots de fréquence normale - conserver
             return zipf_score
             
+    def _get_geocaching_terms(self, language: str) -> Set[str]:
+        """
+        Récupère l'ensemble des termes de géocaching pour une langue donnée.
+        
+        Args:
+            language: Code de la langue
+            
+        Returns:
+            Ensemble des termes de géocaching pour cette langue
+        """
+        if not self._geocaching_terms:
+            return set()
+        
+        # Commencer par les termes communs
+        geocaching_terms = set(term.lower() for term in self._geocaching_terms.get("common", []))
+        
+        # Ajouter les termes spécifiques à la langue
+        if language in self._geocaching_terms:
+            lang_terms = self._geocaching_terms[language]
+            if "terms" in lang_terms:
+                geocaching_terms.update(term.lower() for term in lang_terms["terms"])
+            if "phrases" in lang_terms:
+                geocaching_terms.update(phrase.lower() for phrase in lang_terms["phrases"])
+        
+        # Si la langue n'est pas disponible, utiliser l'anglais comme fallback
+        elif language != 'en' and 'en' in self._geocaching_terms:
+            en_terms = self._geocaching_terms['en']
+            if "terms" in en_terms:
+                geocaching_terms.update(term.lower() for term in en_terms["terms"])
+        
+        return geocaching_terms
+    
     def _compute_language_score(self, segments: List[str], language: str) -> Tuple[float, List[str]]:
         """
         Calcule le score pour une langue spécifique.
@@ -478,16 +526,28 @@ class ScoringService:
         """
         found_words = []
         zipf_scores = []
+        geocaching_terms = self._get_geocaching_terms(language)
+        geocaching_words_found = []
+        
+        # Convertir tous les segments en minuscules pour assurer une comparaison cohérente
+        normalized_segments = [s.lower() for s in segments]
         
         # Utiliser le filtre de Bloom s'il est disponible, sinon utiliser le dictionnaire en mémoire
         if language in self._bloom_filters:
             bloom_filter = self._bloom_filters[language]
             
-            for segment in segments:
+            for segment in normalized_segments:
+                # Vérifier si le segment est dans le filtre de Bloom (toujours en minuscules)
                 if segment in bloom_filter:
                     found_words.append(segment)
                     # Calculer le score Zipf pour le mot reconnu
                     zipf_score = wordfreq.zipf_frequency(segment, language)
+                    
+                    # Appliquer un bonus pour les termes de géocaching
+                    if segment in geocaching_terms:
+                        zipf_score *= self.GEOCACHING_TERM_BONUS
+                        geocaching_words_found.append(segment)
+                    
                     # Ajuster pour éviter de survaloriser les mots très communs
                     adjusted_zipf = self._adjust_zipf_score(zipf_score)
                     zipf_scores.append(adjusted_zipf)
@@ -497,11 +557,17 @@ class ScoringService:
             # Fallback sur le dictionnaire en mémoire si pas de filtre de Bloom
             common_words = self.COMMON_WORDS.get(language, self.COMMON_WORDS['en'])
             
-            for segment in segments:
+            for segment in normalized_segments:
                 if segment in common_words:
                     found_words.append(segment)
                     # Calculer le score Zipf pour le mot reconnu
                     zipf_score = wordfreq.zipf_frequency(segment, language)
+                    
+                    # Appliquer un bonus pour les termes de géocaching
+                    if segment in geocaching_terms:
+                        zipf_score *= self.GEOCACHING_TERM_BONUS
+                        geocaching_words_found.append(segment)
+                    
                     # Ajuster pour éviter de survaloriser les mots très communs
                     adjusted_zipf = self._adjust_zipf_score(zipf_score)
                     zipf_scores.append(adjusted_zipf)
@@ -519,8 +585,19 @@ class ScoringService:
             # Aucun mot reconnu, utiliser une valeur par défaut basse
             average_zipf = self.ZIPF_MIN_VALUE
         
+        # Appliquer un bonus supplémentaire si des termes de géocaching ont été trouvés
+        geocaching_bonus = min(0.2, len(geocaching_words_found) * 0.05)
+        
         # Score lexical combiné
-        lexical_score = (0.7 * coverage) + (0.3 * (average_zipf / self.ZIPF_NORMALIZATION))
+        lexical_score = (0.7 * coverage) + (0.3 * (average_zipf / self.ZIPF_NORMALIZATION)) + geocaching_bonus
+        
+        # Limiter le score à 1.0 maximum
+        lexical_score = min(1.0, lexical_score)
+        
+        # Ajouter les termes de géocaching trouvés au début de la liste des mots reconnus
+        # pour les mettre en évidence dans les métadonnées
+        if geocaching_words_found:
+            found_words = geocaching_words_found + [w for w in found_words if w not in geocaching_words_found]
         
         return lexical_score, found_words
     

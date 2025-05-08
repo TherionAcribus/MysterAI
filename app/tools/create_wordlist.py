@@ -7,6 +7,7 @@ Utilise une approche différente en générant directement une liste de mots.
 import os
 import pickle
 import logging
+import json
 import wordfreq
 from pybloom_live import BloomFilter
 
@@ -73,15 +74,67 @@ COMMON_WORDS = {
     ]
 }
 
-# Mots spécifiques au géocaching par langue
-GEOCACHING_WORDS = {
-    'fr': ['cache', 'geocache', 'indice', 'indices', 'mystère', 'trésor', 'coordonnées', 'nord', 'sud', 'est', 'ouest'],
-    'en': ['cache', 'geocache', 'hint', 'hints', 'mystery', 'treasure', 'coordinates', 'north', 'south', 'east', 'west'],
-    'de': ['cache', 'geocache', 'hinweis', 'hinweise', 'mysterium', 'schatz', 'koordinaten', 'nord', 'süd', 'ost', 'west'],
-    'es': ['cache', 'geocache', 'pista', 'pistas', 'misterio', 'tesoro', 'coordenadas', 'norte', 'sur', 'este', 'oeste'],
-    'it': ['cache', 'geocache', 'indizio', 'indizi', 'mistero', 'tesoro', 'coordinate', 'nord', 'sud', 'est', 'ovest'],
-    'nl': ['cache', 'geocache', 'hint', 'hints', 'mysterie', 'schat', 'coördinaten', 'noord', 'zuid', 'oost', 'west'],
-}
+def load_geocaching_terms():
+    """
+    Charge les termes spécifiques au géocaching depuis le fichier JSON.
+    
+    Returns:
+        Dictionnaire contenant les termes de géocaching par langue
+    """
+    geocaching_terms_path = os.path.join(os.path.dirname(__file__), '..', 'resources', 'geocaching_terms.json')
+    try:
+        with open(geocaching_terms_path, 'r', encoding='utf-8') as f:
+            geocaching_terms = json.load(f)
+        logger.info(f"Termes de géocaching chargés depuis {geocaching_terms_path}")
+        return geocaching_terms
+    except Exception as e:
+        logger.error(f"Erreur lors du chargement des termes de géocaching: {e}")
+        # Retourner un dictionnaire vide en cas d'erreur
+        return {"common": [], "fr": {"terms": [], "phrases": []}, "en": {"terms": [], "phrases": []}}
+
+def get_geocaching_words_for_language(lang_code, geocaching_terms):
+    """
+    Extrait les mots et phrases de géocaching pour une langue spécifique.
+    
+    Args:
+        lang_code: Code de la langue
+        geocaching_terms: Dictionnaire contenant tous les termes de géocaching
+        
+    Returns:
+        Liste des termes de géocaching pour la langue spécifiée
+    """
+    # Commencer par les termes communs à toutes les langues
+    geocaching_words = [term.lower() for term in geocaching_terms.get("common", [])]
+    
+    # Ajouter les termes spécifiques à la langue si disponibles
+    if lang_code in geocaching_terms:
+        # Ajouter les termes simples
+        terms = [term.lower() for term in geocaching_terms[lang_code].get("terms", [])]
+        geocaching_words.extend(terms)
+        
+        # Ajouter les phrases
+        phrases = [phrase.lower() for phrase in geocaching_terms[lang_code].get("phrases", [])]
+        geocaching_words.extend(phrases)
+        
+        # Ajouter également les termes dans leur forme singulier/pluriel
+        terms_with_variations = []
+        for term in geocaching_words:
+            terms_with_variations.append(term)
+            # Ajouter forme plurielle simple (ajouter 's' en anglais)
+            if lang_code == 'en' and not term.endswith('s'):
+                terms_with_variations.append(f"{term}s")
+        
+        geocaching_words = terms_with_variations
+    
+    # Si aucun terme n'est disponible pour cette langue, utiliser les termes anglais
+    if not geocaching_words and 'en' in geocaching_terms:
+        logger.info(f"Aucun terme de géocaching pour {lang_code}, utilisation des termes anglais")
+        common_terms = [term.lower() for term in geocaching_terms.get("common", [])]
+        en_terms = [term.lower() for term in geocaching_terms["en"].get("terms", [])]
+        geocaching_words = common_terms + en_terms
+    
+    logger.info(f"Récupération de {len(geocaching_words)} termes de géocaching pour {lang_code}")
+    return geocaching_words
 
 def get_dictionary_words(lang_code, num_words=20000):
     """
@@ -104,10 +157,11 @@ def get_dictionary_words(lang_code, num_words=20000):
         all_words.extend(corpus_words)
         logger.info(f"Ajout de {len(corpus_words)} mots depuis wordfreq.top_n_list")
         
-        # Ajouter les mots spécifiques au géocaching
-        geocaching_words = GEOCACHING_WORDS.get(lang_code, [])
+        # Charger les termes de géocaching
+        geocaching_terms = load_geocaching_terms()
+        geocaching_words = get_geocaching_words_for_language(lang_code, geocaching_terms)
         all_words.extend(geocaching_words)
-        logger.info(f"Ajout de {len(geocaching_words)} mots spécifiques au géocaching")
+        logger.info(f"Ajout de {len(geocaching_words)} termes spécifiques au géocaching")
         
         # Supprimer les doublons
         unique_words = list(set(all_words))
