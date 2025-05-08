@@ -47,7 +47,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             this.descriptionTextTarget.value = '';
         }
         
-        // Ajouter un écouteur pour le changement de type de caractères autorisés
+        // Ajouter un écouteur d'événement pour le changement de type de caractères autorisés
         document.addEventListener('DOMContentLoaded', () => {
             const allowedCharsSelect = document.getElementById('metasolver-allowed-chars');
             const customCharsContainer = document.getElementById('metasolver-custom-chars-container');
@@ -62,6 +62,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 });
             }
         });
+        
+        // AJOUT: Écouter les changements dans le champ de description
+        if (this.hasDescriptionTextTarget) {
+            this.descriptionTextTarget.addEventListener('input', (event) => {
+                console.log("Mise à jour du champ de description détectée:", event.target.value);
+                // Forcer une mise à jour du modèle
+                this._currentDescriptionValue = event.target.value;
+            });
+        }
     }
 
     async loadGeocacheData() {
@@ -386,7 +395,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         
         // Si on a un plugin sélectionné
         if (pluginId && pluginName) {
-            // Récupérer le texte à traiter
+            // Log pour le débogage - valeur actuelle du champ de description
+            console.log("Valeur actuelle dans descriptionTextTarget:", this.descriptionTextTarget.value);
+            console.log("Valeur dans _currentDescriptionValue:", this._currentDescriptionValue || "non définie");
+            
+            // Récupérer le texte à traiter en privilégiant toujours la saisie la plus récente
             let textToProcess = '';
             
             // Déterminer si le plugin est déjà exécuté dans cette zone (réexécution)
@@ -399,23 +412,32 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             const pluginInputTextarea = pluginZone ? 
                 pluginZone.querySelector('textarea[data-plugin-input="true"]') : null;
             
-            if (pluginInputTextarea) {
-                // Utiliser le texte de la zone d'entrée du plugin (priorité absolue)
+            if (pluginInputTextarea && pluginInputTextarea.value.trim() !== '') {
+                // Utiliser le texte du plugin si disponible et non vide
                 textToProcess = pluginInputTextarea.value;
-                console.log("Utilisation du texte saisi dans le plugin:", textToProcess);
-            } else if (!this.lastPluginOutputValue || isReexecution) {
-                // Si c'est la première exécution ou une réexécution sans zone d'entrée spécifique,
-                // utiliser le texte de la description principale
-                textToProcess = this.descriptionTextTarget.value;
-                console.log("Utilisation du texte de la description principale:", textToProcess);
+                console.log("Texte saisi dans le plugin utilisé:", textToProcess);
             } else {
-                // Dans une chaîne de plugins, utiliser le résultat du plugin précédent
-                textToProcess = this.lastPluginOutputValue;
-                console.log("Utilisation du résultat du plugin précédent:", textToProcess);
+                // Essayer d'utiliser la valeur mise en cache si elle existe
+                if (this._currentDescriptionValue) {
+                    textToProcess = this._currentDescriptionValue;
+                    console.log("Utilisation de la valeur mise en cache:", textToProcess);
+                } else {
+                    // Sinon utiliser le texte de la description principale
+                    textToProcess = this.descriptionTextTarget.value;
+                    console.log("Texte de la description principale utilisé:", textToProcess);
+                }
+                
+                // Si c'est une réexécution et que la description principale est vide, 
+                // utiliser le résultat du plugin précédent comme fallback
+                if (textToProcess.trim() === '' && this.lastPluginOutputValue) {
+                    textToProcess = this.lastPluginOutputValue;
+                    console.log("Description vide, utilisation du résultat du plugin précédent:", textToProcess);
+                }
             }
             
             // Normaliser le texte avant de l'envoyer au plugin
             textToProcess = this.normalizeText(textToProcess);
+            console.log("Texte final qui sera envoyé au plugin:", textToProcess);
             
             try {
                 // Créer ou récupérer la zone de résultat pour ce plugin
@@ -483,8 +505,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 // Collecter tous les paramètres du plugin
                 const pluginInputs = {};
                 
-                // Toujours inclure le texte à traiter
+                // IMPORTANT: Utiliser le texte à traiter qui a été normalisé
                 pluginInputs.text = textToProcess;
+                console.log("Texte utilisé pour les paramètres du plugin:", textToProcess);
                 
                 // Mode par défaut
                 pluginInputs.mode = 'decode';
@@ -498,6 +521,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         const inputName = input.name || input.id;
                         
                         if (!inputName) return; // Ignorer les éléments sans nom
+                        
+                        // IMPORTANT: Ne pas écraser le texte d'entrée
+                        if (inputName === 'text') {
+                            console.log("Champ 'text' trouvé dans le formulaire, ignoré pour ne pas écraser l'entrée");
+                            return;
+                        }
                         
                         // Traiter différemment selon le type d'input
                         if (input.type === 'checkbox' || input.type === 'radio') {
@@ -517,6 +546,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 }
                 
                 console.log("Paramètres collectés pour l'exécution du plugin:", pluginInputs);
+                
+                // Vérification finale pour s'assurer que le texte est bien défini
+                if (pluginInputs.text !== textToProcess) {
+                    console.error("ANOMALIE: Le texte dans les paramètres a été modifié, correction...");
+                    pluginInputs.text = textToProcess;
+                }
                 
                 // Appeler l'API pour exécuter le plugin
                 const response = await fetch(`/api/plugins/${pluginName}/execute`, {
