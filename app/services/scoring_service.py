@@ -10,9 +10,18 @@ import logging
 import time
 from typing import Dict, List, Tuple, Union, Optional, Set
 from app.models.app_config import AppConfig
+import langdetect
+import wordninja
+import os
+import pickle
+from langdetect import DetectorFactory
+from langdetect.detector import LangDetectException
 
 # Configurer le logger
 logger = logging.getLogger(__name__)
+
+# Configurer langdetect pour être déterministe
+DetectorFactory.seed = 0
 
 class ScoringService:
     """
@@ -42,6 +51,46 @@ class ScoringService:
         'geocache', 'cache', 'treasure', 'tresor', 'trésor', 'mystery', 'mystère', 'multi', 'puzzle'
     }
     
+    # Langues supportées avec leurs dictionnaires respectifs
+    SUPPORTED_LANGUAGES = {
+        'fr': 'french',
+        'en': 'english',
+        'de': 'german',
+        'es': 'spanish',
+        'it': 'italian',
+        'nl': 'dutch',
+        'pt': 'portuguese'
+    }
+    
+    # Liste des mots communs par langue (fallback si filtres de Bloom non disponibles)
+    COMMON_WORDS = {
+        'fr': {'le', 'la', 'les', 'un', 'une', 'des', 'et', 'ou', 'mais', 'donc',
+               'car', 'ni', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles',
+               'être', 'avoir', 'faire', 'aller', 'venir', 'voir', 'dire', 'parler',
+               'dans', 'sur', 'sous', 'avec', 'sans', 'pour', 'par', 'en', 'de', 'du',
+               'ce', 'cette', 'ces', 'mon', 'ton', 'son', 'notre', 'votre', 'leur'},
+        'en': {'the', 'a', 'an', 'and', 'or', 'but', 'if', 'of', 'at', 'by', 'for',
+               'with', 'about', 'against', 'between', 'into', 'through', 'during',
+               'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in',
+               'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
+               'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both',
+               'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
+               'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't',
+               'can', 'will', 'just', 'don', 'should', 'now', 'i', 'me', 'my',
+               'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+               'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her',
+               'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their',
+               'theirs', 'themselves', 'what', 'which', 'who', 'whom', 'this', 'that',
+               'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been',
+               'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+               'would', 'could', 'should', 'ought', 'im', 'youre', 'hes', 'shes', 'its',
+               'were', 'theyre', 'ive', 'youve', 'weve', 'theyve', 'id', 'youd',
+               'hed', 'shed', 'wed', 'theyd', 'ill', 'youll', 'hell', 'shell', 'well',
+               'theyll', 'isnt', 'arent', 'wasnt', 'werent', 'hasnt', 'havent',
+               'hadnt', 'doesnt', 'dont', 'didnt', 'wont', 'wouldnt', 'shant',
+               'shouldnt', 'cant', 'cannot', 'couldnt', 'mustnt', 'lets'}
+    }
+    
     def __init__(self):
         """
         Initialise le service de scoring avec les ressources nécessaires.
@@ -50,7 +99,35 @@ class ScoringService:
         self._segmenters = {}
         self._bloom_filters = {}
         self._zipf_frequencies = {}
+        
+        # Initialiser wordninja une fois pour éviter de recharger le modèle à chaque appel
+        self._wordninja = wordninja
+        
         # Les modèles seront chargés à la demande
+        self._load_resources()
+    
+    def _load_resources(self):
+        """
+        Charge les ressources nécessaires pour le scoring (dictionnaires, modèles, etc.)
+        """
+        resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'resources')
+        bloom_filters_dir = os.path.join(resources_dir, 'bloom_filters')
+        
+        # Créer le répertoire des ressources s'il n'existe pas
+        os.makedirs(bloom_filters_dir, exist_ok=True)
+        
+        # Charger les filtres de Bloom existants
+        for lang, name in self.SUPPORTED_LANGUAGES.items():
+            bloom_filter_path = os.path.join(bloom_filters_dir, f"{lang}_bloom.pkl")
+            if os.path.exists(bloom_filter_path):
+                try:
+                    with open(bloom_filter_path, 'rb') as f:
+                        self._bloom_filters[lang] = pickle.load(f)
+                        logger.info(f"Filtre de Bloom chargé pour {name}")
+                except Exception as e:
+                    logger.error(f"Erreur lors du chargement du filtre de Bloom pour {name}: {e}")
+        
+        logger.info("Ressources chargées avec succès")
     
     def is_scoring_enabled(self) -> bool:
         """
@@ -246,19 +323,45 @@ class ScoringService:
         Returns:
             Un tuple contenant la langue détectée et la liste des segments
         """
-        # Implémentation simplifiée (à remplacer par fastText et des segmenteurs réels)
-        # Pour le moment, on utilise une segmentation basique par espaces
+        # Normalisation du texte pour la détection de langue
+        normalized_text = text.lower()
         
-        # TODO: Implémenter la détection de langue avec fastText
-        lang = "fr"  # Par défaut français
+        # Détection de langue avec langdetect
+        try:
+            # Texte trop court pour une détection fiable
+            if len(normalized_text) < 20:
+                lang = "fr"  # Par défaut français
+            else:
+                # Tentative de détection de langue
+                detected = langdetect.detect(normalized_text)
+                
+                # Vérifier si la langue détectée est supportée, sinon fallback sur 'fr'
+                if detected in self.SUPPORTED_LANGUAGES:
+                    lang = detected
+                else:
+                    lang = "fr"
+                
+                # Double vérification pour les cas ambigus français/anglais
+                if detected in ['en', 'fr']:
+                    # Liste de mots spécifiquement français
+                    fr_specific = ['est', 'et', 'dans', 'avec', 'pour', 'vous', 'nous', 'ils', 'sont', 'mais', 'très']
+                    
+                    # Compter les mots spécifiquement français
+                    fr_words_count = sum(1 for word in normalized_text.split() if word in fr_specific)
+                    
+                    # Si plusieurs mots spécifiquement français sont présents, forcer la langue à français
+                    if fr_words_count >= 2 and detected == 'en':
+                        lang = "fr"
+                        logger.debug(f"Langue forcée à français en raison de {fr_words_count} mots spécifiques")
+        except LangDetectException:
+            lang = "fr"  # Par défaut français en cas d'erreur
         
         # Si le texte contient des espaces, utiliser ces espaces comme segmentation
         if ' ' in text:
             segments = text.split()
         else:
-            # TODO: Implémenter une segmentation plus avancée
-            # Pour le moment, segmentation naïve par groupes de caractères
-            segments = [text[i:i+5] for i in range(0, len(text), 5)]
+            # Utiliser wordninja pour segmenter le texte sans espaces
+            segments = self._wordninja.split(text)
         
         return lang, segments
     
@@ -273,29 +376,75 @@ class ScoringService:
         Returns:
             Un tuple contenant le score lexical et la liste des mots reconnus
         """
-        # Implémentation simplifiée (à remplacer par filtres de Bloom et Zipf)
-        
-        # TODO: Implémenter des filtres de Bloom et Zipf réels
-        # Pour le moment, utilisation d'une liste de mots commune en français
-        common_fr_words = {'le', 'la', 'les', 'un', 'une', 'des', 'et', 'ou', 'mais', 'donc',
-                          'car', 'ni', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles',
-                          'être', 'avoir', 'faire', 'aller', 'venir', 'voir', 'dire', 'parler',
-                          'dans', 'sur', 'sous', 'avec', 'sans', 'pour', 'par', 'en', 'de', 'du',
-                          'ce', 'cette', 'ces', 'mon', 'ton', 'son', 'notre', 'votre', 'leur'}
+        # Normaliser les segments (minuscules)
+        lower_segments = [s.lower() for s in segments]
         
         # Filtrer les mots d'arrêt spécifiques au géocaching
-        filtered_segments = [s.lower() for s in segments if s.lower() not in self.GEOCACHING_STOP_WORDS]
+        filtered_segments = [s for s in lower_segments if s not in self.GEOCACHING_STOP_WORDS]
         
-        # Compter les mots reconnus
+        # Identifier les mots reconnus
         found_words = []
-        for segment in filtered_segments:
-            if segment.lower() in common_fr_words:
-                found_words.append(segment)
+        
+        # Essayer la langue détectée d'abord
+        primary_score, primary_words = self._compute_language_score(filtered_segments, language)
+        
+        # Si le score est très faible et la langue n'est pas française, essayer le français comme fallback
+        if primary_score < 0.2 and language != 'fr':
+            fallback_score, fallback_words = self._compute_language_score(filtered_segments, 'fr')
+            
+            # Si le score en français est significativement meilleur, l'utiliser
+            if fallback_score > primary_score * 1.5:
+                logger.debug(f"Langue corrigée: {language} → fr (score: {primary_score:.2f} → {fallback_score:.2f})")
+                return fallback_score, fallback_words
+        
+        # Si le score est très faible et la langue n'est pas anglaise, essayer l'anglais comme fallback
+        elif primary_score < 0.2 and language != 'en':
+            fallback_score, fallback_words = self._compute_language_score(filtered_segments, 'en')
+            
+            # Si le score en anglais est significativement meilleur, l'utiliser
+            if fallback_score > primary_score * 1.5:
+                logger.debug(f"Langue corrigée: {language} → en (score: {primary_score:.2f} → {fallback_score:.2f})")
+                return fallback_score, fallback_words
+        
+        return primary_score, primary_words
+    
+    def _compute_language_score(self, segments: List[str], language: str) -> Tuple[float, List[str]]:
+        """
+        Calcule le score pour une langue spécifique.
+        
+        Args:
+            segments: Liste des segments (mots potentiels) déjà filtrés et en minuscules
+            language: Code de la langue
+            
+        Returns:
+            Un tuple contenant le score lexical et la liste des mots reconnus
+        """
+        found_words = []
+        
+        # Utiliser le filtre de Bloom s'il est disponible, sinon utiliser le dictionnaire en mémoire
+        if language in self._bloom_filters:
+            bloom_filter = self._bloom_filters[language]
+            
+            for segment in segments:
+                if segment in bloom_filter:
+                    found_words.append(segment)
+                    
+            logger.debug(f"Filtre de Bloom utilisé pour {language}, {len(found_words)}/{len(segments)} mots reconnus")
+        else:
+            # Fallback sur le dictionnaire en mémoire si pas de filtre de Bloom
+            common_words = self.COMMON_WORDS.get(language, self.COMMON_WORDS['en'])
+            
+            for segment in segments:
+                if segment in common_words:
+                    found_words.append(segment)
+                    
+            logger.debug(f"Dictionnaire en mémoire utilisé pour {language}, {len(found_words)}/{len(segments)} mots reconnus")
         
         # Calculer la couverture
-        coverage = len(found_words) / max(1, len(filtered_segments))
+        coverage = len(found_words) / max(1, len(segments))
         
-        # Zipf moyen (simulé pour le moment)
+        # Simuler un zipf moyen pour l'instant
+        # Dans une implémentation complète, nous calculerions des fréquences réelles
         average_zipf = 3.5  # Valeur simulée entre 0 et 7
         
         # Score lexical combiné
@@ -313,8 +462,21 @@ class ScoringService:
         Returns:
             Un tuple contenant le bonus de coordonnées et les détails des coordonnées trouvées
         """
-        # Recherche de motifs de coordonnées GPS
-        matches = re.findall(self.GPS_REGEX, text)
+        # Expression régulière améliorée pour les coordonnées GPS
+        # Cette version est plus tolérante aux variations de format
+        gps_patterns = [
+            # Format standard N/S XX° YY.ZZZ E/W XX° YY.ZZZ
+            r'([NS])\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*([EW])\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
+            
+            # Format avec points cardinaux en texte
+            r'(nord|nord|north|south|sud)\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*(est|ouest|east|west)\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
+            
+            # Format sans espaces
+            r'([NS])(\d{1,2})[°](\d{1,2}\.\d+)([EW])(\d{1,3})[°](\d{1,2}\.\d+)',
+            
+            # Format décimal
+            r'([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)'
+        ]
         
         # Structure pour les coordonnées
         coordinates = {
@@ -322,19 +484,37 @@ class ScoringService:
             "ddm_lat": None,
             "ddm_lon": None,
             "ddm": None,
-            "decimal": {"latitude": None, "longitude": None}
+            "decimal": {"latitude": None, "longitude": None},
+            "patterns": []
         }
         
-        if matches:
+        # Rechercher les différents formats de coordonnées
+        found_coords = False
+        
+        for pattern in gps_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                found_coords = True
+                for match in matches:
+                    # Ajouter le motif complet à la liste des motifs trouvés
+                    match_text = re.search(pattern, text, re.IGNORECASE).group(0)
+                    if match_text not in coordinates["patterns"]:
+                        coordinates["patterns"].append(match_text)
+        
+        # Vérifier si des coordonnées ont été trouvées
+        if found_coords:
             # Vérifier les faux positifs (séquence N E N E)
-            if "N E N E" in text or "n e n e" in text:
-                # Réduire le bonus pour ces cas suspects
-                return 0.1, coordinates
+            nene_patterns = ['N E N E', 'n e n e', 'NORD EST NORD EST', 'nord est nord est']
+            for nene in nene_patterns:
+                if nene in text.upper():
+                    # Réduire le bonus pour ces cas suspects
+                    return 0.1, coordinates
             
-            # TODO: Implémenter l'extraction et la validation des coordonnées
-            # Pour le moment, simplement indiquer qu'elles existent
+            # Mise à jour du statut des coordonnées
             coordinates["exist"] = True
-            coordinates["patterns"] = [m[0] if m[0] else m[1] for m in matches if m[0] or m[1]]
+            
+            # TODO: Implémenter l'extraction et la validation complète des coordonnées
+            # Pour le moment, simplement signaler leur présence
             
             return self.COORD_BONUS_VALUE, coordinates
         

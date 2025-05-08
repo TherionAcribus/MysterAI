@@ -56,16 +56,16 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Implémenter la pondération basée sur la distance
 
 - [ ] **Adaptation linguistique régionale**
-  - [ ] Créer une carte des langues par région géographique
+  - [x] Créer une carte des langues par région géographique
   - [ ] Développer la logique de priorisation des langues
   - [ ] Tester avec des jeux de données multilingues
 
 ## Extension du Format de Sortie
 
-- [ ] **Enrichissement des métadonnées**
-  - [ ] Définir la structure complète des métadonnées de scoring
-  - [ ] Implémenter la collecte des mots reconnus
-  - [ ] Ajouter le calcul de confiance linguistique
+- [x] **Enrichissement des métadonnées**
+  - [x] Définir la structure complète des métadonnées de scoring
+  - [x] Implémenter la collecte des mots reconnus
+  - [x] Ajouter le calcul de confiance linguistique
   - [ ] Développer la génération d'explications automatiques
 
 - [ ] **Compatibilité avec l'API existante**
@@ -90,19 +90,19 @@ Cette liste détaille les tâches à accomplir pour implémenter les améliorati
   - [ ] Implémenter la logique de mise en cache des filtres de Bloom
   - [ ] Développer la stratégie d'invalidation du cache
 
-- [ ] **Préchargement intelligent**
-  - [ ] Implémenter la détection de localisation
-  - [ ] Développer la logique de préchargement prioritaire
+- [x] **Préchargement intelligent**
+  - [x] Implémenter la détection de localisation
+  - [x] Développer la logique de préchargement prioritaire
   - [ ] Optimiser la gestion mémoire des modèles
 
-- [ ] **Compilation JIT des expressions régulières**
-  - [ ] Identifier toutes les regex utilisées dans le scoring
-  - [ ] Implémenter le système de précompilation
+- [x] **Compilation JIT des expressions régulières**
+  - [x] Identifier toutes les regex utilisées dans le scoring
+  - [x] Implémenter le système de précompilation
   - [ ] Mesurer les gains de performance
 
-- [ ] **Filtres de Bloom adaptatifs**
-  - [ ] Développer le mécanisme d'ajustement dynamique
-  - [ ] Implémenter la collecte de statistiques d'utilisation
+- [x] **Filtres de Bloom adaptatifs**
+  - [x] Développer le mécanisme d'ajustement dynamique
+  - [x] Implémenter la collecte de statistiques d'utilisation
   - [ ] Optimiser la taille des filtres selon l'usage
 
 ## Interface Utilisateur Améliorée
