@@ -647,8 +647,32 @@
         calculateChecksum(text) {
             if (!text) return 0;
             
-            // Convertir en majuscules et supprimer les caractères spéciaux mais garder les chiffres
-            const cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            // Table de conversion pour les caractères accentués et spéciaux
+            const accentMap = {
+                'À': 'A', 'Á': 'A', 'Â': 'A', 'Ã': 'A', 'Ä': 'A', 'Å': 'A', 'Æ': 'AE',
+                'Ç': 'C', 'È': 'E', 'É': 'E', 'Ê': 'E', 'Ë': 'E',
+                'Ì': 'I', 'Í': 'I', 'Î': 'I', 'Ï': 'I', 'Ð': 'D',
+                'Ñ': 'N', 'Ò': 'O', 'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ö': 'O', 'Ø': 'O',
+                'Ù': 'U', 'Ú': 'U', 'Û': 'U', 'Ü': 'U', 'Ý': 'Y',
+                'Þ': 'TH', 'ß': 'SS',
+                'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'æ': 'ae',
+                'ç': 'c', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+                'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ð': 'd',
+                'ñ': 'n', 'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o',
+                'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y', 'þ': 'th', 'ÿ': 'y',
+                'œ': 'oe', 'Œ': 'OE', 'µ': 'u'
+            };
+            
+            // Fonction pour remplacer les caractères accentués
+            const removeAccents = (str) => {
+                return str.replace(/[^\u0000-\u007E]/g, function(a) {
+                    return accentMap[a] || a;
+                });
+            };
+            
+            // Convertir en majuscules, enlever les accents, puis supprimer les caractères spéciaux sauf les chiffres
+            const normalizedText = removeAccents(text.toUpperCase());
+            const cleanText = normalizedText.replace(/[^A-Z0-9]/g, '');
             
             // Calculer la somme (A=1, B=2, etc. et chiffres conservés tels quels)
             return cleanText.split('').reduce((sum, char) => {
