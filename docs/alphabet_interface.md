@@ -126,6 +126,7 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 
 - **Interactions**
   - Bouton pour envoyer les coordonnées détectées vers la géocache associée
+  - Bouton pour créer automatiquement un waypoint avec les coordonnées détectées
   - Option pour supprimer l'association
   - Persistance de l'association via localStorage
 
@@ -133,6 +134,13 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Affichage de messages d'erreur contextuels
   - Mise en évidence visuelle des champs en erreur
   - Auto-suppression des messages après un délai
+
+- **Création automatique de waypoints**
+  - Création de waypoints directement depuis les coordonnées détectées
+  - Récupération automatique de l'ID de la géocache si nécessaire
+  - Gestion des erreurs et des cas particuliers
+  - Feedback visuel sur l'état de la création (chargement, succès, erreur)
+  - Mise à jour automatique de la liste des waypoints après création
 
 ## Gestion des Polices
 
@@ -353,6 +361,23 @@ associateGeocache(geocache) {
     
     // Charger automatiquement les coordonnées d'origine
     this.loadAndDisplayOriginalCoordinates();
+    
+    // Si nous avons le code GC mais pas d'ID numérique, récupérer l'ID
+    if (geocache.code && !geocache.databaseId) {
+        fetch(`/api/geocaches/by-code/${geocache.code}`)
+            .then(response => response.json())
+            .then(data => {
+                // Mise à jour de l'objet associatedGeocache avec l'ID
+                if (data.id) {
+                    this.associatedGeocache.databaseId = parseInt(data.id);
+                    // Sauvegarder l'association mise à jour
+                    this.saveGeocacheAssociation();
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors de la récupération de l'ID:", error);
+            });
+    }
 }
 ```
 

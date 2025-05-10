@@ -82,15 +82,6 @@
                         <span class="text-gray-400">Coordonnées d'origine : </span>
                         <span data-alphabet-viewer-target="originalCoordinatesValue">Chargement...</span>
                     </div>
-                    <div class="mt-2 flex gap-2">
-                        <button type="button"
-                                class="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded"
-                                data-action="click->alphabet-viewer#sendCoordinatesToGeocache"
-                                disabled
-                                data-alphabet-viewer-target="sendCoordinatesBtn">
-                            Envoyer coordonnées détectées
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -210,6 +201,22 @@
                         <div class="flex items-center">
                             <span class="text-gray-400 text-sm w-20">Longitude:</span>
                             <span data-alphabet-viewer-target="detectedLongitude" class="text-white"></span>
+                        </div>
+                        <div class="mt-2 flex gap-2">
+                            <button type="button"
+                                    class="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded cursor-pointer"
+                                    data-action="click->alphabet-viewer#sendCoordinatesToGeocache"
+                                    disabled
+                                    data-alphabet-viewer-target="sendCoordinatesBtnDetected">
+                                Envoyer coordonnées
+                            </button>
+                            <button type="button"
+                                    class="text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded cursor-pointer"
+                                    data-action="click->alphabet-viewer#createWaypointAuto"
+                                    disabled
+                                    data-alphabet-viewer-target="createWaypointAutoBtnDetected">
+                                Créer WP auto
+                            </button>
                         </div>
                     </div>
                 </div>
