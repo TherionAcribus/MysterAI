@@ -3696,3 +3696,42 @@ def extract_checkers_from_description(description_html):
         current_app.logger.error(f"Erreur lors de l'extraction des checkers de la description: {str(e)}")
     
     return checkers
+
+@geocaches_bp.route('/api/geocaches/by-code/<gc_code>', methods=['GET'])
+def get_geocache_by_code(gc_code):
+    """Récupère une géocache via son code GC."""
+    logger.debug(f"Recherche de la géocache via code GC {gc_code}")
+    geocache = Geocache.query.filter_by(gc_code=gc_code).first()
+    
+    if not geocache:
+        logger.debug(f"Géocache {gc_code} non trouvée")
+        return jsonify({'error': f'Géocache {gc_code} non trouvée'}), 404
+    
+    logger.debug(f"Géocache {gc_code} trouvée (ID: {geocache.id})")
+    return jsonify({
+        'id': geocache.id,
+        'gc_code': geocache.gc_code,
+        'name': geocache.name,
+        'owner': geocache.owner.name if geocache.owner else None,
+        'cache_type': geocache.cache_type,
+        'latitude': geocache.latitude,
+        'longitude': geocache.longitude,
+        'gc_lat': geocache.gc_lat,
+        'gc_lon': geocache.gc_lon,
+        'latitude_corrected': geocache.latitude_corrected,
+        'longitude_corrected': geocache.longitude_corrected,
+        'gc_lat_corrected': geocache.gc_lat_corrected,
+        'gc_lon_corrected': geocache.gc_lon_corrected,
+        'description': geocache.description,
+        'difficulty': geocache.difficulty,
+        'terrain': geocache.terrain,
+        'size': geocache.size,
+        'hints': geocache.hints,
+        'favorites_count': geocache.favorites_count,
+        'logs_count': geocache.logs_count,
+        'hidden_date': geocache.hidden_date.isoformat() if geocache.hidden_date else None,
+        'created_at': geocache.created_at.isoformat() if geocache.created_at else None,
+        'solved': geocache.solved,
+        'found': geocache.found,
+        'found_date': geocache.found_date.isoformat() if geocache.found_date else None
+    })

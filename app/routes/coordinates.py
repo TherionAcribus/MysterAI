@@ -1021,12 +1021,85 @@ def _detect_roman_numerals_coordinates(text: str) -> Optional[Dict[str, Optional
     return None
 
 # ------------------------------------------------------------------------------
+# Détection du format numérique pur (ex: "4912123 00612123")
+# ------------------------------------------------------------------------------
+
+def _detect_numeric_only_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format numérique pur, sans lettres cardinales ni symboles.
+    Format attendu: "4912123 00612123" ou "4912123 612123" ou "4912123 0612123"
+    pour N 49° 12.123' E 006° 12.123'
+    
+    La première partie représente la latitude: 2 chiffres degrés + 2 chiffres minutes + 3 chiffres décimales
+    La deuxième partie représente la longitude: 3 chiffres degrés (avec éventuellement des 0 en tête) + 2 chiffres minutes + 3 chiffres décimales
+    """
+    print(f"[DEBUG] _detect_numeric_only_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
+    
+    # Pattern pour capturer deux groupes de chiffres séparés par un espace
+    # Premier groupe: exactement 7 chiffres (latitude)
+    # Deuxième groupe: 6 à 8 chiffres (longitude)
+    numeric_pattern = r'(\d{7})\s+(\d{6,8})'
+    
+    print(f"[DEBUG] _detect_numeric_only_coordinates: Pattern utilisé: {numeric_pattern}")
+    
+    match = re.search(numeric_pattern, text)
+    if match:
+        print(f"[DEBUG] _detect_numeric_only_coordinates: Match trouvé! Groupes: {match.groups()}")
+        lat_digits = match.group(1)
+        lon_digits = match.group(2)
+        
+        print(f"[DEBUG] _detect_numeric_only_coordinates: Latitude digits: {lat_digits}, Longitude digits: {lon_digits}")
+        
+        try:
+            # Pour la latitude
+            lat_deg = lat_digits[0:2]
+            lat_min = lat_digits[2:4]
+            lat_dec = lat_digits[4:7]
+            
+            # Pour la longitude, nous devons nous assurer que les 3 premiers chiffres représentent les degrés
+            # mais en tenant compte des zéros en tête possibles
+            
+            # Compléter la longitude avec des zéros en tête si nécessaire pour avoir 8 chiffres
+            padded_lon_digits = lon_digits.zfill(8)
+            print(f"[DEBUG] _detect_numeric_only_coordinates: Longitude avec padding: {padded_lon_digits}")
+            
+            # Maintenant nous pouvons découper correctement
+            lon_deg = padded_lon_digits[0:3]
+            lon_min = padded_lon_digits[3:5]
+            lon_dec = padded_lon_digits[5:8]
+            
+            print(f"[DEBUG] _detect_numeric_only_coordinates: Découpage - lon_deg={lon_deg}, lon_min={lon_min}, lon_dec={lon_dec}")
+            
+            # Formatage des coordonnées
+            ddm_lat = f"N {lat_deg}° {lat_min}.{lat_dec}'"
+            ddm_lon = f"E {lon_deg}° {lon_min}.{lon_dec}'"
+            
+            print(f"[DEBUG] _detect_numeric_only_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+            
+            return {
+                "exist": True,
+                "ddm_lat": ddm_lat,
+                "ddm_lon": ddm_lon,
+                "ddm": f"{ddm_lat} {ddm_lon}"
+            }
+        except Exception as e:
+            print(f"[ERROR] _detect_numeric_only_coordinates: Erreur lors du formatage: {e}")
+            traceback.print_exc()
+    
+    print("[DEBUG] _detect_numeric_only_coordinates: Aucun match trouvé ou erreur de conversion")
+    return None
+
+# ------------------------------------------------------------------------------
 # Fonction principale de détection multi-format
 # ------------------------------------------------------------------------------
 
-def detect_gps_coordinates(text: str) -> Dict[str, Optional[str]]:
+def detect_gps_coordinates(text: str, include_numeric_only: bool = False) -> Dict[str, Optional[str]]:
     """
     Recherche des coordonnées GPS dans un texte en testant plusieurs formats.
+    
+    Args:
+        text (str): Le texte dans lequel rechercher des coordonnées
+        include_numeric_only (bool): Si True, inclut la détection de coordonnées au format numérique pur (sans lettres cardinales ni symboles)
     
     Le dictionnaire retourné contient :
       - 'exist': True si une coordonnée a été trouvée, sinon False.
@@ -1036,6 +1109,7 @@ def detect_gps_coordinates(text: str) -> Dict[str, Optional[str]]:
     """
     print(f"[DEBUG] detect_gps_coordinates: Début de la détection sur texte de {len(text)} caractères")
     print(f"[DEBUG] detect_gps_coordinates: Extrait du texte: '{text[:100]}...' (tronqué)")
+    print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}")
     
     detection_functions = [
         _detect_roman_numerals_coordinates,  # Format avec chiffres romains
@@ -1048,8 +1122,12 @@ def detect_gps_coordinates(text: str) -> Dict[str, Optional[str]]:
         _detect_dmm_coordinates,      # Format DMM standard
         _detect_tabspace_coordinates, # Format avec tabulations et espaces
         _detect_variant_coordinates,  # Format variant
-        # Vous pouvez ajouter d'autres fonctions ici.
     ]
+    
+    # Ajouter la détection de coordonnées numériques pures si demandé
+    if include_numeric_only:
+        detection_functions.append(_detect_numeric_only_coordinates)
+        print(f"[DEBUG] detect_gps_coordinates: Détection de coordonnées numériques pures activée")
     
     for i, detect_func in enumerate(detection_functions):
         print(f"[DEBUG] detect_gps_coordinates: Essai de la fonction de détection #{i+1}: {detect_func.__name__}")
@@ -1125,7 +1203,9 @@ def detect_coordinates_in_text():
     """
     Analyse un texte pour détecter des coordonnées GPS.
     
-    Attend un JSON avec un champ 'text' contenant le texte à analyser.
+    Attend un JSON avec:
+    - 'text': Texte à analyser
+    - 'include_numeric_only' (optionnel): Si True, active la détection de coordonnées au format numérique pur
     
     Retourne :
     {
@@ -1141,9 +1221,13 @@ def detect_coordinates_in_text():
             return jsonify({"error": "Le champ 'text' est requis"}), 400
             
         text = data['text']
-        print(f"[DEBUG] Analyse du texte pour détecter des coordonnées: '{text[:50]}...' (tronqué)")
+        # Récupérer le paramètre include_numeric_only (False par défaut)
+        include_numeric_only = data.get('include_numeric_only', False)
         
-        result = detect_gps_coordinates(text)
+        print(f"[DEBUG] Analyse du texte pour détecter des coordonnées: '{text[:50]}...' (tronqué)")
+        print(f"[DEBUG] Détection de format numérique pur activée: {include_numeric_only}")
+        
+        result = detect_gps_coordinates(text, include_numeric_only=include_numeric_only)
         
         return jsonify(result)
         
