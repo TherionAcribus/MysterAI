@@ -1118,3 +1118,36 @@ def convert_ddm_to_decimal(ddm_lat: str, ddm_lon: str) -> Dict[str, float]:
         traceback.print_exc()
     
     return result
+
+# Nouvelle route API pour détecter les coordonnées dans un texte
+@coordinates_bp.route('/api/detect_coordinates', methods=['POST'])
+def detect_coordinates_in_text():
+    """
+    Analyse un texte pour détecter des coordonnées GPS.
+    
+    Attend un JSON avec un champ 'text' contenant le texte à analyser.
+    
+    Retourne :
+    {
+        "exist": true/false,
+        "ddm_lat": "Latitude formatée",
+        "ddm_lon": "Longitude formatée",
+        "ddm": "Coordonnées combinées"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({"error": "Le champ 'text' est requis"}), 400
+            
+        text = data['text']
+        print(f"[DEBUG] Analyse du texte pour détecter des coordonnées: '{text[:50]}...' (tronqué)")
+        
+        result = detect_gps_coordinates(text)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[ERROR] Erreur lors de la détection des coordonnées: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

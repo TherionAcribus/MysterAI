@@ -28,11 +28,121 @@
             <div class="flex flex-wrap gap-4 min-h-24 mb-4 p-4 bg-gray-700 rounded"
                  data-alphabet-viewer-target="enteredSymbols">
             </div>
+            
+            <!-- Boutons de symboles pour les coordonnées -->
+            <div class="mb-4">
+                <div class="flex items-center mb-2">
+                    <h3 class="text-sm font-medium text-gray-400">Symboles pour les coordonnées</h3>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <!-- Lettres cardinales -->
+                    <button type="button" 
+                            class="w-12 h-12 bg-indigo-700 hover:bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="N">
+                        N
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-indigo-700 hover:bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="S">
+                        S
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-indigo-700 hover:bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="E">
+                        E
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-indigo-700 hover:bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="W">
+                        W
+                    </button>
+                    
+                    <!-- Séparateur -->
+                    <div class="w-px h-12 bg-gray-600 mx-1"></div>
+                    
+                    <!-- Symboles spéciaux -->
+                    <button type="button" 
+                            class="w-12 h-12 bg-teal-700 hover:bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="°">
+                        °
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-teal-700 hover:bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value=".">
+                        .
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-teal-700 hover:bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="′">
+                        ′
+                    </button>
+                    <button type="button" 
+                            class="w-12 h-12 bg-teal-700 hover:bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value="″">
+                        ″
+                    </button>
+                    
+                    <!-- Séparateur -->
+                    <div class="w-px h-12 bg-gray-600 mx-1"></div>
+                    
+                    <!-- Espace et effacer -->
+                    <button type="button" 
+                            class="w-20 h-12 bg-gray-600 hover:bg-gray-500 rounded-lg flex items-center justify-center text-white text-sm"
+                            data-action="click->alphabet-viewer#addSpecialSymbol"
+                            data-value=" ">
+                        Espace
+                    </button>
+                    <button type="button" 
+                            class="w-20 h-12 bg-red-700 hover:bg-red-600 rounded-lg flex items-center justify-center text-white text-sm"
+                            data-action="click->alphabet-viewer#removeLastSymbol">
+                        Effacer
+                    </button>
+                </div>
+            </div>
+            
             <div class="mt-4">
-                <label class="block text-sm font-medium text-gray-300 mb-2">Texte décodé</label>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-medium text-gray-300">Texte décodé</label>
+                    <div class="text-xs text-gray-400">Vous pouvez saisir directement du texte ici</div>
+                </div>
                 <textarea class="w-full h-24 bg-gray-700 text-white rounded-lg p-3 resize-none"
-                          readonly
-                          data-alphabet-viewer-target="decodedText"></textarea>
+                          data-alphabet-viewer-target="decodedText"
+                          data-action="input->alphabet-viewer#handleTextInput"></textarea>
+            </div>
+            
+            <!-- Coordonnées détectées -->
+            <div class="mt-4">
+                <div class="flex items-center">
+                    <label class="block text-sm font-medium text-gray-300 mr-2">Coordonnées détectées</label>
+                    <span data-alphabet-viewer-target="coordinatesDetectionStatus" class="hidden text-xs px-2 py-0.5 rounded">Analyse...</span>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3 mt-1 hidden" data-alphabet-viewer-target="coordinatesContainer">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center">
+                            <span class="text-gray-400 text-sm w-20">Format DDM:</span>
+                            <span data-alphabet-viewer-target="detectedCoordinates" class="text-white font-medium"></span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-gray-400 text-sm w-20">Latitude:</span>
+                            <span data-alphabet-viewer-target="detectedLatitude" class="text-white"></span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-gray-400 text-sm w-20">Longitude:</span>
+                            <span data-alphabet-viewer-target="detectedLongitude" class="text-white"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3 mt-1" data-alphabet-viewer-target="noCoordinatesMessage">
+                    <p class="text-gray-400 text-sm">Aucune coordonnée GPS détectée</p>
+                </div>
             </div>
         </div>
 
