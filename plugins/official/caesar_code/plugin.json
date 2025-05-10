@@ -9,6 +9,7 @@
   "categories": ["AlphabetsDecryption", "Decryption"],
   "brute_force": true,
   "enable_scoring": true,
+  "accept_accents": false,
   "scoring_method": {
     "type": "lexical",
     "custom_weights": {

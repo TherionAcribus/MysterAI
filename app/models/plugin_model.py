@@ -22,6 +22,7 @@ class Plugin(db.Model):
     enabled = db.Column(db.Boolean, default=True)
     metadata_json = db.Column(db.Text)
     bruteforce = db.Column(db.Boolean, default=False)
+    accept_accents = db.Column(db.Boolean, default=False)  # Indique si le plugin accepte les caractères accentués
     
     # Store categories as a JSON array string
     categories = db.Column(db.Text, default='[]', nullable=False)

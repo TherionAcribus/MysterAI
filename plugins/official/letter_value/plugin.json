@@ -8,6 +8,7 @@
     "dependencies": [],
     "categories": ["AlphabetsDecryption"],
     "brute_force": true,
+    "accept_accents": false,
     "input_types": {
       "text": {
         "type": "string",

@@ -41,6 +41,7 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
   "categories": ["CategoryName"],
   "brute_force": true,
   "enable_scoring": true,
+  "accept_accents": false,
   "scoring_method": {
     "type": "lexical",
     "custom_weights": {
@@ -77,6 +78,11 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
   - Si défini à `true`, une case à cocher pour activer/désactiver le scoring apparaîtra dans l'interface
   - Si défini à `false`, aucune option de scoring ne sera affichée, et le scoring ne sera pas appliqué
   - L'état initial de cette case à cocher (si affichée) est déterminé par le paramètre global `enable_auto_scoring`
+- `accept_accents`: Indique si le plugin accepte les caractères accentués (booléen)
+  - Si défini à `true`, les caractères accentués seront conservés dans le texte d'entrée
+  - Si défini à `false` (valeur par défaut), les caractères accentués seront convertis en leurs équivalents non accentués (ex: 'é' → 'e', 'à' → 'a', etc.)
+  - Utile pour les plugins qui fonctionnent uniquement avec des caractères ASCII standards
+  - Devrait être défini à `true` pour les plugins basés sur des transpositions de lettres ou qui doivent préserver l'intégralité du texte
 
 ### Configuration du scoring
 
@@ -337,113 +343,33 @@ class MyPlugin:
         
         return standardized_response
 
-### Intégration du système de scoring
+### Gestion des caractères accentués
 
-Le système de scoring permet d'évaluer automatiquement la pertinence des résultats décodés par le plugin. Voici comment l'implémenter :
+Le système de plugins inclut une gestion automatique des caractères accentués. Par défaut, tous les caractères accentués sont convertis en leurs équivalents non accentués avant d'être transmis au plugin. Ceci est utile pour la plupart des algorithmes de décodage qui ne fonctionnent qu'avec l'alphabet standard.
 
-1. **Importation et initialisation du service**
-   ```python
-   try:
-       from app.services.scoring_service import ScoringService
-       self.scoring_service = ScoringService()
-       self.scoring_service_available = True
-   except ImportError:
-       self.scoring_service_available = False
-       print("Module de scoring non disponible")
-   ```
+Si votre plugin nécessite de conserver les caractères accentués (par exemple pour les algorithmes basés sur la transposition de lettres), vous devez spécifier `"accept_accents": true` dans votre fichier `plugin.json`.
 
-2. **Implémentation de la méthode d'évaluation**
-   ```python
-   def get_text_score(self, text, context=None):
-       if not self.scoring_service_available:
-           return None
-           
-       try:
-           # Appel direct au service de scoring
-           result = self.scoring_service.score_text(text, context)
-           return result
-       except Exception as e:
-           print(f"Erreur lors de l'évaluation: {str(e)}")
-           return None
-   ```
+#### Exemple avec plugin.json
 
-3. **Vérification des paramètres de scoring**
-   ```python
-   # Dans execute() ou la méthode pertinente, récupérer l'état de la case à cocher
-   # IMPORTANT: le paramètre est transmis comme une chaîne "on" lorsque coché, ou absent lorsque décoché
-   checkbox_value = inputs.get("enable_scoring", "")
-   enable_scoring = checkbox_value == "on"  # Convertir en booléen
-   
-   # Vérifier si la fonctionnalité de scoring est disponible
-   if enable_scoring and self.scoring_service_available:
-       scoring_result = self.get_text_score(decoded_text, context)
-       confidence = scoring_result.get("score", default_confidence)
-       
-       # Ajouter les informations de scoring au résultat
-       if scoring_result:
-           result["scoring"] = scoring_result
-   else:
-       # Utiliser une méthode alternative pour calculer la confiance
-       # Par exemple, un calcul de confiance basé sur des règles simples
-       confidence = self._legacy_calculate_confidence(params)
-   ```
-
-4. **Fallback vers API REST (optionnel)**
-   Pour les plugins qui ne peuvent pas importer directement le service de scoring, une alternative est d'utiliser l'API REST :
-   
-   ```python
-   def get_text_score_api(self, text, context=None):
-       import requests
-       
-       # Préparer les données
-       data = {"text": text}
-       if context:
-           data["context"] = context
-           
-       try:
-           # Appel à l'API de scoring
-           response = requests.post("http://localhost:5000/api/plugins/score", json=data)
-           
-           if response.status_code == 200:
-               result = response.json()
-               if result.get("success"):
-                   return result.get("result", {})
-           
-           return None
-       except Exception as e:
-           print(f"Erreur lors de l'appel à l'API: {str(e)}")
-           return None
-   ```
-
-Dans l'initialisation de votre plugin, vous devez charger la configuration `enable_scoring` à partir du plugin.json pour déterminer si l'option doit être affichée dans l'interface :
-
-```python
-def __init__(self):
-    self.name = "my_plugin"
-    self.description = "Description of the plugin"
-    
-    # Récupérer la configuration depuis plugin.json
-    plugin_config_path = os.path.join(os.path.dirname(__file__), 'plugin.json')
-    try:
-        with open(plugin_config_path, 'r') as f:
-            config = json.load(f)
-            # Récupérer le paramètre enable_scoring
-            self.enable_scoring = config.get('enable_scoring', False)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        self.enable_scoring = False  # Valeur par défaut
-        print(f"Erreur lors du chargement de la configuration: {str(e)}")
-        
-    # Initialiser le service de scoring
-    try:
-        from app.services.scoring_service import ScoringService
-        self.scoring_service = ScoringService()
-        self.scoring_service_available = True
-    except ImportError:
-        self.scoring_service_available = False
-        print("Module de scoring non disponible")
+```json
+{
+  "name": "transposition_cipher",
+  "version": "1.0.0",
+  "description": "Plugin de chiffrement par transposition",
+  "author": "MysteryAI Team",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "accept_accents": true,
+  "categories": ["Transposition"]
+}
 ```
 
-Le plugin loader de l'application doit également passer le paramètre global `enable_auto_scoring` aux templates pour déterminer l'état initial de la case à cocher.
+#### Comportement du système
+
+- **`accept_accents: false`** (par défaut) : Le texte "Voici un café à Paris" sera transformé en "Voici un cafe a Paris" avant d'être transmis au plugin.
+- **`accept_accents: true`** : Le texte sera transmis sans modification des caractères accentués.
+
+Le traitement des accents est effectué automatiquement par le `PluginManager` et ne nécessite aucune implémentation spécifique dans le plugin lui-même.
 
 ## Modes de fonctionnement
 

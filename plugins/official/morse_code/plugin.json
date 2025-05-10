@@ -9,6 +9,7 @@
   "dependencies": [],
   "brute_force": false,
   "enable_scoring": true,
+  "accept_accents": false,
   "scoring_method": {
     "type": "lexical",
     "custom_weights": {

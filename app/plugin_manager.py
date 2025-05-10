@@ -35,6 +35,7 @@ class PluginMetadata:
     categories: List[str]
     input_types: Dict[str, Any]
     output_types: Dict[str, Any]
+    accept_accents: bool = False  # Indique si le plugin accepte les caractères accentués
 
     @classmethod
     def from_json(cls, json_data: dict) -> 'PluginMetadata':
@@ -48,7 +49,8 @@ class PluginMetadata:
             dependencies=json_data.get('dependencies', []),
             categories=json_data.get('categories', []),      # <-- gère la liste de catégories
             input_types=json_data.get('input_types', {}),    # <-- Dict[str, Any]
-            output_types=json_data.get('output_types', {})   # <-- Dict[str, Any]
+            output_types=json_data.get('output_types', {}),  # <-- Dict[str, Any]
+            accept_accents=json_data.get('accept_accents', False)  # <-- Paramètre pour les accents
         )
 
 # ============================================================
@@ -268,6 +270,7 @@ class PluginManager:
                     existing_plugin.path = plugin_info['path']
                     existing_plugin.entry_point = plugin_info.get('entry_point', '')
                     existing_plugin.bruteforce = plugin_info.get('bruteforce', False)
+                    existing_plugin.accept_accents = plugin_info.get('accept_accents', False)
                     existing_plugin.metadata_json = json.dumps(plugin_info)
                     # Mise à jour des catégories
                     categories = plugin_info.get('categories', [])
@@ -285,6 +288,7 @@ class PluginManager:
                     path=plugin_info['path'],
                     entry_point=plugin_info.get('entry_point', ''),
                     bruteforce=plugin_info.get('bruteforce', False),
+                    accept_accents=plugin_info.get('accept_accents', False),
                     metadata_json=json.dumps(plugin_info),
                     categories=json.dumps(plugin_info.get('categories', []))
                 )
@@ -369,6 +373,16 @@ class PluginManager:
         # Normaliser le texte d'entrée si présent
         if "text" in inputs and isinstance(inputs["text"], str):
             inputs["text"] = self._normalize_text(inputs["text"])
+            
+            # Vérifier si le plugin accepte les accents
+            accept_accents = False
+            if hasattr(plugin, 'metadata') and hasattr(plugin.metadata, 'accept_accents'):
+                accept_accents = plugin.metadata.accept_accents
+                
+            if not accept_accents:
+                # Si le plugin n'accepte pas les accents, on désaccentue le texte
+                inputs["text"] = self._remove_accents(inputs["text"])
+                logger.debug(f"Texte désaccentué pour le plugin {plugin_name}")
             
         # Exécute le plugin pour obtenir le texte décodé
         print(f"[DEBUG] execute_plugin: Exécution du plugin {plugin_name} avec les inputs: {inputs}")
@@ -503,6 +517,40 @@ class PluginManager:
         
         logger.debug(f"Texte normalisé: {normalized}")
         return normalized
+
+    def _remove_accents(self, text: str) -> str:
+        """
+        Supprime les accents d'un texte.
+        Convertit les caractères accentués en leurs équivalents non accentués.
+        """
+        if not text:
+            return ""
+        
+        import unicodedata
+        # Normalisation NFKD pour décomposer les caractères accentués
+        # puis suppression des marques diacritiques (catégorie Mn)
+        normalized = unicodedata.normalize('NFKD', text)
+        result = ''.join([c for c in normalized if not unicodedata.combining(c)])
+        
+        # Remplacements supplémentaires pour certains caractères spéciaux
+        replacements = {
+            'œ': 'oe',
+            'Œ': 'OE',
+            'æ': 'ae',
+            'Æ': 'AE',
+            'ß': 'ss',
+            '€': 'E',
+            '£': 'L',
+            '¥': 'Y',
+            'ñ': 'n',
+            'Ñ': 'N',
+        }
+        
+        for char, replacement in replacements.items():
+            result = result.replace(char, replacement)
+        
+        logger.debug(f"Texte désaccentué: {result}")
+        return result
 
     def _create_plugin_wrapper(self, plugin_record) -> Optional[PluginInterface]:
         """
