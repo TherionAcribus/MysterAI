@@ -25,7 +25,7 @@
         <!-- Zone de saisie -->
         <div class="bg-gray-800 rounded-lg p-4 mb-8">
             <h2 class="text-lg font-semibold text-white mb-4">Symboles entrés</h2>
-            <div class="flex flex-wrap gap-2 min-h-12 mb-4 p-2 bg-gray-700 rounded"
+            <div class="flex flex-wrap gap-4 min-h-24 mb-4 p-4 bg-gray-700 rounded"
                  data-alphabet-viewer-target="enteredSymbols">
             </div>
             <div class="mt-4">
@@ -47,22 +47,27 @@
                 <div class="flex flex-wrap gap-3">
                     {% set letters = "abcdefghijklmnopqrstuvwxyz" %}
                     {% for char in letters %}
-                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
-                             data-alphabet-viewer-target="availableSymbol"
-                             data-action="click->alphabet-viewer#addSymbol"
-                             data-char="{{ char }}">
-                            {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
-                                     alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
-                            {% else %}
-                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
-                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
-                                    {{ char }}
-                                </span>
-                            {% endif %}
-                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
-                                ⌗
+                        <div class="relative flex flex-col items-center">
+                            <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                                 data-alphabet-viewer-target="availableSymbol"
+                                 data-action="click->alphabet-viewer#addSymbol"
+                                 data-char="{{ char }}">
+                                {% if alphabet.alphabetConfig.type == 'images' %}
+                                    <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                         alt="{{ char }}"
+                                         class="w-full h-full object-contain p-3">
+                                {% else %}
+                                    <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                          style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                        {{ char }}
+                                    </span>
+                                {% endif %}
+                                <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                    ⌗
+                                </div>
+                            </div>
+                            <div class="text-center mt-1 px-2 py-1 bg-gray-700 rounded-md text-gray-300 font-medium text-sm w-10 flex items-center justify-center">
+                                {{ char }}
                             </div>
                         </div>
                     {% endfor %}
@@ -77,22 +82,27 @@
                 <div class="flex flex-wrap gap-3">
                     {% set letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
                     {% for char in letters %}
-                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
-                             data-alphabet-viewer-target="availableSymbol"
-                             data-action="click->alphabet-viewer#addSymbol"
-                             data-char="{{ char }}">
-                            {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
-                                     alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
-                            {% else %}
-                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
-                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
-                                    {{ char }}
-                                </span>
-                            {% endif %}
-                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
-                                ⌗
+                        <div class="relative flex flex-col items-center">
+                            <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                                 data-alphabet-viewer-target="availableSymbol"
+                                 data-action="click->alphabet-viewer#addSymbol"
+                                 data-char="{{ char }}">
+                                {% if alphabet.alphabetConfig.type == 'images' %}
+                                    <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                         alt="{{ char }}"
+                                         class="w-full h-full object-contain p-3">
+                                {% else %}
+                                    <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                          style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                        {{ char }}
+                                    </span>
+                                {% endif %}
+                                <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                    ⌗
+                                </div>
+                            </div>
+                            <div class="text-center mt-1 px-2 py-1 bg-gray-700 rounded-md text-gray-300 font-medium text-sm w-10 flex items-center justify-center">
+                                {{ char }}
                             </div>
                         </div>
                     {% endfor %}
@@ -107,22 +117,27 @@
                 <div class="flex flex-wrap gap-3">
                     {% set numbers = "0123456789" %}
                     {% for char in numbers %}
-                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
-                             data-alphabet-viewer-target="availableSymbol"
-                             data-action="click->alphabet-viewer#addSymbol"
-                             data-char="{{ char }}">
-                            {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
-                                     alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
-                            {% else %}
-                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
-                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
-                                    {{ char }}
-                                </span>
-                            {% endif %}
-                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
-                                ⌗
+                        <div class="relative flex flex-col items-center">
+                            <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                                 data-alphabet-viewer-target="availableSymbol"
+                                 data-action="click->alphabet-viewer#addSymbol"
+                                 data-char="{{ char }}">
+                                {% if alphabet.alphabetConfig.type == 'images' %}
+                                    <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                         alt="{{ char }}"
+                                         class="w-full h-full object-contain p-3">
+                                {% else %}
+                                    <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                          style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                        {{ char }}
+                                    </span>
+                                {% endif %}
+                                <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                    ⌗
+                                </div>
+                            </div>
+                            <div class="text-center mt-1 px-2 py-1 bg-gray-700 rounded-md text-gray-300 font-medium text-sm w-10 flex items-center justify-center">
+                                {{ char }}
                             </div>
                         </div>
                     {% endfor %}
@@ -136,23 +151,28 @@
                 <h3 class="text-sm font-medium text-gray-400 mb-2">Caractères spéciaux</h3>
                 <div class="flex flex-wrap gap-3">
                     {% for char, name in alphabet.alphabetConfig.characters.special.items() %}
-                        <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
-                             data-alphabet-viewer-target="availableSymbol"
-                             data-action="click->alphabet-viewer#addSymbol"
-                             data-char="{{ char }}"
-                             title="{{ name }}">
-                            {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
-                                     alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
-                            {% else %}
-                                <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
-                                      style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
-                                    {{ char }}
-                                </span>
-                            {% endif %}
-                            <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
-                                ⌗
+                        <div class="relative flex flex-col items-center">
+                            <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
+                                 data-alphabet-viewer-target="availableSymbol"
+                                 data-action="click->alphabet-viewer#addSymbol"
+                                 data-char="{{ char }}"
+                                 title="{{ name }}">
+                                {% if alphabet.alphabetConfig.type == 'images' %}
+                                    <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                         alt="{{ char }}"
+                                         class="w-full h-full object-contain p-3">
+                                {% else %}
+                                    <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
+                                          style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
+                                        {{ char }}
+                                    </span>
+                                {% endif %}
+                                <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
+                                    ⌗
+                                </div>
+                            </div>
+                            <div class="text-center mt-1 px-2 py-1 bg-gray-700 rounded-md text-gray-300 font-medium text-sm min-w-10 flex items-center justify-center">
+                                {{ char }}
                             </div>
                         </div>
                     {% endfor %}

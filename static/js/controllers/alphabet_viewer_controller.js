@@ -40,7 +40,14 @@
             if (symbolElement) {
                 event.dataTransfer.setData('text/plain', symbolElement.dataset.index)
                 event.dataTransfer.effectAllowed = 'move'
-                symbolElement.classList.add('opacity-50')
+                
+                // Ajouter l'effet d'opacité au conteneur parent pour une meilleure expérience visuelle
+                const container = symbolElement.closest('.flex.flex-col')
+                if (container) {
+                    container.classList.add('opacity-50')
+                } else {
+                    symbolElement.classList.add('opacity-50')
+                }
             }
         }
 
@@ -68,8 +75,8 @@
                 }
             }
 
-            // Retirer l'effet d'opacité de tous les symboles
-            this.enteredSymbolsTarget.querySelectorAll('[data-index]').forEach(el => {
+            // Retirer l'effet d'opacité de tous les conteneurs
+            this.enteredSymbolsTarget.querySelectorAll('.opacity-50').forEach(el => {
                 el.classList.remove('opacity-50')
             })
         }
@@ -145,11 +152,16 @@
                     }
 
                     return `
-                        <div class="w-24 h-24 flex items-center justify-center bg-gray-800 rounded-lg cursor-move group"
-                             draggable="true"
-                             data-index="${index}"
-                             data-char="${char}">
-                            ${symbolContent.outerHTML}
+                        <div class="flex flex-col items-center">
+                            <div class="w-24 h-24 flex items-center justify-center bg-gray-800 rounded-lg cursor-move group"
+                                 draggable="true"
+                                 data-index="${index}"
+                                 data-char="${char}">
+                                ${symbolContent.outerHTML}
+                            </div>
+                            <div class="text-center mt-1 px-2 py-1 bg-gray-600 border border-gray-500 rounded-md text-gray-200 font-medium text-sm min-w-10 flex items-center justify-center shadow-sm">
+                                ${char}
+                            </div>
                         </div>
                     `
                 }).join('')
