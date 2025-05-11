@@ -336,6 +336,21 @@
                     // Afficher les coordonnées dans l'élément dédié
                     const coordsStr = data.gc_lat && data.gc_lon ? `${data.gc_lat} ${data.gc_lon}` : 'Non disponibles';
                     this.originalCoordinatesValueTarget.textContent = coordsStr;
+                    
+                    // Stocker les coordonnées dans le cache pour la détection automatique des points cardinaux
+                    if (data.gc_lat && data.gc_lon) {
+                        this.cachedOriginalCoords = {
+                            gc_lat: data.gc_lat,
+                            gc_lon: data.gc_lon
+                        };
+                        console.log('Coordonnées d\'origine mises en cache:', this.cachedOriginalCoords);
+                        
+                        // Si du texte est déjà entré, relancer la détection avec les nouvelles coordonnées d'origine
+                        const currentText = this.decodedTextTarget.value;
+                        if (currentText && currentText.trim() !== '') {
+                            this.detectCoordinates(currentText);
+                        }
+                    }
                 })
                 .catch(error => {
                     console.error('Erreur lors de la récupération des coordonnées:', error);
@@ -764,6 +779,15 @@
             const requestData = {
                 text: text,
                 include_numeric_only: true
+            }
+
+            // Ajouter les coordonnées d'origine si elles sont disponibles
+            if (this.cachedOriginalCoords && this.cachedOriginalCoords.gc_lat && this.cachedOriginalCoords.gc_lon) {
+                requestData.origin_coords = {
+                    ddm_lat: this.cachedOriginalCoords.gc_lat,
+                    ddm_lon: this.cachedOriginalCoords.gc_lon
+                };
+                console.log('Envoi des coordonnées d\'origine:', requestData.origin_coords);
             }
             
             fetch('/api/detect_coordinates', {

@@ -1024,7 +1024,7 @@ def _detect_roman_numerals_coordinates(text: str) -> Optional[Dict[str, Optional
 # Détection du format numérique pur (ex: "4912123 00612123")
 # ------------------------------------------------------------------------------
 
-def _detect_numeric_only_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+def _detect_numeric_only_coordinates(text: str, origin_coords: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Optional[str]]]:
     """
     Détecte les coordonnées au format numérique pur, sans lettres cardinales ni symboles.
     Format attendu: "4912123 00612123" ou "4912123 612123" ou "4912123 0612123"
@@ -1032,8 +1032,12 @@ def _detect_numeric_only_coordinates(text: str) -> Optional[Dict[str, Optional[s
     
     La première partie représente la latitude: 2 chiffres degrés + 2 chiffres minutes + 3 chiffres décimales
     La deuxième partie représente la longitude: 3 chiffres degrés (avec éventuellement des 0 en tête) + 2 chiffres minutes + 3 chiffres décimales
+    
+    Si origin_coords est fourni, utilise les directions cardinales de ces coordonnées (N/S, E/W)
+    plutôt que de supposer N et E par défaut.
     """
     print(f"[DEBUG] _detect_numeric_only_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
+    print(f"[DEBUG] _detect_numeric_only_coordinates: Coordonnées d'origine: {origin_coords}")
     
     # Pattern pour capturer deux groupes de chiffres séparés par un espace
     # Premier groupe: exactement 7 chiffres (latitude)
@@ -1070,9 +1074,30 @@ def _detect_numeric_only_coordinates(text: str) -> Optional[Dict[str, Optional[s
             
             print(f"[DEBUG] _detect_numeric_only_coordinates: Découpage - lon_deg={lon_deg}, lon_min={lon_min}, lon_dec={lon_dec}")
             
+            # Déterminer les directions cardinales (N/S, E/W) en fonction des coordonnées d'origine
+            lat_dir = "N"  # Direction par défaut
+            lon_dir = "E"  # Direction par défaut
+            
+            if origin_coords and 'ddm_lat' in origin_coords and 'ddm_lon' in origin_coords:
+                try:
+                    # Extraire les directions des coordonnées d'origine
+                    origin_lat_match = re.search(r'([NS])', origin_coords['ddm_lat'])
+                    origin_lon_match = re.search(r'([EW])', origin_coords['ddm_lon'])
+                    
+                    if origin_lat_match:
+                        lat_dir = origin_lat_match.group(1)
+                        print(f"[DEBUG] Direction latitude depuis origine: {lat_dir}")
+                    
+                    if origin_lon_match:
+                        lon_dir = origin_lon_match.group(1)
+                        print(f"[DEBUG] Direction longitude depuis origine: {lon_dir}")
+                except Exception as e:
+                    print(f"[WARNING] Erreur lors de l'extraction des directions depuis les coordonnées d'origine: {e}")
+                    # En cas d'erreur, on garde les directions par défaut
+            
             # Formatage des coordonnées
-            ddm_lat = f"N {lat_deg}° {lat_min}.{lat_dec}'"
-            ddm_lon = f"E {lon_deg}° {lon_min}.{lon_dec}'"
+            ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}.{lat_dec}'"
+            ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}.{lon_dec}'"
             
             print(f"[DEBUG] _detect_numeric_only_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
             
@@ -1093,13 +1118,14 @@ def _detect_numeric_only_coordinates(text: str) -> Optional[Dict[str, Optional[s
 # Fonction principale de détection multi-format
 # ------------------------------------------------------------------------------
 
-def detect_gps_coordinates(text: str, include_numeric_only: bool = False) -> Dict[str, Optional[str]]:
+def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin_coords: Optional[Dict[str, str]] = None) -> Dict[str, Optional[str]]:
     """
     Recherche des coordonnées GPS dans un texte en testant plusieurs formats.
     
     Args:
         text (str): Le texte dans lequel rechercher des coordonnées
         include_numeric_only (bool): Si True, inclut la détection de coordonnées au format numérique pur (sans lettres cardinales ni symboles)
+        origin_coords (Optional[Dict[str, str]]): Coordonnées d'origine au format DDM (optionnel)
     
     Le dictionnaire retourné contient :
       - 'exist': True si une coordonnée a été trouvée, sinon False.
@@ -1109,7 +1135,7 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False) -> Dic
     """
     print(f"[DEBUG] detect_gps_coordinates: Début de la détection sur texte de {len(text)} caractères")
     print(f"[DEBUG] detect_gps_coordinates: Extrait du texte: '{text[:100]}...' (tronqué)")
-    print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}")
+    print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}, origin_coords={origin_coords}")
     
     detection_functions = [
         _detect_roman_numerals_coordinates,  # Format avec chiffres romains
@@ -1126,8 +1152,12 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False) -> Dic
     
     # Ajouter la détection de coordonnées numériques pures si demandé
     if include_numeric_only:
-        detection_functions.append(_detect_numeric_only_coordinates)
         print(f"[DEBUG] detect_gps_coordinates: Détection de coordonnées numériques pures activée")
+        # Pour la détection numérique, on passe les coordonnées d'origine
+        result = _detect_numeric_only_coordinates(text, origin_coords)
+        if result and result.get("exist"):
+            print(f"[DEBUG] detect_gps_coordinates: Coordonnées numériques pures trouvées: {result}")
+            return result
     
     for i, detect_func in enumerate(detection_functions):
         print(f"[DEBUG] detect_gps_coordinates: Essai de la fonction de détection #{i+1}: {detect_func.__name__}")
@@ -1206,6 +1236,8 @@ def detect_coordinates_in_text():
     Attend un JSON avec:
     - 'text': Texte à analyser
     - 'include_numeric_only' (optionnel): Si True, active la détection de coordonnées au format numérique pur
+    - 'origin_coords' (optionnel): Coordonnées d'origine au format DDM pour déterminer les directions cardinales
+      Format attendu: {'ddm_lat': 'N 48° 40.123\'', 'ddm_lon': 'E 06° 10.456\''}
     
     Retourne :
     {
@@ -1223,11 +1255,14 @@ def detect_coordinates_in_text():
         text = data['text']
         # Récupérer le paramètre include_numeric_only (False par défaut)
         include_numeric_only = data.get('include_numeric_only', False)
+        # Récupérer les coordonnées d'origine (None par défaut)
+        origin_coords = data.get('origin_coords')
         
         print(f"[DEBUG] Analyse du texte pour détecter des coordonnées: '{text[:50]}...' (tronqué)")
         print(f"[DEBUG] Détection de format numérique pur activée: {include_numeric_only}")
+        print(f"[DEBUG] Coordonnées d'origine fournies: {origin_coords}")
         
-        result = detect_gps_coordinates(text, include_numeric_only=include_numeric_only)
+        result = detect_gps_coordinates(text, include_numeric_only=include_numeric_only, origin_coords=origin_coords)
         
         return jsonify(result)
         
