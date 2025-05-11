@@ -396,11 +396,13 @@
             console.log("=== Méthode sendCoordinatesToGeocache appelée ===");
             if (!this.associatedGeocache || !this.associatedGeocache.id) {
                 // Si la géocache n'a pas d'ID (pas ouverte), on ne peut pas envoyer les coordonnées
-                showToast({
-                    message: 'Impossible d\'envoyer les coordonnées : la géocache n\'est pas ouverte',
-                    type: 'warning',
-                    duration: 3000
-                });
+                if (typeof showToast === 'function') {
+                    showToast({
+                        message: 'Impossible d\'envoyer les coordonnées : la géocache n\'est pas ouverte',
+                        type: 'warning',
+                        duration: 3000
+                    });
+                }
                 return;
             }
             
@@ -422,11 +424,13 @@
             }));
             
             // Feedback à l'utilisateur
-            showToast({
-                message: `Coordonnées envoyées à ${this.associatedGeocache.name}`,
-                type: 'success',
-                duration: 3000
-            });
+            if (typeof showToast === 'function') {
+                showToast({
+                    message: `Coordonnées envoyées à ${this.associatedGeocache.name}`,
+                    type: 'success',
+                    duration: 3000
+                });
+            }
         }
         
         // Gérer l'événement de détection de coordonnées
@@ -1186,6 +1190,47 @@
             const databaseId = this.associatedGeocache.databaseId;
             console.log("Utilisation de l'ID numérique:", databaseId);
             
+            // Vérifier si l'onglet de la géocache est ouvert avant de tenter de créer un waypoint
+            // Nous recherchons un élément avec le data-controller="waypoint-form"
+            const isGeocacheTabOpen = document.querySelector('[data-controller="waypoint-form"]') !== null;
+            
+            if (!isGeocacheTabOpen) {
+                console.log("L'onglet de la géocache n'est pas ouvert. Ouverture de l'onglet...");
+                
+                try {
+                    // Stocker les coordonnées pour une utilisation ultérieure
+                    this.pendingWaypoint = {
+                        gcLat: gcLat,
+                        gcLon: gcLon,
+                        originalCoordinates: originalCoordinates,
+                        method: 'auto' // Indique qu'il s'agit d'une création automatique, pas d'un formulaire
+                    };
+                    
+                    // Ouvrir l'onglet de la géocache via window.parent.postMessage
+                    window.parent.postMessage({ 
+                        type: 'openGeocacheDetails',
+                        geocacheId: databaseId,
+                        gcCode: this.associatedGeocache.code,
+                        name: this.associatedGeocache.name || this.associatedGeocache.code
+                    }, '*');
+                    
+                    // Afficher un message de succès provisoire
+                    this.showCreateWaypointAutoSuccess();
+                    
+                    // Informer l'utilisateur
+                    setTimeout(() => {
+                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer de créer le waypoint une fois l\'onglet ouvert.');
+                    }, 500);
+                    
+                    return;
+                } catch (error) {
+                    console.error("Erreur lors de l'ouverture de l'onglet de la géocache:", error);
+                    this.showCreateWaypointAutoError("Erreur d'ouverture");
+                    this.showErrorMessage("Impossible d'ouvrir l'onglet de la géocache.");
+                    return;
+                }
+            }
+            
             const waypointData = {
                 name: waypointName,
                 prefix: "AL", // Pour Alphabet
@@ -1287,6 +1332,47 @@
             // Utiliser l'ID numérique de la géocache
             const databaseId = this.associatedGeocache.databaseId;
             console.log("Utilisation de l'ID numérique:", databaseId);
+            
+            // Vérifier si l'onglet de la géocache est ouvert avant de tenter de créer un waypoint
+            // Nous recherchons un élément avec le data-controller="waypoint-form"
+            const isGeocacheTabOpen = document.querySelector('[data-controller="waypoint-form"]') !== null;
+            
+            if (!isGeocacheTabOpen) {
+                console.log("L'onglet de la géocache n'est pas ouvert. Ouverture de l'onglet...");
+                
+                try {
+                    // Stocker les coordonnées pour une utilisation ultérieure
+                    this.pendingWaypoint = {
+                        gcLat: gcLat,
+                        gcLon: gcLon,
+                        originalCoordinates: originalCoordinates,
+                        method: 'auto' // Indique qu'il s'agit d'une création automatique, pas d'un formulaire
+                    };
+                    
+                    // Ouvrir l'onglet de la géocache via window.parent.postMessage
+                    window.parent.postMessage({ 
+                        type: 'openGeocacheDetails',
+                        geocacheId: databaseId,
+                        gcCode: this.associatedGeocache.code,
+                        name: this.associatedGeocache.name || this.associatedGeocache.code
+                    }, '*');
+                    
+                    // Afficher un message de succès provisoire
+                    this.showCreateWaypointAutoSuccess();
+                    
+                    // Informer l'utilisateur
+                    setTimeout(() => {
+                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer de créer le waypoint une fois l\'onglet ouvert.');
+                    }, 500);
+                    
+                    return;
+                } catch (error) {
+                    console.error("Erreur lors de l'ouverture de l'onglet de la géocache:", error);
+                    this.showCreateWaypointAutoError("Erreur d'ouverture");
+                    this.showErrorMessage("Impossible d'ouvrir l'onglet de la géocache.");
+                    return;
+                }
+            }
             
             // Utiliser FormData au lieu de JSON
             const formData = new FormData();
@@ -1468,23 +1554,38 @@
             let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
             
             if (!waypointForm) {
-                console.error("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+                console.log("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
                 
-                // Proposer d'ouvrir automatiquement les détails de la géocache
-                const shouldOpenDetails = confirm(
-                    'Le panneau des détails de la géocache n\'est pas ouvert.\n\n' +
-                    'Pour ajouter un waypoint, vous devez ouvrir l\'onglet des détails de la géocache.\n\n' +
-                    'Souhaitez-vous ouvrir l\'onglet des détails de la géocache maintenant?'
-                );
-                
-                if (shouldOpenDetails && window.openGeocacheDetailsTab) {
-                    // Tenter d'ouvrir l'onglet des détails de la géocache
-                    window.openGeocacheDetailsTab(this.associatedGeocache.databaseId);
+                try {
+                    // Utiliser window.parent.postMessage comme dans geocaches_table.html
+                    console.log("Ouverture de l'onglet via window.parent.postMessage");
+                    console.log("Ouverture de l'onglet via window.parent.postMessage");
+                    window.parent.postMessage({ 
+                        type: 'openGeocacheDetails',
+                        geocacheId: this.associatedGeocache.databaseId,
+                        gcCode: this.associatedGeocache.code,
+                        name: this.associatedGeocache.name || this.associatedGeocache.code
+                    }, '*');
                     
-                    // Afficher un message informant l'utilisateur de réessayer après l'ouverture
+                    // Informer l'utilisateur et stocker les coordonnées pour les utiliser plus tard
+                    this.pendingCoordinates = {
+                        gcLat: gcLat,
+                        gcLon: gcLon,
+                        originalCoordinates: originalCoordinates
+                    };
+                    
+                    // Afficher un message de succès provisoire
+                    this.showAddWaypointSuccess();
+                    
+                    // Informer l'utilisateur
                     setTimeout(() => {
-                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer d\'ajouter le waypoint dans quelques secondes.');
+                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer d\'ajouter le waypoint dans quelques secondes lorsque l\'onglet sera ouvert.');
                     }, 500);
+                    
+                } catch (error) {
+                    console.error("Erreur lors de l'ouverture de l'onglet de détails:", error);
+                    this.showAddWaypointError("Erreur d'ouverture");
+                    alert('Impossible d\'ouvrir l\'onglet des détails de la géocache. Veuillez l\'ouvrir manuellement et réessayer.');
                 }
                 
                 return;
