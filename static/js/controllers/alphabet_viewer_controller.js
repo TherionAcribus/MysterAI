@@ -36,7 +36,8 @@
             "originalCoordinatesValue",
             "createWaypointAutoBtn", // pour la rétrocompatibilité temporaire
             "sendCoordinatesBtnDetected",
-            "createWaypointAutoBtnDetected"
+            "createWaypointAutoBtnDetected",
+            "addWaypointBtnDetected"
         ]
         
         static values = {
@@ -455,6 +456,11 @@
             }
             if (this.hasCreateWaypointAutoBtnDetectedTarget) {
                 this.createWaypointAutoBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+            }
+            
+            // Bouton d'ajout de waypoint
+            if (this.hasAddWaypointBtnDetectedTarget) {
+                this.addWaypointBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
             }
         }
 
@@ -1319,6 +1325,294 @@
                 console.error("Erreur lors de la création du waypoint (FormData):", error);
                 this.showCreateWaypointAutoError("Erreur API (FormData)");
             });
+        }
+
+        /**
+         * Méthode pour ajouter les coordonnées détectées comme waypoint via un formulaire
+         */
+        addAsWaypoint(event) {
+            console.log("=== Méthode addAsWaypoint appelée ===", event);
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Vérifier que nous avons une géocache associée
+            if (!this.associatedGeocache || !this.associatedGeocache.code) {
+                console.error("Aucune géocache associée pour créer un waypoint");
+                this.showErrorMessage("Veuillez d'abord associer une géocache");
+                this.showAddWaypointError("Pas de géocache");
+                return;
+            }
+            
+            // Récupérer les coordonnées détectées
+            const coordinates = this.detectedCoordinatesTarget.textContent.trim();
+            if (!coordinates) {
+                console.error("Aucune coordonnée détectée");
+                this.showAddWaypointError("Aucune coordonnée");
+                return;
+            }
+            
+            console.log("État actuel de la géocache associée:", this.associatedGeocache);
+            console.log("Code GC:", this.associatedGeocache.code);
+            
+            // Si nous n'avons pas d'ID de base de données, le récupérer
+            if (!this.associatedGeocache.databaseId) {
+                // Afficher un indicateur de chargement
+                this.showAddWaypointLoading();
+                
+                // Récupérer l'ID de la géocache à partir du code GC
+                console.log(`Récupération de l'ID de la géocache pour le code ${this.associatedGeocache.code}...`);
+                
+                fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Impossible de récupérer les détails de la géocache ${this.associatedGeocache.code}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geocacheData => {
+                        console.log("Données de la géocache récupérées:", geocacheData);
+                        
+                        // Vérifier que l'ID est bien un ID numérique
+                        if (!geocacheData.id || isNaN(parseInt(geocacheData.id))) {
+                            throw new Error(`ID invalide ou non numérique retourné pour la géocache: ${geocacheData.id}`);
+                        }
+                        
+                        const numericId = parseInt(geocacheData.id);
+                        console.log("ID numérique de la géocache:", numericId);
+                        
+                        // Mise à jour de l'objet associatedGeocache avec les informations récupérées
+                        this.associatedGeocache = {
+                            ...this.associatedGeocache,
+                            databaseId: numericId,  // ID numérique pour l'API
+                            id: this.associatedGeocache.id || null,  // Garder l'ID du composant pour d'autres usages
+                            latitude: geocacheData.latitude,
+                            longitude: geocacheData.longitude
+                        };
+                        
+                        console.log("Géocache mise à jour avec l'ID numérique:", this.associatedGeocache);
+                        
+                        // Une fois l'ID récupéré, continuer avec l'extraction des coordonnées
+                        this.processCoordinatesForForm(coordinates);
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
+                        this.showAddWaypointError("Erreur API");
+                        this.showErrorMessage(`Impossible de récupérer les détails de la géocache. ${error.message}`);
+                    });
+            } else {
+                // Si nous avons déjà l'ID, procéder directement
+                this.processCoordinatesForForm(coordinates);
+            }
+        }
+        
+        /**
+         * Traite les coordonnées extraites pour les afficher dans le formulaire de waypoint
+         */
+        processCoordinatesForForm(coordinates) {
+            // Extraire la latitude et la longitude au format standard
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+['']*)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+['']*)/ ;
+            
+            const match = coordinates.match(regex);
+            
+            // Débogage pour voir ce qui est extrait
+            console.log("Coordonnées à extraire:", coordinates);
+            console.log("Résultat du match:", match);
+            
+            if (!match || match.length < 3) {
+                console.error("Format de coordonnées non reconnu");
+                
+                // Essayer avec une regex plus permissive
+                const altRegex = /([NS])[\s]*(\d+)°[\s]*(\d+\.\d+)[']*[\s]*([EW])[\s]*(\d+)°[\s]*(\d+\.\d+)[']*/;
+                const altMatch = coordinates.match(altRegex);
+                
+                if (altMatch && altMatch.length >= 7) {
+                    console.log("Match alternatif trouvé:", altMatch);
+                    
+                    // Reconstruire les coordonnées au format attendu
+                    const gcLat = `${altMatch[1]} ${altMatch[2]}° ${altMatch[3]}`;
+                    const gcLon = `${altMatch[4]} ${altMatch[5]}° ${altMatch[6]}`;
+                    
+                    console.log("Coordonnées reconstruites:", gcLat, gcLon);
+                    
+                    // Continuer avec ces coordonnées
+                    this.fillWaypointForm(gcLat, gcLon, coordinates);
+                    return;
+                }
+                
+                this.showAddWaypointError("Format invalide");
+                return;
+            }
+            
+            const gcLat = match[1].trim();
+            const gcLon = match[2].trim();
+            
+            // Remplir le formulaire avec ces coordonnées
+            this.fillWaypointForm(gcLat, gcLon, coordinates);
+        }
+        
+        /**
+         * Remplit le formulaire de waypoint avec les coordonnées extraites
+         */
+        fillWaypointForm(gcLat, gcLon, originalCoordinates) {
+            console.log("Remplissage du formulaire de waypoint:", { gcLat, gcLon, originalCoordinates });
+            
+            // Vérifier que nous avons un ID de géocache valide
+            if (!this.associatedGeocache.databaseId) {
+                console.error("ID de géocache non disponible pour le formulaire de waypoint");
+                this.showAddWaypointError("ID manquant");
+                return;
+            }
+            
+            // Trouver le panneau de détails de la géocache et le formulaire de waypoint
+            let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
+            
+            if (!waypointForm) {
+                console.error("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+                
+                // Proposer d'ouvrir automatiquement les détails de la géocache
+                const shouldOpenDetails = confirm(
+                    'Le panneau des détails de la géocache n\'est pas ouvert.\n\n' +
+                    'Pour ajouter un waypoint, vous devez ouvrir l\'onglet des détails de la géocache.\n\n' +
+                    'Souhaitez-vous ouvrir l\'onglet des détails de la géocache maintenant?'
+                );
+                
+                if (shouldOpenDetails && window.openGeocacheDetailsTab) {
+                    // Tenter d'ouvrir l'onglet des détails de la géocache
+                    window.openGeocacheDetailsTab(this.associatedGeocache.databaseId);
+                    
+                    // Afficher un message informant l'utilisateur de réessayer après l'ouverture
+                    setTimeout(() => {
+                        alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer d\'ajouter le waypoint dans quelques secondes.');
+                    }, 500);
+                }
+                
+                return;
+            }
+            
+            // Générer un nom de waypoint par défaut
+            let waypointName = "Alphabet: Point décodé";
+            
+            // Préparer les notes avec les informations disponibles
+            let notes = `Point décodé depuis l'alphabet "${document.querySelector('h1')?.textContent || 'inconnu'}".\nCoordonnées: ${originalCoordinates}`;
+            
+            // Afficher un message de succès
+            this.showAddWaypointSuccess();
+            
+            // Récupérer les éléments du formulaire
+            const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+            const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+            const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+            const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+            const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+            const formToggleButton = waypointForm.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+            const form = waypointForm.querySelector('[data-waypoint-form-target="form"]');
+            
+            // Vérifier si le formulaire est actuellement caché et l'afficher si nécessaire
+            if (form && form.classList.contains('hidden') && formToggleButton) {
+                formToggleButton.click();
+            }
+            
+            // Remplir le formulaire avec les données calculées
+            if (prefixInput) prefixInput.value = "AL"; // Pour Alphabet
+            if (nameInput) nameInput.value = waypointName;
+            if (gcLatInput) gcLatInput.value = gcLat;
+            if (gcLonInput) gcLonInput.value = gcLon;
+            if (noteInput) noteInput.value = notes;
+            
+            // Faire défiler jusqu'au formulaire pour que l'utilisateur puisse le voir
+            if (form) {
+                form.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+        }
+        
+        /**
+         * Affiche l'état de chargement pour le bouton Ajouter WP
+         */
+        showAddWaypointLoading() {
+            const button = this.addWaypointBtnDetectedTarget;
+            const originalButtonHTML = button.innerHTML;
+            
+            // Sauvegarder le texte original
+            button.dataset.originalHtml = originalButtonHTML;
+            
+            // Afficher l'animation de chargement
+            button.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Chargement...</span>
+            `;
+            
+            // Désactiver le bouton pendant le chargement
+            button.disabled = true;
+        }
+        
+        /**
+         * Affiche l'état de succès pour le bouton Ajouter WP
+         */
+        showAddWaypointSuccess() {
+            const button = this.addWaypointBtnDetectedTarget;
+            const originalButtonHTML = button.dataset.originalHtml || `
+                <span>Ajouter WP</span>
+            `;
+            
+            // Changer temporairement le texte du bouton pour indiquer le succès
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Formulaire ouvert!</span>
+            `;
+            button.classList.remove("bg-blue-700", "hover:bg-blue-600");
+            button.classList.add("bg-teal-600", "hover:bg-teal-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalButtonHTML;
+                button.classList.remove("bg-teal-600", "hover:bg-teal-700");
+                button.classList.add("bg-blue-700", "hover:bg-blue-600");
+                button.disabled = false;
+            }, 2000);
+        }
+        
+        /**
+         * Affiche l'état d'erreur pour le bouton Ajouter WP
+         */
+        showAddWaypointError(message) {
+            console.error('Erreur lors de l\'ajout du waypoint:', message);
+            
+            const button = this.addWaypointBtnDetectedTarget;
+            const originalButtonHTML = button.dataset.originalHtml || `
+                <span>Ajouter WP</span>
+            `;
+            
+            // Déterminer le message à afficher
+            let displayMessage = "Erreur";
+            if (message) {
+                if (message.length <= 10) {
+                    displayMessage = message;
+                }
+            }
+            
+            // Afficher un message d'erreur
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${displayMessage}</span>
+            `;
+            button.classList.remove("bg-blue-700", "hover:bg-blue-600");
+            button.classList.add("bg-red-600", "hover:bg-red-700");
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalButtonHTML;
+                button.classList.remove("bg-red-600", "hover:bg-red-700");
+                button.classList.add("bg-blue-700", "hover:bg-blue-600");
+                button.disabled = false;
+            }, 3000);
         }
     })
 })()
