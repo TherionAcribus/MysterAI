@@ -123,11 +123,32 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - **Affichage automatique** des coordonnées détectées sur la carte de la géocache associée
 - Conversion automatique des coordonnées au format décimal pour l'affichage sur la carte
 - Représentation visuelle sous forme de losange bleu avec un point d'interrogation au centre
-- Feedback visuel avec un message "Point affiché sur la carte" sous les coordonnées détectées
-- Nécessite une géocache associée avec un ID valide
-- Le point affiché est automatiquement recentré sur la carte
-- Compatible avec le système de carte utilisé dans le Formula Solver
-- Point affiché est persistant entre les onglets tant que la session est active
+- Feedback visuel avec un message de confirmation en dessous des coordonnées détectées
+- Synchronisation automatique avec la carte de la géocache
+
+### 5.2 Calcul de Distance
+
+- **Vérification automatique** de la conformité aux règles de géocaching (distance < 2 miles)
+- Calcul de la distance entre le point d'origine et les coordonnées détectées 
+- Affichage colorisé selon le statut de conformité :
+  - **Vert** : Distance conforme (< 2 miles) - Répondant aux règles du géocaching
+  - **Jaune** : Distance proche de la limite (entre 2 et 2,5 miles) - Avertissement
+  - **Rouge** : Distance non conforme (> 2,5 miles) - Indication claire de violation des règles
+- Inclusion automatique des informations de distance dans les notes des waypoints créés
+- Gestion intelligente de la mise en cache des coordonnées d'origine pour limiter les appels API
+- Actualisation automatique lors de la détection de nouvelles coordonnées
+- Suppression du message de distance lors de la dissociation d'une géocache
+- Métriques affichées en mètres et en miles pour une meilleure lisibilité internationale
+
+### 5.3 Intégration avec Waypoints
+
+- Ajout automatique des informations de distance dans les waypoints créés
+- Indication visuelle claire du statut de conformité dans les notes du waypoint
+- Messages d'avertissement spécifiques inclus selon le statut de la distance
+- Cohérence de l'affichage entre l'interface et les waypoints créés
+- Compatible avec les deux méthodes de création de waypoints :
+  - Via le formulaire ("Ajouter WP")
+  - Via la création automatique ("Créer WP auto")
 
 ### 6. Association avec une Géocache
 
@@ -812,6 +833,126 @@ detectCoordinates(text) {
 }
 ```
 
+### Calcul et Affichage de la Distance
+```javascript
+// Calcule la distance entre les coordonnées détectées et l'origine de la géocache
+calculateDistanceFromOrigin(detectedLat, detectedLon) {
+    // Vérifier que nous avons les données nécessaires
+    if (!this.associatedGeocache || !this.associatedGeocache.code) {
+        console.log("Calcul de distance impossible: pas de géocache associée");
+        return;
+    }
+
+    // Charger d'abord les coordonnées de la géocache si on ne les a pas déjà
+    if (!this.cachedOriginalCoords) {
+        // Afficher un état de chargement pour la distance
+        this.addLoadingDistanceMessage();
+        
+        fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+            .then(response => response.json())
+            .then(data => {
+                // Mémoriser les coordonnées originales pour éviter des appels répétés
+                this.cachedOriginalCoords = {
+                    gc_lat: data.gc_lat,
+                    gc_lon: data.gc_lon
+                };
+                
+                // Une fois les coordonnées récupérées, calculer la distance
+                this.requestDistanceCalculation(detectedLat, detectedLon);
+            });
+    } else {
+        // Si on a déjà les coordonnées, calculer directement la distance
+        this.requestDistanceCalculation(detectedLat, detectedLon);
+    }
+}
+
+// Affiche la distance calculée avec un format et une couleur appropriés
+displayDistance(distanceInfo) {
+    // Déterminer la classe de couleur en fonction du statut
+    let distanceClass = '';
+    let distanceMessage = '';
+    
+    switch (distanceInfo.status) {
+        case 'ok':
+            distanceClass = 'text-green-400';
+            distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Conforme aux règles du géocaching`;
+            break;
+        case 'warning':
+            distanceClass = 'text-amber-300';
+            distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Attention, proche de la limite de 2 miles!`;
+            break;
+        case 'far':
+            distanceClass = 'text-red-500';
+            distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.`;
+            break;
+    }
+    
+    // Créer l'élément de message de distance et l'ajouter à l'interface
+    const distanceElement = document.createElement('div');
+    distanceElement.id = 'distance-message';
+    distanceElement.className = `text-xs ${distanceClass} mt-2`;
+    distanceElement.innerHTML = distanceMessage;
+    
+    // Ajouter aux coordonnées détectées
+    this.coordinatesContainerTarget.appendChild(distanceElement);
+    
+    // Stocker la distance calculée pour les waypoints
+    this.lastCalculatedDistance = distanceInfo;
+}
+```
+
+### Intégration de la Distance dans les Waypoints
+```javascript
+/**
+ * Méthode pour créer un waypoint en utilisant JSON (comme dans Formula Solver)
+ */
+createWaypointWithJSON(gcLat, gcLon, originalCoordinates) {
+    console.log("=== Appel de createWaypointWithJSON ===");
+    console.log("État actuel de la géocache:", this.associatedGeocache);
+    
+    // Générer un nom pour le waypoint
+    const waypointName = "Coordonnées Alphabet";
+    
+    // Préparer la note avec les informations disponibles
+    let note = `Point créé à partir des coordonnées détectées dans l'alphabet.\nSource: ${this.decodedTextTarget.value}\nCoordonnées: ${originalCoordinates}`;
+    
+    // Ajouter les informations de distance si disponibles
+    if (this.lastCalculatedDistance) {
+        const distance = this.lastCalculatedDistance;
+        note += `\nDistance: ${distance.meters} m (${distance.miles} miles)`;
+        
+        // Ajouter un avertissement si la distance est problématique
+        if (distance.status === 'warning') {
+            note += " - Attention, proche de la limite de 2 miles!";
+        } else if (distance.status === 'far') {
+            note += " - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.";
+        }
+    }
+    
+    // Utiliser l'ID numérique de la géocache
+    const databaseId = this.associatedGeocache.databaseId;
+    
+    const waypointData = {
+        name: waypointName,
+        prefix: "AL", // Pour Alphabet
+        gc_lat: gcLat,
+        gc_lon: gcLon,
+        note: note,
+        geocache_id: databaseId
+    };
+    
+    // Appeler l'API pour créer le waypoint
+    fetch(`/api/geocaches/${databaseId}/waypoints`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(waypointData)
+    })
+    // Suite du traitement de la réponse...
+}
+```
+
 ## Bonnes Pratiques
 
 1. **Performance**
@@ -856,3 +997,51 @@ L'interface peut être personnalisée via :
 4. Les options du contrôleur Stimulus
 5. Les paramètres de détection des coordonnées
 6. Les préférences d'association de géocaches
+
+### Architecture du Calcul de Distance
+
+Le système de calcul de distance implémente une vérification complète des règles du géocaching en utilisant plusieurs composants interconnectés :
+
+#### 1. Composants Frontend
+
+- **Détection et Récupération des Données** 
+  - Mécanisme de mise en cache des coordonnées d'origine (`cachedOriginalCoords`)
+  - Fonction `calculateDistanceFromOrigin` pour initier le calcul
+  - Fonctions d'affichage pour les états de chargement, erreur et succès
+
+- **Gestion des Requêtes API**
+  - Utilisation de l'API `/api/calculate_coordinates` pour externaliser le calcul
+  - Transmission des coordonnées d'origine et détectées pour comparaison
+  - Prise en charge des formats DMM standard pour la géolocalisation
+
+- **Présentation Visuelle**
+  - Représentation colorisée du statut (vert/jaune/rouge)
+  - Gestion du cycle de vie des messages (affichage, suppression)
+  - Intégration avec les autres informations des coordonnées
+
+#### 2. Composants Backend
+
+- **API de Calcul**
+  - Endpoint REST `/api/calculate_coordinates`
+  - Analyse des coordonnées au format DDM
+  - Conversion en coordonnées décimales pour les calculs précis
+
+- **Moteur de Calcul**
+  - Fonction `calculate_distance_between_coords` pour le calcul de distance
+  - Utilisation de `pyproj.Geod` pour des calculs géodésiques précis
+  - Détermination dynamique du statut basée sur des seuils prédéfinis
+
+- **Règles Métier**
+  - Implémentation des règles de distance du géocaching (< 2 miles)
+  - Seuils configurés pour les statuts (OK < 2 miles, warning entre 2 et 2,5 miles, far > 2,5 miles)
+  - Double affichage en mètres et miles pour la compatibilité internationale
+
+#### 3. Flux de Données
+
+```
+[Détection des coordonnées] → [Récupération des coordonnées d'origine] → [Requête API] 
+→ [Calcul côté serveur] → [Classification du statut] → [Affichage dans l'interface] 
+→ [Intégration dans les waypoints]
+```
+
+Cette architecture modulaire garantit une séparation claire des responsabilités entre le frontend (présentation) et le backend (calculs géodésiques précis), tout en assurant une expérience utilisateur fluide et des calculs conformes aux standards.

@@ -363,6 +363,12 @@
             if (mapConfirmationMessage) {
                 mapConfirmationMessage.remove();
             }
+            
+            // Supprimer le message de distance s'il existe
+            this.removeDistanceMessage();
+            
+            // Réinitialiser les coordonnées d'origine en cache
+            this.cachedOriginalCoords = null;
         }
         
         // Sauvegarder l'association dans le localStorage
@@ -790,7 +796,12 @@
                         detail: data
                     }))
                     
-                    // Afficher le point sur la carte UNIQUEMENT si une géocache est associée avec un ID valide
+                    // Si une géocache est associée, calculer la distance par rapport à l'origine
+                    if (this.associatedGeocache && this.associatedGeocache.code) {
+                        this.calculateDistanceFromOrigin(data.ddm_lat, data.ddm_lon);
+                    }
+                    
+                    // Afficher le point sur la carte si une géocache est associée
                     if (this.associatedGeocache && this.associatedGeocache.databaseId) {
                         if (data.decimal_latitude && data.decimal_longitude) {
                             this.addCalculatedPointToMap(data.decimal_latitude, data.decimal_longitude);
@@ -830,7 +841,7 @@
             })
         }
         
-        // Réinitialiser l'affichage des coordonnées
+        // Reset l'affichage des coordonnées
         resetCoordinatesDisplay() {
             // Réinitialiser l'affichage des coordonnées
             this.coordinatesDetectionStatusTarget.classList.remove('bg-green-600', 'bg-yellow-600');
@@ -842,6 +853,18 @@
             // Masquer le conteneur de coordonnées et afficher le message "Aucune coordonnée"
             this.coordinatesContainerTarget.classList.add('hidden');
             this.noCoordinatesMessageTarget.classList.remove('hidden');
+            
+            // Supprimer le message de coordonnées sur la carte s'il existe
+            const mapConfirmationMessage = this.coordinatesContainerTarget.querySelector('.text-blue-400');
+            if (mapConfirmationMessage) {
+                mapConfirmationMessage.remove();
+            }
+            
+            // Supprimer le message de distance s'il existe
+            this.removeDistanceMessage();
+            
+            // Réinitialiser la dernière distance calculée
+            this.lastCalculatedDistance = null;
         }
 
         removeSymbol(index) {
@@ -1205,7 +1228,22 @@
             
             // Générer un nom pour le waypoint
             const waypointName = "Coordonnées Alphabet";
-            const note = `Point créé à partir des coordonnées détectées dans l'alphabet.\nSource: ${this.decodedTextTarget.value}\nCoordonnées: ${originalCoordinates}`;
+            
+            // Préparer la note avec les informations disponibles
+            let note = `Point créé à partir des coordonnées détectées dans l'alphabet.\nSource: ${this.decodedTextTarget.value}\nCoordonnées: ${originalCoordinates}`;
+            
+            // Ajouter les informations de distance si disponibles
+            if (this.lastCalculatedDistance) {
+                const distance = this.lastCalculatedDistance;
+                note += `\nDistance: ${distance.meters} m (${distance.miles} miles)`;
+                
+                // Ajouter un avertissement si la distance est problématique
+                if (distance.status === 'warning') {
+                    note += " - Attention, proche de la limite de 2 miles!";
+                } else if (distance.status === 'far') {
+                    note += " - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.";
+                }
+            }
             
             // Vérifier si nous avons l'ID numérique de la géocache
             if (!this.associatedGeocache || !this.associatedGeocache.databaseId) {
@@ -1664,6 +1702,19 @@
             
             // Préparer les notes avec les informations disponibles
             let notes = `Point décodé depuis l'alphabet "${document.querySelector('h1')?.textContent || 'inconnu'}".\nCoordonnées: ${originalCoordinates}`;
+            
+            // Ajouter les informations de distance si disponibles
+            if (this.lastCalculatedDistance) {
+                const distance = this.lastCalculatedDistance;
+                notes += `\nDistance: ${distance.meters} m (${distance.miles} miles)`;
+                
+                // Ajouter un avertissement si la distance est problématique
+                if (distance.status === 'warning') {
+                    notes += " - Attention, proche de la limite de 2 miles!";
+                } else if (distance.status === 'far') {
+                    notes += " - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.";
+                }
+            }
             
             // Afficher un message de succès
             this.showAddWaypointSuccess();
@@ -2178,6 +2229,194 @@
                 console.error("Erreur lors de la conversion des coordonnées:", error);
                 return null;
             }
+        }
+
+        // Calcule la distance entre les coordonnées détectées et l'origine de la géocache
+        calculateDistanceFromOrigin(detectedLat, detectedLon) {
+            // Vérifier que nous avons les données nécessaires
+            if (!this.associatedGeocache || !this.associatedGeocache.code) {
+                console.log("Calcul de distance impossible: pas de géocache associée");
+                return;
+            }
+
+            // Charger d'abord les coordonnées de la géocache si on ne les a pas déjà
+            if (!this.cachedOriginalCoords) {
+                // Afficher un état de chargement pour la distance
+                this.addLoadingDistanceMessage();
+                
+                fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Impossible de récupérer les coordonnées pour ${this.associatedGeocache.code}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data.gc_lat || !data.gc_lon) {
+                            throw new Error("Les coordonnées d'origine ne sont pas disponibles");
+                        }
+                        
+                        // Mémoriser les coordonnées originales pour éviter des appels répétés
+                        this.cachedOriginalCoords = {
+                            gc_lat: data.gc_lat,
+                            gc_lon: data.gc_lon
+                        };
+                        
+                        // Une fois les coordonnées récupérées, calculer la distance
+                        this.requestDistanceCalculation(detectedLat, detectedLon);
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération des coordonnées d'origine:", error);
+                        this.addDistanceErrorMessage("Impossible de récupérer les coordonnées d'origine");
+                    });
+            } else {
+                // Si on a déjà les coordonnées, calculer directement la distance
+                this.requestDistanceCalculation(detectedLat, detectedLon);
+            }
+        }
+
+        // Affiche un message de chargement pour la distance
+        addLoadingDistanceMessage() {
+            // Vérifier si un message de distance existe déjà et le supprimer
+            this.removeDistanceMessage();
+            
+            // Créer le message de chargement
+            const loadingMessage = document.createElement('div');
+            loadingMessage.id = 'distance-message';
+            loadingMessage.className = 'text-xs text-gray-400 mt-2 flex items-center';
+            loadingMessage.innerHTML = `
+                <svg class="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span>Calcul de la distance...</span>
+            `;
+            
+            // Ajouter le message après les boutons
+            const buttonsContainer = this.coordinatesContainerTarget.querySelector('.mt-2.flex.gap-2');
+            if (buttonsContainer) {
+                buttonsContainer.after(loadingMessage);
+            } else {
+                this.coordinatesContainerTarget.appendChild(loadingMessage);
+            }
+        }
+
+        // Supprime le message de distance s'il existe
+        removeDistanceMessage() {
+            const existingMessage = document.getElementById('distance-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+        }
+
+        // Affiche un message d'erreur pour la distance
+        addDistanceErrorMessage(errorText) {
+            // Supprimer l'ancien message s'il existe
+            this.removeDistanceMessage();
+            
+            // Créer le message d'erreur
+            const errorMessage = document.createElement('div');
+            errorMessage.id = 'distance-message';
+            errorMessage.className = 'text-xs text-red-400 mt-2';
+            errorMessage.textContent = errorText || "Erreur lors du calcul de la distance";
+            
+            // Ajouter le message après les boutons
+            const buttonsContainer = this.coordinatesContainerTarget.querySelector('.mt-2.flex.gap-2');
+            if (buttonsContainer) {
+                buttonsContainer.after(errorMessage);
+            } else {
+                this.coordinatesContainerTarget.appendChild(errorMessage);
+            }
+        }
+
+        // Envoie une requête à l'API pour calculer la distance
+        requestDistanceCalculation(detectedLat, detectedLon) {
+            // Afficher un état de chargement
+            this.addLoadingDistanceMessage();
+            
+            // Préparer les données pour la requête
+            const requestData = {
+                formula: `${detectedLat} ${detectedLon}`, // On utilise le format de l'API calculate_coordinates
+                origin_lat: this.cachedOriginalCoords.gc_lat,
+                origin_lon: this.cachedOriginalCoords.gc_lon
+            };
+            
+            // Appeler l'API pour calculer les coordonnées (et la distance)
+            fetch('/api/calculate_coordinates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Vérifier si la distance a été calculée
+                if (data.distance_from_origin) {
+                    this.displayDistance(data.distance_from_origin);
+                } else {
+                    throw new Error("La distance n'a pas été calculée par l'API");
+                }
+            })
+            .catch(error => {
+                console.error("Erreur lors du calcul de la distance:", error);
+                this.addDistanceErrorMessage("Erreur lors du calcul de la distance");
+            });
+        }
+
+        // Affiche la distance calculée avec un format et une couleur appropriés
+        displayDistance(distanceInfo) {
+            // Supprimer l'ancien message s'il existe
+            this.removeDistanceMessage();
+            
+            // Déterminer la classe de couleur en fonction du statut
+            let distanceClass = '';
+            let distanceMessage = '';
+            
+            switch (distanceInfo.status) {
+                case 'ok':
+                    distanceClass = 'text-green-400';
+                    distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Conforme aux règles du géocaching`;
+                    break;
+                case 'warning':
+                    distanceClass = 'text-amber-300';
+                    distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Attention, proche de la limite de 2 miles!`;
+                    break;
+                case 'far':
+                    distanceClass = 'text-red-500';
+                    distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Trop éloigné! La géocache doit être à moins de 2 miles du point d'origine.`;
+                    break;
+                default:
+                    distanceClass = 'text-gray-400';
+                    distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles)`;
+            }
+            
+            // Créer l'élément de message de distance
+            const distanceElement = document.createElement('div');
+            distanceElement.id = 'distance-message';
+            distanceElement.className = `text-xs ${distanceClass} mt-2`;
+            distanceElement.innerHTML = distanceMessage;
+            
+            // Ajouter le message après les boutons ou après le message de coordonnées sur la carte s'il existe
+            const mapConfirmationMessage = this.coordinatesContainerTarget.querySelector('.text-blue-400');
+            if (mapConfirmationMessage) {
+                mapConfirmationMessage.after(distanceElement);
+            } else {
+                const buttonsContainer = this.coordinatesContainerTarget.querySelector('.mt-2.flex.gap-2');
+                if (buttonsContainer) {
+                    buttonsContainer.after(distanceElement);
+                } else {
+                    this.coordinatesContainerTarget.appendChild(distanceElement);
+                }
+            }
+            
+            // Stocker la distance calculée pour une utilisation ultérieure (par exemple, dans les waypoints)
+            this.lastCalculatedDistance = distanceInfo;
         }
     })
 })()
