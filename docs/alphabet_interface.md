@@ -123,10 +123,13 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Nom et code GC de la géocache associée
   - Affichage automatique des coordonnées d'origine de la géocache
   - Gestion des erreurs avec messages contextuels
+  - Bouton pour ouvrir la page de détails de la géocache associée
 
 - **Interactions**
   - Bouton pour envoyer les coordonnées détectées vers la géocache associée
-  - Bouton pour créer automatiquement un waypoint avec les coordonnées détectées
+  - Bouton pour créer automatiquement un waypoint avec les coordonnées détectées ("Créer WP auto")
+  - Bouton pour ajouter un waypoint via le formulaire de la géocache ("Ajouter WP")
+  - Bouton pour mettre à jour les coordonnées de la géocache avec les coordonnées détectées
   - Option pour supprimer l'association
   - Persistance de l'association via localStorage
 
@@ -141,6 +144,18 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Gestion des erreurs et des cas particuliers
   - Feedback visuel sur l'état de la création (chargement, succès, erreur)
   - Mise à jour automatique de la liste des waypoints après création
+  
+- **Ajout de waypoints via formulaire**
+  - Ouverture automatique de l'onglet de détails de la géocache si nécessaire
+  - Préremplissage du formulaire de waypoint avec les coordonnées détectées
+  - Ajout de métadonnées (préfixe "AL", notes avec référence à l'alphabet)
+  - Feedback visuel sur l'état du processus
+
+- **Mise à jour des coordonnées de géocache**
+  - Mise à jour directe des coordonnées de la géocache associée
+  - Utilisation des coordonnées détectées au format standard
+  - Actualisation automatique des coordonnées d'origine affichées
+  - Feedback visuel sur l'état de la mise à jour (chargement, succès, erreur)
 
 ## Gestion des Polices
 
@@ -361,23 +376,134 @@ associateGeocache(geocache) {
     
     // Charger automatiquement les coordonnées d'origine
     this.loadAndDisplayOriginalCoordinates();
-    
-    // Si nous avons le code GC mais pas d'ID numérique, récupérer l'ID
-    if (geocache.code && !geocache.databaseId) {
-        fetch(`/api/geocaches/by-code/${geocache.code}`)
-            .then(response => response.json())
-            .then(data => {
-                // Mise à jour de l'objet associatedGeocache avec l'ID
-                if (data.id) {
-                    this.associatedGeocache.databaseId = parseInt(data.id);
-                    // Sauvegarder l'association mise à jour
-                    this.saveGeocacheAssociation();
-                }
-            })
-            .catch(error => {
-                console.error("Erreur lors de la récupération de l'ID:", error);
-            });
+}
+
+### Ouverture de l'onglet Géocache
+```javascript
+openGeocacheDetails(event) {
+    if (event) {
+        event.preventDefault();
     }
+    
+    // Vérifier que nous avons une géocache associée
+    if (!this.associatedGeocache || !this.associatedGeocache.code) {
+        console.error("Aucune géocache associée à ouvrir");
+        this.showErrorMessage("Veuillez d'abord associer une géocache");
+        return;
+    }
+    
+    // Si nous n'avons pas d'ID de base de données, le récupérer
+    if (!this.associatedGeocache.databaseId) {
+        // Récupérer l'ID et ouvrir l'onglet
+    } else {
+        // Ouvrir directement l'onglet
+        this.openGeocacheTab();
+    }
+}
+
+openGeocacheTab() {
+    // Utiliser le système de messaging pour ouvrir l'onglet
+    window.parent.postMessage({ 
+        type: 'openGeocacheDetails',
+        geocacheId: this.associatedGeocache.databaseId,
+        gcCode: this.associatedGeocache.code,
+        name: this.associatedGeocache.name || this.associatedGeocache.code
+    }, '*');
+}
+```
+
+### Ajout d'un Waypoint via Formulaire
+```javascript
+addAsWaypoint(event) {
+    // Vérifier que nous avons une géocache associée
+    if (!this.associatedGeocache || !this.associatedGeocache.code) {
+        this.showAddWaypointError("Pas de géocache");
+        return;
+    }
+    
+    // Récupérer les coordonnées détectées
+    const coordinates = this.detectedCoordinatesTarget.textContent.trim();
+    if (!coordinates) {
+        this.showAddWaypointError("Aucune coordonnée");
+        return;
+    }
+    
+    // Trouver le panneau de détails de la géocache et le formulaire de waypoint
+    let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
+    
+    if (!waypointForm) {
+        // Ouvrir l'onglet de la géocache si nécessaire
+        window.parent.postMessage({ 
+            type: 'openGeocacheDetails',
+            geocacheId: this.associatedGeocache.databaseId,
+            gcCode: this.associatedGeocache.code,
+            name: this.associatedGeocache.name || this.associatedGeocache.code
+        }, '*');
+        return;
+    }
+    
+    // Remplir le formulaire avec les coordonnées et métadonnées
+    const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+    const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+    const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+    const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+    const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+    
+    if (prefixInput) prefixInput.value = "AL"; // Pour Alphabet
+    if (nameInput) nameInput.value = "Alphabet: Point décodé";
+    if (gcLatInput) gcLatInput.value = gcLat;
+    if (gcLonInput) gcLonInput.value = gcLon;
+    if (noteInput) noteInput.value = `Point décodé depuis l'alphabet "${document.querySelector('h1')?.textContent || 'inconnu'}".\nCoordonnées: ${originalCoordinates}`;
+}
+```
+
+### Mise à jour des Coordonnées de la Géocache
+```javascript
+saveGeocacheCoordinates(event) {
+    // Vérifier que nous avons une géocache associée
+    if (!this.associatedGeocache || !this.associatedGeocache.code) {
+        this.showSaveCoordinatesError("Pas de géocache");
+        return;
+    }
+    
+    // Récupérer les coordonnées détectées
+    const coordinates = this.detectedCoordinatesTarget.textContent.trim();
+    if (!coordinates) {
+        this.showSaveCoordinatesError("Aucune coordonnée");
+        return;
+    }
+    
+    // Extraire la latitude et la longitude au format standard
+    const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+['']*)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+['']*)/ ;
+    const match = coordinates.match(regex);
+    
+    if (!match || match.length < 3) {
+        this.showSaveCoordinatesError("Format invalide");
+        return;
+    }
+    
+    const gcLat = match[1].trim();
+    const gcLon = match[2].trim();
+    
+    // Appel à l'API pour sauvegarder les coordonnées
+    fetch(`/geocaches/${this.associatedGeocache.databaseId}/coordinates`, {
+        method: 'PUT',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        return response.text();
+    })
+    .then(html => {
+        this.showSaveCoordinatesSuccess();
+        // Mettre à jour l'affichage des coordonnées d'origine
+        this.loadAndDisplayOriginalCoordinates();
+    })
+    .catch(error => {
+        this.showSaveCoordinatesError("Erreur API");
+    });
 }
 ```
 

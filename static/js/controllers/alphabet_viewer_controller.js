@@ -17,27 +17,27 @@
     application.register("alphabet-viewer", class extends Stimulus.Controller {
         static targets = [
             "enteredSymbols", 
-            "decodedText", 
             "availableSymbol", 
+            "decodedText", 
             "detectedCoordinates", 
             "detectedLatitude", 
             "detectedLongitude", 
-            "coordinatesContainer", 
-            "noCoordinatesMessage",
+            "coordinatesContainer",
             "coordinatesDetectionStatus",
-            // Nouveaux targets pour l'association de géocache
+            "noCoordinatesMessage",
+            "sendCoordinatesBtn", // pour la rétrocompatibilité temporaire
+            "sendCoordinatesBtnDetected",
+            "createWaypointAutoBtn", // pour la rétrocompatibilité temporaire
+            "createWaypointAutoBtnDetected",
+            "addWaypointBtnDetected",
+            "saveCoordinatesBtnDetected",
             "geocacheSelect",
             "gcCodeInput",
-            "associatedGeocacheInfo",
             "associatedGeocacheName",
             "associatedGeocacheCode",
-            "sendCoordinatesBtn", // pour la rétrocompatibilité temporaire
+            "associatedGeocacheInfo",
             "originalCoordinates",
-            "originalCoordinatesValue",
-            "createWaypointAutoBtn", // pour la rétrocompatibilité temporaire
-            "sendCoordinatesBtnDetected",
-            "createWaypointAutoBtnDetected",
-            "addWaypointBtnDetected"
+            "originalCoordinatesValue"
         ]
         
         static values = {
@@ -465,6 +465,11 @@
             // Bouton d'ajout de waypoint
             if (this.hasAddWaypointBtnDetectedTarget) {
                 this.addWaypointBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+            }
+            
+            // Bouton de mise à jour des coordonnées de la géocache
+            if (this.hasSaveCoordinatesBtnDetectedTarget) {
+                this.saveCoordinatesBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
             }
         }
 
@@ -1804,6 +1809,233 @@
                 console.error("Erreur lors de l'ouverture de l'onglet de la géocache:", error);
                 this.showErrorMessage("Impossible d'ouvrir l'onglet de la géocache.");
             }
+        }
+
+        /**
+         * Sauvegarde les coordonnées corrigées de la géocache
+         */
+        saveGeocacheCoordinates(event) {
+            console.log("=== Méthode saveGeocacheCoordinates appelée ===", event);
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Vérifier que nous avons une géocache associée
+            if (!this.associatedGeocache || !this.associatedGeocache.code) {
+                console.error("Aucune géocache associée pour mettre à jour les coordonnées");
+                this.showErrorMessage("Veuillez d'abord associer une géocache");
+                this.showSaveCoordinatesError("Pas de géocache");
+                return;
+            }
+            
+            // Récupérer les coordonnées détectées
+            const coordinates = this.detectedCoordinatesTarget.textContent.trim();
+            if (!coordinates) {
+                console.error("Aucune coordonnée détectée");
+                this.showSaveCoordinatesError("Aucune coordonnée");
+                return;
+            }
+            
+            console.log("État actuel de la géocache associée:", this.associatedGeocache);
+            console.log("Code GC:", this.associatedGeocache.code);
+            
+            // Si nous n'avons pas d'ID de base de données, le récupérer
+            if (!this.associatedGeocache.databaseId) {
+                // Afficher un indicateur de chargement
+                this.showSaveCoordinatesLoading();
+                
+                // Récupérer l'ID de la géocache à partir du code GC
+                console.log(`Récupération de l'ID de la géocache pour le code ${this.associatedGeocache.code}...`);
+                
+                fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Impossible de récupérer les détails de la géocache ${this.associatedGeocache.code}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geocacheData => {
+                        console.log("Données de la géocache récupérées:", geocacheData);
+                        
+                        // Vérifier que l'ID est bien un ID numérique
+                        if (!geocacheData.id || isNaN(parseInt(geocacheData.id))) {
+                            throw new Error(`ID invalide ou non numérique retourné pour la géocache: ${geocacheData.id}`);
+                        }
+                        
+                        const numericId = parseInt(geocacheData.id);
+                        console.log("ID numérique de la géocache:", numericId);
+                        
+                        // Mise à jour de l'objet associatedGeocache avec les informations récupérées
+                        this.associatedGeocache = {
+                            ...this.associatedGeocache,
+                            databaseId: numericId,
+                            // Conserver les autres propriétés existantes
+                            id: this.associatedGeocache.id || null,
+                            name: this.associatedGeocache.name,
+                            code: this.associatedGeocache.code
+                        };
+                        
+                        // Sauvegarder l'association mise à jour
+                        this.saveGeocacheAssociation();
+                        
+                        // Une fois l'ID récupéré, continuer avec la mise à jour des coordonnées
+                        this.updateGeocacheCoordinatesWithAPI(coordinates);
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
+                        this.showSaveCoordinatesError("Erreur API");
+                        this.showErrorMessage(`Impossible de récupérer les détails de la géocache. ${error.message}`);
+                    });
+            } else {
+                // Si nous avons déjà l'ID, continuer directement avec la mise à jour des coordonnées
+                this.updateGeocacheCoordinatesWithAPI(coordinates);
+            }
+        }
+        
+        /**
+         * Met à jour les coordonnées de la géocache via l'API
+         */
+        updateGeocacheCoordinatesWithAPI(coordinates) {
+            console.log("Mise à jour des coordonnées:", coordinates);
+            
+            // Extraire la latitude et la longitude au format standard
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+['']*)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+['']*)/ ;
+            const match = coordinates.match(regex);
+            
+            if (!match || match.length < 3) {
+                console.error("Format de coordonnées non reconnu");
+                this.showSaveCoordinatesError("Format invalide");
+                return;
+            }
+            
+            const gcLat = match[1].trim();
+            const gcLon = match[2].trim();
+            
+            // Vérifier que nous avons un ID de géocache valide
+            if (!this.associatedGeocache.databaseId) {
+                console.error("ID de géocache non disponible pour la mise à jour des coordonnées");
+                this.showSaveCoordinatesError("ID manquant");
+                return;
+            }
+            
+            // Préparer les données à envoyer
+            const formData = new FormData();
+            formData.append('gc_lat', gcLat);
+            formData.append('gc_lon', gcLon);
+            
+            // Afficher l'état de chargement
+            this.showSaveCoordinatesLoading();
+            
+            // Appel à l'API pour sauvegarder les coordonnées
+            fetch(`/geocaches/${this.associatedGeocache.databaseId}/coordinates`, {
+                method: 'PUT',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                console.log("Coordonnées mises à jour avec succès");
+                this.showSaveCoordinatesSuccess();
+                
+                // Mettre à jour l'affichage des coordonnées d'origine
+                this.loadAndDisplayOriginalCoordinates();
+                
+                // Si on utilise HTMX, déclencher un événement personnalisé
+                if (html.includes('coordinatesUpdated')) {
+                    document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+                }
+                
+                // Afficher un message de succès
+                this.showErrorMessage(`Les coordonnées de la géocache ${this.associatedGeocache.code} ont été mises à jour avec succès.`, "success");
+            })
+            .catch(error => {
+                console.error("Erreur lors de la mise à jour des coordonnées:", error);
+                this.showSaveCoordinatesError("Erreur API");
+                this.showErrorMessage(`Erreur lors de la mise à jour des coordonnées: ${error.message}`);
+            });
+        }
+        
+        /**
+         * Affiche l'état de chargement pour le bouton Mettre à jour coordonnées
+         */
+        showSaveCoordinatesLoading() {
+            const button = this.saveCoordinatesBtnDetectedTarget;
+            const originalButtonHTML = button.innerHTML;
+            
+            // Sauvegarder le texte original
+            button.dataset.originalHtml = originalButtonHTML;
+            
+            // Afficher l'animation de chargement
+            button.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Sauvegarde...</span>
+            `;
+            
+            // Désactiver le bouton pendant le chargement
+            button.disabled = true;
+        }
+        
+        /**
+         * Affiche l'état de succès pour le bouton Mettre à jour coordonnées
+         */
+        showSaveCoordinatesSuccess() {
+            const button = this.saveCoordinatesBtnDetectedTarget;
+            const originalButtonHTML = button.dataset.originalHtml || `
+                <span>Mettre à jour coordonnées</span>
+            `;
+            
+            // Afficher l'icône de succès
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Sauvegardé!</span>
+            `;
+            button.classList.remove("bg-amber-700", "hover:bg-amber-600");
+            button.classList.add("bg-green-700", "hover:bg-green-600");
+            button.disabled = false;
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalButtonHTML;
+                button.classList.remove("bg-green-700", "hover:bg-green-600");
+                button.classList.add("bg-amber-700", "hover:bg-amber-600");
+            }, 3000);
+        }
+        
+        /**
+         * Affiche l'état d'erreur pour le bouton Mettre à jour coordonnées
+         */
+        showSaveCoordinatesError(message) {
+            const button = this.saveCoordinatesBtnDetectedTarget;
+            const originalButtonHTML = button.dataset.originalHtml || `
+                <span>Mettre à jour coordonnées</span>
+            `;
+            
+            // Afficher l'icône d'erreur
+            button.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>${message}</span>
+            `;
+            button.classList.remove("bg-amber-700", "hover:bg-amber-600");
+            button.classList.add("bg-red-700", "hover:bg-red-600");
+            button.disabled = false;
+            
+            // Rétablir le bouton après un délai
+            setTimeout(() => {
+                button.innerHTML = originalButtonHTML;
+                button.classList.remove("bg-red-700", "hover:bg-red-600");
+                button.classList.add("bg-amber-700", "hover:bg-amber-600");
+            }, 3000);
         }
     })
 })()
