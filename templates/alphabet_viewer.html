@@ -72,11 +72,21 @@
                             <span class="text-white font-medium ml-1" data-alphabet-viewer-target="associatedGeocacheName"></span>
                             <span class="text-gray-400 ml-2" data-alphabet-viewer-target="associatedGeocacheCode"></span>
                         </div>
-                        <button type="button"
-                                class="text-xs text-red-400 hover:text-red-300"
-                                data-action="click->alphabet-viewer#removeGeocacheAssociation">
-                            Supprimer l'association
-                        </button>
+                        <div class="flex items-center gap-3">
+                            <button type="button"
+                                    class="text-xs text-blue-400 hover:text-blue-300 flex items-center"
+                                    data-action="click->alphabet-viewer#openGeocacheDetails">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Ouvrir Géocache
+                            </button>
+                            <button type="button"
+                                    class="text-xs text-red-400 hover:text-red-300"
+                                    data-action="click->alphabet-viewer#removeGeocacheAssociation">
+                                Supprimer l'association
+                            </button>
+                        </div>
                     </div>
                     <div class="mt-2 text-xs text-white" data-alphabet-viewer-target="originalCoordinates">
                         <span class="text-gray-400">Coordonnées d'origine : </span>

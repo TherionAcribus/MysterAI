@@ -1715,5 +1715,95 @@
                 button.disabled = false;
             }, 3000);
         }
+
+        /**
+         * Ouvre l'onglet de détails de la géocache associée
+         */
+        openGeocacheDetails(event) {
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Vérifier que nous avons une géocache associée
+            if (!this.associatedGeocache || !this.associatedGeocache.code) {
+                console.error("Aucune géocache associée à ouvrir");
+                this.showErrorMessage("Veuillez d'abord associer une géocache");
+                return;
+            }
+            
+            console.log("Ouverture de la géocache:", this.associatedGeocache);
+            
+            // Si nous n'avons pas d'ID de base de données, le récupérer
+            if (!this.associatedGeocache.databaseId) {
+                console.log(`Récupération de l'ID de la géocache pour le code ${this.associatedGeocache.code}...`);
+                
+                fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Impossible de récupérer les détails de la géocache ${this.associatedGeocache.code}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geocacheData => {
+                        // Vérifier que l'ID est bien un ID numérique
+                        if (!geocacheData.id || isNaN(parseInt(geocacheData.id))) {
+                            throw new Error(`ID invalide ou non numérique retourné pour la géocache: ${geocacheData.id}`);
+                        }
+                        
+                        const numericId = parseInt(geocacheData.id);
+                        console.log("ID numérique de la géocache:", numericId);
+                        
+                        // Mise à jour de l'objet associatedGeocache avec les informations récupérées
+                        this.associatedGeocache = {
+                            ...this.associatedGeocache,
+                            databaseId: numericId,
+                            // Conserver les autres propriétés existantes
+                            name: this.associatedGeocache.name,
+                            code: this.associatedGeocache.code,
+                            id: this.associatedGeocache.id || null
+                        };
+                        
+                        // Sauvegarder l'association mise à jour
+                        this.saveGeocacheAssociation();
+                        
+                        // Ouvrir l'onglet avec l'ID récupéré
+                        this.openGeocacheTab();
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
+                        this.showErrorMessage(`Impossible de récupérer les détails de la géocache. ${error.message}`);
+                    });
+            } else {
+                // Si nous avons déjà l'ID, ouvrir directement l'onglet
+                this.openGeocacheTab();
+            }
+        }
+        
+        /**
+         * Ouvre l'onglet de la géocache avec l'ID disponible
+         */
+        openGeocacheTab() {
+            try {
+                console.log("Ouverture de l'onglet via window.parent.postMessage");
+                window.parent.postMessage({ 
+                    type: 'openGeocacheDetails',
+                    geocacheId: this.associatedGeocache.databaseId,
+                    gcCode: this.associatedGeocache.code,
+                    name: this.associatedGeocache.name || this.associatedGeocache.code
+                }, '*');
+                
+                // Afficher un feedback visuel temporaire
+                if (typeof showToast === 'function') {
+                    showToast({
+                        message: `Ouverture de la géocache ${this.associatedGeocache.code}`,
+                        type: 'info',
+                        duration: 2000
+                    });
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de l'onglet de la géocache:", error);
+                this.showErrorMessage("Impossible d'ouvrir l'onglet de la géocache.");
+            }
+        }
     })
 })()
