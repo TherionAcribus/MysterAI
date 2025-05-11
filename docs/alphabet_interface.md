@@ -115,6 +115,7 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - **Analyse automatique** du texte décodé
 - Détection de formats standards (DDM, DMS, etc.)
 - Support de formats spéciaux sans symboles (ex: "4912123 00612123")
+- **Utilisation intelligente des coordonnées d'origine** pour déterminer les bonnes lettres cardinales (N/S pour latitude, E/W pour longitude)
 - Affichage des coordonnées détectées en format DDM
 - Indicateur visuel de l'état de la détection (analyse, trouvées, non trouvées)
 
@@ -140,7 +141,20 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - Suppression du message de distance lors de la dissociation d'une géocache
 - Métriques affichées en mètres et en miles pour une meilleure lisibilité internationale
 
-### 5.3 Intégration avec Waypoints
+### 5.3 Détection Intelligente des Lettres Cardinales
+
+- **Utilisation des coordonnées d'origine** de la géocache associée pour déterminer les bonnes lettres cardinales
+- Configuration automatique des formats numériques purs pour utiliser N/S et E/W appropriés
+- Lors de l'association d'une géocache, les coordonnées d'origine sont automatiquement mises en cache
+- Lorsque des coordonnées numériques pures sont détectées (sans lettres cardinales), le système utilise celles de la géocache d'origine
+- Avantages:
+  - Plus besoin de saisir manuellement N/S ou E/W pour les coordonnées numériques
+  - Fonctionnement correct dans l'hémisphère sud (S) et à l'ouest du méridien de Greenwich (W)
+  - Meilleure précision dans la détection des coordonnées numériques pures
+- Dégradation gracieuse: si aucune géocache n'est associée, utilise N et E par défaut (comme avant)
+- Relance automatique de la détection lorsqu'une géocache est associée et que ses coordonnées sont chargées
+
+### 5.4 Intégration avec Waypoints
 
 - Ajout automatique des informations de distance dans les waypoints créés
 - Indication visuelle claire du statut de conformité dans les notes du waypoint
@@ -156,6 +170,12 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Sélection parmi les géocaches ouvertes dans l'application
   - Saisie manuelle d'un code GC
   - Bouton d'actualisation pour rafraîchir la liste des géocaches ouvertes
+
+- **Caractère temporaire de l'association**
+  - Association valable uniquement pour la session en cours
+  - Suppression automatique à la fermeture de l'onglet ou de l'application
+  - Pas de persistance entre les sessions pour éviter les conflits
+  - Nécessité de réassocier la géocache lors de la réouverture de l'alphabet
 
 - **Affichage des informations**
   - Nom et code GC de la géocache associée
@@ -175,7 +195,7 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Bouton pour ajouter un waypoint via le formulaire de la géocache ("Ajouter WP")
   - Bouton pour mettre à jour les coordonnées de la géocache avec les coordonnées détectées
   - Option pour supprimer l'association
-  - Persistance de l'association via localStorage
+  - Persistance temporaire de l'association via sessionStorage (uniquement durant la session)
 
 - **Gestion des erreurs**
   - Affichage de messages d'erreur contextuels
@@ -415,12 +435,61 @@ associateGeocache(geocache) {
     this.associatedGeocacheCodeTarget.textContent = geocache.code;
     this.associatedGeocacheInfoTarget.classList.remove('hidden');
     
-    // Enregistrer l'association dans le localStorage
+    // Enregistrer l'association dans le sessionStorage pour la session actuelle
     this.saveGeocacheAssociation();
     
     // Charger automatiquement les coordonnées d'origine
     this.loadAndDisplayOriginalCoordinates();
 }
+
+// Sauvegarder l'association dans le sessionStorage (temporaire)
+saveGeocacheAssociation() {
+    if (this.associatedGeocache) {
+        sessionStorage.setItem(`alphabet_${this.alphabetIdValue}_geocache`, 
+            JSON.stringify({
+                id: this.associatedGeocache.id,
+                name: this.associatedGeocache.name,
+                code: this.associatedGeocache.code,
+                databaseId: this.associatedGeocache.databaseId || null
+            })
+        );
+    }
+}
+
+// Charger l'association depuis le sessionStorage
+loadGeocacheAssociation() {
+    const saved = sessionStorage.getItem(`alphabet_${this.alphabetIdValue}_geocache`);
+    if (saved) {
+        try {
+            const geocache = JSON.parse(saved);
+            console.log("Association de géocache chargée depuis sessionStorage:", geocache);
+            this.associateGeocache(geocache);
+            
+            // Mettre à jour le sélecteur si la géocache est ouverte
+            if (geocache.id) {
+                this.geocacheSelectTarget.value = geocache.id;
+            }
+        } catch (e) {
+            console.error('Erreur lors du chargement de l\'association:', e);
+        }
+    }
+}
+
+// Méthode appelée lorsque le contrôleur est déconnecté
+disconnect() {
+    console.log('Alphabet Viewer Controller disconnected');
+    
+    // Supprimer l'association géocache
+    if (this.associatedGeocache) {
+        sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
+        this.associatedGeocache = null;
+    }
+    
+    // Supprimer les écouteurs d'événements
+    window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+    this.element.removeEventListener('coordinatesDetected', this.handleCoordinatesDetected);
+}
+```
 
 ### Ouverture de l'onglet Géocache
 ```javascript
@@ -696,8 +765,8 @@ removeGeocacheAssociation() {
     // Réinitialiser l'affichage des coordonnées d'origine
     this.originalCoordinatesValueTarget.textContent = "";
     
-    // Supprimer l'association du localStorage
-    localStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
+    // Supprimer l'association du sessionStorage
+    sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
     
     // Mettre à jour l'état des boutons pour les masquer
     this.updateSendCoordinatesButton();
@@ -803,10 +872,24 @@ detectCoordinates(text) {
         return
     }
     
+    // Afficher l'indicateur d'analyse
+    this.coordinatesDetectionStatusTarget.textContent = 'Analyse...'
+    this.coordinatesDetectionStatusTarget.classList.remove('hidden')
+    this.coordinatesDetectionStatusTarget.classList.add('bg-yellow-600')
+    
     // Préparer les données avec include_numeric_only=true pour l'interface alphabet
     const requestData = {
         text: text,
         include_numeric_only: true
+    }
+
+    // Ajouter les coordonnées d'origine si elles sont disponibles
+    if (this.cachedOriginalCoords && this.cachedOriginalCoords.gc_lat && this.cachedOriginalCoords.gc_lon) {
+        requestData.origin_coords = {
+            ddm_lat: this.cachedOriginalCoords.gc_lat,
+            ddm_lon: this.cachedOriginalCoords.gc_lon
+        };
+        console.log('Envoi des coordonnées d\'origine:', requestData.origin_coords);
     }
     
     fetch('/api/detect_coordinates', {
@@ -825,6 +908,8 @@ detectCoordinates(text) {
             // Afficher le conteneur des coordonnées
             this.coordinatesContainerTarget.classList.remove('hidden')
             this.noCoordinatesMessageTarget.classList.add('hidden')
+            
+            // Autres traitements...
         } else {
             // Aucune coordonnée trouvée
             this.resetCoordinatesDisplay()
@@ -832,6 +917,41 @@ detectCoordinates(text) {
     })
 }
 ```
+
+#### API de Détection des Coordonnées
+
+L'API `/api/detect_coordinates` accepte désormais un paramètre optionnel `origin_coords` qui permet de spécifier les coordonnées d'origine au format DDM. Ce paramètre est utilisé pour déterminer les bonnes lettres cardinales lors de la détection de coordonnées numériques pures.
+
+**Paramètres de la requête :**
+- `text` (obligatoire) : Le texte à analyser pour détecter des coordonnées
+- `include_numeric_only` (optionnel) : Si true, active la détection de coordonnées au format numérique pur
+- `origin_coords` (optionnel) : Objet contenant les coordonnées d'origine au format DDM
+  - `ddm_lat` : Latitude en format DDM (ex: "N 49° 12.345'")
+  - `ddm_lon` : Longitude en format DDM (ex: "E 006° 12.345'")
+
+**Exemple de requête :**
+```json
+{
+  "text": "4912123 00612123",
+  "include_numeric_only": true,
+  "origin_coords": {
+    "ddm_lat": "N 49° 10.000'",
+    "ddm_lon": "E 006° 10.000'"
+  }
+}
+```
+
+**Réponse :**
+```json
+{
+  "exist": true,
+  "ddm_lat": "N 49° 12.123'",
+  "ddm_lon": "E 006° 12.123'",
+  "ddm": "N 49° 12.123' E 006° 12.123'"
+}
+```
+
+Si `origin_coords` n'est pas fourni, l'API utilise par défaut "N" pour la latitude et "E" pour la longitude lors de la détection de coordonnées numériques pures.
 
 ### Calcul et Affichage de la Distance
 ```javascript

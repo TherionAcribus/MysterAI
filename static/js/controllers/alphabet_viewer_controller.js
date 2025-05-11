@@ -55,7 +55,7 @@
             // Ajouter un délai pour éviter des appels trop fréquents
             this.detectCoordinatesDebounced = this.debounce(this.detectCoordinates.bind(this), 500)
             
-            // Initialiser la géocache associée depuis le localStorage s'il y en a une
+            // Initialiser la géocache associée depuis le sessionStorage s'il y en a une
             this.loadGeocacheAssociation();
             
             // Indicateur pour éviter les boucles infinies lors de la saisie directe
@@ -69,33 +69,34 @@
             // Écouter les événements de coordonnées détectées
             this.element.addEventListener('coordinatesDetected', this.handleCoordinatesDetected.bind(this))
             
-            // Débogage des boutons
-            setTimeout(() => {
-                console.log("== Débogage des boutons ==");
-                
-                // Anciens boutons (pour rétrocompatibilité)
-                if (this.hasSendCoordinatesBtnTarget) {
-                    console.log("Ancien bouton Envoyer coordonnées:", this.sendCoordinatesBtnTarget);
-                }
-                if (this.hasCreateWaypointAutoBtnTarget) {
-                    console.log("Ancien bouton Créer WP auto:", this.createWaypointAutoBtnTarget);
-                }
-                
-                // Nouveaux boutons dans la section "Coordonnées détectées"
-                if (this.hasSendCoordinatesBtnDetectedTarget) {
-                    console.log("Nouveau bouton Envoyer coordonnées:", this.sendCoordinatesBtnDetectedTarget);
-                    this.sendCoordinatesBtnDetectedTarget.addEventListener('click', () => {
-                        console.log('Clic sur le bouton Envoyer coordonnées détecté');
-                    });
-                }
-                
-                if (this.hasCreateWaypointAutoBtnDetectedTarget) {
-                    console.log("Nouveau bouton Créer WP auto:", this.createWaypointAutoBtnDetectedTarget);
-                    this.createWaypointAutoBtnDetectedTarget.addEventListener('click', () => {
-                        console.log('Clic sur le bouton Créer WP auto détecté');
-                    });
-                }
-            }, 1000);
+            // Ajouter un écouteur pour l'événement beforeunload de la fenêtre
+            this.beforeUnloadHandler = this.handleBeforeUnload.bind(this)
+            window.addEventListener('beforeunload', this.beforeUnloadHandler)
+        }
+        
+        // Méthode appelée lorsque le contrôleur est déconnecté
+        disconnect() {
+            console.log('Alphabet Viewer Controller disconnected')
+            
+            // Supprimer l'association géocache
+            if (this.associatedGeocache) {
+                sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`)
+                this.associatedGeocache = null
+            }
+            
+            // Supprimer l'écouteur d'événement beforeunload
+            window.removeEventListener('beforeunload', this.beforeUnloadHandler)
+            
+            // Supprimer l'écouteur d'événement pour les coordonnées détectées
+            this.element.removeEventListener('coordinatesDetected', this.handleCoordinatesDetected)
+        }
+        
+        // Gérer l'événement beforeunload de la fenêtre
+        handleBeforeUnload() {
+            // Supprimer l'association de géocache lors de la fermeture de la page
+            if (this.associatedGeocache) {
+                sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`)
+            }
         }
         
         // Fonction pour charger les géocaches ouvertes
@@ -367,8 +368,8 @@
             // Réinitialiser l'affichage des coordonnées d'origine
             this.originalCoordinatesValueTarget.textContent = "";
             
-            // Supprimer l'association du localStorage
-            localStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
+            // Supprimer l'association du sessionStorage au lieu du localStorage
+            sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
             
             // Mettre à jour l'état des boutons pour les masquer
             this.updateSendCoordinatesButton();
@@ -386,10 +387,10 @@
             this.cachedOriginalCoords = null;
         }
         
-        // Sauvegarder l'association dans le localStorage
+        // Sauvegarder l'association dans le sessionStorage au lieu du localStorage
         saveGeocacheAssociation() {
             if (this.associatedGeocache) {
-                localStorage.setItem(`alphabet_${this.alphabetIdValue}_geocache`, 
+                sessionStorage.setItem(`alphabet_${this.alphabetIdValue}_geocache`, 
                     JSON.stringify({
                         id: this.associatedGeocache.id,
                         name: this.associatedGeocache.name,
@@ -400,13 +401,13 @@
             }
         }
         
-        // Charger l'association depuis le localStorage
+        // Charger l'association depuis le sessionStorage au lieu du localStorage
         loadGeocacheAssociation() {
-            const saved = localStorage.getItem(`alphabet_${this.alphabetIdValue}_geocache`);
+            const saved = sessionStorage.getItem(`alphabet_${this.alphabetIdValue}_geocache`);
             if (saved) {
                 try {
                     const geocache = JSON.parse(saved);
-                    console.log("Association de géocache chargée depuis localStorage:", geocache);
+                    console.log("Association de géocache chargée depuis sessionStorage:", geocache);
                     this.associateGeocache(geocache);
                     
                     // Mettre à jour le sélecteur si la géocache est ouverte
