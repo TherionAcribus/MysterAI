@@ -55,6 +55,9 @@
             // Ajouter un délai pour éviter des appels trop fréquents
             this.detectCoordinatesDebounced = this.debounce(this.detectCoordinates.bind(this), 500)
             
+            // Initialiser la géocache associée depuis le localStorage s'il y en a une
+            this.loadGeocacheAssociation();
+            
             // Indicateur pour éviter les boucles infinies lors de la saisie directe
             this.isUpdatingFromTextInput = false
             
@@ -745,6 +748,19 @@
                     this.element.dispatchEvent(new CustomEvent('coordinatesDetected', {
                         detail: data
                     }))
+                    
+                    // Afficher le point sur la carte UNIQUEMENT si une géocache est associée avec un ID valide
+                    if (this.associatedGeocache && this.associatedGeocache.databaseId) {
+                        if (data.decimal_latitude && data.decimal_longitude) {
+                            this.addCalculatedPointToMap(data.decimal_latitude, data.decimal_longitude);
+                        } else if (data.ddm_lat && data.ddm_lon) {
+                            // Convertir les coordonnées DDM en décimales si nécessaire
+                            const coords = this.convertGCCoordsToDecimal(data.ddm_lat, data.ddm_lon);
+                            if (coords) {
+                                this.addCalculatedPointToMap(coords.latitude, coords.longitude);
+                            }
+                        }
+                    }
                 } else {
                     // Aucune coordonnée trouvée
                     this.resetCoordinatesDisplay()
@@ -775,10 +791,19 @@
         
         // Réinitialiser l'affichage des coordonnées
         resetCoordinatesDisplay() {
-            this.coordinatesContainerTarget.classList.add('hidden')
-            this.noCoordinatesMessageTarget.classList.remove('hidden')
-            // Désactiver le bouton d'envoi des coordonnées
-            this.updateSendCoordinatesButton()
+            // Réinitialiser l'affichage des coordonnées
+            this.coordinatesDetectionStatusTarget.classList.remove('bg-green-600', 'bg-yellow-600');
+            this.coordinatesDetectionStatusTarget.classList.add('hidden');
+            
+            // Désactiver les boutons
+            if (this.hasSendCoordinatesBtnDetectedTarget) this.sendCoordinatesBtnDetectedTarget.disabled = true;
+            if (this.hasAddWaypointBtnDetectedTarget) this.addWaypointBtnDetectedTarget.disabled = true;
+            if (this.hasCreateWaypointAutoBtnDetectedTarget) this.createWaypointAutoBtnDetectedTarget.disabled = true;
+            if (this.hasSaveCoordinatesBtnDetectedTarget) this.saveCoordinatesBtnDetectedTarget.disabled = true;
+            
+            // Masquer le conteneur de coordonnées et afficher le message "Aucune coordonnée"
+            this.coordinatesContainerTarget.classList.add('hidden');
+            this.noCoordinatesMessageTarget.classList.remove('hidden');
         }
 
         removeSymbol(index) {
@@ -2036,6 +2061,85 @@
                 button.classList.remove("bg-red-700", "hover:bg-red-600");
                 button.classList.add("bg-amber-700", "hover:bg-amber-600");
             }, 3000);
+        }
+
+        // Fonction pour ajouter un point calculé sur la carte
+        addCalculatedPointToMap(latitude, longitude) {
+            // Vérifier si nous avons une géocache associée avec un ID
+            if (!this.associatedGeocache || !this.associatedGeocache.databaseId) {
+                console.error("Impossible d'afficher le point sur la carte: pas de géocache associée");
+                return;
+            }
+
+            // Créer l'événement pour ajouter le point à la carte
+            const pointData = {
+                latitude: latitude,
+                longitude: longitude,
+                geocacheId: this.associatedGeocache.databaseId,
+                source: 'alphabet'
+            };
+
+            const event = new CustomEvent('addCalculatedPointToMap', {
+                detail: pointData,
+                bubbles: true
+            });
+
+            // Déclencher l'événement
+            window.dispatchEvent(event);
+            
+            // Ajouter un message de confirmation sous les coordonnées - uniquement si une géocache est associée
+            if (this.associatedGeocache && this.associatedGeocache.databaseId) {
+                const confirmationMessage = document.createElement('div');
+                confirmationMessage.className = 'text-xs text-blue-400 mt-1';
+                confirmationMessage.textContent = 'Point affiché sur la carte';
+                
+                // Vérifier si un message existe déjà et le remplacer
+                const existingMessage = this.coordinatesContainerTarget.querySelector('.text-blue-400');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+                
+                // Ajouter le message après les boutons
+                const buttonsContainer = this.coordinatesContainerTarget.querySelector('.mt-2.flex.gap-2');
+                if (buttonsContainer) {
+                    buttonsContainer.after(confirmationMessage);
+                } else {
+                    this.coordinatesContainerTarget.appendChild(confirmationMessage);
+                }
+            }
+        }
+
+        // Fonction utilitaire pour convertir les coordonnées DMM en coordonnées décimales
+        convertGCCoordsToDecimal(gcLat, gcLon) {
+            try {
+                // Extraire les composants pour la latitude
+                const latMatch = gcLat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                if (!latMatch) return null;
+                
+                const latDir = latMatch[1].toUpperCase();
+                const latDeg = parseInt(latMatch[2], 10);
+                const latMin = parseFloat(latMatch[3]);
+                
+                // Extraire les composants pour la longitude
+                const lonMatch = gcLon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                if (!lonMatch) return null;
+                
+                const lonDir = lonMatch[1].toUpperCase();
+                const lonDeg = parseInt(lonMatch[2], 10);
+                const lonMin = parseFloat(lonMatch[3]);
+                
+                // Calculer les coordonnées décimales
+                let latitude = latDeg + (latMin / 60);
+                if (latDir === 'S') latitude = -latitude;
+                
+                let longitude = lonDeg + (lonMin / 60);
+                if (lonDir === 'W') longitude = -longitude;
+                
+                return { latitude, longitude };
+            } catch (error) {
+                console.error("Erreur lors de la conversion des coordonnées:", error);
+                return null;
+            }
         }
     })
 })()

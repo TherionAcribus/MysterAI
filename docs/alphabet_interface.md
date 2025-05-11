@@ -28,6 +28,12 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
    - Détection automatique des coordonnées GPS dans le texte décodé
    - Support de formats standards et numériques purs
 
+5. **Intégration avec la Carte**
+   - Communication inter-composants via événements personnalisés (`addCalculatedPointToMap`)
+   - Conversion automatique des coordonnées DMM en format décimal
+   - Partage du contrôleur de carte avec d'autres fonctionnalités (Formula Solver)
+   - Gestion unifiée des points calculés sur la carte
+
 ### Structure des Données
 
 ```json
@@ -111,6 +117,17 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - Support de formats spéciaux sans symboles (ex: "4912123 00612123")
 - Affichage des coordonnées détectées en format DDM
 - Indicateur visuel de l'état de la détection (analyse, trouvées, non trouvées)
+
+### 5.1 Affichage sur la Carte
+
+- **Affichage automatique** des coordonnées détectées sur la carte de la géocache associée
+- Conversion automatique des coordonnées au format décimal pour l'affichage sur la carte
+- Représentation visuelle sous forme de losange bleu avec un point d'interrogation au centre
+- Feedback visuel avec un message "Point affiché sur la carte" sous les coordonnées détectées
+- Nécessite une géocache associée avec un ID valide
+- Le point affiché est automatiquement recentré sur la carte
+- Compatible avec le système de carte utilisé dans le Formula Solver
+- Point affiché est persistant entre les onglets tant que la session est active
 
 ### 6. Association avec une Géocache
 
@@ -534,6 +551,82 @@ loadAndDisplayOriginalCoordinates() {
         .catch(error => {
             this.originalCoordinatesValueTarget.textContent = "Erreur lors du chargement";
         });
+}
+```
+
+### Affichage du Point sur la Carte
+```javascript
+// Fonction pour ajouter un point calculé sur la carte
+addCalculatedPointToMap(latitude, longitude) {
+    // Vérifier si nous avons une géocache associée avec un ID
+    if (!this.associatedGeocache || !this.associatedGeocache.databaseId) {
+        console.error("Impossible d'afficher le point sur la carte: pas de géocache associée");
+        return;
+    }
+
+    // Créer l'événement pour ajouter le point à la carte
+    const pointData = {
+        latitude: latitude,
+        longitude: longitude,
+        geocacheId: this.associatedGeocache.databaseId,
+        source: 'alphabet'
+    };
+
+    const event = new CustomEvent('addCalculatedPointToMap', {
+        detail: pointData,
+        bubbles: true
+    });
+
+    // Déclencher l'événement
+    window.dispatchEvent(event);
+    
+    // Ajouter un message de confirmation sous les coordonnées
+    if (this.associatedGeocache && this.associatedGeocache.databaseId) {
+        const confirmationMessage = document.createElement('div');
+        confirmationMessage.className = 'text-xs text-blue-400 mt-1';
+        confirmationMessage.textContent = 'Point affiché sur la carte';
+        
+        // Ajouter le message après les boutons
+        const buttonsContainer = this.coordinatesContainerTarget.querySelector('.mt-2.flex.gap-2');
+        if (buttonsContainer) {
+            buttonsContainer.after(confirmationMessage);
+        } else {
+            this.coordinatesContainerTarget.appendChild(confirmationMessage);
+        }
+    }
+}
+
+// Conversion des coordonnées DMM en décimales
+convertGCCoordsToDecimal(gcLat, gcLon) {
+    try {
+        // Extraire les composants pour la latitude
+        const latMatch = gcLat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+        if (!latMatch) return null;
+        
+        const latDir = latMatch[1].toUpperCase();
+        const latDeg = parseInt(latMatch[2], 10);
+        const latMin = parseFloat(latMatch[3]);
+        
+        // Extraire les composants pour la longitude
+        const lonMatch = gcLon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+        if (!lonMatch) return null;
+        
+        const lonDir = lonMatch[1].toUpperCase();
+        const lonDeg = parseInt(lonMatch[2], 10);
+        const lonMin = parseFloat(lonMatch[3]);
+        
+        // Calculer les coordonnées décimales
+        let latitude = latDeg + (latMin / 60);
+        if (latDir === 'S') latitude = -latitude;
+        
+        let longitude = lonDeg + (lonMin / 60);
+        if (lonDir === 'W') longitude = -longitude;
+        
+        return { latitude, longitude };
+    } catch (error) {
+        console.error("Erreur lors de la conversion des coordonnées:", error);
+        return null;
+    }
 }
 ```
 
