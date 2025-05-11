@@ -354,6 +354,15 @@
             
             // Supprimer l'association du localStorage
             localStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
+            
+            // Mettre à jour l'état des boutons pour les masquer
+            this.updateSendCoordinatesButton();
+            
+            // Supprimer le message confirmant l'affichage sur la carte s'il existe
+            const mapConfirmationMessage = this.coordinatesContainerTarget.querySelector('.text-blue-400');
+            if (mapConfirmationMessage) {
+                mapConfirmationMessage.remove();
+            }
         }
         
         // Sauvegarder l'association dans le localStorage
@@ -451,28 +460,60 @@
             
             // Pour la rétrocompatibilité
             if (this.hasSendCoordinatesBtnTarget) {
-                this.sendCoordinatesBtnTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.sendCoordinatesBtnTarget.classList.remove('hidden');
+                    this.sendCoordinatesBtnTarget.disabled = !hasCoordinates;
+                } else {
+                    this.sendCoordinatesBtnTarget.classList.add('hidden');
+                }
             }
+            
             if (this.hasCreateWaypointAutoBtnTarget) {
-                this.createWaypointAutoBtnTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.createWaypointAutoBtnTarget.classList.remove('hidden');
+                    this.createWaypointAutoBtnTarget.disabled = !hasCoordinates;
+                } else {
+                    this.createWaypointAutoBtnTarget.classList.add('hidden');
+                }
             }
             
             // Nouveaux boutons dans la section "Coordonnées détectées"
             if (this.hasSendCoordinatesBtnDetectedTarget) {
-                this.sendCoordinatesBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.sendCoordinatesBtnDetectedTarget.classList.remove('hidden');
+                    this.sendCoordinatesBtnDetectedTarget.disabled = !hasCoordinates;
+                } else {
+                    this.sendCoordinatesBtnDetectedTarget.classList.add('hidden');
+                }
             }
+            
             if (this.hasCreateWaypointAutoBtnDetectedTarget) {
-                this.createWaypointAutoBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.createWaypointAutoBtnDetectedTarget.classList.remove('hidden');
+                    this.createWaypointAutoBtnDetectedTarget.disabled = !hasCoordinates;
+                } else {
+                    this.createWaypointAutoBtnDetectedTarget.classList.add('hidden');
+                }
             }
             
             // Bouton d'ajout de waypoint
             if (this.hasAddWaypointBtnDetectedTarget) {
-                this.addWaypointBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.addWaypointBtnDetectedTarget.classList.remove('hidden');
+                    this.addWaypointBtnDetectedTarget.disabled = !hasCoordinates;
+                } else {
+                    this.addWaypointBtnDetectedTarget.classList.add('hidden');
+                }
             }
             
             // Bouton de mise à jour des coordonnées de la géocache
             if (this.hasSaveCoordinatesBtnDetectedTarget) {
-                this.saveCoordinatesBtnDetectedTarget.disabled = !(hasCoordinates && hasAssociatedGeocache);
+                if (hasAssociatedGeocache) {
+                    this.saveCoordinatesBtnDetectedTarget.classList.remove('hidden');
+                    this.saveCoordinatesBtnDetectedTarget.disabled = !hasCoordinates;
+                } else {
+                    this.saveCoordinatesBtnDetectedTarget.classList.add('hidden');
+                }
             }
         }
 
@@ -795,11 +836,8 @@
             this.coordinatesDetectionStatusTarget.classList.remove('bg-green-600', 'bg-yellow-600');
             this.coordinatesDetectionStatusTarget.classList.add('hidden');
             
-            // Désactiver les boutons
-            if (this.hasSendCoordinatesBtnDetectedTarget) this.sendCoordinatesBtnDetectedTarget.disabled = true;
-            if (this.hasAddWaypointBtnDetectedTarget) this.addWaypointBtnDetectedTarget.disabled = true;
-            if (this.hasCreateWaypointAutoBtnDetectedTarget) this.createWaypointAutoBtnDetectedTarget.disabled = true;
-            if (this.hasSaveCoordinatesBtnDetectedTarget) this.saveCoordinatesBtnDetectedTarget.disabled = true;
+            // Désactiver et masquer les boutons selon qu'une géocache est associée ou non
+            this.updateSendCoordinatesButton();
             
             // Masquer le conteneur de coordonnées et afficher le message "Aucune coordonnée"
             this.coordinatesContainerTarget.classList.add('hidden');

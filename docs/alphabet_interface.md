@@ -142,6 +142,12 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
   - Gestion des erreurs avec messages contextuels
   - Bouton pour ouvrir la page de détails de la géocache associée
 
+- **Gestion de l'interface**
+  - Affichage dynamique des boutons d'action en fonction de l'état d'association
+  - Boutons relatifs aux géocaches (envoyer coordonnées, ajouter/créer waypoint, mettre à jour) sont masqués quand aucune géocache n'est associée
+  - Réapparition automatique des boutons lors de l'association d'une géocache
+  - Suppression des messages d'affichage sur la carte lors de la dissociation d'une géocache
+
 - **Interactions**
   - Bouton pour envoyer les coordonnées détectées vers la géocache associée
   - Bouton pour créer automatiquement un waypoint avec les coordonnées détectées ("Créer WP auto")
@@ -626,6 +632,59 @@ convertGCCoordsToDecimal(gcLat, gcLon) {
     } catch (error) {
         console.error("Erreur lors de la conversion des coordonnées:", error);
         return null;
+    }
+}
+```
+
+### Gestion dynamique des boutons
+```javascript
+// Mettre à jour l'état des boutons selon qu'une géocache est associée ou non
+updateSendCoordinatesButton() {
+    const hasCoordinates = !this.coordinatesContainerTarget.classList.contains('hidden');
+    const hasAssociatedGeocache = this.associatedGeocache && this.associatedGeocache.code;
+    
+    // Pour chaque bouton relatif aux géocaches
+    if (this.hasSendCoordinatesBtnDetectedTarget) {
+        if (hasAssociatedGeocache) {
+            this.sendCoordinatesBtnDetectedTarget.classList.remove('hidden');
+            this.sendCoordinatesBtnDetectedTarget.disabled = !hasCoordinates;
+        } else {
+            this.sendCoordinatesBtnDetectedTarget.classList.add('hidden');
+        }
+    }
+    
+    // Même logique pour les autres boutons
+    if (this.hasCreateWaypointAutoBtnDetectedTarget) {
+        if (hasAssociatedGeocache) {
+            this.createWaypointAutoBtnDetectedTarget.classList.remove('hidden');
+            this.createWaypointAutoBtnDetectedTarget.disabled = !hasCoordinates;
+        } else {
+            this.createWaypointAutoBtnDetectedTarget.classList.add('hidden');
+        }
+    }
+    
+    // etc. pour les autres boutons
+}
+
+// Supprimer l'association avec la géocache
+removeGeocacheAssociation() {
+    this.associatedGeocache = null;
+    this.associatedGeocacheInfoTarget.classList.add('hidden');
+    this.geocacheSelectTarget.value = "";
+    
+    // Réinitialiser l'affichage des coordonnées d'origine
+    this.originalCoordinatesValueTarget.textContent = "";
+    
+    // Supprimer l'association du localStorage
+    localStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`);
+    
+    // Mettre à jour l'état des boutons pour les masquer
+    this.updateSendCoordinatesButton();
+    
+    // Supprimer le message confirmant l'affichage sur la carte s'il existe
+    const mapConfirmationMessage = this.coordinatesContainerTarget.querySelector('.text-blue-400');
+    if (mapConfirmationMessage) {
+        mapConfirmationMessage.remove();
     }
 }
 ```
