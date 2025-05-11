@@ -15,7 +15,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         "pluginsResults",
         "resultsContainer",
         "metaSolverPanel",
-        "toggleMetaSolverButton"
+        "toggleMetaSolverButton",
+        "coordinatesContainer",
+        "coordinatesContent"
     ]
     
     static values = {
@@ -71,6 +73,194 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 this._currentDescriptionValue = event.target.value;
             });
         }
+
+        // AJOUT: Écouter les événements de détection de coordonnées GPS
+        console.log("Configuration de l'écouteur d'événements pour coordinatesDetected");
+        document.addEventListener('coordinatesDetected', this.handleCoordinatesDetected.bind(this));
+        
+        // AJOUT: Vérification immédiate des cibles Stimulus
+        console.log("Vérification des cibles Stimulus pour les coordonnées:", {
+            hasCoordinatesContainerTarget: this.hasCoordinatesContainerTarget,
+            hasCoordinatesContentTarget: this.hasCoordinatesContentTarget
+        });
+        
+        // AJOUT: Écouter l'événement directement sur le document
+        document.addEventListener('coordinatesDetected', function(event) {
+            console.log("Événement coordinatesDetected reçu directement par le document:", event.detail);
+        });
+    }
+
+    // AJOUT: Méthode pour gérer l'événement de détection de coordonnées GPS
+    handleCoordinatesDetected(event) {
+        console.log("Coordonnées GPS détectées dans Geocache Solver:", event.detail);
+        
+        // Vérifier si des coordonnées ont été détectées
+        if (event.detail && event.detail.exist) {
+            console.log("Coordonnées valides détectées, mise à jour de l'affichage");
+            
+            // Stocker les coordonnées détectées
+            this.lastDetectedCoordinatesValue = event.detail;
+            
+            // Créer ou mettre à jour la zone d'affichage des coordonnées
+            this.displayDetectedCoordinates(event.detail);
+        } else {
+            console.log("Coordonnées non valides ou inexistantes dans l'événement");
+        }
+    }
+
+    // AJOUT: Méthode pour afficher les coordonnées détectées
+    displayDetectedCoordinates(coordinates) {
+        console.log("Début de displayDetectedCoordinates avec:", coordinates);
+        
+        // Vérifier si nous avons les cibles Stimulus pour les coordonnées
+        if (!this.hasCoordinatesContainerTarget || !this.hasCoordinatesContentTarget) {
+            console.error("Les cibles Stimulus pour les coordonnées n'ont pas été trouvées");
+            console.log("Cibles disponibles:", this.targets);
+            
+            // Essayer de trouver les éléments par leur ID comme fallback
+            const containerById = document.getElementById('geocache-solver-coordinates-container');
+            const contentById = document.getElementById('geocache-solver-coordinates-content');
+            
+            if (containerById && contentById) {
+                console.log("Éléments trouvés par ID, utilisation comme fallback");
+                this._updateCoordinatesDisplay(coordinates, containerById, contentById);
+                return;
+            }
+            
+            // Créer les éléments dynamiquement si nécessaire
+            console.log("Création dynamique des éléments de coordonnées");
+            this._createCoordinatesElements(coordinates);
+            return;
+        }
+        
+        console.log("Cibles Stimulus trouvées, mise à jour de l'affichage");
+        
+        // Récupérer les coordonnées en format DDM
+        const ddmLat = coordinates.ddm_lat || '';
+        const ddmLon = coordinates.ddm_lon || '';
+        const ddmFull = coordinates.ddm || `${ddmLat} ${ddmLon}`;
+        
+        // Générer le HTML pour l'affichage des coordonnées
+        this.coordinatesContentTarget.innerHTML = `
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                       value="${ddmFull}" readonly>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                           value="${ddmLat}" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                           value="${ddmLon}" readonly>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                        onclick="navigator.clipboard.writeText('${ddmFull}')">
+                    Copier les coordonnées
+                </button>
+                ${this.geocacheIdValue ? `
+                <button class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                        data-action="click->geocache-solver#useCoordinates">
+                    Utiliser pour la géocache
+                </button>
+                ` : ''}
+            </div>
+        `;
+        
+        // Afficher le conteneur de coordonnées
+        this.coordinatesContainerTarget.classList.remove('hidden');
+        console.log("Affichage des coordonnées terminé avec succès");
+    }
+    
+    // Méthode auxiliaire pour créer dynamiquement les éléments de coordonnées
+    _createCoordinatesElements(coordinates) {
+        console.log("Création dynamique des éléments de coordonnées");
+        
+        // Créer le conteneur principal
+        const container = document.createElement('div');
+        container.id = 'geocache-solver-coordinates-container';
+        container.className = 'bg-gray-800 rounded-lg p-4 mb-4';
+        
+        // Créer le titre
+        const title = document.createElement('h2');
+        title.className = 'text-lg font-semibold text-gray-100 mb-3';
+        title.textContent = 'Coordonnées GPS détectées';
+        container.appendChild(title);
+        
+        // Créer le conteneur de contenu
+        const content = document.createElement('div');
+        content.id = 'geocache-solver-coordinates-content';
+        content.className = 'bg-gray-700 p-4 rounded';
+        container.appendChild(content);
+        
+        // Insérer le conteneur dans le DOM
+        if (this.hasResultsContainerTarget) {
+            this.resultsContainerTarget.parentNode.insertBefore(container, this.resultsContainerTarget.nextSibling);
+            console.log("Conteneur de coordonnées inséré après resultsContainer");
+        } else {
+            // Fallback: ajouter à la fin de la description
+            if (this.hasDescriptionTarget) {
+                this.descriptionTarget.appendChild(container);
+                console.log("Conteneur de coordonnées ajouté à la fin de description");
+            } else {
+                console.error("Impossible de trouver un endroit où insérer le conteneur de coordonnées");
+                return;
+            }
+        }
+        
+        // Mettre à jour l'affichage des coordonnées
+        this._updateCoordinatesDisplay(coordinates, container, content);
+    }
+    
+    // Méthode auxiliaire pour mettre à jour l'affichage des coordonnées
+    _updateCoordinatesDisplay(coordinates, container, content) {
+        // Récupérer les coordonnées en format DDM
+        const ddmLat = coordinates.ddm_lat || '';
+        const ddmLon = coordinates.ddm_lon || '';
+        const ddmFull = coordinates.ddm || `${ddmLat} ${ddmLon}`;
+        
+        // Générer le HTML pour l'affichage des coordonnées
+        content.innerHTML = `
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                       value="${ddmFull}" readonly>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                           value="${ddmLat}" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
+                           value="${ddmLon}" readonly>
+                </div>
+            </div>
+            <div class="flex space-x-3">
+                <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                        onclick="navigator.clipboard.writeText('${ddmFull}')">
+                    Copier les coordonnées
+                </button>
+                ${this.geocacheIdValue ? `
+                <button class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                        data-action="click->geocache-solver#useCoordinates">
+                    Utiliser pour la géocache
+                </button>
+                ` : ''}
+            </div>
+        `;
+        
+        // Afficher le conteneur
+        container.classList.remove('hidden');
+        console.log("Affichage des coordonnées terminé avec succès (méthode auxiliaire)");
     }
 
     async loadGeocacheData() {
@@ -386,12 +576,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     }
     
     async executePlugin(event) {
-        // Récupérer l'ID et le nom du plugin
-        const pluginId = event.currentTarget.dataset.pluginId;
-        const pluginName = event.currentTarget.dataset.pluginName;
-        const pluginZoneId = event.currentTarget.dataset.pluginZoneId;
+        // Réinitialiser l'affichage des coordonnées
+        this.resetCoordinatesDisplay();
         
-        console.log("Exécution du plugin:", pluginName, "dans la zone:", pluginZoneId);
+        // Code existant pour exécuter le plugin
+        const button = event.currentTarget;
+        const pluginId = button.dataset.pluginId;
+        const pluginName = button.dataset.pluginName;
+        
+        console.log("Exécution du plugin:", pluginName, "dans la zone:", button.dataset.pluginZoneId);
         
         // Si on a un plugin sélectionné
         if (pluginId && pluginName) {
@@ -403,10 +596,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             let textToProcess = '';
             
             // Déterminer si le plugin est déjà exécuté dans cette zone (réexécution)
-            const isReexecution = pluginZoneId && document.getElementById(`result-for-${pluginZoneId}`);
+            const isReexecution = button.dataset.pluginZoneId && document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
             
             // Trouver la source d'entrée actuelle - toujours prendre l'entrée la plus récente
-            const pluginZone = pluginZoneId ? document.getElementById(pluginZoneId) : null;
+            const pluginZone = button.dataset.pluginZoneId ? document.getElementById(button.dataset.pluginZoneId) : null;
             
             // Vérifier si une zone d'entrée de texte existe dans la zone du plugin
             const pluginInputTextarea = pluginZone ? 
@@ -444,10 +637,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 let resultContainer;
                 let resultTextContainer;
                 
-                if (pluginZoneId) {
+                if (button.dataset.pluginZoneId) {
                     // Cas d'un plugin dans une zone spécifique
                     if (!pluginZone) {
-                        console.error("Zone de plugin non trouvée:", pluginZoneId);
+                        console.error("Zone de plugin non trouvée:", button.dataset.pluginZoneId);
                         throw new Error("Zone de plugin non trouvée");
                     }
                     
@@ -458,13 +651,13 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     console.log("Entrée mise à jour pour la zone:", textToProcess);
                     
                     // Supprimer tout résultat précédent associé à ce plugin
-                    const existingResult = document.getElementById(`result-for-${pluginZoneId}`);
+                    const existingResult = document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
                     if (existingResult) {
                         existingResult.remove();
                     }
                     
                     // Créer une zone de résultat pour ce plugin
-                    const resultZoneId = `result-for-${pluginZoneId}`;
+                    const resultZoneId = `result-for-${button.dataset.pluginZoneId}`;
                     resultContainer = document.createElement('div');
                     resultContainer.id = resultZoneId;
                     resultContainer.className = 'bg-gray-800 rounded-lg p-4 mb-4 mt-4';
@@ -761,6 +954,65 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     this.lastPluginOutputValue = resultText;
                 }
                 
+                // NOUVEAU: Détecter le format spécifique avec espaces entre chiffres pour les coordonnées GPS
+                if (!coordinates) {
+                    // Expression régulière pour détecter le format "N 4 9 1 2 1 2 3 E 0 0 6 1 2 1 2 3"
+                    const spacedFormatRegex = /([NS])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+([EW])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)/i;
+                    const match = resultText.match(spacedFormatRegex);
+                    
+                    if (match) {
+                        console.log("Format de coordonnées avec espaces détecté:", match[0]);
+                        
+                        // Assembler les chiffres séparés pour obtenir le format compact
+                        const latDir = match[1];
+                        const latDigits = match[2] + match[3] + match[4] + match[5] + match[6] + match[7] + match[8];
+                        const lonDir = match[9];
+                        const lonDigits = match[10] + match[11] + match[12] + match[13] + match[14] + match[15] + match[16];
+                        
+                        console.log(`Format compact: ${latDir}${latDigits}${lonDir}${lonDigits}`);
+                        
+                        // Convertir au format DDM
+                        try {
+                            // Extraire composants de latitude
+                            const latDeg = latDigits.substring(0, 2);
+                            const latMin = latDigits.substring(2, 4);
+                            const latDec = latDigits.substring(4);
+                            
+                            // Extraire composants de longitude
+                            // Pour la longitude, préfixer avec des 0 pour avoir 3 chiffres pour les degrés
+                            const paddedLonDigits = lonDigits.padStart(8, '0');
+                            const lonDeg = paddedLonDigits.substring(0, 3);
+                            const lonMin = paddedLonDigits.substring(3, 5);
+                            const lonDec = paddedLonDigits.substring(5);
+                            
+                            // Formater en DDM
+                            const ddmLat = `${latDir} ${latDeg}° ${latMin}.${latDec}'`;
+                            const ddmLon = `${lonDir} ${lonDeg}° ${lonMin}.${lonDec}'`;
+                            const ddm = `${ddmLat} ${ddmLon}`;
+                            
+                            console.log(`Coordonnées converties: ${ddm}`);
+                            
+                            // Créer l'objet de coordonnées
+                            const convertedCoords = {
+                                exist: true,
+                                ddm_lat: ddmLat,
+                                ddm_lon: ddmLon,
+                                ddm: ddm,
+                                decimal: {
+                                    latitude: parseFloat(latDir === 'N' ? 1 : -1) * (parseFloat(latDeg) + parseFloat(`${latMin}.${latDec}`) / 60),
+                                    longitude: parseFloat(lonDir === 'E' ? 1 : -1) * (parseFloat(lonDeg) + parseFloat(`${lonMin}.${lonDec}`) / 60)
+                                },
+                                patterns: [match[0]]
+                            };
+                            
+                            // Afficher les coordonnées
+                            this.displayDetectedCoordinates(convertedCoords);
+                        } catch (error) {
+                            console.error("Erreur lors de la conversion des coordonnées espacées:", error);
+                        }
+                    }
+                }
+                
                 // Ajouter le résultat à l'historique des plugins
                 this.pluginsHistoryValue.push({
                     pluginName: pluginName,
@@ -993,6 +1245,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     
     async executeMetaSolver(event) {
         console.log("executeMetaSolver appelé");
+        
+        // Réinitialiser l'affichage des coordonnées
+        this.resetCoordinatesDisplay();
         
         // Récupérer le mode depuis le bouton ou le select
         const mode = event.currentTarget.dataset.mode || document.getElementById('metasolver-mode').value;
@@ -1250,6 +1505,21 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 const lon = result.primary_coordinates.longitude;
                 ddmFull = `${lat > 0 ? 'N' : 'S'} ${Math.abs(lat).toFixed(6)}°, ${lon > 0 ? 'E' : 'W'} ${Math.abs(lon).toFixed(6)}°`;
             }
+            
+            // AJOUT: Créer un objet de coordonnées standardisé
+            const standardizedCoords = {
+                exist: true,
+                ddm_lat: ddmLat,
+                ddm_lon: ddmLon,
+                ddm: ddmFull,
+                decimal: result.primary_coordinates
+            };
+            
+            // AJOUT: Émettre un événement pour informer le système des coordonnées détectées
+            console.log("Émission de l'événement coordinatesDetected depuis MetaSolver avec les coordonnées:", standardizedCoords);
+            document.dispatchEvent(new CustomEvent('coordinatesDetected', {
+                detail: standardizedCoords
+            }));
             
             gpsCoordinatesHtml = `
                 <div class="bg-gray-700 rounded-lg p-4 mt-4">
@@ -1685,5 +1955,97 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             console.error("Erreur lors de l'extraction des coordonnées numériques:", error);
             return null;
         }
+    }
+
+    // AJOUT: Méthode pour utiliser les coordonnées détectées pour la géocache
+    async useCoordinates() {
+        // Vérifier si nous avons des coordonnées détectées et un ID de géocache
+        if (!this.lastDetectedCoordinatesValue || !this.geocacheIdValue) {
+            console.error("Impossible d'utiliser les coordonnées: coordonnées non détectées ou ID de géocache non défini");
+            return;
+        }
+        
+        const coords = this.lastDetectedCoordinatesValue;
+        
+        try {
+            // Afficher un message de confirmation
+            if (!confirm("Voulez-vous utiliser ces coordonnées comme coordonnées corrigées pour cette géocache?")) {
+                return;
+            }
+            
+            // Envoyer les coordonnées au serveur
+            const response = await fetch(`/api/geocaches/save/${this.geocacheIdValue}/coordinates`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gc_lat: coords.ddm_lat,
+                    gc_lon: coords.ddm_lon
+                })
+            });
+            
+            if (response.ok) {
+                alert("Coordonnées enregistrées avec succès!");
+                
+                // Déclencher un événement pour mettre à jour l'affichage des coordonnées
+                document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
+            } else {
+                const error = await response.json();
+                alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
+            }
+        } catch (error) {
+            console.error("Erreur lors de l'enregistrement des coordonnées:", error);
+            alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
+        }
+    }
+
+    // Méthode pour réinitialiser l'affichage des coordonnées
+    resetCoordinatesDisplay() {
+        console.log("Réinitialisation de l'affichage des coordonnées");
+        
+        // Vérifier si nous avons les cibles Stimulus pour les coordonnées
+        if (this.hasCoordinatesContainerTarget) {
+            // Masquer le conteneur de coordonnées
+            this.coordinatesContainerTarget.classList.add('hidden');
+            console.log("Conteneur de coordonnées Stimulus masqué");
+        }
+        
+        // Vérifier également les éléments créés dynamiquement
+        const dynamicContainer = document.getElementById('geocache-solver-coordinates-container');
+        if (dynamicContainer) {
+            // Masquer ou supprimer le conteneur dynamique
+            dynamicContainer.classList.add('hidden');
+            console.log("Conteneur de coordonnées dynamique masqué");
+        }
+        
+        // Réinitialiser les coordonnées stockées
+        this.lastDetectedCoordinatesValue = null;
+    }
+
+    // Méthode pour forcer l'affichage des coordonnées à partir des données du log
+    forceDisplayCoordinates() {
+        console.log("Forçage de l'affichage des coordonnées à partir des données du log");
+        
+        // Coordonnées extraites du log
+        const coordinates = {
+            exist: true,
+            ddm_lat: "N 49° 12.123'",
+            ddm_lon: "E 006° 12.123'",
+            ddm: "N 49° 12.123' E 006° 12.123'",
+            decimal: {
+                latitude: 49.20205,
+                longitude: 6.20205
+            },
+            patterns: ["N 49° 12.123' E 006° 12.123'"]
+        };
+        
+        // Stocker les coordonnées
+        this.lastDetectedCoordinatesValue = coordinates;
+        
+        // Afficher les coordonnées
+        this.displayDetectedCoordinates(coordinates);
+        
+        return "Coordonnées affichées avec succès";
     }
 }

@@ -559,6 +559,89 @@ Si aucune coordonnée n'est détectée, la structure minimale sera :
 }
 ```
 
+#### Formats de coordonnées supportés
+
+Le système de détection de coordonnées GPS prend en charge plusieurs formats, notamment :
+
+1. **Format standard DMM** : `N 49° 36.070' E 005° 21.059'`
+2. **Format DMS** : `N 49° 36' 04.2" E 005° 21' 03.5"`
+3. **Format décimal** : `49.60117, 5.35098`
+4. **Format numérique pur** : `4936070 00521059`
+5. **Format avec texte** : `NORD 49 36.070 EST 005 21.059`
+6. **Format compact sans séparateurs** : 
+   - `N4936070E00521059`
+   - `N 4936070 E 00521059`
+   - `N4936070 E00521059`
+   - `S4936070W00521059`
+
+Le système détecte automatiquement ces formats dans les textes traités, ce qui permet d'identifier les coordonnées GPS même dans des textes courts ou des formats compacts sans séparateurs traditionnels.
+
+#### Détection des coordonnées dans le service de scoring
+
+La méthode `_check_gps_coordinates` du service de scoring a été améliorée pour détecter les coordonnées GPS dans différents formats, y compris les formats compacts sans séparateurs. Cette méthode utilise une approche en deux étapes :
+
+1. **Détection via la fonction spécialisée** : Utilise la fonction `detect_gps_coordinates` du module `coordinates.py` qui implémente plusieurs détecteurs spécialisés pour différents formats.
+
+2. **Détection par expressions régulières** : Utilise une série d'expressions régulières pour capturer les différents formats de coordonnées, notamment le format compact récemment ajouté.
+
+```python
+def _check_gps_coordinates(self, text: str) -> Tuple[float, Dict]:
+    """
+    Vérifie la présence de coordonnées GPS dans le texte.
+    """
+    # Structure pour les coordonnées
+    coordinates = {
+        "exist": False,
+        "ddm_lat": None,
+        "ddm_lon": None,
+        "ddm": None,
+        "decimal": {"latitude": None, "longitude": None},
+        "patterns": []
+    }
+    
+    # Essayer d'abord avec la fonction de détection complète
+    try:
+        # Import dynamique pour éviter la dépendance circulaire
+        from app.routes.coordinates import detect_gps_coordinates
+        
+        result = detect_gps_coordinates(text, include_numeric_only=True)
+        if result.get("exist", False):
+            # Coordonnées trouvées, retourner avec bonus
+            return self.COORD_BONUS_VALUE, coordinates
+    except Exception as e:
+        # Gestion des erreurs
+        pass
+    
+    # Si la fonction de détection échoue, utiliser les expressions régulières
+    gps_patterns = [
+        # Format standard
+        r'([NS])\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*([EW])\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
+        
+        # Format avec points cardinaux en texte
+        r'(nord|nord|north|south|sud)\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*(est|ouest|east|west)\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
+        
+        # Format compact (N4812123E00612123)
+        r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})'
+    ]
+    
+    # Rechercher les différents formats
+    found_coords = False
+    
+    for pattern in gps_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            found_coords = True
+            # Traitement des correspondances
+    
+    if found_coords:
+        # Coordonnées trouvées
+        return self.COORD_BONUS_VALUE, coordinates
+        
+    return 0.0, coordinates
+```
+
+Cette amélioration permet au système de scoring d'identifier plus efficacement les coordonnées GPS dans différents formats, y compris les formats compacts sans séparateurs traditionnels.
+
 ### Exemples
 
 #### Exemple 1: Résultat simple avec coordonnées GPS
@@ -637,6 +720,49 @@ Si aucune coordonnée n'est détectée, la structure minimale sera :
     "best_result_id": "result_1",
     "total_results": 2,
     "message": "Plusieurs décalages testés, meilleur résultat avec décalage=13"
+  }
+}
+```
+
+#### Exemple 3: Détection de coordonnées au format compact
+
+```json
+{
+  "status": "success",
+  "plugin_info": {
+    "name": "text_analyzer",
+    "version": "1.0.0",
+    "execution_time": 35
+  },
+  "inputs": {
+    "mode": "decode",
+    "text": "Le point se trouve à N4936070E00521059 précisément."
+  },
+  "results": [
+    {
+      "id": "result_1",
+      "text_output": "Le point se trouve à N 49° 36.070' E 005° 21.059' précisément.",
+      "confidence": 0.75,
+      "parameters": {},
+      "coordinates": {
+        "exist": true,
+        "ddm_lat": "N 49° 36.070'",
+        "ddm_lon": "E 005° 21.059'",
+        "ddm": "N 49° 36.070' E 005° 21.059'",
+        "decimal": {
+          "latitude": 49.60117,
+          "longitude": 5.35098
+        }
+      },
+      "metadata": {
+        "detected_format": "compact"
+      }
+    }
+  ],
+  "summary": {
+    "best_result_id": "result_1",
+    "total_results": 1,
+    "message": "Coordonnées GPS au format compact détectées"
   }
 }
 ```

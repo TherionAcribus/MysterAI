@@ -176,12 +176,30 @@
                     </div>
                 </div>
                 
+                <!-- Section pour les coordonnées GPS détectées (initialement masquée) -->
+                <div data-geocache-solver-target="coordinatesContainer" class="hidden bg-gray-800 rounded-lg p-4 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-3">Coordonnées GPS détectées</h2>
+                    <div data-geocache-solver-target="coordinatesContent" class="bg-gray-700 p-4 rounded">
+                        <!-- Le contenu sera généré dynamiquement par le JS -->
+                    </div>
+                </div>
+                
                 <!-- Historique des plugins -->
                 <div class="bg-gray-800 rounded-lg p-4 mb-4">
                     <h2 class="text-lg font-semibold text-gray-100 mb-3">Historique des plugins</h2>
                     <div data-geocache-solver-target="pluginsResults" class="space-y-3">
                         <!-- Sera rempli dynamiquement avec l'historique des plugins -->
                     </div>
+                </div>
+                
+                <!-- Bouton de débogage pour forcer l'affichage des coordonnées (temporaire) -->
+                <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                    <h2 class="text-lg font-semibold text-gray-100 mb-3">Débogage</h2>
+                    <button 
+                        data-action="click->geocache-solver#forceDisplayCoordinates"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors">
+                        Forcer l'affichage des coordonnées
+                    </button>
                 </div>
             </div>
 
