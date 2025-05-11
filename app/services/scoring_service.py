@@ -179,6 +179,50 @@ class ScoringService:
         # Tracer le temps d'exécution
         start_time = time.time()
         
+        # Traitement spécial pour les textes très courts (< MIN_TEXT_LENGTH)
+        # qui pourraient être des coordonnées GPS
+        if len(text) < self.MIN_TEXT_LENGTH:
+            logger.debug(f"Texte très court ({len(text)} caractères), vérification directe des coordonnées")
+            
+            # Vérifier directement si c'est une coordonnée GPS
+            coord_bonus, coordinates = self._check_gps_coordinates(text)
+            
+            if coordinates["exist"]:
+                # Si des coordonnées sont détectées, retourner un score élevé
+                result = {
+                    "score": self.COORD_BONUS_VALUE,
+                    "confidence_level": "high" if self.COORD_BONUS_VALUE >= self.CONFIDENCE_THRESHOLD_HIGH else "medium",
+                    "candidates": [{
+                        "text": text,
+                        "score": self.COORD_BONUS_VALUE,
+                        "lexical_score": 0.0,
+                        "gps_bonus": self.COORD_BONUS_VALUE,
+                        "language": "unknown",
+                        "words_found": [],
+                        "coordinates": coordinates,
+                        "zipf_info": {
+                            "average": 0.0,
+                            "max": 0.0,
+                            "min": 0.0,
+                            "word_frequencies": {}
+                        }
+                    }],
+                    "coordinates": coordinates,
+                    "language": "unknown",
+                    "words_found": [],
+                    "zipf_info": {
+                        "average": 0.0,
+                        "max": 0.0,
+                        "min": 0.0,
+                        "word_frequencies": {}
+                    },
+                    "status": "success",
+                    "execution_time_ms": round((time.time() - start_time) * 1000, 2)
+                }
+                
+                logger.info(f"Coordonnées GPS détectées dans texte court, score={result['score']}")
+                return result
+        
         # 1. Pré-filtrage
         prefilter_result = self._prefilter_text(text)
         if not prefilter_result["passed"]:
@@ -294,13 +338,31 @@ class ScoringService:
         Returns:
             Dictionnaire avec le résultat du filtrage et la raison éventuelle de rejet
         """
-        # Pour le moment, implémentation simplifiée
-        
-        # 1. Vérifier la longueur minimale (sauf si contient des coordonnées GPS)
-        if len(text) < self.MIN_TEXT_LENGTH and not re.search(self.GPS_REGEX, text):
+        # Pour les textes courts, vérifier s'il s'agit de coordonnées GPS (y compris format numérique pur)
+        if len(text) < self.MIN_TEXT_LENGTH:
+            logger.debug(f"Texte court ({len(text)} caractères < {self.MIN_TEXT_LENGTH}), recherche de coordonnées GPS")
+            
+            # Vérifier d'abord avec l'expression régulière simple
+            if re.search(self.GPS_REGEX, text):
+                logger.debug("Coordonnées GPS détectées avec regex simple")
+                return {"passed": True}
+            
+            # Sinon, essayer avec la fonction de détection complète, y compris format numérique
+            try:
+                # Import dynamique pour éviter la dépendance circulaire
+                from app.routes.coordinates import detect_gps_coordinates
+                
+                result = detect_gps_coordinates(text, include_numeric_only=True)
+                if result.get("exist", False):
+                    logger.info(f"Coordonnées GPS détectées dans texte court: {result.get('ddm')}")
+                    return {"passed": True}
+            except Exception as e:
+                logger.warning(f"Erreur lors de la détection de coordonnées: {e}")
+            
+            # Si aucune coordonnée n'est détectée, rejeter le texte car trop court
             return {
                 "passed": False,
-                "reason": f"Texte trop court ({len(text)} caractères < {self.MIN_TEXT_LENGTH})"
+                "reason": f"Texte trop court ({len(text)} caractères < {self.MIN_TEXT_LENGTH}) et pas de coordonnées GPS détectées"
             }
         
         # 2. Vérifier la proportion de caractères non-alphabétiques
@@ -310,9 +372,21 @@ class ScoringService:
             if non_alpha_ratio > self.NON_ALPHA_THRESHOLD:
                 # Exception pour les textes qui semblent avoir un format de coordonnées
                 if not re.search(self.GPS_REGEX, text):
+                    # Essayer avec la fonction de détection complète avant de rejeter
+                    try:
+                        # Import dynamique pour éviter la dépendance circulaire
+                        from app.routes.coordinates import detect_gps_coordinates
+                        
+                        result = detect_gps_coordinates(text, include_numeric_only=True)
+                        if result.get("exist", False):
+                            logger.info(f"Coordonnées GPS détectées malgré ratio non-alpha élevé: {result.get('ddm')}")
+                            return {"passed": True}
+                    except Exception as e:
+                        logger.warning(f"Erreur lors de la détection de coordonnées: {e}")
+                    
                     return {
                         "passed": False,
-                        "reason": f"Trop de caractères non-alphabétiques ({non_alpha_ratio:.2f} > {self.NON_ALPHA_THRESHOLD})"
+                        "reason": f"Trop de caractères non-alphabétiques ({non_alpha_ratio:.2f} > {self.NON_ALPHA_THRESHOLD}) et pas de coordonnées GPS détectées"
                     }
         
         # 3. Vérifier le ratio voyelles/consonnes (à implémenter)
@@ -611,6 +685,39 @@ class ScoringService:
         Returns:
             Un tuple contenant le bonus de coordonnées et les détails des coordonnées trouvées
         """
+        # Structure pour les coordonnées
+        coordinates = {
+            "exist": False,
+            "ddm_lat": None,
+            "ddm_lon": None,
+            "ddm": None,
+            "decimal": {"latitude": None, "longitude": None},
+            "patterns": []
+        }
+        
+        # Essayer d'abord avec la fonction de détection complète
+        try:
+            # Import dynamique pour éviter la dépendance circulaire
+            from app.routes.coordinates import detect_gps_coordinates
+            
+            result = detect_gps_coordinates(text, include_numeric_only=True)
+            if result.get("exist", False):
+                logger.debug(f"Coordonnées GPS détectées via fonction: {result.get('ddm')}")
+                
+                # Mettre à jour la structure de coordonnées
+                coordinates["exist"] = True
+                coordinates["ddm_lat"] = result.get("ddm_lat")
+                coordinates["ddm_lon"] = result.get("ddm_lon")
+                coordinates["ddm"] = result.get("ddm")
+                if "patterns" not in coordinates:
+                    coordinates["patterns"] = []
+                coordinates["patterns"].append(result.get("ddm", "Format détecté par fonction"))
+                
+                return self.COORD_BONUS_VALUE, coordinates
+        except Exception as e:
+            logger.warning(f"Erreur lors de la détection de coordonnées: {e}")
+        
+        # Si la fonction de détection échoue, utiliser l'approche par expressions régulières
         # Expression régulière améliorée pour les coordonnées GPS
         # Cette version est plus tolérante aux variations de format
         gps_patterns = [
@@ -624,18 +731,11 @@ class ScoringService:
             r'([NS])(\d{1,2})[°](\d{1,2}\.\d+)([EW])(\d{1,3})[°](\d{1,2}\.\d+)',
             
             # Format décimal
-            r'([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)'
+            r'([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)',
+            
+            # Format compact (N4812123E00612123)
+            r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})'
         ]
-        
-        # Structure pour les coordonnées
-        coordinates = {
-            "exist": False,
-            "ddm_lat": None,
-            "ddm_lon": None,
-            "ddm": None,
-            "decimal": {"latitude": None, "longitude": None},
-            "patterns": []
-        }
         
         # Rechercher les différents formats de coordonnées
         found_coords = False

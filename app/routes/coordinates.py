@@ -1115,6 +1115,67 @@ def _detect_numeric_only_coordinates(text: str, origin_coords: Optional[Dict[str
     return None
 
 # ------------------------------------------------------------------------------
+# Détection du format compact sans séparateurs (ex: "N4812123E00612123")
+# ------------------------------------------------------------------------------
+
+def _detect_compact_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format compact sans séparateurs entre les composants, par exemple :
+      - "N4812123E00612123"
+      - "N 4812123 E 00612123"
+      - "N4812123 E00612123"
+      - "S4812123W00612123"
+    
+    Ce format est très compact et ne contient pas de symboles de degrés ni de minutes.
+    """
+    print(f"[DEBUG] _detect_compact_coordinates: Analyse du texte: '{text[:100]}...' (tronqué)")
+    
+    # Pattern pour détecter le format compact
+    # Capture: direction latitude, 7 chiffres, direction longitude, 6-8 chiffres
+    # Accepte des espaces optionnels entre les composants
+    compact_regex = r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})'
+    
+    print(f"[DEBUG] _detect_compact_coordinates: Regex utilisée: {compact_regex}")
+    
+    match = re.search(compact_regex, text, re.IGNORECASE)
+    if match:
+        print(f"[DEBUG] _detect_compact_coordinates: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_digits, lon_dir, lon_digits = match.groups()
+        
+        print(f"[DEBUG] _detect_compact_coordinates: Latitude: {lat_dir}{lat_digits}, Longitude: {lon_dir}{lon_digits}")
+        
+        try:
+            # Pour la latitude
+            lat_deg = lat_digits[0:2]
+            lat_min = lat_digits[2:4]
+            lat_dec = lat_digits[4:7]
+            
+            # Pour la longitude, compléter avec des zéros en tête si nécessaire
+            padded_lon_digits = lon_digits.zfill(8)
+            lon_deg = padded_lon_digits[0:3]
+            lon_min = padded_lon_digits[3:5]
+            lon_dec = padded_lon_digits[5:8]
+            
+            # Formatage des coordonnées
+            ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}.{lat_dec}'"
+            ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}.{lon_dec}'"
+            
+            print(f"[DEBUG] _detect_compact_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+            
+            return {
+                "exist": True,
+                "ddm_lat": ddm_lat,
+                "ddm_lon": ddm_lon,
+                "ddm": f"{ddm_lat} {ddm_lon}"
+            }
+        except Exception as e:
+            print(f"[ERROR] _detect_compact_coordinates: Erreur lors du formatage: {e}")
+            traceback.print_exc()
+    
+    print("[DEBUG] _detect_compact_coordinates: Aucun match trouvé ou erreur de conversion")
+    return None
+
+# ------------------------------------------------------------------------------
 # Fonction principale de détection multi-format
 # ------------------------------------------------------------------------------
 
@@ -1138,6 +1199,7 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
     print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}, origin_coords={origin_coords}")
     
     detection_functions = [
+        _detect_compact_coordinates,  # Format compact sans séparateurs (ajouté en premier car très spécifique)
         _detect_roman_numerals_coordinates,  # Format avec chiffres romains
         _detect_dms_coordinates,      # Format DMS (degrés, minutes, secondes)
         _detect_nord_est_variations,  # Format NORD/EST avec variations
