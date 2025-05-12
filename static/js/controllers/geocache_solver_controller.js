@@ -1,23 +1,11 @@
 // Geocache Solver Controller
 window.GeocacheSolverController = class extends Stimulus.Controller {
     static targets = [
-        "loading", 
-        "description", 
-        "descriptionText", 
-        "error", 
-        "pluginsPanel", 
-        "togglePluginsButton",
-        "togglePluginsText",
-        "pluginList",
-        "pluginResult",
-        "pluginResultText",
-        "pluginInputText",
-        "pluginsResults",
-        "resultsContainer",
-        "metaSolverPanel",
-        "toggleMetaSolverButton",
-        "coordinatesContainer",
-        "coordinatesContent"
+        "loading", "description", "descriptionText", "error", 
+        "pluginsPanel", "togglePluginsButton", "togglePluginsText",
+        "pluginList", "pluginResult", "pluginResultText", "pluginInputText",
+        "pluginsResults", "resultsContainer", "metaSolverPanel",
+        "toggleMetaSolverButton"
     ]
     
     static values = {
@@ -65,7 +53,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
         });
         
-        // AJOUT: Écouter les changements dans le champ de description
+        // Écouter les changements dans le champ de description
         if (this.hasDescriptionTextTarget) {
             this.descriptionTextTarget.addEventListener('input', (event) => {
                 console.log("Mise à jour du champ de description détectée:", event.target.value);
@@ -74,193 +62,41 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             });
         }
 
-        // AJOUT: Écouter les événements de détection de coordonnées GPS
+        // Écouter les événements de détection de coordonnées GPS
         console.log("Configuration de l'écouteur d'événements pour coordinatesDetected");
         document.addEventListener('coordinatesDetected', this.handleCoordinatesDetected.bind(this));
         
-        // AJOUT: Vérification immédiate des cibles Stimulus
+        // Vérification immédiate des cibles Stimulus
         console.log("Vérification des cibles Stimulus pour les coordonnées:", {
             hasCoordinatesContainerTarget: this.hasCoordinatesContainerTarget,
             hasCoordinatesContentTarget: this.hasCoordinatesContentTarget
         });
         
-        // AJOUT: Écouter l'événement directement sur le document
+        // Écouter l'événement directement sur le document
         document.addEventListener('coordinatesDetected', function(event) {
             console.log("Événement coordinatesDetected reçu directement par le document:", event.detail);
         });
     }
 
-    // AJOUT: Méthode pour gérer l'événement de détection de coordonnées GPS
+    // Méthode pour gérer l'événement de détection de coordonnées GPS
     handleCoordinatesDetected(event) {
         console.log("Coordonnées GPS détectées dans Geocache Solver:", event.detail);
         
         // Vérifier si des coordonnées ont été détectées
         if (event.detail && event.detail.exist) {
-            console.log("Coordonnées valides détectées, mise à jour de l'affichage");
+            console.log("Coordonnées valides détectées, stockage uniquement");
             
-            // Stocker les coordonnées détectées
+            // Stocker les coordonnées détectées sans mise à jour de l'affichage
             this.lastDetectedCoordinatesValue = event.detail;
-            
-            // Créer ou mettre à jour la zone d'affichage des coordonnées
-            this.displayDetectedCoordinates(event.detail);
         } else {
             console.log("Coordonnées non valides ou inexistantes dans l'événement");
         }
     }
 
-    // AJOUT: Méthode pour afficher les coordonnées détectées
+    // Méthode simplifiée pour displayDetectedCoordinates (garde l'interface compatible)
     displayDetectedCoordinates(coordinates) {
-        console.log("Début de displayDetectedCoordinates avec:", coordinates);
-        
-        // Vérifier si nous avons les cibles Stimulus pour les coordonnées
-        if (!this.hasCoordinatesContainerTarget || !this.hasCoordinatesContentTarget) {
-            console.error("Les cibles Stimulus pour les coordonnées n'ont pas été trouvées");
-            console.log("Cibles disponibles:", this.targets);
-            
-            // Essayer de trouver les éléments par leur ID comme fallback
-            const containerById = document.getElementById('geocache-solver-coordinates-container');
-            const contentById = document.getElementById('geocache-solver-coordinates-content');
-            
-            if (containerById && contentById) {
-                console.log("Éléments trouvés par ID, utilisation comme fallback");
-                this._updateCoordinatesDisplay(coordinates, containerById, contentById);
-                return;
-            }
-            
-            // Créer les éléments dynamiquement si nécessaire
-            console.log("Création dynamique des éléments de coordonnées");
-            this._createCoordinatesElements(coordinates);
-            return;
-        }
-        
-        console.log("Cibles Stimulus trouvées, mise à jour de l'affichage");
-        
-        // Récupérer les coordonnées en format DDM
-        const ddmLat = coordinates.ddm_lat || '';
-        const ddmLon = coordinates.ddm_lon || '';
-        const ddmFull = coordinates.ddm || `${ddmLat} ${ddmLon}`;
-        
-        // Générer le HTML pour l'affichage des coordonnées
-        this.coordinatesContentTarget.innerHTML = `
-            <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                       value="${ddmFull}" readonly>
-            </div>
-            <div class="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                           value="${ddmLat}" readonly>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                           value="${ddmLon}" readonly>
-                </div>
-            </div>
-            <div class="flex space-x-3">
-                <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                        onclick="navigator.clipboard.writeText('${ddmFull}')">
-                    Copier les coordonnées
-                </button>
-                ${this.geocacheIdValue ? `
-                <button class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                        data-action="click->geocache-solver#useCoordinates">
-                    Utiliser pour la géocache
-                </button>
-                ` : ''}
-            </div>
-        `;
-        
-        // Afficher le conteneur de coordonnées
-        this.coordinatesContainerTarget.classList.remove('hidden');
-        console.log("Affichage des coordonnées terminé avec succès");
-    }
-    
-    // Méthode auxiliaire pour créer dynamiquement les éléments de coordonnées
-    _createCoordinatesElements(coordinates) {
-        console.log("Création dynamique des éléments de coordonnées");
-        
-        // Créer le conteneur principal
-        const container = document.createElement('div');
-        container.id = 'geocache-solver-coordinates-container';
-        container.className = 'bg-gray-800 rounded-lg p-4 mb-4';
-        
-        // Créer le titre
-        const title = document.createElement('h2');
-        title.className = 'text-lg font-semibold text-gray-100 mb-3';
-        title.textContent = 'Coordonnées GPS détectées';
-        container.appendChild(title);
-        
-        // Créer le conteneur de contenu
-        const content = document.createElement('div');
-        content.id = 'geocache-solver-coordinates-content';
-        content.className = 'bg-gray-700 p-4 rounded';
-        container.appendChild(content);
-        
-        // Insérer le conteneur dans le DOM
-        if (this.hasResultsContainerTarget) {
-            this.resultsContainerTarget.parentNode.insertBefore(container, this.resultsContainerTarget.nextSibling);
-            console.log("Conteneur de coordonnées inséré après resultsContainer");
-        } else {
-            // Fallback: ajouter à la fin de la description
-            if (this.hasDescriptionTarget) {
-                this.descriptionTarget.appendChild(container);
-                console.log("Conteneur de coordonnées ajouté à la fin de description");
-            } else {
-                console.error("Impossible de trouver un endroit où insérer le conteneur de coordonnées");
-                return;
-            }
-        }
-        
-        // Mettre à jour l'affichage des coordonnées
-        this._updateCoordinatesDisplay(coordinates, container, content);
-    }
-    
-    // Méthode auxiliaire pour mettre à jour l'affichage des coordonnées
-    _updateCoordinatesDisplay(coordinates, container, content) {
-        // Récupérer les coordonnées en format DDM
-        const ddmLat = coordinates.ddm_lat || '';
-        const ddmLon = coordinates.ddm_lon || '';
-        const ddmFull = coordinates.ddm || `${ddmLat} ${ddmLon}`;
-        
-        // Générer le HTML pour l'affichage des coordonnées
-        content.innerHTML = `
-            <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                       value="${ddmFull}" readonly>
-            </div>
-            <div class="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                           value="${ddmLat}" readonly>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                    <input type="text" class="w-full bg-gray-700 text-green-300 border border-gray-600 rounded p-2 font-mono" 
-                           value="${ddmLon}" readonly>
-                </div>
-            </div>
-            <div class="flex space-x-3">
-                <button class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                        onclick="navigator.clipboard.writeText('${ddmFull}')">
-                    Copier les coordonnées
-                </button>
-                ${this.geocacheIdValue ? `
-                <button class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                        data-action="click->geocache-solver#useCoordinates">
-                    Utiliser pour la géocache
-                </button>
-                ` : ''}
-            </div>
-        `;
-        
-        // Afficher le conteneur
-        container.classList.remove('hidden');
-        console.log("Affichage des coordonnées terminé avec succès (méthode auxiliaire)");
+        console.log("Méthode displayDetectedCoordinates désactivée - fonctionalité intégrée directement dans l'affichage des résultats");
+        // Ne fait rien - cette méthode est conservée pour compatibilité
     }
 
     async loadGeocacheData() {
@@ -345,6 +181,228 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         }
     }
     
+    toggleMetaSolverPanel() {
+        console.log("toggleMetaSolverPanel appelé");
+        
+        // Masquer le panneau des plugins s'il est visible
+        if (!this.pluginsPanelTarget.classList.contains('hidden')) {
+            this.pluginsPanelTarget.classList.add('hidden');
+            this.togglePluginsButtonTarget.classList.remove('bg-purple-700');
+            this.togglePluginsButtonTarget.classList.add('bg-purple-600');
+        }
+        
+        // Si le panneau MetaSolver est masqué, l'afficher
+        if (this.metaSolverPanelTarget.classList.contains('hidden')) {
+            console.log("Panneau MetaSolver masqué, on l'affiche");
+            this.metaSolverPanelTarget.classList.remove('hidden');
+            this.toggleMetaSolverButtonTarget.classList.remove('bg-blue-600');
+            this.toggleMetaSolverButtonTarget.classList.add('bg-blue-700');
+        } else {
+            // Si le panneau est visible, le masquer
+            console.log("Panneau MetaSolver visible, on le masque");
+            this.metaSolverPanelTarget.classList.add('hidden');
+            this.toggleMetaSolverButtonTarget.classList.remove('bg-blue-700');
+            this.toggleMetaSolverButtonTarget.classList.add('bg-blue-600');
+        }
+    }
+    
+    async executeMetaSolver(event) {
+        console.log("executeMetaSolver appelé");
+        
+        // Récupérer le mode (detect ou decode) depuis l'attribut data-mode du bouton
+        const mode = event.currentTarget.dataset.mode || 'detect';
+        console.log("Mode MetaSolver:", mode);
+        
+        // Récupérer le texte à analyser
+        const textToProcess = this._currentDescriptionValue || this.descriptionTextTarget.value;
+        if (!textToProcess || textToProcess.trim() === '') {
+            alert("Veuillez entrer du texte à analyser");
+            return;
+        }
+        
+        // Récupérer les autres paramètres du MetaSolver
+        const strict = document.getElementById('metasolver-strict').value;
+        const allowedChars = document.getElementById('metasolver-allowed-chars').value;
+        const customChars = document.getElementById('metasolver-custom-chars').value;
+        const embedded = document.getElementById('metasolver-embedded').checked;
+        const gpsDetection = document.getElementById('metasolver-gps-detection').checked;
+        
+        // Préparer les paramètres pour l'API
+        const formData = new FormData();
+        formData.append('text', textToProcess);
+        formData.append('mode', mode);
+        formData.append('strict', strict);
+        formData.append('embedded', embedded ? 'true' : 'false');
+        
+        // Ajouter les caractères autorisés selon la sélection
+        if (allowedChars === 'special') {
+            formData.append('allowed_chars', JSON.stringify("°.'"));
+        } else if (allowedChars === 'custom' && customChars) {
+            formData.append('allowed_chars', JSON.stringify(customChars));
+        }
+        
+        // Afficher un indicateur de chargement
+        const resultContainer = document.getElementById('metasolver-result');
+        const resultContent = document.getElementById('metasolver-result-content');
+        
+        resultContainer.classList.remove('hidden');
+        resultContent.innerHTML = `
+            <div class="animate-pulse">
+                <div class="h-4 bg-gray-600 rounded w-3/4 mb-2"></div>
+                <div class="h-4 bg-gray-600 rounded w-1/2 mb-2"></div>
+                <div class="h-4 bg-gray-600 rounded w-2/3"></div>
+            </div>
+        `;
+        
+        try {
+            // Appeler l'API MetaSolver
+            const response = await fetch('/api/plugins/metadetection/execute', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log("Réponse du MetaSolver:", data);
+            
+            // Afficher les résultats
+            let resultHtml = '';
+            
+            // Si nous avons des résultats
+            if (data.results && Array.isArray(data.results) && data.results.length > 0) {
+                // Afficher les résultats avec leur score
+                resultHtml += `<h3 class="text-md font-medium text-blue-400 mb-2">Résultats (${data.results.length})</h3>`;
+                
+                // Trier les résultats par score décroissant
+                const sortedResults = [...data.results].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+                
+                // Afficher les résultats
+                sortedResults.forEach((result, index) => {
+                    const confidenceColor = this.getConfidenceColor(result.confidence);
+                    const confidencePercent = result.confidence ? Math.round(result.confidence * 100) : '?';
+                    
+                    resultHtml += `
+                        <div class="bg-gray-700 rounded-lg p-3 mb-3">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="text-md font-medium text-gray-300">Résultat ${index + 1}</h4>
+                                <div class="bg-gray-900 px-2 py-1 rounded text-xs">
+                                    Confiance: <span class="font-bold ${confidenceColor}">${confidencePercent}%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-800 p-3 rounded mb-2">
+                                <div class="text-sm text-gray-300 whitespace-pre-wrap">${result.text || ''}</div>
+                            </div>
+                    `;
+                    
+                    // Afficher les coordonnées GPS si présentes
+                    if (result.coordinates && result.coordinates.exist) {
+                        resultHtml += `
+                            <div class="mt-2 p-2 bg-gray-800 rounded">
+                                <h5 class="text-xs font-medium text-gray-400 mb-1">Coordonnées GPS:</h5>
+                                <div class="text-xs text-gray-300">
+                                    <div class="mb-1"><span class="text-gray-500">Format DDM:</span> ${result.coordinates.ddm || ''}</div>
+                                    <div class="grid grid-cols-2 gap-1">
+                                        <div><span class="text-gray-500">Latitude:</span> ${result.coordinates.ddm_lat || ''}</div>
+                                        <div><span class="text-gray-500">Longitude:</span> ${result.coordinates.ddm_lon || ''}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Émettre un événement pour les coordonnées détectées
+                        if (result.coordinates.ddm) {
+                            const event = new CustomEvent('coordinatesDetected', {
+                                detail: result.coordinates,
+                                bubbles: true
+                            });
+                            document.dispatchEvent(event);
+                        }
+                    }
+                    
+                    // Ajouter un bouton pour utiliser ce résultat dans un plugin
+                    resultHtml += `
+                        <div class="mt-2 flex justify-end">
+                            <button 
+                                class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                                data-action="click->geocache-solver#useMetaSolverResult"
+                                data-result-index="${index}">
+                                Utiliser ce résultat
+                            </button>
+                        </div>
+                    </div>`;
+                });
+                
+                // Stocker les résultats pour une utilisation ultérieure
+                this._metaSolverResults = sortedResults;
+                
+            } else {
+                // Aucun résultat
+                resultHtml = `<div class="text-gray-300">Aucun résultat trouvé</div>`;
+            }
+            
+            // Mettre à jour le contenu
+            resultContent.innerHTML = resultHtml;
+            
+        } catch (error) {
+            console.error('Erreur lors de l\'exécution du MetaSolver:', error);
+            resultContent.innerHTML = `
+                <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                    Erreur lors de l'exécution du MetaSolver: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    useMetaSolverResult(event) {
+        console.log("useMetaSolverResult appelé");
+        
+        // Récupérer l'index du résultat à utiliser
+        const resultIndex = parseInt(event.currentTarget.dataset.resultIndex, 10);
+        
+        // Vérifier que les résultats du MetaSolver sont disponibles
+        if (!this._metaSolverResults || !this._metaSolverResults[resultIndex]) {
+            console.error("Résultat du MetaSolver non disponible");
+            alert("Impossible de récupérer le résultat");
+            return;
+        }
+        
+        // Récupérer le résultat
+        const result = this._metaSolverResults[resultIndex];
+        console.log("Résultat sélectionné:", result);
+        
+        // Mettre à jour la valeur du plugin output avec le texte du résultat
+        if (result.text) {
+            this.lastPluginOutputValue = result.text;
+            
+            // Mise à jour de l'interface utilisateur pour indiquer que le résultat a été sélectionné
+            // Mettre tous les boutons "Utiliser ce résultat" en état normal
+            const buttons = document.querySelectorAll('button[data-action="click->geocache-solver#useMetaSolverResult"]');
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-purple-600', 'hover:bg-purple-700');
+                btn.textContent = 'Utiliser ce résultat';
+            });
+            
+            // Mettre le bouton actuel en vert avec texte "Sélectionné"
+            event.currentTarget.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+            event.currentTarget.classList.add('bg-green-600', 'hover:bg-green-700');
+            event.currentTarget.textContent = 'Sélectionné';
+            
+            // Notification de succès
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+            notification.textContent = 'Résultat sélectionné pour utilisation dans les plugins';
+            document.body.appendChild(notification);
+            
+            // Supprimer la notification après 3 secondes
+            setTimeout(() => notification.remove(), 3000);
+        }
+    }
+    
     async loadPluginsList() {
         try {
             console.log("loadPluginsList appelé");
@@ -392,7 +450,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     <div class="mb-4">
                         <input 
                             type="text" 
-                            placeholder="Rechercher un plugin...2" 
+                            placeholder="Rechercher un plugin..." 
                             class="w-full px-3 py-2 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                             data-action="input->geocache-solver#filterPlugins">
                     </div>
@@ -441,7 +499,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         }
     }
-    
+
+    // Méthode pour sélectionner un plugin
     async selectPlugin(event) {
         const pluginId = event.currentTarget.dataset.pluginId;
         const pluginName = event.currentTarget.dataset.pluginName;
@@ -488,10 +547,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     pluginZone.innerHTML = html;
                     
                     // Ajouter l'attribut data-plugin-zone-id au bouton d'exécution
-                    const executeButton = pluginZone.querySelector('[data-action="click->geocache-solver#executePlugin"]');
+                    const executeButton = 
+pluginZone.querySelector('[data-action="click->geocache-solver#executePlugin"]');
                     if (executeButton) {
                         executeButton.setAttribute('data-plugin-zone-id', pluginZoneId);
-                        console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution:", pluginZoneId);
+                        console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution:", 
+pluginZoneId);
                     }
                     
                     // Ajouter l'attribut data-plugin-input="true" à tous les textareas du plugin
@@ -509,7 +570,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     this.pluginsPanelTarget.setAttribute('data-plugin-selection-zone', 'true');
                     
                     // Ajouter l'attribut data-plugin-zone-id au bouton d'exécution
-                    const executeButton = this.pluginsPanelTarget.querySelector('[data-action="click->geocache-solver#executePlugin"]');
+                    const executeButton = 
+this.pluginsPanelTarget.querySelector('[data-action="click->geocache-solver#executePlugin"]');
                     if (executeButton) {
                         executeButton.setAttribute('data-plugin-zone-id', mainPanelId);
                         console.log("Attribut data-plugin-zone-id ajouté au bouton d'exécution principal:", mainPanelId);
@@ -554,7 +616,87 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
         }
     }
-    
+
+    // Méthode pour filtrer la liste des plugins
+    filterPlugins(event) {
+        const searchTerm = event.target.value.toLowerCase();
+        console.log("Filtrage des plugins avec le terme:", searchTerm);
+        
+        // Trouver la liste des plugins la plus proche de l'input de recherche
+        const pluginList = event.target.closest('div').nextElementSibling;
+        
+        if (!pluginList) {
+            console.error("Liste de plugins non trouvée");
+            return;
+        }
+        
+        // Filtrer les éléments de la liste
+        const pluginItems = pluginList.querySelectorAll('.plugin-item');
+        
+        pluginItems.forEach(item => {
+            const pluginName = item.dataset.pluginName;
+            if (pluginName.includes(searchTerm)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    // Méthode pour extraire les valeurs numériques des coordonnées
+    extractNumericCoordinate(coordStr) {
+        try {
+            // Format attendu: "N 48° 32.296'" ou "E 6° 40.636'"
+            const direction = coordStr.charAt(0);
+            const parts = coordStr.substring(1).trim().split('°');
+            
+            if (parts.length !== 2) return null;
+            
+            const degrees = parseFloat(parts[0].trim());
+            const minutes = parseFloat(parts[1].replace("'", "").trim());
+            
+            let decimal = degrees + (minutes / 60);
+            
+            // Ajuster selon la direction
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            
+            return decimal;
+        } catch (error) {
+            console.error("Erreur lors de l'extraction des coordonnées numériques:", error);
+            return null;
+        }
+    }
+
+    // Méthode pour réinitialiser l'affichage des coordonnées
+    resetCoordinatesDisplay() {
+        console.log("Réinitialisation des coordonnées détectées");
+        // Réinitialiser les coordonnées stockées
+        this.lastDetectedCoordinatesValue = null;
+    }
+
+    // Méthode pour forcer l'affichage des coordonnées à partir des données du log
+    forceCoordinatesDisplay() {
+        console.log("Forçage de l'affichage des coordonnées à partir des données du log");
+        
+        // Coordonnées extraites du log
+        const coordinates = {
+            exist: true,
+            ddm_lat: "N 49° 12.123'",
+            ddm_lon: "E 006° 12.123'",
+            ddm: "N 49° 12.123' E 006° 12.123'",
+            decimal: {
+                latitude: 49.20205,
+                longitude: 6.20205
+            },
+            patterns: ["N 49° 12.123' E 006° 12.123'"]
+        };
+        
+        // Stocker les coordonnées
+        this.lastDetectedCoordinatesValue = coordinates;
+    }
+
     // Fonction pour normaliser le texte avant de l'envoyer aux plugins
     normalizeText(text) {
         if (!text) return '';
@@ -596,10 +738,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             let textToProcess = '';
             
             // Déterminer si le plugin est déjà exécuté dans cette zone (réexécution)
-            const isReexecution = button.dataset.pluginZoneId && document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
+            const isReexecution = button.dataset.pluginZoneId && 
+document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
             
             // Trouver la source d'entrée actuelle - toujours prendre l'entrée la plus récente
-            const pluginZone = button.dataset.pluginZoneId ? document.getElementById(button.dataset.pluginZoneId) : null;
+            const pluginZone = button.dataset.pluginZoneId ? 
+document.getElementById(button.dataset.pluginZoneId) : null;
             
             // Vérifier si une zone d'entrée de texte existe dans la zone du plugin
             const pluginInputTextarea = pluginZone ? 
@@ -624,7 +768,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 // utiliser le résultat du plugin précédent comme fallback
                 if (textToProcess.trim() === '' && this.lastPluginOutputValue) {
                     textToProcess = this.lastPluginOutputValue;
-                    console.log("Description vide, utilisation du résultat du plugin précédent:", textToProcess);
+                    console.log("Description vide, utilisation du résultat du plugin précédent:", 
+textToProcess);
                 }
             }
             
@@ -651,7 +796,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     console.log("Entrée mise à jour pour la zone:", textToProcess);
                     
                     // Supprimer tout résultat précédent associé à ce plugin
-                    const existingResult = document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
+                    const existingResult = 
+document.getElementById(`result-for-${button.dataset.pluginZoneId}`);
                     if (existingResult) {
                         existingResult.remove();
                     }
@@ -954,10 +1100,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     this.lastPluginOutputValue = resultText;
                 }
                 
-                // NOUVEAU: Détecter le format spécifique avec espaces entre chiffres pour les coordonnées GPS
+                // Détecter le format spécifique avec espaces entre chiffres pour les coordonnées GPS
                 if (!coordinates) {
                     // Expression régulière pour détecter le format "N 4 9 1 2 1 2 3 E 0 0 6 1 2 1 2 3"
-                    const spacedFormatRegex = /([NS])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+([EW])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)/i;
+                    const spacedFormatRegex = /([NS])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+([EW])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)/i;
                     const match = resultText.match(spacedFormatRegex);
                     
                     if (match) {
@@ -1005,8 +1151,60 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                 patterns: [match[0]]
                             };
                             
-                            // Afficher les coordonnées
-                            this.displayDetectedCoordinates(convertedCoords);
+                            // Au lieu d'afficher les coordonnées séparément, les inclure directement dans le HTML du résultat
+                            if (resultTextContainer && resultTextContainer.tagName !== 'TEXTAREA') {
+                                // Pour les conteneurs HTML, ajouter la section de coordonnées au HTML existant
+                                const coordsHtml = `
+                                    <div class="mt-3 p-3 bg-gray-800 rounded">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <h4 class="text-sm font-medium text-blue-400">Coordonnées GPS détectées</h4>
+                                            <span class="px-3 py-1 text-xs rounded-full bg-green-600">Format avec espaces</span>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-2">
+                                            <div class="flex items-center">
+                                                <span class="text-gray-400 text-sm w-20">Format DDM:</span>
+                                                <span class="text-white font-medium">${ddm}</span>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div class="flex items-center">
+                                                    <span class="text-gray-400 text-sm w-20">Latitude:</span>
+                                                    <span class="text-white">${ddmLat}</span>
+                                                </div>
+                                                <div class="flex items-center">
+                                                    <span class="text-gray-400 text-sm w-20">Longitude:</span>
+                                                    <span class="text-white">${ddmLon}</span>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2 flex gap-2">
+                                                <button type="button" 
+                                                        class="text-xs bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded cursor-pointer copy-coords" 
+                                                        data-coords="${ddm}"
+                                                        onclick="navigator.clipboard.writeText('${ddm}')">
+                                                    Copier
+                                                </button>
+                                                <button type="button" 
+                                                        class="text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded cursor-pointer create-waypoint"
+                                                        data-ddm="${ddm}" 
+                                                        data-lat="${ddmLat}" 
+                                                        data-lon="${ddmLon}"
+                                                        data-action="click->geocache-solver#useCoordinates">
+                                                    Utiliser coordonnées
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                
+                                // Ajouter les coordonnées au HTML existant
+                                resultTextContainer.innerHTML += coordsHtml;
+                            }
+                            
+                            // Émettre également l'événement pour que d'autres composants puissent réagir
+                            const event = new CustomEvent('coordinatesDetected', {
+                                detail: convertedCoords,
+                                bubbles: true
+                            });
+                            document.dispatchEvent(event);
                         } catch (error) {
                             console.error("Erreur lors de la conversion des coordonnées espacées:", error);
                         }
@@ -1057,7 +1255,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
         }
     }
-    
+
+    // Méthode pour afficher l'historique des plugins
     displayPluginsHistory() {
         if (this.hasPluginsResultsTarget) {
             const historyHtml = this.pluginsHistoryValue.map((entry, index) => {
@@ -1076,750 +1275,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         }
     }
     
-    closePlugin() {
-        // Réinitialiser le plugin sélectionné
-        this.selectedPluginValue = '';
-        
-        // Recharger la liste des plugins
-        this.loadPluginsList();
-    }
-    
-    cancelPlugin() {
-        // Réinitialiser l'état du plugin
-        this.selectedPluginValue = '';
-        this.lastPluginOutputValue = '';
-        
-        // Masquer le panneau des plugins
-        this.pluginsPanelTarget.classList.add('hidden');
-        this.togglePluginsButtonTarget.classList.remove('bg-purple-700');
-        this.togglePluginsButtonTarget.classList.add('bg-purple-600');
-        
-        // Réinitialiser l'attribut data-loaded
-        this.pluginsPanelTarget.removeAttribute('data-loaded');
-        
-        // Vider le contenu du panneau des plugins
-        this.pluginsPanelTarget.innerHTML = '';
-        
-        // Masquer le résultat du plugin
-        if (this.hasPluginResultTarget) {
-            this.pluginResultTarget.classList.add('hidden');
-            this.pluginResultTarget.innerHTML = '';
-        }
-        
-        // Réinitialiser l'historique des plugins
-        this.pluginsHistoryValue = [];
-        this.displayPluginsHistory();
-    }
-    
-    filterPlugins(event) {
-        const searchTerm = event.target.value.toLowerCase();
-        console.log("Filtrage des plugins avec le terme:", searchTerm);
-        
-        // Trouver la liste des plugins la plus proche de l'input de recherche
-        const pluginList = event.target.closest('div').nextElementSibling;
-        
-        if (!pluginList) {
-            console.error("Liste de plugins non trouvée");
-            return;
-        }
-        
-        // Filtrer les éléments de la liste
-        const pluginItems = pluginList.querySelectorAll('.plugin-item');
-        
-        pluginItems.forEach(item => {
-            const pluginName = item.dataset.pluginName;
-            if (pluginName.includes(searchTerm)) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    }
-    
-    async addNewPluginZone() {
-        console.log("addNewPluginZone appelé");
-        
-        try {
-            // Créer une nouvelle zone de recherche de plugins
-            const newPluginZoneId = `plugin-zone-${Date.now()}`;
-            const newPluginZone = document.createElement('div');
-            newPluginZone.id = newPluginZoneId;
-            newPluginZone.className = 'bg-gray-800 rounded-lg p-4 mb-4 mt-4';
-            newPluginZone.setAttribute('data-plugin-selection-zone', 'true');
-            
-            // Afficher un loader pendant le chargement
-            newPluginZone.innerHTML = `
-                <h2 class="text-lg font-semibold text-gray-100 mb-3">Appliquer un nouveau plugin</h2>
-                <div class="animate-pulse">
-                    <div class="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                    <div class="h-4 bg-gray-700 rounded w-1/2 mb-2"></div>
-                    <div class="h-4 bg-gray-700 rounded w-2/3"></div>
-                </div>
-            `;
-            
-            // Ajouter la nouvelle zone à la fin du conteneur de résultats
-            this.resultsContainerTarget.appendChild(newPluginZone);
-            
-            // Charger la liste des plugins dans cette nouvelle zone
-            const response = await fetch('/api/plugins?context=solver');
-            
-            if (!response.ok) {
-                throw new Error('Erreur lors du chargement des plugins');
-            }
-            
-            const plugins = await response.json();
-            
-            // Générer le HTML pour la liste des plugins (similaire à loadPluginsList)
-            let pluginsListHtml = `
-                <h2 class="text-lg font-semibold text-gray-100 mb-3">Plugins disponibles</h2>
-                
-                <div class="mb-4">
-                    <input 
-                        type="text" 
-                        placeholder="Rechercher un plugin...1" 
-                        class="w-full px-3 py-2 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                        data-action="input->geocache-solver#filterPlugins">
-                </div>
-                
-                <div class="space-y-2 plugin-list">
-            `;
-            
-            // Ajouter chaque plugin à la liste
-            plugins.forEach(plugin => {
-                pluginsListHtml += `
-                    <div class="plugin-item flex items-center justify-between p-2 rounded-md hover:bg-gray-700 transition-colors" data-plugin-name="${plugin.name.toLowerCase()}">
-                        <div>
-                            <div class="font-medium text-gray-200">${plugin.name}</div>
-                            <div class="text-xs text-gray-400">${plugin.description || 'Aucune description'}</div>
-                        </div>
-                        <button 
-                            data-action="click->geocache-solver#selectPlugin" 
-                            data-plugin-id="${plugin.id}"
-                            data-plugin-name="${plugin.name}"
-                            data-plugin-zone-id="${newPluginZoneId}"
-                            class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-medium transition-colors">
-                            Sélectionner
-                        </button>
-                    </div>
-                `;
-            });
-            
-            pluginsListHtml += `
-                </div>
-            `;
-            
-            // Mettre à jour le contenu de la nouvelle zone
-            document.getElementById(newPluginZoneId).innerHTML = pluginsListHtml;
-            
-        } catch (error) {
-            console.error('Erreur lors de l\'ajout d\'une nouvelle zone de plugin:', error);
-        }
-    }
-    
-    // Méthodes pour gérer le MetaSolver
-    
-    toggleMetaSolverPanel() {
-        console.log("toggleMetaSolverPanel appelé");
-        
-        // Masquer le panneau des plugins s'il est visible
-        if (!this.pluginsPanelTarget.classList.contains('hidden')) {
-            this.pluginsPanelTarget.classList.add('hidden');
-            this.togglePluginsButtonTarget.classList.remove('bg-purple-700');
-            this.togglePluginsButtonTarget.classList.add('bg-purple-600');
-        }
-        
-        // Si le panneau MetaSolver est masqué, l'afficher
-        if (this.metaSolverPanelTarget.classList.contains('hidden')) {
-            console.log("Panneau MetaSolver masqué, on l'affiche");
-            this.metaSolverPanelTarget.classList.remove('hidden');
-            this.toggleMetaSolverButtonTarget.classList.remove('bg-blue-600');
-            this.toggleMetaSolverButtonTarget.classList.add('bg-blue-700');
-        } else {
-            // Si le panneau MetaSolver est visible, le masquer
-            console.log("Panneau MetaSolver visible, on le masque");
-            this.metaSolverPanelTarget.classList.add('hidden');
-            this.toggleMetaSolverButtonTarget.classList.remove('bg-blue-700');
-            this.toggleMetaSolverButtonTarget.classList.add('bg-blue-600');
-        }
-    }
-    
-    async executeMetaSolver(event) {
-        console.log("executeMetaSolver appelé");
-        
-        // Réinitialiser l'affichage des coordonnées
-        this.resetCoordinatesDisplay();
-        
-        // Récupérer le mode depuis le bouton ou le select
-        const mode = event.currentTarget.dataset.mode || document.getElementById('metasolver-mode').value;
-        const strict = document.getElementById('metasolver-strict').value;
-        const embedded = document.getElementById('metasolver-embedded').checked;
-        const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
-        
-        // Récupérer les informations sur les caractères autorisés
-        const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
-        let allowedChars = [];
-        
-        if (allowedCharsType === 'special') {
-            allowedChars = ['°', '.', "'"];
-        } else if (allowedCharsType === 'custom') {
-            const customChars = document.getElementById('metasolver-custom-chars').value;
-            if (customChars) {
-                // Convertir la chaîne en tableau de caractères
-                allowedChars = customChars.split('');
-            }
-        }
-        
-        // Récupérer le texte à analyser et le normaliser
-        let text = this.descriptionTextTarget.value;
-        text = this.normalizeText(text);
-        
-        if (!text.trim()) {
-            alert("Veuillez entrer un texte à analyser");
-            return;
-        }
-        
-        try {
-            // Afficher un indicateur de chargement
-            const resultElement = document.getElementById('metasolver-result');
-            const resultContentElement = document.getElementById('metasolver-result-content');
-            
-            resultElement.classList.remove('hidden');
-            resultContentElement.innerHTML = `
-                <div class="animate-pulse space-y-2">
-                    <div class="h-4 bg-gray-600 rounded w-3/4"></div>
-                    <div class="h-4 bg-gray-600 rounded w-1/2"></div>
-                    <div class="h-4 bg-gray-600 rounded w-2/3"></div>
-                </div>
-            `;
-            
-            // Préparer les données pour l'API
-            const formData = new FormData();
-            formData.append('text', text);
-            formData.append('mode', mode);
-            formData.append('strict', strict);
-            formData.append('embedded', embedded ? 'true' : 'false');
-            formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
-            
-            // Ajouter les caractères autorisés si nécessaire
-            if (allowedCharsType !== 'all') {
-                formData.append('allowed_chars', JSON.stringify(allowedChars));
-            }
-            
-            console.log("Paramètres envoyés à l'API:", {
-                text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-                mode: mode,
-                strict: strict,
-                embedded: embedded,
-                enable_gps_detection: enableGpsDetection,
-                allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
-            });
-            
-            // Appeler l'API pour exécuter le MetaSolver
-            const response = await fetch('/api/plugins/metadetection/execute', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
-            }
-            
-            const result = await response.json();
-            console.log("Réponse brute de l'API MetaSolver:", result);
-            console.log("Structure complète des résultats:", JSON.stringify(result, null, 2));
-            console.log("Présence de 'results':", !!result.results);
-            console.log("Type de 'results':", result.results ? typeof result.results : "non défini");
-            console.log("Nombre d'éléments dans 'results':", result.results && Array.isArray(result.results) ? result.results.length : 0);
-            console.log("Présence de 'combined_results':", !!result.combined_results);
-            console.log("Présence de 'primary_coordinates':", !!result.primary_coordinates);
-            
-            // Formater et afficher les résultats
-            resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
-            
-            // Ajouter à l'historique des plugins
-            this.addToPluginsHistory({
-                plugin: 'MetaSolver',
-                action: mode === 'detect' ? 'Analyse' : 'Décodage',
-                timestamp: new Date().toLocaleTimeString(),
-                result: result
-            });
-            
-        } catch (error) {
-            console.error("Erreur lors de l'exécution du MetaSolver:", error);
-            const resultElement = document.getElementById('metasolver-result');
-            const resultContentElement = document.getElementById('metasolver-result-content');
-            
-            resultElement.classList.remove('hidden');
-            resultContentElement.innerHTML = `
-                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
-                    Erreur lors de l'exécution du MetaSolver: ${error.message}
-                </div>
-            `;
-        }
-    }
-    
-    async decodeWithPlugin(event) {
-        const pluginName = event.currentTarget.dataset.plugin;
-        const text = this.descriptionTextTarget.value;
-        
-        if (!text.trim()) {
-            alert("Veuillez entrer un texte à décoder");
-            return;
-        }
-        
-        try {
-            // Récupérer les options du MetaSolver
-            const strict = document.getElementById('metasolver-strict').value;
-            const embedded = document.getElementById('metasolver-embedded').checked;
-            const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
-            
-            // Récupérer les informations sur les caractères autorisés
-            const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
-            let allowedChars = [];
-            
-            if (allowedCharsType === 'special') {
-                allowedChars = ['°', '.', "'"];
-            } else if (allowedCharsType === 'custom') {
-                const customChars = document.getElementById('metasolver-custom-chars').value;
-                if (customChars) {
-                    allowedChars = customChars.split('');
-                }
-            }
-            
-            // Afficher un indicateur de chargement
-            const resultElement = document.getElementById('metasolver-result');
-            const resultContentElement = document.getElementById('metasolver-result-content');
-            
-            resultElement.classList.remove('hidden');
-            resultContentElement.innerHTML = `
-                <div class="animate-pulse space-y-2">
-                    <div class="h-4 bg-gray-600 rounded w-3/4"></div>
-                    <div class="h-4 bg-gray-600 rounded w-1/2"></div>
-                    <div class="h-4 bg-gray-600 rounded w-2/3"></div>
-                </div>
-            `;
-            
-            // Préparer les données pour l'API
-            const formData = new FormData();
-            formData.append('text', text);
-            formData.append('mode', 'decode');
-            formData.append('strict', strict);
-            formData.append('embedded', embedded ? 'true' : 'false');
-            formData.append('plugin_name', pluginName);
-            formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
-            
-            // Ajouter les caractères autorisés si nécessaire
-            if (allowedCharsType !== 'all') {
-                formData.append('allowed_chars', JSON.stringify(allowedChars));
-            }
-            
-            console.log("decodeWithPlugin - Paramètres envoyés à l'API:", {
-                text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-                mode: "decode",
-                strict: strict,
-                embedded: embedded,
-                plugin_name: pluginName,
-                enable_gps_detection: enableGpsDetection,
-                allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
-            });
-            
-            // Appeler l'API pour exécuter le MetaSolver avec le plugin spécifié
-            const response = await fetch('/api/plugins/metadetection/execute', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP: ${response.status}`);
-            }
-            
-            const result = await response.json();
-            console.log("decodeWithPlugin - Réponse brute de l'API MetaSolver:", result);
-            console.log("decodeWithPlugin - Présence de 'results':", !!result.results);
-            console.log("decodeWithPlugin - Type de 'results':", result.results ? typeof result.results : "non défini");
-            console.log("decodeWithPlugin - Nombre d'éléments dans 'results':", result.results && Array.isArray(result.results) ? result.results.length : 0);
-            
-            // Afficher le résultat en utilisant la méthode de formatage
-            resultContentElement.innerHTML = await this.formatMetaDetectionResults(result);
-            
-            // Ajouter à l'historique des plugins
-            this.addToPluginsHistory({
-                plugin: 'MetaSolver - ' + pluginName,
-                action: 'Décodage',
-                timestamp: new Date().toLocaleTimeString(),
-                result: result
-            });
-            
-        } catch (error) {
-            console.error("Erreur lors du décodage:", error);
-            const resultElement = document.getElementById('metasolver-result');
-            const resultContentElement = document.getElementById('metasolver-result-content');
-            
-            resultElement.classList.remove('hidden');
-            resultContentElement.innerHTML = `
-                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
-                    Erreur lors du décodage: ${error.message}
-                </div>
-            `;
-        }
-    }
-    
-    async formatMetaDetectionResults(result) {
-        console.log("formatMetaDetectionResults - Début du formatage des résultats");
-        
-        if (result.error) {
-            console.log("formatMetaDetectionResults - Erreur détectée:", result.error);
-            return `
-                <div class="bg-red-900 text-red-100 p-4 rounded-lg">
-                    ${result.error}
-                </div>
-            `;
-        }
-        
-        // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
-        let gpsCoordinatesHtml = '';
-        if (result.primary_coordinates) {
-            console.log("formatMetaDetectionResults - Coordonnées primaires détectées:", result.primary_coordinates);
-            // Stocker les coordonnées détectées pour une utilisation ultérieure
-            this.lastDetectedCoordinatesValue = result.primary_coordinates;
-            
-            // Récupérer les coordonnées en format DDM si disponibles
-            let ddmLat = "";
-            let ddmLon = "";
-            let ddmFull = "";
-            
-            // Parcourir les résultats combinés pour trouver les coordonnées DDM
-            if (result.combined_results) {
-                Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
-                    if (pluginResult.coordinates && pluginResult.coordinates.exist) {
-                        ddmLat = pluginResult.coordinates.ddm_lat || "";
-                        ddmLon = pluginResult.coordinates.ddm_lon || "";
-                        ddmFull = pluginResult.coordinates.ddm || "";
-                    }
-                });
-            }
-            
-            // Utiliser les coordonnées décimales si on n'a pas trouvé de format DDM
-            if (!ddmFull && result.primary_coordinates) {
-                const lat = result.primary_coordinates.latitude;
-                const lon = result.primary_coordinates.longitude;
-                ddmFull = `${lat > 0 ? 'N' : 'S'} ${Math.abs(lat).toFixed(6)}°, ${lon > 0 ? 'E' : 'W'} ${Math.abs(lon).toFixed(6)}°`;
-            }
-            
-            // AJOUT: Créer un objet de coordonnées standardisé
-            const standardizedCoords = {
-                exist: true,
-                ddm_lat: ddmLat,
-                ddm_lon: ddmLon,
-                ddm: ddmFull,
-                decimal: result.primary_coordinates
-            };
-            
-            // AJOUT: Émettre un événement pour informer le système des coordonnées détectées
-            console.log("Émission de l'événement coordinatesDetected depuis MetaSolver avec les coordonnées:", standardizedCoords);
-            document.dispatchEvent(new CustomEvent('coordinatesDetected', {
-                detail: standardizedCoords
-            }));
-            
-            gpsCoordinatesHtml = `
-                <div class="bg-gray-700 rounded-lg p-4 mt-4">
-                    <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
-                    
-                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Coordonnées:</label>
-                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                   value="${ddmFull}" readonly>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${ddmLat || result.primary_coordinates.latitude}" readonly>
-                            </div>
-                            <div>
-                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${ddmLon || result.primary_coordinates.longitude}" readonly>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-2">
-                            <a href="https://www.google.com/maps?q=${result.primary_coordinates.latitude},${result.primary_coordinates.longitude}" 
-                               target="_blank" 
-                               class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm inline-flex items-center mr-2">
-                               <i class="fas fa-map-marker-alt mr-1"></i> Google Maps
-                            </a>
-                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
-                                    onclick="navigator.clipboard.writeText('${ddmFull}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
-                                <i class="fas fa-copy mr-1"></i> Copier
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else if (result.coordinates && result.coordinates.exist) {
-            console.log("formatMetaDetectionResults - Coordonnées anciennes détectées (format rétrocompatible)");
-            // Ancien format pour rétrocompatibilité
-            this.lastDetectedCoordinatesValue = result.coordinates;
-            
-            gpsCoordinatesHtml = `
-                <div class="bg-gray-700 rounded-lg p-4 mt-4">
-                    <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
-                    
-                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                   value="${result.coordinates.ddm || ''}" readonly>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${result.coordinates.ddm_lat || ''}" readonly>
-                            </div>
-                            <div>
-                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${result.coordinates.ddm_lon || ''}" readonly>
-                            </div>
-                        </div>
-                        
-                        <div class="flex justify-between mt-2">
-                            <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                                    data-action="click->geocache-solver#useCoordinates">
-                                Utiliser ces coordonnées
-                            </button>
-                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
-                                    onclick="navigator.clipboard.writeText('${result.coordinates.ddm}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
-                                Copier
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Vérifier si nous avons le nouveau format standardisé avec un tableau results
-        if (result.results && Array.isArray(result.results) && result.results.length > 0) {
-            console.log("formatMetaDetectionResults - Détecté format standardisé avec tableau results", result.results);
-            let html = '';
-            
-            // Afficher le résumé si disponible
-            if (result.summary) {
-                console.log("formatMetaDetectionResults - Résumé disponible:", result.summary);
-                html += `
-                    <div class="bg-gray-700 rounded-lg p-4 mb-3">
-                        <h3 class="text-md font-medium text-blue-400 mb-2">Résumé</h3>
-                        <div class="bg-gray-800 p-3 rounded">
-                            <p class="text-gray-300">${result.summary.message || `${result.summary.total_results} résultat(s)`}</p>
-                            ${result.plugin_info ? `<p class="text-gray-400 text-xs mt-1">Temps d'exécution: ${result.plugin_info.execution_time || 0} ms</p>` : ''}
-                        </div>
-                    </div>`;
-            }
-            
-            // Conteneur principal pour les résultats
-            html += `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
-                    <div class="space-y-3">
-            `;
-            
-            // Traiter chaque résultat
-            result.results.forEach((resultEntry, index) => {
-                console.log("formatMetaDetectionResults - Traitement du résultat", index, resultEntry);
-                const isBest = result.summary && result.summary.best_result_id === resultEntry.id;
-                
-                // Classe de couleur basée sur le niveau de confiance
-                const confidenceColor = this.getConfidenceColor(resultEntry.confidence);
-                const parameterPlugin = resultEntry.parameters?.plugin || "";
-                
-                // Déterminer si ce résultat peut être décodé
-                const canDecode = resultEntry.metadata?.can_decode === true;
-                const isDetectMode = resultEntry.parameters?.mode === "detect";
-                const isNotMetadetection = !parameterPlugin.includes("metadetection");
-                const showDecodeButton = isDetectMode && isNotMetadetection && canDecode;
-                
-                console.log(`Résultat ${index} - Plugin: ${parameterPlugin}, Mode: ${resultEntry.parameters?.mode}, CanDecode: ${canDecode}, ShowButton: ${showDecodeButton}`);
-                
-                html += `
-                    <div class="bg-gray-600 p-3 rounded ${isBest ? 'border border-blue-500' : ''}">
-                        <div class="flex justify-between items-center mb-2">
-                            <div class="flex items-center">
-                                <span class="text-gray-200 font-medium">${parameterPlugin}</span>
-                                <div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round((resultEntry.confidence || 0) * 100)}%</div>
-                            </div>
-                            ${showDecodeButton ? 
-                                `<button 
-                                    data-action="click->geocache-solver#decodeWithPlugin" 
-                                    data-plugin="${parameterPlugin}" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded">
-                                    Décoder
-                                </button>` : ''}
-                        </div>
-                        <div class="text-sm text-gray-300 whitespace-pre-wrap">${resultEntry.text_output || ''}</div>
-                        
-                        ${resultEntry.metadata?.fragments?.length > 0 ? 
-                            `<div class="mt-2 text-xs text-gray-400">
-                                Fragments: ${resultEntry.metadata.fragments.join(', ')}
-                             </div>` : ''}
-                    </div>`;
-            });
-            
-            html += `</div></div>`;
-            console.log("formatMetaDetectionResults - HTML généré pour le format standardisé (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
-        }
-        // Afficher les résultats des plugins combinés (nouveau format)
-        else if (result.combined_results && Object.keys(result.combined_results).length > 0) {
-            console.log("formatMetaDetectionResults - Utilisation du format combined_results", Object.keys(result.combined_results));
-            let html = `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
-                    <div class="space-y-3">
-            `;
-            
-            // Parcourir tous les résultats combinés
-            Object.entries(result.combined_results).forEach(([pluginName, pluginResult]) => {
-                console.log("formatMetaDetectionResults - Plugin résultat:", pluginName, pluginResult);
-                let resultText = "";
-                let confidenceText = "";
-                
-                // Extraire le texte décodé s'il existe
-                if (pluginResult.decoded_text) {
-                    resultText = pluginResult.decoded_text;
-                }
-                
-                // Ajouter l'indicateur de confiance si disponible
-                if (pluginResult.confidence !== undefined) {
-                    const confidence = pluginResult.confidence;
-                    const confidenceColor = this.getConfidenceColor(confidence);
-                    confidenceText = `<div class="text-xs ${confidenceColor} font-medium">Confiance: ${Math.round(confidence * 100)}%</div>`;
-                }
-                
-                html += `
-                    <div class="bg-gray-600 p-3 rounded">
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-200 font-medium">${pluginName}</span>
-                            ${confidenceText}
-                        </div>
-                        <div class="text-gray-200 mt-1">${resultText}</div>
-                    </div>
-                `;
-            });
-            
-            html += `</div></div>`;
-            console.log("formatMetaDetectionResults - HTML généré pour le format combined_results (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
-        }
-        // Gérer l'ancien format (mode détection)
-        else if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
-            console.log("formatMetaDetectionResults - Utilisation du format possible_codes ancien", result.result.possible_codes);
-            const codes = result.result.possible_codes;
-            let html = `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Codes détectés</h3>
-                    <div class="space-y-3">
-            `;
-            
-            for (const code of codes) {
-                const fragments = code.fragments || [];
-                const fragmentsText = fragments.map(f => f.value).join(', ');
-                
-                // Ajouter l'indicateur de confiance si disponible
-                let confidenceText = "";
-                if (code.confidence !== undefined) {
-                    const confidence = code.confidence;
-                    const confidenceColor = this.getConfidenceColor(confidence);
-                    confidenceText = `<div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round(confidence * 100)}%</div>`;
-                }
-                
-                html += `
-                    <div class="bg-gray-600 p-3 rounded">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center">
-                                <span class="text-gray-200 font-medium">${code.plugin_name}</span>
-                                ${confidenceText}
-                            </div>
-                            ${code.can_decode ? `<button 
-                                data-action="click->geocache-solver#decodeWithPlugin" 
-                                data-plugin="${code.plugin_name}" 
-                                class="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded">
-                                Décoder
-                            </button>` : ''}
-                        </div>
-                        <div class="text-sm text-gray-400 mt-1">${fragments.length} fragment(s): ${fragmentsText}</div>
-                    </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-            console.log("formatMetaDetectionResults - HTML généré pour le format possible_codes (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
-        }
-        // Gérer l'ancien format (décodage spécifique)
-        else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
-            console.log("formatMetaDetectionResults - Utilisation du format decoded_results ancien", result.result.decoded_results);
-            const decodedResults = result.result.decoded_results;
-            let html = `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats du décodage</h3>
-                    <div class="space-y-3">
-            `;
-            
-            for (const decoded of decodedResults) {
-                // Ajouter l'indicateur de confiance si disponible
-                let confidenceText = "";
-                if (decoded.confidence !== undefined) {
-                    const confidence = decoded.confidence;
-                    const confidenceColor = this.getConfidenceColor(confidence);
-                    confidenceText = `<div class="text-xs ${confidenceColor} ml-2">Confiance: ${Math.round(confidence * 100)}%</div>`;
-                }
-                
-                html += `
-                    <div class="bg-gray-600 p-3 rounded">
-                        <div class="flex items-center">
-                            <div class="text-gray-300 font-medium">${decoded.plugin_name}</div>
-                            ${confidenceText}
-                        </div>
-                        <div class="text-gray-200 mt-1">${decoded.decoded_text}</div>
-                    </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-            console.log("formatMetaDetectionResults - HTML généré pour le format decoded_results (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
-        } 
-        // Gérer l'ancien format (décodage simple)
-        else if (result.result && result.result.decoded_text) {
-            console.log("formatMetaDetectionResults - Utilisation du format decoded_text ancien", result.result.decoded_text);
-            return `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>
-                    <div class="text-gray-200">${result.result.decoded_text}</div>
-                    ${gpsCoordinatesHtml}
-                </div>
-            `;
-        } else {
-            console.log("formatMetaDetectionResults - Aucun format reconnu, affichage du message par défaut", result);
-            return `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <div class="text-gray-400">Aucun code détecté dans le texte.</div>
-                    ${gpsCoordinatesHtml}
-                </div>
-            `;
-        }
-    }
-    
-    addToPluginsHistory(entry) {
-        this.pluginsHistoryValue.push(entry);
-        this.displayPluginsHistory();
-    }
-
     // Fonction utilitaire pour obtenir la couleur selon le niveau de confiance
     getConfidenceColor(confidence) {
         if (!confidence) return 'text-gray-300';
@@ -1828,224 +1283,4 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         if (confidence >= 0.3) return 'text-orange-400';
         return 'text-red-400';
     }
-
-    // Méthode pour utiliser les coordonnées détectées
-    useCoordinates(event) {
-        event.preventDefault();
-        
-        if (!this.lastDetectedCoordinatesValue) {
-            alert("Aucune coordonnée GPS détectée.");
-            return;
-        }
-        
-        const coords = this.lastDetectedCoordinatesValue;
-        
-        // Si nous sommes dans le contexte d'une géocache
-        if (this.geocacheIdValue) {
-            if (confirm("Voulez-vous utiliser ces coordonnées comme coordonnées corrigées pour cette géocache?")) {
-                this.saveCoordinatesToGeocache(coords);
-            }
-        } else {
-            // Sinon, proposer de copier les coordonnées ou de les ouvrir dans une carte
-            const action = prompt(
-                "Que souhaitez-vous faire avec ces coordonnées?\n" +
-                "1: Copier dans le presse-papier\n" +
-                "2: Ouvrir dans Google Maps\n" +
-                "3: Ouvrir dans OpenStreetMap",
-                "1"
-            );
-            
-            switch (action) {
-                case "1":
-                    navigator.clipboard.writeText(coords.ddm)
-                        .then(() => alert("Coordonnées copiées dans le presse-papier"))
-                        .catch(err => alert("Erreur lors de la copie: " + err));
-                    break;
-                case "2":
-                    // Extraire les valeurs numériques pour Google Maps
-                    this.openInGoogleMaps(coords);
-                    break;
-                case "3":
-                    // Extraire les valeurs numériques pour OpenStreetMap
-                    this.openInOpenStreetMap(coords);
-                    break;
-                default:
-                    alert("Action annulée ou non reconnue.");
-            }
-        }
-    }
-    
-    // Méthode pour sauvegarder les coordonnées dans une géocache
-    async saveCoordinatesToGeocache(coords) {
-        try {
-            const response = await fetch(`/api/geocaches/save/${this.geocacheIdValue}/coordinates`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    gc_lat: coords.ddm_lat,
-                    gc_lon: coords.ddm_lon
-                })
-            });
-            
-            if (response.ok) {
-                alert("Coordonnées enregistrées avec succès!");
-                // Déclencher un événement pour mettre à jour l'affichage des coordonnées
-                document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
-            } else {
-                const error = await response.json();
-                alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
-            }
-        } catch (error) {
-            console.error("Erreur lors de l'enregistrement des coordonnées:", error);
-            alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
-        }
-    }
-    
-    // Méthode pour ouvrir les coordonnées dans Google Maps
-    openInGoogleMaps(coords) {
-        // Extraire les valeurs numériques des coordonnées
-        const lat = this.extractNumericCoordinate(coords.ddm_lat);
-        const lon = this.extractNumericCoordinate(coords.ddm_lon);
-        
-        if (lat && lon) {
-            const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-            window.open(url, '_blank');
-        } else {
-            alert("Impossible d'extraire les valeurs numériques des coordonnées.");
-        }
-    }
-    
-    // Méthode pour ouvrir les coordonnées dans OpenStreetMap
-    openInOpenStreetMap(coords) {
-        // Extraire les valeurs numériques des coordonnées
-        const lat = this.extractNumericCoordinate(coords.ddm_lat);
-        const lon = this.extractNumericCoordinate(coords.ddm_lon);
-        
-        if (lat && lon) {
-            const url = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=15`;
-            window.open(url, '_blank');
-        } else {
-            alert("Impossible d'extraire les valeurs numériques des coordonnées.");
-        }
-    }
-    
-    // Méthode pour extraire les valeurs numériques des coordonnées
-    extractNumericCoordinate(coordStr) {
-        try {
-            // Format attendu: "N 48° 32.296'" ou "E 6° 40.636'"
-            const direction = coordStr.charAt(0);
-            const parts = coordStr.substring(1).trim().split('°');
-            
-            if (parts.length !== 2) return null;
-            
-            const degrees = parseFloat(parts[0].trim());
-            const minutes = parseFloat(parts[1].replace("'", "").trim());
-            
-            let decimal = degrees + (minutes / 60);
-            
-            // Ajuster selon la direction
-            if (direction === 'S' || direction === 'W') {
-                decimal = -decimal;
-            }
-            
-            return decimal;
-        } catch (error) {
-            console.error("Erreur lors de l'extraction des coordonnées numériques:", error);
-            return null;
-        }
-    }
-
-    // AJOUT: Méthode pour utiliser les coordonnées détectées pour la géocache
-    async useCoordinates() {
-        // Vérifier si nous avons des coordonnées détectées et un ID de géocache
-        if (!this.lastDetectedCoordinatesValue || !this.geocacheIdValue) {
-            console.error("Impossible d'utiliser les coordonnées: coordonnées non détectées ou ID de géocache non défini");
-            return;
-        }
-        
-        const coords = this.lastDetectedCoordinatesValue;
-        
-        try {
-            // Afficher un message de confirmation
-            if (!confirm("Voulez-vous utiliser ces coordonnées comme coordonnées corrigées pour cette géocache?")) {
-                return;
-            }
-            
-            // Envoyer les coordonnées au serveur
-            const response = await fetch(`/api/geocaches/save/${this.geocacheIdValue}/coordinates`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    gc_lat: coords.ddm_lat,
-                    gc_lon: coords.ddm_lon
-                })
-            });
-            
-            if (response.ok) {
-                alert("Coordonnées enregistrées avec succès!");
-                
-                // Déclencher un événement pour mettre à jour l'affichage des coordonnées
-                document.dispatchEvent(new CustomEvent('coordinatesUpdated'));
-            } else {
-                const error = await response.json();
-                alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
-            }
-        } catch (error) {
-            console.error("Erreur lors de l'enregistrement des coordonnées:", error);
-            alert(`Erreur lors de l'enregistrement des coordonnées: ${error.message || 'Erreur inconnue'}`);
-        }
-    }
-
-    // Méthode pour réinitialiser l'affichage des coordonnées
-    resetCoordinatesDisplay() {
-        console.log("Réinitialisation de l'affichage des coordonnées");
-        
-        // Vérifier si nous avons les cibles Stimulus pour les coordonnées
-        if (this.hasCoordinatesContainerTarget) {
-            // Masquer le conteneur de coordonnées
-            this.coordinatesContainerTarget.classList.add('hidden');
-            console.log("Conteneur de coordonnées Stimulus masqué");
-        }
-        
-        // Vérifier également les éléments créés dynamiquement
-        const dynamicContainer = document.getElementById('geocache-solver-coordinates-container');
-        if (dynamicContainer) {
-            // Masquer ou supprimer le conteneur dynamique
-            dynamicContainer.classList.add('hidden');
-            console.log("Conteneur de coordonnées dynamique masqué");
-        }
-        
-        // Réinitialiser les coordonnées stockées
-        this.lastDetectedCoordinatesValue = null;
-    }
-
-    // Méthode pour forcer l'affichage des coordonnées à partir des données du log
-    forceDisplayCoordinates() {
-        console.log("Forçage de l'affichage des coordonnées à partir des données du log");
-        
-        // Coordonnées extraites du log
-        const coordinates = {
-            exist: true,
-            ddm_lat: "N 49° 12.123'",
-            ddm_lon: "E 006° 12.123'",
-            ddm: "N 49° 12.123' E 006° 12.123'",
-            decimal: {
-                latitude: 49.20205,
-                longitude: 6.20205
-            },
-            patterns: ["N 49° 12.123' E 006° 12.123'"]
-        };
-        
-        // Stocker les coordonnées
-        this.lastDetectedCoordinatesValue = coordinates;
-        
-        // Afficher les coordonnées
-        this.displayDetectedCoordinates(coordinates);
-        
-        return "Coordonnées affichées avec succès";
-    }
-}
+} 
