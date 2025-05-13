@@ -734,10 +734,7 @@ class ScoringService:
             r'([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)',
             
             # Format compact (N4812123E00612123)
-            r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})',
-            
-            # Format avec espaces entre chaque chiffre (N 4 9 1 2 1 2 3 E 0 0 6 1 2 1 2 3)
-            r'([NS])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+([EW])\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)'
+            r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})'
         ]
         
         # Rechercher les différents formats de coordonnées
@@ -748,37 +745,10 @@ class ScoringService:
             if matches:
                 found_coords = True
                 for match in matches:
-                    # Traitement spécial pour le format avec espaces entre chaque chiffre
-                    if pattern.endswith(r'\s+(\d)'):
-                        # Récupérer le match complet
-                        match_text = re.search(pattern, text, re.IGNORECASE).group(0)
-                        # Format spécial avec espaces entre chiffres détecté
-                        lat_dir = match[0]
-                        lat_digits = ''.join(match[1:8])  # Assembler les 7 chiffres de latitude
-                        lon_dir = match[8]
-                        lon_digits = ''.join(match[9:])   # Assembler les 8 chiffres de longitude
-                        
-                        # Construction du format compact pour l'affichage
-                        compact_format = f"{lat_dir}{lat_digits}{lon_dir}{lon_digits}"
-                        coordinates["patterns"].append(compact_format)
-                        
-                        # Pour l'affichage standard en DDM
-                        try:
-                            # Import dynamique pour éviter la dépendance circulaire
-                            from app.routes.coordinates import _detect_compact_coordinates
-                            
-                            coord_result = _detect_compact_coordinates(compact_format)
-                            if coord_result and coord_result.get("exist"):
-                                coordinates["ddm_lat"] = coord_result.get("ddm_lat")
-                                coordinates["ddm_lon"] = coord_result.get("ddm_lon")
-                                coordinates["ddm"] = coord_result.get("ddm")
-                        except Exception as e:
-                            logger.warning(f"Erreur lors de la conversion du format espacé: {e}")
-                    else:
-                        # Traitement standard pour les autres formats
-                        match_text = re.search(pattern, text, re.IGNORECASE).group(0)
-                        if match_text not in coordinates["patterns"]:
-                            coordinates["patterns"].append(match_text)
+                    # Ajouter le motif complet à la liste des motifs trouvés
+                    match_text = re.search(pattern, text, re.IGNORECASE).group(0)
+                    if match_text not in coordinates["patterns"]:
+                        coordinates["patterns"].append(match_text)
         
         # Vérifier si des coordonnées ont été trouvées
         if found_coords:

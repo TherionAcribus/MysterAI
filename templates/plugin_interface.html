@@ -303,8 +303,12 @@
                                 // Émettre un événement avec les coordonnées détectées
                                 console.log('Coordonnées GPS trouvées:', coordinates);
                                 
-                                // Utiliser la nouvelle fonction pour émettre l'événement
-                                window.emitCoordinatesDetectedEvent(coordinates);
+                                // Envoyer également l'événement pour le contrôleur (au cas où il fonctionne)
+                                const event = new CustomEvent('coordinatesDetected', {
+                                    detail: coordinates,
+                                    bubbles: true
+                                });
+                                document.dispatchEvent(event);
                                 coordinatesFound = true;
                             }
                     } 
@@ -313,8 +317,11 @@
                         // Émettre un événement avec les coordonnées détectées
                         console.log('Coordonnées GPS trouvées (ancien format):', data.coordinates);
                         
-                        // Utiliser la nouvelle fonction pour émettre l'événement
-                        window.emitCoordinatesDetectedEvent(data.coordinates);
+                        const event = new CustomEvent('coordinatesDetected', {
+                            detail: data.coordinates,
+                            bubbles: true
+                        });
+                        document.dispatchEvent(event);
                         coordinatesFound = true;
                         
                         // Rendre visible la section des coordonnées
@@ -325,8 +332,11 @@
                     else if (data.scoring && data.scoring.coordinates && data.scoring.coordinates.exist) {
                         console.log('Coordonnées GPS trouvées (format scoring):', data.scoring.coordinates);
                         
-                        // Utiliser la nouvelle fonction pour émettre l'événement
-                        window.emitCoordinatesDetectedEvent(data.scoring.coordinates);
+                        const event = new CustomEvent('coordinatesDetected', {
+                            detail: data.scoring.coordinates,
+                            bubbles: true
+                        });
+                        document.dispatchEvent(event);
                         coordinatesFound = true;
                         
                         // Rendre visible la section des coordonnées
@@ -361,35 +371,9 @@
                             </div>`;
                         }
                         
-                        // AJOUT: Vérification des coordonnées au niveau des résultats
-                        console.log("Vérification des coordonnées dans les résultats:", data.results);
-                        
                         // Afficher chaque résultat
                         data.results.forEach((result, index) => {
                             const isBest = data.summary && data.summary.best_result_id === result.id;
-                            
-                            // AJOUT: Vérification des coordonnées dans ce résultat spécifique
-                            console.log(`Vérification des coordonnées dans le résultat ${index}:`, result);
-                            if (result.scoring && result.scoring.coordinates) {
-                                console.log(`Coordonnées trouvées dans result.scoring.coordinates:`, result.scoring.coordinates);
-                                
-                                // Émettre un événement pour ces coordonnées
-                                if (result.scoring.coordinates.exist) {
-                                    console.log("Émission de l'événement coordinatesDetected pour les coordonnées dans result.scoring.coordinates");
-                                    // Utiliser la nouvelle fonction pour émettre l'événement
-                                    window.emitCoordinatesDetectedEvent(result.scoring.coordinates);
-                                }
-                            }
-                            if (result.coordinates) {
-                                console.log(`Coordonnées trouvées dans result.coordinates:`, result.coordinates);
-                                
-                                // Émettre un événement pour ces coordonnées
-                                if (result.coordinates.exist) {
-                                    console.log("Émission de l'événement coordinatesDetected pour les coordonnées dans result.coordinates");
-                                    // Utiliser la nouvelle fonction pour émettre l'événement
-                                    window.emitCoordinatesDetectedEvent(result.coordinates);
-                                }
-                            }
                             
                             resultsHtml += `
                             <div class="bg-gray-700 rounded-lg p-4 mb-4 ${isBest ? 'border-2 border-blue-500' : ''}">
@@ -479,17 +463,8 @@
                                 Afficher le format brut
                             </button>
                             <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
-                                <textarea class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(data, null, 2)}</textarea>
+                                <textarea class="w-full h-60 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(data, null, 2)}</textarea>
                             </div>
-                        </div>`;
-                        
-                        // Bouton de débogage pour forcer l'émission de l'événement coordinatesDetected
-                        resultsHtml += `
-                        <div class="mt-4">
-                            <button class="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded force-coords-btn" 
-                                    data-id="${uniqueId}">
-                                Forcer l'émission des coordonnées
-                            </button>
                         </div>`;
                         
                         // Mettre à jour le DOM avec le HTML généré
@@ -508,36 +483,6 @@
                                 toggleButton.textContent = rawOutput.classList.contains('hidden') 
                                     ? 'Afficher le format brut'
                                     : 'Masquer le format brut';
-                            });
-                        }
-                        
-                        // Ajouter l'événement pour le bouton de débogage des coordonnées
-                        const forceCoordinatesButton = output.querySelector(`.force-coords-btn[data-id="${uniqueId}"]`);
-                        if (forceCoordinatesButton) {
-                            forceCoordinatesButton.addEventListener('click', function() {
-                                console.log("Bouton de débogage cliqué, émission forcée des coordonnées");
-                                
-                                // Coordonnées extraites du log
-                                const coordinates = {
-                                    exist: true,
-                                    ddm_lat: "N 49° 12.123'",
-                                    ddm_lon: "E 006° 12.123'",
-                                    ddm: "N 49° 12.123' E 006° 12.123'",
-                                    decimal: {
-                                        latitude: 49.20205,
-                                        longitude: 6.20205
-                                    },
-                                    patterns: ["N 49° 12.123' E 006° 12.123'"]
-                                };
-                                
-                                // Utiliser la fonction globale pour émettre l'événement
-                                if (window.emitCoordinatesDetectedEvent) {
-                                    window.emitCoordinatesDetectedEvent(coordinates);
-                                    alert("Événement coordinatesDetected émis avec succès");
-                                } else {
-                                    console.error("La fonction emitCoordinatesDetectedEvent n'est pas disponible");
-                                    alert("Erreur: La fonction d'émission n'est pas disponible");
-                                }
                             });
                         }
                     }
@@ -612,12 +557,14 @@
                                 </div>
                                 ` : ''}
                                 
-                                <!-- Bouton de débogage pour forcer l'émission de l'événement coordinatesDetected -->
+                                <!-- Ajout de l'affichage du format brut -->
                                 <div class="mt-4">
-                                    <button class="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded force-coords-btn" 
-                                            data-id="${uniqueId}">
-                                        Forcer l'émission des coordonnées
+                                    <button class="text-sm text-blue-400 hover:text-blue-300" id="toggle-raw-${uniqueId}">
+                                        Afficher le format brut
                                     </button>
+                                    <div class="raw-output hidden mt-2 bg-gray-700 rounded-lg p-4">
+                                        <textarea class="w-full h-40 bg-gray-800 text-gray-300 border border-gray-700 focus:border-blue-500 p-2 rounded resize-y">${JSON.stringify(normalizedData, null, 2)}</textarea>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -774,32 +721,6 @@
         
         console.log('Traitement des coordonnées détectées:', coordinates);
     });
-    
-    // AJOUT: Fonction pour émettre l'événement de coordonnées
-    window.emitCoordinatesDetectedEvent = function(coordinates) {
-        if (!coordinates || !coordinates.exist) return;
-        
-        console.log("Émission forcée de l'événement coordinatesDetected:", coordinates);
-        
-        // Créer et dispatcher l'événement
-        const event = new CustomEvent('coordinatesDetected', {
-            detail: coordinates,
-            bubbles: true,
-            composed: true,
-            cancelable: true
-        });
-        
-        // Émettre sur le document
-        document.dispatchEvent(event);
-        
-        // Émettre également sur window pour une meilleure propagation
-        window.dispatchEvent(event);
-        
-        // Émettre sur le body également
-        document.body.dispatchEvent(event);
-        
-        return true;
-    };
     
     // Le reste est géré directement par les fonctions setupCoordinateButtons
     // qui sont appelées après avoir ajouté les résultats au DOM

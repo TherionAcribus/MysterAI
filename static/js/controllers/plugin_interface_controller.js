@@ -224,14 +224,6 @@ class PluginInterfaceController extends Controller {
                         </div>
                     </div>
                 `
-                
-                // AJOUT: Émettre un événement pour informer le Geocache Solver des coordonnées détectées
-                if (exists) {
-                    console.log("Émission de l'événement coordinatesDetected avec les coordonnées:", coords);
-                    document.dispatchEvent(new CustomEvent('coordinatesDetected', {
-                        detail: coords
-                    }));
-                }
             }
             
             // Ajouter l'option pour afficher le format brut
