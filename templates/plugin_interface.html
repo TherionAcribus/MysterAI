@@ -38,13 +38,14 @@
                     <div class="flex">
                         <select class="flex-grow bg-gray-700 text-white rounded-l py-2 px-3 border border-gray-600"
                                 data-plugin-interface-target="geocacheSelect"
-                                data-action="change->plugin-interface#selectGeocache">
+                                data-skip-association="false"
+                                onchange="selectGeocache(event, this.closest('[data-controller=\'plugin-interface\']'))">
                             <option value="">Sélectionner une géocache...</option>
                             <!-- Les options seront remplies par JavaScript -->
                         </select>
                         <button type="button"
                                 class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-r border-t border-r border-b border-gray-600"
-                                data-action="click->plugin-interface#loadOpenGeocaches"
+                                onclick="loadOpenGeocaches(this.closest('[data-controller=\'plugin-interface\']'))"
                                 title="Actualiser la liste des géocaches ouvertes">
                             <i class="fas fa-sync-alt"></i>
                         </button>
@@ -64,7 +65,8 @@
                                data-plugin-interface-target="gcCodeInput">
                         <button type="button"
                                 class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-r"
-                                data-action="click->plugin-interface#associateGcCode">
+                                onclick="associateGcCode(event, this.closest('[data-controller=\'plugin-interface\']'))"
+                                >
                             Associer
                         </button>
                     </div>
@@ -82,7 +84,7 @@
                     <div class="flex items-center gap-3">
                         <button type="button"
                                 class="text-xs text-blue-400 hover:text-blue-300 flex items-center"
-                                data-action="click->plugin-interface#openGeocacheDetails">
+                                onclick="openGeocacheDetails(this.closest('[data-controller=\'plugin-interface\']'))">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
@@ -90,7 +92,7 @@
                         </button>
                         <button type="button"
                                 class="text-xs text-red-400 hover:text-red-300"
-                                data-action="click->plugin-interface#removeGeocacheAssociation">
+                                onclick="removeGeocacheAssociation(this.closest('[data-controller=\'plugin-interface\']'))">
                             Supprimer l'association
                         </button>
                     </div>
@@ -256,6 +258,31 @@
             rootElement.dataset.debugId = uniqueId;
             
             console.log(`Plugin [${pluginName}] chargé (${uniqueId})`);
+
+            // === NOUVELLE LIGNE POUR SUPPRIMER L'ASSOCIATION AU DÉMARRAGE ===
+            if (pluginName && pluginName !== 'inconnu') {
+                const storageKey = `plugin_${pluginName}_geocache`;
+                sessionStorage.removeItem(storageKey);
+                console.log(`[Inline Script] Association de géocache supprimée pour ${pluginName} (initialisation)`);
+            }
+            // =================================================================
+            
+            // S'assurer que le sélecteur de géocaches a l'attribut pour éviter l'association automatique
+            const geocacheSelect = rootElement.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+            if (geocacheSelect) {
+                geocacheSelect.dataset.skipAssociation = "true";
+            }
+            
+            // Désactiver complètement l'association automatique lors de l'initialisation
+            rootElement.dataset.disableAutoAssociation = "true";
+            
+            // Initialiser les fonctionnalités d'association de géocache avec le flag pour éviter l'association automatique
+            initGeocacheAssociationFeatures(rootElement, true);
+            
+            // Une fois l'initialisation terminée, réactiver la possibilité d'association manuelle
+            setTimeout(() => {
+                rootElement.dataset.disableAutoAssociation = "false";
+            }, 2000);
             
             // Chercher le bouton d'exécution
             const executeButton = rootElement.querySelector('.debug-button');
@@ -516,6 +543,14 @@
                                                 Copier
                                             </button>
                                             <button type="button" 
+                                                    class="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1 rounded cursor-pointer add-waypoint"
+                                                    onclick="addAsWaypoint(event, this.closest('[data-controller=\'plugin-interface\']'))"
+                                                    data-ddm="${coordinates.ddm || ''}" 
+                                                    data-lat="${coordinates.ddm_lat || ''}" 
+                                                    data-lon="${coordinates.ddm_lon || ''}">
+                                                Ajouter WP
+                                            </button>
+                                            <button type="button" 
                                                     class="text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded cursor-pointer create-waypoint"
                                                     data-ddm="${coordinates.ddm || ''}" 
                                                     data-lat="${coordinates.ddm_lat || ''}" 
@@ -681,6 +716,25 @@
                     }
                 });
             });
+            
+            // Écouter les événements de changements dans GoldenLayout pour rafraîchir les géocaches ouvertes
+            if (window.parent && window.parent.postMessage) {
+                // Créer un écouteur d'événements personnalisé pour les changements de layout
+                window.addEventListener('message', function(event) {
+                    // Vérifier si c'est un événement de changement de layout (tab ouvert, fermé, etc.)
+                    if (event.data && 
+                        (event.data.type === 'componentCreated' || 
+                         event.data.type === 'tabActivated' || 
+                         event.data.type === 'geocacheDetailsOpened')) {
+                        
+                        console.log("Événement de layout détecté, rafraîchissement des géocaches ouvertes");
+                        // Rafraîchir la liste des géocaches ouvertes
+                        setTimeout(() => {
+                            loadOpenGeocaches(rootElement);
+                        }, 500); // Délai pour s'assurer que les composants sont bien initialisés
+                    }
+                });
+            }
         }, 100);
     })();
     
@@ -716,6 +770,27 @@
                         }, 1500);
                     });
                 }
+            });
+        });
+        
+        // Gestion des boutons d'ajout de waypoint
+        document.querySelectorAll('.add-waypoint').forEach(button => {
+            if (button.dataset.eventSetup) return; // Éviter la duplication des événements
+            
+            button.dataset.eventSetup = "true";
+            button.addEventListener('click', function() {
+                // Les actions seront gérées par le contrôleur Stimulus via data-action
+                // Mais nous pouvons ajouter un feedback visuel ici
+                const originalText = this.textContent;
+                this.innerHTML = '✓ En cours...';
+                this.classList.add('bg-indigo-800');
+                this.classList.remove('bg-indigo-700', 'hover:bg-indigo-600');
+                
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('bg-indigo-800');
+                    this.classList.add('bg-indigo-700', 'hover:bg-indigo-600');
+                }, 1500);
             });
         });
         
@@ -782,462 +857,770 @@
     }
 </script>
 
-<!-- Script d'initialisation des fonctionnalités d'association de géocache -->
+<!-- Fonctions pour les actions d'association de geocache -->
 <script>
-    // Initialisation des fonctionnalités d'association de géocache
-    (function() {
-        console.log("Initialisation du script d'association de géocache");
+    // Fonctions pour interagir directement avec les éléments
+    // Compteur pour les logs
+    let pluginInterfaceCount = 0;
+    
+    function loadOpenGeocaches(element) {
+        console.log("Chargement des géocaches ouvertes depuis le bouton");
+        const geocacheSelect = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+        
+        if (geocacheSelect) {
+            // Définir le flag pour ignorer l'association automatique lors du chargement
+            geocacheSelect.dataset.skipAssociation = "true";
+            
+            // Réinitialiser d'abord le select pour éviter des associations indésirables
+            geocacheSelect.value = '';
+            
+            // Initialiser le sélecteur avec les géocaches ouvertes
+            initGeocacheSelector(element, geocacheSelect, true);
+        }
+    }
+    
+    function selectGeocache(event, element) {
+        const select = event.target;
 
-        // Fonction d'initialisation principale
-        function initGeocacheAssociationFeatures() {
-            console.log("Démarrage de l'initialisation de l'association de géocache");
-            
-            // Trouver le contrôleur via l'élément data-controller
-            const pluginElements = document.querySelectorAll('[data-controller="plugin-interface"]');
-            console.log(`Trouvé ${pluginElements.length} éléments avec contrôleur plugin-interface`);
-            
-            // Si on ne trouve pas l'élément, essayer via Stimulus
-            if (pluginElements.length === 0) {
-                initializeViaStimulus();
-                return;
-            }
-            
-            // Pour chaque élément avec le contrôleur
-            pluginElements.forEach((element, index) => {
-                console.log(`Initialisation de l'élément plugin-interface #${index + 1}`);
-                
-                // Vérifier si les éléments d'interface sont présents
-                const geocacheSelect = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
-                const associateBtn = element.querySelector('[data-action="click->plugin-interface#associateGcCode"]');
-                
-                if (!geocacheSelect || !associateBtn) {
-                    console.warn("Éléments d'interface non trouvés pour l'association de géocache");
-                    return;
-                }
-                
-                console.log("Éléments d'interface trouvés, tentative d'initialisation directe");
-                
-                // Initialiser manuellement le sélecteur de géocache
-                initGeocacheSelector(element, geocacheSelect);
-                
-                // Configurer le bouton d'association
-                associateBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const gcCodeInput = element.querySelector('[data-plugin-interface-target="gcCodeInput"]');
-                    if (!gcCodeInput || !gcCodeInput.value.trim()) {
-                        console.warn("Code GC vide ou élément non trouvé");
-                        return;
-                    }
-                    
-                    console.log(`Tentative d'association avec le code: ${gcCodeInput.value.trim()}`);
-                    associateGcCode(element, gcCodeInput.value.trim());
-                });
-                
-                // Configurer le bouton de rafraîchissement
-                const refreshBtn = element.querySelector('[data-action="click->plugin-interface#loadOpenGeocaches"]');
-                if (refreshBtn) {
-                    refreshBtn.addEventListener('click', function() {
-                        console.log("Rafraîchissement manuel des géocaches ouvertes");
-                        initGeocacheSelector(element, geocacheSelect);
-                    });
-                }
-                
-                // Chargement de l'association sauvegardée
-                const savedGeocache = loadGeocacheAssociation(element);
-                if (savedGeocache) {
-                    associateGeocache(element, savedGeocache);
-                }
-                
-                // Configurer les boutons de suppression et d'ouverture
-                setupAdditionalButtons(element);
-            });
+        if (select.dataset.skipAssociation === "true") {
+            console.log("Le flag skipAssociation était 'true'. L\'association va maintenant avoir lieu et le flag est réinitialisé.");
+            select.dataset.skipAssociation = "false";
+            // PAS DE 'return;' ICI, ON CONTINUE
+        }
+
+        console.log("Sélection manuelle de géocache détectée");
+
+        const selectedOption = select.options[select.selectedIndex];
+        const selectedId = select.value;
+
+        if (!selectedId || !selectedOption) {
+            console.warn("Aucune géocache valide sélectionnée");
+            return;
+        }
+
+        const geocacheName = selectedOption.dataset.name;
+        const gcCode = selectedOption.dataset.gcCode;
+        const databaseId = selectedOption.dataset.databaseId;
+
+        console.log(`Géocache sélectionnée: ${selectedId}`);
+        console.log("Données de la géocache:", {
+            name: geocacheName,
+            code: gcCode,
+            databaseId
+        });
+
+        if (!gcCode) {
+            console.error("Code GC manquant pour la géocache sélectionnée");
+            showErrorMessage(element, "Cette géocache n'a pas de code GC valide");
+            return;
+        }
+
+        associateGeocache(element, {
+            id: selectedId,
+            name: geocacheName,
+            code: gcCode,
+            databaseId: databaseId || null
+        });
+    }
+    
+    function associateGcCode(event, element) {
+        event.preventDefault();
+        
+        const gcCodeInput = element.querySelector('[data-plugin-interface-target="gcCodeInput"]');
+        if (!gcCodeInput) {
+            console.error("Champ de saisie de code GC introuvable");
+            return;
         }
         
-        // Initialiser le sélecteur de géocaches
-        function initGeocacheSelector(element, selectElement) {
-            console.log("Chargement des géocaches ouvertes");
-            
-            // Vider le sélecteur
-            selectElement.innerHTML = '<option value="">Sélectionner une géocache...</option>';
-            
-            // Récupérer les géocaches ouvertes via le gestionnaire d'état de layout
-            try {
-                if (window.layoutStateManager) {
-                    const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
-                    console.log(`${openGeocaches.length} géocaches ouvertes trouvées`);
+        const gcCode = gcCodeInput.value.trim().toUpperCase();
+        if (!gcCode) {
+            showErrorMessage(element, "Veuillez saisir un code GC");
+            return;
+        }
+        
+        console.log(`Tentative d'association avec le code GC: ${gcCode}`);
+        
+        // Rechercher parmi les géocaches ouvertes
+        try {
+            if (window.layoutStateManager) {
+                const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                console.log("Recherche parmi les géocaches ouvertes:", openGeocaches);
+                
+                // Chercher le code GC dans les métadonnées des géocaches
+                const existingGeocache = openGeocaches.find(gc => 
+                    gc.metadata && (
+                        (gc.metadata.gcCode && gc.metadata.gcCode.toUpperCase() === gcCode) || 
+                        (gc.metadata.code && gc.metadata.code.toUpperCase() === gcCode)
+                    )
+                );
+                
+                if (existingGeocache) {
+                    console.log("Géocache trouvée parmi les onglets ouverts:", existingGeocache);
                     
-                    // Ajouter chaque géocache au sélecteur
-                    openGeocaches.forEach(gc => {
-                        const option = document.createElement('option');
-                        option.value = gc.id;
-                        option.textContent = `${gc.metadata.name} (${gc.metadata.code})`;
-                        selectElement.appendChild(option);
+                    // La géocache est déjà ouverte, on l'associe directement
+                    associateGeocache(element, {
+                        id: existingGeocache.id,
+                        name: existingGeocache.metadata.name || "Sans nom",
+                        code: gcCode, // Utiliser le code fourni pour garantir sa présence
+                        databaseId: existingGeocache.metadata.databaseId || null
                     });
                 } else {
-                    console.warn("layoutStateManager non disponible");
-                }
-                
-                // Configurer le changement de sélection
-                selectElement.addEventListener('change', function() {
-                    const selectedValue = this.value;
-                    if (!selectedValue) return;
+                    console.log("Géocache non trouvée parmi les onglets ouverts, requête API nécessaire");
                     
-                    console.log(`Géocache sélectionnée: ${selectedValue}`);
-                    if (window.layoutStateManager) {
-                        const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
-                        const selectedGeocache = openGeocaches.find(gc => gc.id === selectedValue);
-                        
-                        if (selectedGeocache) {
+                    // La géocache n'est pas ouverte, il faut faire une requête API
+                    fetch(`/api/geocaches/by-code/${gcCode}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Géocache non trouvée: ${gcCode}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Données de géocache récupérées:", data);
+                            
                             associateGeocache(element, {
-                                id: selectedValue,
-                                name: selectedGeocache.metadata.name,
-                                code: selectedGeocache.metadata.code,
-                                databaseId: selectedGeocache.metadata.databaseId || null
+                                id: null, // Pas d'ID car non ouverte
+                                name: data.name || gcCode,
+                                code: gcCode, // Utiliser le code fourni
+                                databaseId: data.id || null
                             });
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error("Erreur lors du chargement des géocaches ouvertes:", error);
-            }
-        }
-        
-        // Associer une géocache via son code GC
-        function associateGcCode(element, gcCode) {
-            console.log(`Association de la géocache avec le code: ${gcCode}`);
-            
-            // Rechercher parmi les géocaches ouvertes
-            try {
-                if (window.layoutStateManager) {
-                    const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
-                    const existingGeocache = openGeocaches.find(gc => 
-                        gc.metadata.code && gc.metadata.code.toUpperCase() === gcCode.toUpperCase()
-                    );
-                    
-                    if (existingGeocache) {
-                        console.log("Géocache trouvée parmi les onglets ouverts");
-                        // La géocache est déjà ouverte, on l'associe directement
-                        associateGeocache(element, {
-                            id: existingGeocache.id,
-                            name: existingGeocache.metadata.name,
-                            code: existingGeocache.metadata.code,
-                            databaseId: existingGeocache.metadata.databaseId || null
+                        })
+                        .catch(error => {
+                            console.error("Erreur lors de la récupération de la géocache:", error);
+                            showErrorMessage(element, `Erreur: ${error.message}`);
                         });
-                    } else {
-                        // La géocache n'est pas ouverte, il faut faire une requête API
-                        console.log("Géocache non ouverte, requête API nécessaire");
-                        fetch(`/api/geocaches/by-code/${gcCode}`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`Géocache non trouvée: ${gcCode}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                associateGeocache(element, {
-                                    id: null, // Pas d'ID car non ouverte
-                                    name: data.name,
-                                    code: gcCode,
-                                    databaseId: data.id || null
-                                });
-                            })
-                            .catch(error => {
-                                // Afficher une notification d'erreur visible
-                                showErrorMessage(element, `Erreur: ${error.message}`);
-                            });
-                    }
                 }
-            } catch (error) {
-                console.error("Erreur lors de l'association de la géocache:", error);
-                showErrorMessage(element, `Erreur: ${error.message}`);
-            }
-        }
-        
-        // Configurer les boutons supplémentaires
-        function setupAdditionalButtons(element) {
-            // Bouton ouvrir géocache
-            const openGeocacheBtn = element.querySelector('[data-action="click->plugin-interface#openGeocacheDetails"]');
-            if (openGeocacheBtn) {
-                openGeocacheBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    openGeocacheDetails(element);
-                });
-            }
-            
-            // Bouton supprimer association
-            const removeAssociationBtn = element.querySelector('[data-action="click->plugin-interface#removeGeocacheAssociation"]');
-            if (removeAssociationBtn) {
-                removeAssociationBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    removeGeocacheAssociation(element);
-                });
-            }
-        }
-        
-        // Ouvrir les détails de la géocache
-        function openGeocacheDetails(element) {
-            const savedGeocache = loadGeocacheAssociation(element);
-            if (!savedGeocache || !savedGeocache.code) {
-                showErrorMessage(element, "Veuillez d'abord associer une géocache");
-                return;
-            }
-            
-            // Si nous n'avons pas d'ID de base de données, le récupérer
-            if (!savedGeocache.databaseId) {
-                fetch(`/api/geocaches/by-code/${savedGeocache.code}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Impossible de récupérer les détails de la géocache`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        savedGeocache.databaseId = data.id;
-                        saveGeocacheAssociation(element, savedGeocache); // Mettre à jour avec l'ID
-                        openGeocacheTab(savedGeocache);
-                    })
-                    .catch(error => {
-                        showErrorMessage(element, `Erreur: ${error.message}`);
-                    });
             } else {
-                // Ouvrir directement l'onglet
-                openGeocacheTab(savedGeocache);
+                console.warn("layoutStateManager non disponible");
+                showErrorMessage(element, "Impossible de vérifier les géocaches ouvertes");
             }
+        } catch (error) {
+            console.error("Erreur lors de l'association de la géocache:", error);
+            showErrorMessage(element, `Erreur: ${error.message}`);
+        }
+        
+        // Vider le champ de saisie
+        gcCodeInput.value = '';
+    }
+    
+    function openGeocacheDetails(element) {
+        const geocache = loadGeocacheAssociation(element);
+        if (!geocache || !geocache.code) {
+            showErrorMessage(element, "Veuillez d'abord associer une géocache");
+            return;
         }
         
         // Ouvrir l'onglet de la géocache
-        function openGeocacheTab(geocache) {
-            // Utiliser le système de messaging pour ouvrir l'onglet
-            window.parent.postMessage({ 
-                type: 'openGeocacheDetails',
-                geocacheId: geocache.databaseId,
-                gcCode: geocache.code,
-                name: geocache.name || geocache.code
-            }, '*');
+        window.parent.postMessage({ 
+            type: 'openGeocacheDetails',
+            geocacheId: geocache.databaseId,
+            gcCode: geocache.code,
+            name: geocache.name || geocache.code
+        }, '*');
+    }
+    
+    function removeGeocacheAssociation(element) {
+        console.log("Suppression de l'association de géocache");
+        
+        const nameElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheName"]');
+        const codeElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheCode"]');
+        const infoElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"]');
+        const selectElement = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+        const coordsValueElement = element.querySelector('[data-plugin-interface-target="originalCoordinatesValue"]');
+        
+        // Masquer les infos
+        if (infoElement) {
+            infoElement.classList.add('hidden');
         }
         
-        // Supprimer l'association avec la géocache
-        function removeGeocacheAssociation(element) {
-            console.log("Suppression de l'association de géocache");
-            
-            const nameElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheName"]');
-            const codeElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheCode"]');
-            const infoElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"]');
-            const selectElement = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
-            const coordsValueElement = element.querySelector('[data-plugin-interface-target="originalCoordinatesValue"]');
-            
-            // Masquer les infos
-            if (infoElement) {
-                infoElement.classList.add('hidden');
-            }
-            
-            // Réinitialiser le sélecteur
-            if (selectElement) {
-                selectElement.value = "";
-            }
-            
-            // Réinitialiser l'affichage des coordonnées
-            if (coordsValueElement) {
-                coordsValueElement.textContent = "";
-            }
-            
-            // Supprimer du sessionStorage
-            const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
-            if (pluginName) {
-                sessionStorage.removeItem(`plugin_${pluginName}_geocache`);
-            }
+        // Réinitialiser le sélecteur
+        if (selectElement) {
+            selectElement.value = "";
         }
         
-        // Associer une géocache (fonction commune)
-        function associateGeocache(element, geocache) {
-            console.log("Association de la géocache:", geocache);
+        // Réinitialiser l'affichage des coordonnées
+        if (coordsValueElement) {
+            coordsValueElement.textContent = "";
+        }
+        
+        // Supprimer du sessionStorage
+        const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
+        if (pluginName) {
+            sessionStorage.removeItem(`plugin_${pluginName}_geocache`);
+        }
+    }
+    
+    function addAsWaypoint(event, element) {
+        console.log("=== Méthode addAsWaypoint appelée ===", event);
+        
+        // Récupération standard du geocache associé
+        let geocache = loadGeocacheAssociation(element);
+        
+        // Méthode de secours #1: Vérifier la variable globale si elle existe
+        if ((!geocache || !geocache.code) && window.lastAssociatedGeocache && window.lastAssociatedGeocache.code) {
+            console.log("Utilisation de la variable globale lastAssociatedGeocache comme secours");
+            geocache = window.lastAssociatedGeocache;
+        }
+        
+        // Méthode de secours #2: Chercher parmi les onglets ouverts
+        if (!geocache || !geocache.code) {
+            console.log("Tentative de récupération d'une géocache parmi les onglets ouverts");
             
-            // Mettre à jour l'affichage
-            const nameElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheName"]');
-            const codeElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheCode"]');
-            const infoElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"]');
-            const selectElement = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
-            
-            if (nameElement && codeElement && infoElement) {
-                nameElement.textContent = geocache.name;
-                codeElement.textContent = geocache.code;
-                infoElement.classList.remove('hidden');
-                
-                // Mettre à jour le sélecteur si la géocache est ouverte
-                if (geocache.id && selectElement) {
-                    selectElement.value = geocache.id;
+            if (window.layoutStateManager) {
+                const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                if (openGeocaches.length > 0) {
+                    // Utiliser la première géocache ouverte comme secours
+                    const firstGeocache = openGeocaches[0];
+                    if (firstGeocache && firstGeocache.metadata) {
+                        const gcCode = firstGeocache.metadata.gcCode || firstGeocache.metadata.code;
+                        if (gcCode) {
+                            console.log(`Utilisation de la première géocache ouverte comme secours: ${gcCode}`);
+                            geocache = {
+                                id: firstGeocache.id,
+                                name: firstGeocache.metadata.name || "Sans nom",
+                                code: gcCode,
+                                databaseId: firstGeocache.metadata.databaseId || null
+                            };
+                        }
+                    }
                 }
-                
-                // Enregistrer l'association dans le sessionStorage
+            }
+        }
+        
+        // Méthode de secours #3: Demander le code directement à l'utilisateur
+        if (!geocache || !geocache.code) {
+            const userCode = prompt("Aucune géocache associée. Veuillez entrer un code GC:", "GC");
+            if (userCode && userCode.trim()) {
+                geocache = {
+                    code: userCode.trim().toUpperCase(),
+                    name: "Géocache saisie manuellement"
+                };
+                // Sauvegarder cette association pour une utilisation ultérieure
                 saveGeocacheAssociation(element, geocache);
-                
-                // Charger les coordonnées d'origine
-                loadAndDisplayOriginalCoordinates(element, geocache);
-            } else {
-                console.error("Éléments d'interface manquants pour afficher l'association");
             }
         }
         
-        // Sauvegarder l'association dans sessionStorage
-        function saveGeocacheAssociation(element, geocache) {
-            const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
-            if (pluginName) {
-                sessionStorage.setItem(`plugin_${pluginName}_geocache`, 
-                    JSON.stringify({
-                        id: geocache.id,
-                        name: geocache.name,
-                        code: geocache.code,
-                        databaseId: geocache.databaseId || null
-                    })
-                );
-                console.log(`Association sauvegardée pour le plugin ${pluginName}`);
-            }
+        // Vérifier que nous avons maintenant un code GC
+        if (!geocache || !geocache.code) {
+            showErrorMessage(element, "Impossible d'associer une géocache. Veuillez d'abord associer une géocache.");
+            return;
         }
         
-        // Charger l'association depuis sessionStorage
-        function loadGeocacheAssociation(element) {
-            const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
-            if (!pluginName) return null;
+        // Normaliser le code GC si nécessaire
+        if (!geocache.code.startsWith('GC')) {
+            geocache.code = `GC${geocache.code}`;
+        }
+        
+        const button = event.currentTarget || event.target;
+        const coordinates = {
+            ddm: button.dataset.ddm,
+            ddm_lat: button.dataset.lat,
+            ddm_lon: button.dataset.lon
+        };
+        
+        if (!coordinates.ddm) {
+            showErrorMessage(element, "Coordonnées manquantes");
+            return;
+        }
+        
+        console.log(`Ajout de waypoint: ${coordinates.ddm} pour la géocache ${geocache.code}`);
+        
+        // Ouvrir l'onglet de la géocache et préparer l'ajout d'un waypoint
+        window.parent.postMessage({
+            type: 'addWaypoint',
+            geocacheCode: geocache.code,
+            coordinates: coordinates.ddm
+        }, '*');
+        
+        // Enregistrer cette géocache pour les utilisations futures
+        window.lastAssociatedGeocache = geocache;
+        
+        showSuccessMessage(element, "Préparation du waypoint en cours...");
+    }
+    
+    function showErrorMessage(element, message, type = 'error') {
+        // Créer un élément d'erreur s'il n'existe pas déjà
+        let errorElement = document.getElementById('plugin-error-message');
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = 'plugin-error-message';
+            errorElement.className = `bg-${type === "error" ? "red" : "green"}-600 text-white px-4 py-2 rounded-lg mb-4 flex items-center justify-between`;
             
-            const saved = sessionStorage.getItem(`plugin_${pluginName}_geocache`);
-            if (saved) {
-                try {
-                    const geocache = JSON.parse(saved);
-                    console.log(`Association chargée pour le plugin ${pluginName}:`, geocache);
-                    return geocache;
-                } catch (e) {
-                    console.error('Erreur lors du chargement de l\'association:', e);
+            // Ajouter après la section d'association
+            const associationSection = element.querySelector('[data-plugin-interface-target="geocacheAssociation"]');
+            if (associationSection) {
+                associationSection.parentNode.insertBefore(errorElement, associationSection.nextSibling);
+            } else {
+                // Fallback si la cible n'est pas disponible
+                const form = element.querySelector('form');
+                if (form) {
+                    form.parentNode.insertBefore(errorElement, form);
+                } else {
+                    element.insertBefore(errorElement, element.firstChild);
                 }
             }
+        }
+        
+        // Mettre à jour le contenu
+        errorElement.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span>${message}</span>
+            </div>
+            <button class="text-white hover:text-gray-200" onclick="this.parentNode.remove()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        `;
+        
+        // Auto-supprimer après un délai
+        setTimeout(() => {
+            if (errorElement && errorElement.parentNode) {
+                errorElement.remove();
+            }
+        }, 5000);
+    }
+    
+    function showSuccessMessage(element, message) {
+        showErrorMessage(element, message, 'success');
+    }
+</script>
+
+<!-- Script d'initialisation des fonctionnalités d'association de géocache -->
+<script>
+    // Fonction principale pour initialiser les fonctionnalités d'association de géocache
+    function initGeocacheAssociationFeatures(element, skipAutoAssociation = false) {
+        console.log("Initialisation de l'élément plugin-interface #" + (++pluginInterfaceCount) + 
+                    (skipAutoAssociation ? " (sans association auto)" : ""));
+        
+        // Trouver les éléments d'interface
+        const gcCodeInput = element.querySelector('[data-plugin-interface-target="gcCodeInput"]');
+        const geocacheSelect = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+        
+        if (gcCodeInput && geocacheSelect) {
+            console.log("Éléments d'interface trouvés, tentative d'initialisation directe");
+            
+            // S'assurer que le sélecteur a l'attribut skipAssociation correct
+            geocacheSelect.dataset.skipAssociation = skipAutoAssociation ? "true" : "false";
+            
+            // Initialiser le sélecteur de géocache avec une tentative immédiate et des retentatives
+            initGeocacheSelector(element, geocacheSelect, skipAutoAssociation);
+            
+            // Deuxième tentative de chargement des géocaches après un court délai
+            // pour s'assurer que le layoutStateManager est complètement initialisé
+            setTimeout(() => {
+                initGeocacheSelector(element, geocacheSelect, skipAutoAssociation);
+                
+                // Troisième tentative après un délai plus long si nécessaire
+                setTimeout(() => {
+                    initGeocacheSelector(element, geocacheSelect, skipAutoAssociation);
+                }, 1500);
+            }, 500);
+            
+            // Charger une association existante si disponible (sans fallback si skipAutoAssociation est true)
+            const savedGeocache = loadGeocacheAssociation(element, skipAutoAssociation);
+            if (savedGeocache && savedGeocache.code) {
+                console.log("Tentative de restauration d'une association sauvegardée");
+                // Vérifier d'abord si la géocache est toujours ouverte
+                if (savedGeocache.id && window.layoutStateManager) {
+                    const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                    const stillOpen = openGeocaches.some(gc => gc.id === savedGeocache.id);
+                    
+                    if (stillOpen) {
+                        console.log("La géocache associée est toujours ouverte");
+                        associateGeocache(element, savedGeocache);
+                    } else if (savedGeocache.code) {
+                        console.log("La géocache n'est plus ouverte, mais nous avons son code");
+                        // La géocache n'est plus ouverte, mais nous avons son code
+                        associateGeocache(element, savedGeocache);
+                    }
+                } else if (savedGeocache.code) {
+                    // Pas d'ID, mais nous avons un code
+                    console.log("Association avec code GC uniquement");
+                    associateGeocache(element, savedGeocache);
+                }
+            } else if (!skipAutoAssociation) {
+                console.log("Aucune association précédente trouvée ou association invalide");
+                // Essayer de récupérer des informations à partir de l'URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const gcId = urlParams.get('geocacheId');
+                if (gcId && gcId !== 'default' && window.layoutStateManager) {
+                    console.log("Tentative de récupération de la géocache à partir de l'ID dans l'URL:", gcId);
+                    
+                    const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                    const matchingGeocache = openGeocaches.find(gc => 
+                        gc.metadata && gc.metadata.databaseId === gcId
+                    );
+                    
+                    if (matchingGeocache && matchingGeocache.metadata) {
+                        const gcCode = matchingGeocache.metadata.gcCode || matchingGeocache.metadata.code;
+                        if (gcCode) {
+                            console.log(`Géocache trouvée via l'ID URL: ${gcCode}`);
+                            associateGeocache(element, {
+                                id: matchingGeocache.id,
+                                name: matchingGeocache.metadata.name || "Sans nom",
+                                code: gcCode,
+                                databaseId: matchingGeocache.metadata.databaseId || null
+                            });
+                            return;
+                        }
+                    }
+                }
+                
+                // Si aucune association n'est trouvée et qu'il y a des géocaches ouvertes,
+                // suggérer visuellement la première (sans l'associer automatiquement)
+                if (window.layoutStateManager) {
+                    const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                    if (openGeocaches.length > 0) {
+                        const firstGeocache = openGeocaches[0];
+                        if (firstGeocache && firstGeocache.metadata) {
+                            const gcCode = firstGeocache.metadata.gcCode || firstGeocache.metadata.code;
+                            if (gcCode) {
+                                console.log(`Suggestion visuelle de la première géocache ouverte: ${gcCode}`);
+                                // Préparer le sélecteur pour ignorer l'événement onChange
+                                if (geocacheSelect) {
+                                    geocacheSelect.dataset.skipAssociation = "true";
+                                    geocacheSelect.value = firstGeocache.id;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                console.log("Aucune suggestion ou association automatique (skipAutoAssociation=true)");
+            }
+        } else {
+            console.error("Éléments d'interface manquants pour l'association de géocache");
+        }
+    }
+
+    // Initialiser le sélecteur de géocache
+    function initGeocacheSelector(element, selectElement, skipAutoAssociation = false) {
+        console.log("Chargement des géocaches ouvertes" + (skipAutoAssociation ? " (sans association auto)" : ""));
+        
+        // S'assurer que le flag est correctement défini
+        if (skipAutoAssociation) {
+            selectElement.dataset.skipAssociation = "true";
+        }
+        
+        // Vider le sélecteur
+        const defaultOption = document.createElement('option');
+        defaultOption.value = "";
+        defaultOption.textContent = "Sélectionner une géocache...";
+        selectElement.innerHTML = '';
+        selectElement.appendChild(defaultOption);
+        
+        // Récupérer les géocaches ouvertes via le gestionnaire d'état de layout
+        try {
+            if (window.layoutStateManager) {
+                const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                console.log(`${openGeocaches.length} géocaches ouvertes trouvées`);
+                
+                if (openGeocaches.length === 0) {
+                    console.log("Aucune géocache ouverte trouvée");
+                    // Ne plus charger les géocaches récentes du sessionStorage
+                    return;
+                }
+
+                console.log("Premier élément de géocache:", openGeocaches[0]);
+                console.log("Propriétés metadata:", openGeocaches[0].metadata);
+                
+                // Ajouter chaque géocache au sélecteur
+                openGeocaches.forEach((gc, index) => {
+                    if (!gc.metadata) {
+                        console.warn(`Géocache ${index} sans métadonnées:`, gc);
+                        return;
+                    }
+                    
+                    // Extraire le code GC
+                    let gcCode = null;
+                    if (gc.metadata.gcCode) {
+                        gcCode = gc.metadata.gcCode;
+                        console.log(`Utilisation de gc.metadata.gcCode: ${gcCode}`);
+                    } else if (gc.metadata.code) {
+                        gcCode = gc.metadata.code;
+                        console.log(`Utilisation de gc.metadata.code: ${gcCode}`);
+                    }
+                    
+                    if (!gcCode) {
+                        console.warn(`Géocache ${index} sans code GC:`, gc);
+                        return;
+                    }
+
+                    // Créer l'option
+                    const option = document.createElement('option');
+                    option.value = gc.id;
+                    option.textContent = `${gc.metadata.name || 'Sans nom'} (${gcCode})`;
+                    
+                    // Ajouter les données dans les attributs data-*
+                    option.dataset.name = gc.metadata.name || 'Sans nom';
+                    option.dataset.gcCode = gcCode;
+                    option.dataset.databaseId = gc.metadata.databaseId || '';
+                    
+                    console.log(`Option ajoutée: ${option.textContent} avec code=${option.dataset.gcCode}`);
+                    
+                    selectElement.appendChild(option);
+                    
+                    // Stocker également dans sessionStorage pour référence future
+                    try {
+                        const recentGeocaches = JSON.parse(sessionStorage.getItem('recent_geocaches') || '[]');
+                        const existingIndex = recentGeocaches.findIndex(item => item.code === gcCode);
+                        
+                        const geocacheInfo = {
+                            id: gc.id,
+                            code: gcCode,
+                            name: gc.metadata.name || 'Sans nom',
+                            databaseId: gc.metadata.databaseId || null
+                        };
+                        
+                        if (existingIndex >= 0) {
+                            // Mettre à jour l'entrée existante
+                            recentGeocaches[existingIndex] = geocacheInfo;
+                        } else {
+                            // Ajouter une nouvelle entrée
+                            recentGeocaches.push(geocacheInfo);
+                        }
+                        
+                        // Limiter à 10 entrées récentes
+                        while (recentGeocaches.length > 10) {
+                            recentGeocaches.shift();
+                        }
+                        
+                        sessionStorage.setItem('recent_geocaches', JSON.stringify(recentGeocaches));
+                    } catch (error) {
+                        console.error("Erreur lors du stockage des géocaches récentes:", error);
+                    }
+                });
+                
+                console.log(`${selectElement.options.length - 1} géocaches ajoutées au sélecteur`);
+            } else {
+                console.warn("layoutStateManager non disponible");
+            }
+        } catch (error) {
+            console.error("Erreur lors du chargement des géocaches ouvertes:", error);
+        }
+    }
+
+    // Charger l'association depuis sessionStorage
+    function loadGeocacheAssociation(element, skipFallback = false) {
+        // Vérifier si l'élément a le flag pour désactiver complètement l'association automatique
+        const disableAutoAssociation = element.dataset.disableAutoAssociation === "true";
+        if (disableAutoAssociation) {
+            console.log("Association automatique complètement désactivée");
+            skipFallback = true;
+        }
+        
+        const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
+        if (!pluginName) {
+            console.warn("Impossible de déterminer le nom du plugin pour charger l'association");
             return null;
         }
         
-        // Charger et afficher les coordonnées d'origine
-        function loadAndDisplayOriginalCoordinates(element, geocache) {
-            console.log(`Chargement des coordonnées pour ${geocache.code}`);
-            
-            const coordsValueElement = element.querySelector('[data-plugin-interface-target="originalCoordinatesValue"]');
-            if (!coordsValueElement) return;
-            
-            // Afficher l'état de chargement
-            coordsValueElement.textContent = "Chargement...";
-            
-            fetch(`/api/geocaches/by-code/${geocache.code}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Impossible de récupérer les coordonnées`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Afficher les coordonnées
-                    const coordsStr = data.gc_lat && data.gc_lon ? 
-                        `${data.gc_lat} ${data.gc_lon}` : 'Non disponibles';
-                    coordsValueElement.textContent = coordsStr;
-                    console.log(`Coordonnées chargées: ${coordsStr}`);
-                })
-                .catch(error => {
-                    coordsValueElement.textContent = "Erreur lors du chargement";
-                    console.error("Erreur lors du chargement des coordonnées:", error);
-                });
-        }
+        const storageKey = `plugin_${pluginName}_geocache`;
+        console.log(`Tentative de chargement de l'association pour ${pluginName} depuis la clé ${storageKey}`);
         
-        // Afficher un message d'erreur
-        function showErrorMessage(element, message) {
-            console.error("Erreur:", message);
-            
-            // Créer un élément d'erreur
-            let errorElement = document.getElementById('plugin-error-message');
-            if (!errorElement) {
-                errorElement = document.createElement('div');
-                errorElement.id = 'plugin-error-message';
-                errorElement.className = 'bg-red-600 text-white px-4 py-2 rounded-lg mb-4 flex items-center justify-between';
+        const saved = sessionStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const geocache = JSON.parse(saved);
+                console.log(`Association chargée pour ${pluginName}:`, geocache);
                 
-                // Ajouter après la section d'association
-                const associationSection = element.querySelector('[data-plugin-interface-target="geocacheAssociation"]');
-                if (associationSection) {
-                    associationSection.parentNode.insertBefore(errorElement, associationSection.nextSibling);
-                } else {
-                    // Fallback
-                    const form = element.querySelector('form');
-                    if (form) {
-                        form.parentNode.insertBefore(errorElement, form);
-                    } else {
-                        element.insertBefore(errorElement, element.firstChild);
-                    }
+                // Vérifier que le code GC est présent
+                if (!geocache.code) {
+                    console.error("Association invalide: code GC manquant");
+                    sessionStorage.removeItem(storageKey);
+                    return null;
                 }
-            }
-            
-            // Mettre à jour le contenu
-            errorElement.innerHTML = `
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    <span>${message}</span>
-                </div>
-                <button class="text-white hover:text-gray-200" onclick="this.parentNode.remove()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            `;
-            
-            // Auto-supprimer après un délai
-            setTimeout(() => {
-                if (errorElement && errorElement.parentNode) {
-                    errorElement.remove();
-                }
-            }, 5000);
-        }
-        
-        // Initialisation via Stimulus si disponible
-        function initializeViaStimulus() {
-            console.log("Tentative d'initialisation via Stimulus");
-            if (window.StimulusApp && window.StimulusApp.controllers) {
-                // Trouver tous les contrôleurs plugin-interface
-                const pluginControllers = window.StimulusApp.controllers.filter(
-                    c => c.context.identifier === 'plugin-interface'
-                );
                 
-                if (pluginControllers.length > 0) {
-                    console.log(`${pluginControllers.length} contrôleurs plugin-interface trouvés via Stimulus`);
-                    
-                    // Initialiser chaque contrôleur
-                    pluginControllers.forEach(controller => {
-                        try {
-                            if (typeof controller.loadOpenGeocaches === 'function') {
-                                console.log("Appel de loadOpenGeocaches()");
-                                controller.loadOpenGeocaches();
-                            }
-                            
-                            if (typeof controller.loadGeocacheAssociation === 'function') {
-                                console.log("Appel de loadGeocacheAssociation()");
-                                controller.loadGeocacheAssociation();
-                            }
-                        } catch (e) {
-                            console.error("Erreur lors de l'initialisation du contrôleur plugin-interface via Stimulus:", e);
-                        }
-                    });
-                } else {
-                    console.warn("Aucun contrôleur plugin-interface trouvé via Stimulus");
+                return geocache;
+            } catch (e) {
+                console.error("Erreur lors du chargement de l'association:", e);
+                sessionStorage.removeItem(storageKey);
                 }
             } else {
-                console.warn("Stimulus non disponible");
+            console.log(`Aucune association enregistrée pour ${pluginName}`);
+            
+            // Désactiver le fallback si demandé
+            if (skipFallback) {
+                console.log("Fallback désactivé: aucune géocache ne sera suggérée automatiquement");
+                return null;
+            }
+            
+            // Essayer de récupérer le code GC des autres façons si l'association n'existe pas
+            if (window.layoutStateManager) {
+                const openGeocaches = window.layoutStateManager.getComponentsByType('geocache-details');
+                if (openGeocaches.length > 0) {
+                    // Prendre la première géocache ouverte comme fallback
+                    const firstGeocache = openGeocaches[0];
+                    if (firstGeocache && firstGeocache.metadata) {
+                        const gcCode = firstGeocache.metadata.gcCode || firstGeocache.metadata.code;
+                        if (gcCode) {
+                            console.log(`Utilisation de la première géocache ouverte ${gcCode} comme fallback`);
+                            return {
+                                id: firstGeocache.id,
+                                name: firstGeocache.metadata.name || "Sans nom",
+                                code: gcCode,
+                                databaseId: firstGeocache.metadata.databaseId || null
+                            };
+                        }
+                    }
+                }
+                
+                // Rechercher dans les données de l'URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const gcId = urlParams.get('geocacheId');
+                if (gcId && gcId !== 'default') {
+                    console.log(`Tentative de récupération du code GC à partir de l'ID: ${gcId}`);
+                    
+                    // Chercher parmi les géocaches ouvertes
+                    const matchingGeocache = openGeocaches.find(gc => 
+                        gc.metadata && gc.metadata.databaseId === gcId
+                    );
+                    
+                    if (matchingGeocache && matchingGeocache.metadata) {
+                        const gcCode = matchingGeocache.metadata.gcCode || matchingGeocache.metadata.code;
+                        if (gcCode) {
+                            console.log(`Géocache trouvée via l'ID: ${gcCode}`);
+                            return {
+                                id: matchingGeocache.id,
+                                name: matchingGeocache.metadata.name || "Sans nom",
+                                code: gcCode,
+                                databaseId: matchingGeocache.metadata.databaseId || null
+                            };
+                        }
+                    }
+                }
             }
         }
+        return null;
+    }
 
-        // Vérifier si le DOM est déjà chargé
-        if (document.readyState === "loading") {
-            document.addEventListener('DOMContentLoaded', initGeocacheAssociationFeatures);
-        } else {
-            // DOM déjà chargé, exécuter directement
-            initGeocacheAssociationFeatures();
+    // Méthode pour associer une géocache (fonction commune)
+    function associateGeocache(element, geocache) {
+        console.log("Association de la géocache:", geocache);
+        
+        // Vérifier que le code GC est présent
+        if (!geocache || !geocache.code) {
+            console.error("Tentative d'association avec une géocache sans code GC:", geocache);
+            showErrorMessage(element, "La géocache n'a pas de code GC valide");
+            return;
         }
         
-        // Initialiser aussi après un court délai (fallback)
-        setTimeout(initGeocacheAssociationFeatures, 500);
-    })();
+        // S'assurer que le code GC est au format standard (commence par GC)
+        if (!geocache.code.startsWith('GC')) {
+            geocache.code = `GC${geocache.code}`;
+            console.log(`Code GC normalisé: ${geocache.code}`);
+        }
+        
+        // Mettre à jour l'affichage
+        const nameElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheName"]');
+        const codeElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheCode"]');
+        const infoElement = element.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"]');
+        const selectElement = element.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+        const coordsValueElement = element.querySelector('[data-plugin-interface-target="originalCoordinatesValue"]');
+        
+        if (nameElement && codeElement && infoElement) {
+            nameElement.textContent = geocache.name || "Sans nom";
+            codeElement.textContent = geocache.code;
+            infoElement.classList.remove('hidden');
+            
+            // Mettre à jour le sélecteur si la géocache est ouverte
+            if (geocache.id && selectElement) {
+                selectElement.value = geocache.id;
+            }
+        } else {
+            console.error("Éléments d'interface manquants pour afficher l'association");
+        }
+        
+        // Enregistrer l'association dans le sessionStorage
+        saveGeocacheAssociation(element, geocache);
+        
+        // Charger et afficher les coordonnées d'origine
+        loadAndDisplayOriginalCoordinates(element, geocache);
+        
+        // Attachement global pour débogage
+        window.lastAssociatedGeocache = geocache;
+        console.log("Géocache associée et stockée dans window.lastAssociatedGeocache:", geocache);
+    }
+    
+    // Sauvegarder l'association dans sessionStorage
+    function saveGeocacheAssociation(element, geocache) {
+        if (!geocache || !geocache.code) {
+            console.warn("Tentative de sauvegarde d'une association sans code GC");
+            return;
+        }
+        
+        const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
+        if (!pluginName) {
+            console.warn("Impossible de déterminer le nom du plugin pour sauvegarder l'association");
+            return;
+        }
+        
+        const storageKey = `plugin_${pluginName}_geocache`;
+        
+        // Sauvegarder dans le sessionStorage
+        sessionStorage.setItem(storageKey, JSON.stringify({
+            id: geocache.id || null,
+            name: geocache.name || "Sans nom",
+            code: geocache.code,
+            databaseId: geocache.databaseId || null
+        }));
+        
+        // Stocker également dans la variable globale pour référence
+        window.lastAssociatedGeocache = {
+            id: geocache.id || null,
+            name: geocache.name || "Sans nom",
+            code: geocache.code,
+            databaseId: geocache.databaseId || null
+        };
+        
+        console.log(`Association sauvegardée pour ${pluginName} avec le code ${geocache.code}`);
+    }
+    
+    // Charger et afficher les coordonnées d'origine
+    function loadAndDisplayOriginalCoordinates(element, geocache) {
+        if (!geocache || !geocache.code) {
+            console.error("Impossible de charger les coordonnées: code GC manquant");
+            return;
+        }
+        
+        const coordsValueElement = element.querySelector('[data-plugin-interface-target="originalCoordinatesValue"]');
+        if (!coordsValueElement) {
+            console.warn("Élément d'affichage des coordonnées introuvable");
+            return;
+        }
+        
+        // Afficher l'état de chargement
+        coordsValueElement.textContent = "Chargement...";
+        
+        console.log(`Chargement des coordonnées pour ${geocache.code}`);
+        
+        // Appel API
+        fetch(`/api/geocaches/by-code/${geocache.code}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Impossible de récupérer les coordonnées pour ${geocache.code}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Données de coordonnées reçues:", data);
+                
+                // Afficher les coordonnées
+                const coordsStr = data.gc_lat && data.gc_lon ? 
+                    `${data.gc_lat} ${data.gc_lon}` : 'Non disponibles';
+                coordsValueElement.textContent = coordsStr;
+                
+                console.log(`Coordonnées affichées: ${coordsStr}`);
+            })
+            .catch(error => {
+                console.error("Erreur lors du chargement des coordonnées:", error);
+                coordsValueElement.textContent = "Erreur lors du chargement";
+            });
+    }
 </script>
 
 <!-- Inclure le contrôleur des coordonnées -->
