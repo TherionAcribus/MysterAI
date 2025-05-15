@@ -463,23 +463,82 @@ class PluginInterfaceController extends Controller {
             return;
         }
         
-        const coordinates = event.target.dataset.coords;
+        // Récupérer les coordonnées des attributs data du bouton
+        const button = event.currentTarget || event.target;
+        const coordinates = {
+            ddm: button.dataset.ddm,
+            ddm_lat: button.dataset.lat,
+            ddm_lon: button.dataset.lon
+        };
         
-        if (!coordinates) {
+        if (!coordinates.ddm) {
             this.showErrorMessage("Coordonnées manquantes");
             return;
         }
         
-        console.log(`Ajout de waypoint: ${coordinates} pour la géocache ${this.associatedGeocache.code}`);
+        console.log(`Ajout de waypoint: ${coordinates.ddm} pour la géocache ${this.associatedGeocache.code}`);
         
-        // Ouvrir l'onglet de la géocache et préparer l'ajout d'un waypoint
-        window.parent.postMessage({
-            type: 'addWaypoint',
-            geocacheCode: this.associatedGeocache.code,
-            coordinates: coordinates
-        }, '*');
+        // Trouver le panneau de détails de la géocache et le formulaire de waypoint
+        let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
         
-        this.showSuccessMessage("Préparation du waypoint en cours...");
+        if (!waypointForm) {
+            console.log("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+            
+            try {
+                // Ouvrir l'onglet de la géocache
+                this.openGeocacheTab();
+                
+                // Stocker les coordonnées pour une utilisation ultérieure
+                this.pendingCoordinates = coordinates;
+                
+                // Informer l'utilisateur
+                setTimeout(() => {
+                    this.showSuccessMessage("L'onglet de la géocache est en cours d'ouverture. Veuillez réessayer d'ajouter le waypoint dans quelques secondes.");
+                }, 500);
+                
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de l'onglet de détails:", error);
+                this.showErrorMessage("Erreur d'ouverture de l'onglet");
+            }
+            
+            return;
+        }
+        
+        // Préparer les éléments du formulaire
+        const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+        const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+        const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+        const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+        const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+        const formToggleButton = waypointForm.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+        const form = waypointForm.querySelector('[data-waypoint-form-target="form"]');
+        
+        // Générer un nom de waypoint par défaut
+        const pluginName = this.element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim() || 'Plugin';
+        let waypointName = `${pluginName}: Point détecté`;
+        
+        // Préparer les notes avec les informations disponibles
+        let notes = `Point détecté par le plugin "${pluginName}".\nCoordonnées: ${coordinates.ddm}`;
+        
+        // Vérifier si le formulaire est actuellement caché et l'afficher si nécessaire
+        if (form && form.classList.contains('hidden') && formToggleButton) {
+            formToggleButton.click();
+        }
+        
+        // Remplir le formulaire
+        if (prefixInput) prefixInput.value = "PL"; // Pour Plugin
+        if (nameInput) nameInput.value = waypointName;
+        if (gcLatInput) gcLatInput.value = coordinates.ddm_lat;
+        if (gcLonInput) gcLonInput.value = coordinates.ddm_lon;
+        if (noteInput) noteInput.value = notes;
+        
+        // Faire défiler jusqu'au formulaire pour que l'utilisateur puisse le voir
+        if (form) {
+            form.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+        
+        // Afficher un message de confirmation
+        this.showSuccessMessage("Formulaire de waypoint prérempli avec les coordonnées détectées");
     }
     
     // Méthode pour remplir le formulaire de waypoint avec les coordonnées extraites

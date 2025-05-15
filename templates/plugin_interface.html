@@ -279,6 +279,9 @@
             // Initialiser les fonctionnalités d'association de géocache avec le flag pour éviter l'association automatique
             initGeocacheAssociationFeatures(rootElement, true);
             
+            // Remplacer les attributs onclick et onchange par des gestionnaires d'événements JavaScript
+            setupEventHandlers(rootElement);
+            
             // Une fois l'initialisation terminée, réactiver la possibilité d'association manuelle
             setTimeout(() => {
                 rootElement.dataset.disableAutoAssociation = "false";
@@ -544,7 +547,6 @@
                                             </button>
                                             <button type="button" 
                                                     class="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1 rounded cursor-pointer add-waypoint"
-                                                    onclick="addAsWaypoint(event, this.closest('[data-controller=\'plugin-interface\']'))"
                                                     data-ddm="${coordinates.ddm || ''}" 
                                                     data-lat="${coordinates.ddm_lat || ''}" 
                                                     data-lon="${coordinates.ddm_lon || ''}">
@@ -778,9 +780,16 @@
             if (button.dataset.eventSetup) return; // Éviter la duplication des événements
             
             button.dataset.eventSetup = "true";
-            button.addEventListener('click', function() {
-                // Les actions seront gérées par le contrôleur Stimulus via data-action
-                // Mais nous pouvons ajouter un feedback visuel ici
+            button.addEventListener('click', function(event) {
+                // Appeler explicitement la fonction addAsWaypoint
+                const element = this.closest('[data-controller="plugin-interface"]');
+                if (element) {
+                    addAsWaypoint(event, element);
+                } else {
+                    console.error("Impossible de trouver l'élément parent avec data-controller='plugin-interface'");
+                }
+                
+                // Feedback visuel
                 const originalText = this.textContent;
                 this.innerHTML = '✓ En cours...';
                 this.classList.add('bg-indigo-800');
@@ -854,6 +863,56 @@
                 }
             }, 300);
         }, 3000);
+    }
+    
+    // Fonction pour configurer tous les gestionnaires d'événements au lieu d'utiliser des attributs onclick/onchange
+    function setupEventHandlers(rootElement) {
+        console.log("Configuration des gestionnaires d'événements pour", rootElement);
+        
+        // Sélecteur de géocache
+        const geocacheSelect = rootElement.querySelector('[data-plugin-interface-target="geocacheSelect"]');
+        if (geocacheSelect) {
+            geocacheSelect.removeAttribute('onchange');
+            geocacheSelect.addEventListener('change', function(event) {
+                selectGeocache(event, rootElement);
+            });
+        }
+        
+        // Bouton de rafraîchissement des géocaches ouvertes
+        const refreshButton = rootElement.querySelector('[title="Actualiser la liste des géocaches ouvertes"]');
+        if (refreshButton) {
+            refreshButton.removeAttribute('onclick');
+            refreshButton.addEventListener('click', function() {
+                loadOpenGeocaches(rootElement);
+            });
+        }
+        
+        // Bouton d'association du code GC
+        const associateButton = rootElement.querySelector('[data-plugin-interface-target="gcCodeInput"]')?.nextElementSibling;
+        if (associateButton) {
+            associateButton.removeAttribute('onclick');
+            associateButton.addEventListener('click', function(event) {
+                associateGcCode(event, rootElement);
+            });
+        }
+        
+        // Bouton d'ouverture des détails de la géocache
+        const openDetailsButton = rootElement.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"] button.text-blue-400');
+        if (openDetailsButton) {
+            openDetailsButton.removeAttribute('onclick');
+            openDetailsButton.addEventListener('click', function() {
+                openGeocacheDetails(rootElement);
+            });
+        }
+        
+        // Bouton de suppression de l'association
+        const removeAssociationButton = rootElement.querySelector('[data-plugin-interface-target="associatedGeocacheInfo"] button.text-red-400');
+        if (removeAssociationButton) {
+            removeAssociationButton.removeAttribute('onclick');
+            removeAssociationButton.addEventListener('click', function() {
+                removeGeocacheAssociation(rootElement);
+            });
+        }
     }
 </script>
 
@@ -1125,17 +1184,64 @@
         
         console.log(`Ajout de waypoint: ${coordinates.ddm} pour la géocache ${geocache.code}`);
         
-        // Ouvrir l'onglet de la géocache et préparer l'ajout d'un waypoint
-        window.parent.postMessage({
-            type: 'addWaypoint',
-            geocacheCode: geocache.code,
-            coordinates: coordinates.ddm
-        }, '*');
+        // Trouver le formulaire de waypoint
+        let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
+        
+        if (!waypointForm) {
+            console.log("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+            
+            // Ouvrir l'onglet de la géocache et préparer l'ajout d'un waypoint
+            window.parent.postMessage({
+                type: 'openGeocacheDetails',
+                geocacheId: geocache.databaseId,
+                gcCode: geocache.code,
+                name: geocache.name || geocache.code
+            }, '*');
+            
+            // Enregistrer cette géocache pour les utilisations futures
+            window.lastAssociatedGeocache = geocache;
+            
+            showSuccessMessage(element, "L'onglet de la géocache est en cours d'ouverture. Veuillez réessayer d'ajouter le waypoint dans quelques secondes.");
+            return;
+        }
+        
+        // Préparer les éléments du formulaire
+        const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+        const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+        const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+        const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+        const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+        const formToggleButton = waypointForm.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+        const form = waypointForm.querySelector('[data-waypoint-form-target="form"]');
+        
+        // Générer un nom de waypoint par défaut
+        const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim() || 'Plugin';
+        let waypointName = `${pluginName}: Point détecté`;
+        
+        // Préparer les notes avec les informations disponibles
+        let notes = `Point détecté par le plugin "${pluginName}".\nCoordonnées: ${coordinates.ddm}`;
+        
+        // Vérifier si le formulaire est actuellement caché et l'afficher si nécessaire
+        if (form && form.classList.contains('hidden') && formToggleButton) {
+            formToggleButton.click();
+        }
+        
+        // Remplir le formulaire
+        if (prefixInput) prefixInput.value = "PL"; // Pour Plugin
+        if (nameInput) nameInput.value = waypointName;
+        if (gcLatInput) gcLatInput.value = coordinates.ddm_lat;
+        if (gcLonInput) gcLonInput.value = coordinates.ddm_lon;
+        if (noteInput) noteInput.value = notes;
+        
+        // Faire défiler jusqu'au formulaire pour que l'utilisateur puisse le voir
+        if (form) {
+            form.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
         
         // Enregistrer cette géocache pour les utilisations futures
         window.lastAssociatedGeocache = geocache;
         
-        showSuccessMessage(element, "Préparation du waypoint en cours...");
+        showSuccessMessage(element, "Formulaire de waypoint prérempli avec les coordonnées détectées");
     }
     
     function showErrorMessage(element, message, type = 'error') {
