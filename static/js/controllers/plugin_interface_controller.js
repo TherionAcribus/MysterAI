@@ -484,22 +484,16 @@ class PluginInterfaceController extends Controller {
         if (!waypointForm) {
             console.log("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
             
-            try {
-                // Ouvrir l'onglet de la géocache
-                this.openGeocacheTab();
-                
-                // Stocker les coordonnées pour une utilisation ultérieure
-                this.pendingCoordinates = coordinates;
-                
-                // Informer l'utilisateur
-                setTimeout(() => {
-                    this.showSuccessMessage("L'onglet de la géocache est en cours d'ouverture. Veuillez réessayer d'ajouter le waypoint dans quelques secondes.");
-                }, 500);
-                
-            } catch (error) {
-                console.error("Erreur lors de l'ouverture de l'onglet de détails:", error);
-                this.showErrorMessage("Erreur d'ouverture de l'onglet");
-            }
+            // Ouvrir l'onglet de la géocache
+            this.openGeocacheTab();
+            
+            // Stocker les coordonnées pour une utilisation ultérieure
+            this.pendingCoordinates = coordinates;
+            
+            // Informer l'utilisateur
+            setTimeout(() => {
+                this.showSuccessMessage("L'onglet de la géocache est en cours d'ouverture. Veuillez réessayer d'ajouter le waypoint dans quelques secondes.");
+            }, 500);
             
             return;
         }
@@ -537,8 +531,239 @@ class PluginInterfaceController extends Controller {
             form.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
         
-        // Afficher un message de confirmation
+        // Enregistrer cette géocache pour les utilisations futures
+        window.lastAssociatedGeocache = this.associatedGeocache;
+        
         this.showSuccessMessage("Formulaire de waypoint prérempli avec les coordonnées détectées");
+    }
+    
+    // Méthode pour créer automatiquement un waypoint à partir des coordonnées détectées
+    createWaypointAuto(event) {
+        console.log("=== Méthode createWaypointAuto appelée ===");
+        
+        // Vérifier que nous avons une géocache associée
+        if (!this.associatedGeocache || !this.associatedGeocache.code) {
+            this.showErrorMessage("Vous devez d'abord associer une géocache");
+            return;
+        }
+        
+        // Récupérer les coordonnées du bouton
+        const button = event.currentTarget || event.target;
+        const coordinates = {
+            ddm: button.dataset.ddm,
+            ddm_lat: button.dataset.lat,
+            ddm_lon: button.dataset.lon
+        };
+        
+        if (!coordinates.ddm || !coordinates.ddm_lat || !coordinates.ddm_lon) {
+            this.showErrorMessage("Coordonnées manquantes ou incomplètes");
+            return;
+        }
+        
+        // Vérifier si nous avons l'ID dans la base de données de la géocache
+        if (!this.associatedGeocache.databaseId) {
+            // Afficher un état de chargement
+            button.disabled = true;
+            button.classList.add('opacity-50');
+            button.innerHTML = 'Chargement...';
+            
+            // Récupérer l'ID de la géocache
+            fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Impossible de récupérer les détails de la géocache`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Mettre à jour l'ID de la géocache dans l'objet associé
+                    this.associatedGeocache.databaseId = data.id;
+                    this.saveGeocacheAssociation(); // Mettre à jour l'association avec le nouvel ID
+                    
+                    // Créer le waypoint maintenant que nous avons l'ID
+                    this.createWaypointWithJSON(
+                        coordinates.ddm_lat,
+                        coordinates.ddm_lon,
+                        coordinates.ddm,
+                        button
+                    );
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la récupération de l'ID de géocache:", error);
+                    button.disabled = false;
+                    button.classList.remove('opacity-50');
+                    button.innerHTML = 'Créer WP auto';
+                    this.showErrorMessage(`Erreur: ${error.message}`);
+                });
+        } else {
+            // Nous avons déjà l'ID, créer directement le waypoint
+            this.createWaypointWithJSON(
+                coordinates.ddm_lat,
+                coordinates.ddm_lon,
+                coordinates.ddm,
+                button
+            );
+        }
+    }
+    
+    // Méthode interne pour créer un waypoint via l'API JSON
+    createWaypointWithJSON(gcLat, gcLon, originalCoordinates, buttonElement) {
+        // Afficher l'état de chargement sur le bouton
+        if (buttonElement) {
+            buttonElement.disabled = true;
+            buttonElement.classList.add('opacity-50');
+            buttonElement.innerHTML = 'Création...';
+        }
+        
+        // Générer un nom pour le waypoint
+        const pluginName = this.element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim() || 'Plugin';
+        const waypointName = `${pluginName}: Point détecté`;
+        
+        // Préparer la note avec les informations disponibles
+        let note = `Point créé automatiquement à partir des coordonnées détectées dans le plugin "${pluginName}".\nCoordonnées: ${originalCoordinates}`;
+        
+        // Récupérer le texte décodé si disponible (pour référence)
+        const decodedText = document.querySelector('.text-output-field')?.value;
+        if (decodedText) {
+            note += `\nTexte source: ${decodedText}`;
+        }
+        
+        // S'assurer que nous avons un ID de géocache numérique valide
+        if (!this.associatedGeocache || !this.associatedGeocache.databaseId) {
+            console.error("ID de géocache manquant pour la création du waypoint");
+            this.showErrorMessage("ID de géocache manquant. Veuillez associer une géocache.");
+            
+            // Rétablir le bouton
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                buttonElement.classList.remove('opacity-50');
+                buttonElement.innerHTML = 'Créer WP auto';
+            }
+            
+            return;
+        }
+        
+        // Utiliser l'ID de la géocache
+        const databaseId = this.associatedGeocache.databaseId;
+        
+        // Préparer les données du waypoint
+        const waypointData = {
+            name: waypointName,
+            prefix: "PL", // Pour Plugin
+            gc_lat: gcLat,
+            gc_lon: gcLon,
+            note: note,
+            geocache_id: databaseId
+        };
+        
+        console.log("Création du waypoint avec les données:", waypointData);
+        
+        // Vérifier si l'onglet de la géocache est ouvert
+        const isGeocacheTabOpen = document.querySelector('[data-controller="waypoint-form"]') !== null;
+        if (!isGeocacheTabOpen) {
+            console.log("L'onglet de la géocache n'est pas ouvert. Ouverture de l'onglet...");
+            
+            try {
+                // Stocker les coordonnées pour une utilisation ultérieure
+                this.pendingWaypoint = {
+                    gcLat: gcLat,
+                    gcLon: gcLon,
+                    originalCoordinates: originalCoordinates,
+                    method: 'auto'
+                };
+                
+                // Ouvrir l'onglet de la géocache
+        window.parent.postMessage({
+                    type: 'openGeocacheDetails',
+                    geocacheId: databaseId,
+                    gcCode: this.associatedGeocache.code,
+                    name: this.associatedGeocache.name || this.associatedGeocache.code
+        }, '*');
+        
+                // Informer l'utilisateur
+                this.showSuccessMessage("L'onglet de la géocache est en cours d'ouverture. Veuillez réessayer dans quelques secondes.");
+                
+                // Rétablir le bouton
+                if (buttonElement) {
+                    buttonElement.disabled = false;
+                    buttonElement.classList.remove('opacity-50');
+                    buttonElement.innerHTML = 'Créer WP auto';
+                }
+                
+                return;
+            } catch (error) {
+                console.error("Erreur lors de l'ouverture de l'onglet:", error);
+            }
+        }
+        
+        // Appeler l'API pour créer le waypoint
+        fetch(`/api/geocaches/${databaseId}/waypoints`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(waypointData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Waypoint créé avec succès:", data);
+            
+            // Afficher un message de succès
+            this.showSuccessMessage("Waypoint créé avec succès");
+            
+            // Rétablir le bouton
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                buttonElement.classList.remove('opacity-50');
+                buttonElement.innerHTML = 'Créer WP auto';
+            }
+            
+            // Rafraîchir la liste des waypoints si l'onglet de la géocache est ouvert
+            if (window.layoutStateManager) {
+                const geocacheComponent = window.layoutStateManager.findComponentById(this.associatedGeocache.id);
+                if (geocacheComponent && geocacheComponent.instance) {
+                    // Si l'onglet de la géocache est ouvert et a une méthode de rafraîchissement des waypoints
+                    if (typeof geocacheComponent.instance.refreshWaypoints === 'function') {
+                        try {
+                            geocacheComponent.instance.refreshWaypoints();
+                            console.log("Liste des waypoints rafraîchie");
+                        } catch (error) {
+                            console.error("Erreur lors du rafraîchissement de la liste des waypoints:", error);
+                        }
+                    } else {
+                        console.log("L'instance de la géocache n'a pas de méthode refreshWaypoints");
+                    }
+                }
+            }
+            
+            // Émettre un événement pour informer d'autres composants
+            const event = new CustomEvent('waypointCreated', {
+                detail: {
+                    geocacheId: databaseId,
+                    waypoint: data
+                },
+                bubbles: true
+            });
+            document.dispatchEvent(event);
+        })
+        .catch(error => {
+            console.error("Erreur lors de la création du waypoint:", error);
+            
+            // Afficher un message d'erreur
+            this.showErrorMessage(`Erreur lors de la création du waypoint: ${error.message}`);
+            
+            // Rétablir le bouton
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                buttonElement.classList.remove('opacity-50');
+                buttonElement.innerHTML = 'Créer WP auto';
+            }
+        });
     }
     
     // Méthode pour remplir le formulaire de waypoint avec les coordonnées extraites
