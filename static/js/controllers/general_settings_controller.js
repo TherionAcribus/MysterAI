@@ -10,7 +10,7 @@
     
     class GeneralSettingsController extends Stimulus.Controller {
         static targets = [
-            "autoMarkSolved", "autoCorrectCoordinates", "enableAutoScoring"
+            "autoMarkSolved", "autoCorrectCoordinates", "enableAutoScoring", "openTabsInSameSection"
         ];
         
         connect() {
@@ -18,13 +18,38 @@
             console.log('=== DEBUG: Cibles disponibles ===', {
                 autoMarkSolved: this.hasAutoMarkSolvedTarget,
                 autoCorrectCoordinates: this.hasAutoCorrectCoordinatesTarget,
-                enableAutoScoring: this.hasEnableAutoScoringTarget
+                enableAutoScoring: this.hasEnableAutoScoringTarget,
+                openTabsInSameSection: this.hasOpenTabsInSameSectionTarget
             });
             
             // Attendre un instant pour s'assurer que le DOM est complètement chargé
             setTimeout(() => {
                 this.loadSettings();
             }, 100);
+            
+            // Ajouter des écouteurs d'événements pour les changements en temps réel
+            if (this.hasOpenTabsInSameSectionTarget) {
+                this.openTabsInSameSectionTarget.addEventListener('change', this.handleTabSectionChange.bind(this));
+            }
+        }
+        
+        /**
+         * Gérer le changement du paramètre d'ouverture des onglets en temps réel
+         */
+        handleTabSectionChange(event) {
+            console.log('=== DEBUG: Changement du paramètre d\'ouverture des onglets ===', event.target.checked);
+            
+            // Émettre un événement personnalisé pour informer GoldenLayout du changement
+            const settingChangeEvent = new CustomEvent('goldenLayoutSettingChange', {
+                detail: {
+                    setting: 'openTabsInSameSection',
+                    value: event.target.checked
+                },
+                bubbles: true
+            });
+            
+            // Émettre l'événement dans le document pour qu'il puisse être capturé globalement
+            document.dispatchEvent(settingChangeEvent);
         }
         
         /**
@@ -34,7 +59,8 @@
             console.log('=== DEBUG: Chargement des paramètres généraux ===');
             
             // Vérifier que les cibles sont disponibles
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || 
+                !this.hasEnableAutoScoringTarget || !this.hasOpenTabsInSameSectionTarget) {
                 console.warn('=== WARN: Les cibles ne sont pas encore disponibles, réessai dans 100ms ===');
                 setTimeout(() => this.loadSettings(), 100);
                 return;
@@ -97,6 +123,14 @@
             } else {
                 console.warn('=== WARN: Cible enableAutoScoring non disponible ===');
             }
+            
+            if (this.hasOpenTabsInSameSectionTarget) {
+                // Utiliser true comme valeur par défaut si la propriété est absente
+                this.openTabsInSameSectionTarget.checked = settings.open_tabs_in_same_section !== undefined ? 
+                    settings.open_tabs_in_same_section : true;
+            } else {
+                console.warn('=== WARN: Cible openTabsInSameSection non disponible ===');
+            }
         }
         
         /**
@@ -114,6 +148,10 @@
             if (this.hasEnableAutoScoringTarget) {
                 this.enableAutoScoringTarget.checked = true;
             }
+            
+            if (this.hasOpenTabsInSameSectionTarget) {
+                this.openTabsInSameSectionTarget.checked = true;
+            }
         }
         
         /**
@@ -122,7 +160,8 @@
         saveSettings() {
             console.log('=== DEBUG: Enregistrement des paramètres ===');
             
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || 
+                !this.hasEnableAutoScoringTarget || !this.hasOpenTabsInSameSectionTarget) {
                 console.error('=== ERREUR: Les cibles ne sont pas disponibles ===');
                 this.showNotification('Erreur: Impossible d\'accéder aux paramètres', true);
                 return;
@@ -131,7 +170,8 @@
             const settings = {
                 auto_mark_solved: this.autoMarkSolvedTarget.checked,
                 auto_correct_coordinates: this.autoCorrectCoordinatesTarget.checked,
-                enable_auto_scoring: this.enableAutoScoringTarget.checked
+                enable_auto_scoring: this.enableAutoScoringTarget.checked,
+                open_tabs_in_same_section: this.openTabsInSameSectionTarget.checked
             };
             
             console.log('=== DEBUG: Paramètres à enregistrer ===', settings);
@@ -154,6 +194,9 @@
                 
                 if (data.success) {
                     this.showNotification('Paramètres enregistrés avec succès!');
+                    
+                    // Émettre des événements pour les paramètres modifiés
+                    this.notifySettingsChanged(settings);
                 } else {
                     this.showNotification('Erreur: ' + data.error, true);
                 }
@@ -165,12 +208,31 @@
         }
         
         /**
+         * Notifier l'application des changements de paramètres
+         */
+        notifySettingsChanged(settings) {
+            console.log('=== DEBUG: Notification des changements de paramètres ===');
+            
+            // Créer et émettre un événement pour le paramètre d'ouverture des onglets
+            const tabSettingEvent = new CustomEvent('goldenLayoutSettingChange', {
+                detail: {
+                    setting: 'openTabsInSameSection',
+                    value: settings.open_tabs_in_same_section
+                },
+                bubbles: true
+            });
+            
+            document.dispatchEvent(tabSettingEvent);
+        }
+        
+        /**
          * Réinitialiser les paramètres aux valeurs par défaut
          */
         resetDefaults() {
             console.log('=== DEBUG: Réinitialisation des paramètres ===');
             
-            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || !this.hasEnableAutoScoringTarget) {
+            if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || 
+                !this.hasEnableAutoScoringTarget || !this.hasOpenTabsInSameSectionTarget) {
                 console.error('=== ERREUR: Les cibles ne sont pas disponibles ===');
                 this.showNotification('Erreur: Impossible d\'accéder aux paramètres', true);
                 return;
@@ -180,6 +242,7 @@
             this.autoMarkSolvedTarget.checked = true;
             this.autoCorrectCoordinatesTarget.checked = true;
             this.enableAutoScoringTarget.checked = true;
+            this.openTabsInSameSectionTarget.checked = true;
             
             // Enregistrer les valeurs par défaut
             this.saveSettings();

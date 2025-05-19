@@ -2263,8 +2263,10 @@
 <!-- Fonctions pour les actions d'association de geocache -->
 <script>
     // Fonctions pour interagir directement avec les éléments
-    // Compteur pour les logs
-    let pluginInterfaceCount = 0;
+    // Compteur pour les logs - utiliser une variable globale unique pour éviter les redéclarations
+    if (typeof window.pluginInterfaceCount === 'undefined') {
+        window.pluginInterfaceCount = 0;
+    }
     
     function loadOpenGeocaches(element) {
         console.log("Chargement des géocaches ouvertes depuis le bouton");
@@ -2644,7 +2646,7 @@
 <script>
     // Fonction principale pour initialiser les fonctionnalités d'association de géocache
     function initGeocacheAssociationFeatures(element, skipAutoAssociation = false) {
-        console.log("Initialisation de l'élément plugin-interface #" + (++pluginInterfaceCount) + 
+        console.log("Initialisation de l'élément plugin-interface #" + (++window.pluginInterfaceCount) + 
                     (skipAutoAssociation ? " (sans association auto)" : ""));
         
         // Trouver les éléments d'interface

@@ -2,6 +2,11 @@
  * Script d'intégration des plugins avec GoldenLayout et Stimulus
  */
 
+// Variables de configuration globales pour GoldenLayout
+let goldenLayoutConfig = {
+    openTabsInSameSection: true // Valeur par défaut
+};
+
 // Fonction pour réinitialiser les contrôleurs Stimulus dans un conteneur GoldenLayout
 function reinitializeStimulus(container) {
     console.log("Réinitialisation de Stimulus pour", container.getElement())
@@ -100,12 +105,52 @@ function updateRootElementWithContainerId(container) {
     }
 }
 
+// Fonction pour charger les paramètres depuis le serveur au démarrage
+function loadGoldenLayoutSettings() {
+    console.log('=== DEBUG: Chargement des paramètres pour GoldenLayout ===');
+    
+    fetch('/api/settings/general')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('=== DEBUG: Paramètres GoldenLayout chargés ===', data);
+            
+            if (data.success && data.settings) {
+                // Mettre à jour la configuration
+                goldenLayoutConfig.openTabsInSameSection = data.settings.open_tabs_in_same_section !== undefined ? 
+                    data.settings.open_tabs_in_same_section : true;
+                
+                console.log('=== DEBUG: Configuration GoldenLayout mise à jour ===', goldenLayoutConfig);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement des paramètres:', error);
+        });
+}
+
+// Écouteur d'événements pour les changements de paramètres
+document.addEventListener('goldenLayoutSettingChange', function(event) {
+    console.log('=== DEBUG: Événement de changement de paramètre détecté ===', event.detail);
+    
+    if (event.detail && event.detail.setting === 'openTabsInSameSection') {
+        goldenLayoutConfig.openTabsInSameSection = event.detail.value;
+        console.log(`=== DEBUG: Paramètre openTabsInSameSection mis à jour: ${goldenLayoutConfig.openTabsInSameSection} ===`);
+    }
+});
+
 // Enregistrer le composant plugin-interface dans GoldenLayout
 function registerPluginInterfaceComponent(layout) {
     if (!layout) {
         console.error("GoldenLayout non disponible");
         return;
     }
+    
+    // Charger les paramètres au démarrage
+    loadGoldenLayoutSettings();
     
     layout.registerComponent('plugin-interface', function(container, state) {
         // Générer un ID unique pour ce conteneur s'il n'en a pas déjà un
@@ -125,6 +170,9 @@ function registerPluginInterfaceComponent(layout) {
         // Afficher un indicateur de chargement
         container.getElement().innerHTML = '<div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div></div>';
         
+        // Marquer ce conteneur avec un attribut data unique pour éviter les collisions de scripts
+        container.getElement().attr('data-plugin-instance-id', containerId);
+        
         // Charger le contenu du plugin
         fetch(`/api/plugins/${state.pluginName}/interface${state.geocacheId ? '?geocacheId=' + state.geocacheId : ''}`)
             .then(response => {
@@ -132,8 +180,18 @@ function registerPluginInterfaceComponent(layout) {
                 return response.text();
             })
             .then(html => {
+                // Créer un ID unique pour ce conteneur
+                const uniqueScriptId = `plugin-scripts-${containerId}`;
+                
+                // Créer un wrapper avec un ID unique pour isoler le contexte JavaScript
+                const modifiedHtml = `
+                    <div id="${uniqueScriptId}" class="plugin-instance-wrapper">
+                        ${html}
+                    </div>
+                `;
+                
                 // Insérer le HTML
-                container.getElement().innerHTML = html;
+                container.getElement().html(modifiedHtml);
                 
                 // Ajouter un attribut pour identifier facilement ce conteneur
                 updateRootElementWithContainerId(container);
@@ -186,6 +244,11 @@ function registerPluginInterfaceComponent(layout) {
     });
     
     console.log("Composant plugin-interface enregistré avec succès");
+}
+
+// Fonction pour vérifier si les onglets doivent s'ouvrir dans la même section
+function shouldOpenInSameSection() {
+    return goldenLayoutConfig.openTabsInSameSection;
 }
 
 // Fonction d'appel direct à l'API en cas d'échec des contrôleurs
@@ -336,5 +399,6 @@ window.PluginGoldenLayoutIntegration = {
     reinitializeStimulus,
     registerPluginInterfaceComponent,
     directAPICall,
-    updateRootElementWithContainerId
+    updateRootElementWithContainerId,
+    shouldOpenInSameSection
 } 

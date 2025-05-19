@@ -1164,9 +1164,33 @@ window.openPluginTab = function(pluginName, title, params = {}) {
             // Si l'onglet existe, le mettre en focus
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
+            // Vérifier si les onglets doivent s'ouvrir dans la même section
+            let openInSameSection = true; // Valeur par défaut
+            
+            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
+            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+                console.log(`=== DEBUG: openPluginTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
+            }
+            
             // Pour le plugin analysis_web_page avec un geocacheId, utiliser le composant GeocacheAnalysis
             if (pluginName === 'analysis_web_page' && params.geocacheId) {
-                window.mainLayout.root.contentItems[0].addChild({
+                // Trouver le conteneur actif où ajouter le composant
+                let targetContainer = openInSameSection ? 
+                    window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
+                    window.mainLayout.root.contentItems[0];
+                
+                // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
+                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                    targetContainer = targetContainer.parent;
+                }
+                
+                // Si on n'a pas trouvé de conteneur approprié, utiliser le root
+                if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
+                    targetContainer = window.mainLayout.root.contentItems[0];
+                }
+                
+                targetContainer.addChild({
                     type: 'component',
                     componentName: 'GeocacheAnalysis',
                     title: title || pluginName,
@@ -1177,7 +1201,22 @@ window.openPluginTab = function(pluginName, title, params = {}) {
                 });
             } else {
                 // Sinon, créer un nouvel onglet de plugin standard
-                window.mainLayout.root.contentItems[0].addChild({
+                // Trouver le conteneur actif où ajouter le composant
+                let targetContainer = openInSameSection ? 
+                    window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
+                    window.mainLayout.root.contentItems[0];
+                
+                // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
+                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                    targetContainer = targetContainer.parent;
+                }
+                
+                // Si on n'a pas trouvé de conteneur approprié, utiliser le root
+                if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
+                    targetContainer = window.mainLayout.root.contentItems[0];
+                }
+                
+                targetContainer.addChild({
                     type: 'component',
                     componentName: 'plugin',
                     title: title || pluginName,
@@ -1213,8 +1252,32 @@ window.openSolverTab = function(geocacheId = null, gcCode = null) {
             // Si l'onglet existe et qu'on n'a pas spécifié de géocache, le mettre en focus
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
+            // Vérifier si les onglets doivent s'ouvrir dans la même section
+            let openInSameSection = true; // Valeur par défaut
+            
+            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
+            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+                console.log(`=== DEBUG: openSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
+            }
+            
+            // Trouver le conteneur actif où ajouter le composant
+            let targetContainer = openInSameSection ? 
+                window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
+                window.mainLayout.root.contentItems[0];
+            
+            // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
+            while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                targetContainer = targetContainer.parent;
+            }
+            
+            // Si on n'a pas trouvé de conteneur approprié, utiliser le root
+            if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
+                targetContainer = window.mainLayout.root.contentItems[0];
+            }
+            
             // Sinon, créer un nouvel onglet
-            window.mainLayout.root.contentItems[0].addChild({
+            targetContainer.addChild({
                 type: 'component',
                 componentName: 'geocache-solver',
                 title: title,
@@ -1252,8 +1315,32 @@ window.openFormulaSolverTab = function(geocacheId = null, gcCode = null) {
             // Si l'onglet existe, le mettre en focus
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
+            // Vérifier si les onglets doivent s'ouvrir dans la même section
+            let openInSameSection = true; // Valeur par défaut
+            
+            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
+            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+                console.log(`=== DEBUG: openFormulaSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
+            }
+            
+            // Trouver le conteneur actif où ajouter le composant
+            let targetContainer = openInSameSection ? 
+                window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
+                window.mainLayout.root.contentItems[0];
+            
+            // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
+            while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                targetContainer = targetContainer.parent;
+            }
+            
+            // Si on n'a pas trouvé de conteneur approprié, utiliser le root
+            if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
+                targetContainer = window.mainLayout.root.contentItems[0];
+            }
+            
             // Sinon, créer un nouvel onglet
-            window.mainLayout.root.contentItems[0].addChild({
+            targetContainer.addChild({
                 type: 'component',
                 componentName: 'FormulaSolver',
                 title: title,

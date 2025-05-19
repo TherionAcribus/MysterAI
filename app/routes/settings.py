@@ -46,7 +46,8 @@ def get_general_settings():
         settings = {
             'auto_mark_solved': AppConfig.get_value('auto_mark_solved', True),
             'auto_correct_coordinates': AppConfig.get_value('auto_correct_coordinates', True),
-            'enable_auto_scoring': AppConfig.get_value('enable_auto_scoring', True)
+            'enable_auto_scoring': AppConfig.get_value('enable_auto_scoring', True),
+            'open_tabs_in_same_section': AppConfig.get_value('open_tabs_in_same_section', True)
         }
         
         logger.info(f"=== DEBUG: Paramètres récupérés: {settings} ===")
@@ -121,6 +122,13 @@ def save_general_settings():
             data.get('enable_auto_scoring', True),
             category='general',
             description='Activer le système de scoring automatique pour évaluer la pertinence des résultats de déchiffrement'
+        )
+        
+        AppConfig.set_value(
+            'open_tabs_in_same_section', 
+            data.get('open_tabs_in_same_section', True),
+            category='general',
+            description='Ouvrir automatiquement les nouveaux onglets dans le même ensemble plutôt que dans une section différente (GoldenLayout)'
         )
         
         logger.info("=== DEBUG: Paramètres enregistrés avec succès ===")
