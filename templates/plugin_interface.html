@@ -414,6 +414,107 @@
                                 });
                                 document.dispatchEvent(event);
                                 coordinatesFound = true;
+                                
+                                // Afficher automatiquement le point sur la carte
+                                try {
+                                    // Convertir directement les coordonnées DDM en décimales
+                                    // Extraire les composants pour la latitude
+                                    const latMatch = coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                                    const lonMatch = coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                                    
+                                    if (latMatch && lonMatch) {
+                                        const latDir = latMatch[1].toUpperCase();
+                                        const latDeg = parseInt(latMatch[2], 10);
+                                        const latMin = parseFloat(latMatch[3]);
+                                        
+                                        const lonDir = lonMatch[1].toUpperCase();
+                                        const lonDeg = parseInt(lonMatch[2], 10);
+                                        const lonMin = parseFloat(lonMatch[3]);
+                                        
+                                        // Calculer les coordonnées décimales
+                                        let latitude = latDeg + (latMin / 60);
+                                        if (latDir === 'S') latitude = -latitude;
+                                        
+                                        let longitude = lonDeg + (lonMin / 60);
+                                        if (lonDir === 'W') longitude = -longitude;
+                                        
+                                        // Récupérer l'ID de la géocache associée si disponible
+                                        const geocache = loadGeocacheAssociation(rootElement);
+                                        if (geocache && geocache.databaseId) {
+                                            console.log("Affichage automatique du point sur la carte (format standardisé) avec coordonnées:", latitude, longitude);
+                                            
+                                            // Créer et envoyer directement l'événement d'ajout de point
+                                            const pointData = {
+                                                latitude: latitude,
+                                                longitude: longitude,
+                                                geocacheId: geocache.databaseId,
+                                                source: 'plugin',
+                                                label: `Point détecté par plugin`
+                                            };
+                                            
+                                            const event = new CustomEvent('addCalculatedPointToMap', {
+                                                detail: pointData,
+                                                bubbles: true
+                                            });
+                                            
+                                            // Déclencher l'événement
+                                            window.dispatchEvent(event);
+                                            
+                                            // Ajouter un indicateur visuel
+                                            const buttonContainer = rootElement.querySelector('.show-on-map');
+                                            if (buttonContainer) {
+                                                const message = document.createElement('div');
+                                                message.className = 'text-xs text-green-400 mt-1';
+                                                message.textContent = 'Point automatiquement affiché sur la carte';
+                                                buttonContainer.parentNode.appendChild(message);
+                                            }
+                                        } else if (geocache && geocache.code) {
+                                            // Si nous avons le code mais pas l'ID, récupérer l'ID d'abord
+                                            console.log("Récupération de l'ID de géocache pour affichage automatique");
+                                            fetch(`/api/geocaches/by-code/${geocache.code}`)
+                                                .then(response => response.json())
+                                                .then(data => {
+                                                    // Sauvegarder l'ID et déclencher l'affichage
+                                                    geocache.databaseId = data.id;
+                                                    saveGeocacheAssociation(rootElement, geocache);
+                                                    
+                                                    // Maintenant envoyer l'événement
+                                                    const pointData = {
+                                                        latitude: latitude,
+                                                        longitude: longitude,
+                                                        geocacheId: data.id,
+                                                        source: 'plugin',
+                                                        label: `Point détecté par plugin`
+                                                    };
+                                                    
+                                                    const event = new CustomEvent('addCalculatedPointToMap', {
+                                                        detail: pointData,
+                                                        bubbles: true
+                                                    });
+                                                    
+                                                    window.dispatchEvent(event);
+                                                    
+                                                    // Ajouter un indicateur visuel
+                                                    const buttonContainer = rootElement.querySelector('.show-on-map');
+                                                    if (buttonContainer) {
+                                                        const message = document.createElement('div');
+                                                        message.className = 'text-xs text-green-400 mt-1';
+                                                        message.textContent = 'Point automatiquement affiché sur la carte';
+                                                        buttonContainer.parentNode.appendChild(message);
+                                                    }
+                                                })
+                                                .catch(error => {
+                                                    console.error("Erreur lors de la récupération de l'ID de géocache:", error);
+                                                });
+                                        } else {
+                                            console.warn("Pas de géocache associée pour l'affichage automatique");
+                                        }
+                                    } else {
+                                        console.warn("Format de coordonnées non reconnu pour l'affichage automatique");
+                                    }
+                                } catch (error) {
+                                    console.error("Erreur lors de l'affichage automatique du point:", error);
+                                }
                             }
                     } 
                     // Pour l'ancien format
@@ -431,6 +532,111 @@
                         // Rendre visible la section des coordonnées
                         const coordSection = rootElement.querySelector('[data-plugin-interface-target="coordinatesSection"]');
                         if (coordSection) coordSection.classList.remove('hidden');
+                        
+                        // Afficher automatiquement le point sur la carte
+                        try {
+                            // Convertir directement les coordonnées DDM en décimales
+                            // Extraire les composants pour la latitude
+                            const latMatch = data.coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            const lonMatch = data.coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            
+                            if (latMatch && lonMatch) {
+                                const latDir = latMatch[1].toUpperCase();
+                                const latDeg = parseInt(latMatch[2], 10);
+                                const latMin = parseFloat(latMatch[3]);
+                                
+                                const lonDir = lonMatch[1].toUpperCase();
+                                const lonDeg = parseInt(lonMatch[2], 10);
+                                const lonMin = parseFloat(lonMatch[3]);
+                                
+                                // Calculer les coordonnées décimales
+                                let latitude = latDeg + (latMin / 60);
+                                if (latDir === 'S') latitude = -latitude;
+                                
+                                let longitude = lonDeg + (lonMin / 60);
+                                if (lonDir === 'W') longitude = -longitude;
+                                
+                                // Récupérer l'ID de la géocache associée si disponible
+                                const geocache = loadGeocacheAssociation(rootElement);
+                                if (geocache && geocache.databaseId) {
+                                    console.log("Affichage automatique du point sur la carte avec coordonnées:", latitude, longitude);
+                                    
+                                    // Créer et envoyer directement l'événement d'ajout de point
+                                    const pointData = {
+                                        latitude: latitude,
+                                        longitude: longitude,
+                                        geocacheId: geocache.databaseId,
+                                        source: 'plugin',
+                                        label: `Point détecté par plugin`
+                                    };
+                                    
+                                    const event = new CustomEvent('addCalculatedPointToMap', {
+                                        detail: pointData,
+                                        bubbles: true
+                                    });
+                                    
+                                    // Déclencher l'événement
+                                    window.dispatchEvent(event);
+                                    
+                                    // Ajouter un indicateur visuel
+                                    setTimeout(() => {
+                                        const buttonContainer = rootElement.querySelector('.show-on-map');
+                                        if (buttonContainer) {
+                                            const message = document.createElement('div');
+                                            message.className = 'text-xs text-green-400 mt-1';
+                                            message.textContent = 'Point automatiquement affiché sur la carte';
+                                            buttonContainer.parentNode.appendChild(message);
+                                        }
+                                    }, 500);
+                                } else if (geocache && geocache.code) {
+                                    // Si nous avons le code mais pas l'ID, récupérer l'ID d'abord
+                                    console.log("Récupération de l'ID de géocache pour affichage automatique");
+                                    fetch(`/api/geocaches/by-code/${geocache.code}`)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            // Sauvegarder l'ID et déclencher l'affichage
+                                            geocache.databaseId = data.id;
+                                            saveGeocacheAssociation(rootElement, geocache);
+                                            
+                                            // Maintenant envoyer l'événement
+                                            const pointData = {
+                                                latitude: latitude,
+                                                longitude: longitude,
+                                                geocacheId: data.id,
+                                                source: 'plugin',
+                                                label: `Point détecté par plugin`
+                                            };
+                                            
+                                            const event = new CustomEvent('addCalculatedPointToMap', {
+                                                detail: pointData,
+                                                bubbles: true
+                                            });
+                                            
+                                            window.dispatchEvent(event);
+                                            
+                                            // Ajouter un indicateur visuel
+                                            setTimeout(() => {
+                                                const buttonContainer = rootElement.querySelector('.show-on-map');
+                                                if (buttonContainer) {
+                                                    const message = document.createElement('div');
+                                                    message.className = 'text-xs text-green-400 mt-1';
+                                                    message.textContent = 'Point automatiquement affiché sur la carte';
+                                                    buttonContainer.parentNode.appendChild(message);
+                                                }
+                                            }, 500);
+                                        })
+                                        .catch(error => {
+                                            console.error("Erreur lors de la récupération de l'ID de géocache:", error);
+                                        });
+                                } else {
+                                    console.warn("Pas de géocache associée pour l'affichage automatique");
+                                }
+                            } else {
+                                console.warn("Format de coordonnées non reconnu pour l'affichage automatique");
+                            }
+                        } catch (error) {
+                            console.error("Erreur lors de l'affichage automatique du point:", error);
+                        }
                     }
                     // Vérifier également dans data.scoring
                     else if (data.scoring && data.scoring.coordinates && data.scoring.coordinates.exist) {
@@ -446,6 +652,111 @@
                         // Rendre visible la section des coordonnées
                         const coordSection = rootElement.querySelector('[data-plugin-interface-target="coordinatesSection"]');
                         if (coordSection) coordSection.classList.remove('hidden');
+                        
+                        // Afficher automatiquement le point sur la carte
+                        try {
+                            // Convertir directement les coordonnées DDM en décimales
+                            // Extraire les composants pour la latitude
+                            const latMatch = data.scoring.coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            const lonMatch = data.scoring.coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            
+                            if (latMatch && lonMatch) {
+                                const latDir = latMatch[1].toUpperCase();
+                                const latDeg = parseInt(latMatch[2], 10);
+                                const latMin = parseFloat(latMatch[3]);
+                                
+                                const lonDir = lonMatch[1].toUpperCase();
+                                const lonDeg = parseInt(lonMatch[2], 10);
+                                const lonMin = parseFloat(lonMatch[3]);
+                                
+                                // Calculer les coordonnées décimales
+                                let latitude = latDeg + (latMin / 60);
+                                if (latDir === 'S') latitude = -latitude;
+                                
+                                let longitude = lonDeg + (lonMin / 60);
+                                if (lonDir === 'W') longitude = -longitude;
+                                
+                                // Récupérer l'ID de la géocache associée si disponible
+                                const geocache = loadGeocacheAssociation(rootElement);
+                                if (geocache && geocache.databaseId) {
+                                    console.log("Affichage automatique du point sur la carte (format scoring) avec coordonnées:", latitude, longitude);
+                                    
+                                    // Créer et envoyer directement l'événement d'ajout de point
+                                    const pointData = {
+                                        latitude: latitude,
+                                        longitude: longitude,
+                                        geocacheId: geocache.databaseId,
+                                        source: 'plugin',
+                                        label: `Point détecté par plugin`
+                                    };
+                                    
+                                    const event = new CustomEvent('addCalculatedPointToMap', {
+                                        detail: pointData,
+                                        bubbles: true
+                                    });
+                                    
+                                    // Déclencher l'événement
+                                    window.dispatchEvent(event);
+                                    
+                                    // Ajouter un indicateur visuel
+                                    setTimeout(() => {
+                                        const buttonContainer = rootElement.querySelector('.show-on-map');
+                                        if (buttonContainer) {
+                                            const message = document.createElement('div');
+                                            message.className = 'text-xs text-green-400 mt-1';
+                                            message.textContent = 'Point automatiquement affiché sur la carte';
+                                            buttonContainer.parentNode.appendChild(message);
+                                        }
+                                    }, 500);
+                                } else if (geocache && geocache.code) {
+                                    // Si nous avons le code mais pas l'ID, récupérer l'ID d'abord
+                                    console.log("Récupération de l'ID de géocache pour affichage automatique");
+                                    fetch(`/api/geocaches/by-code/${geocache.code}`)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            // Sauvegarder l'ID et déclencher l'affichage
+                                            geocache.databaseId = data.id;
+                                            saveGeocacheAssociation(rootElement, geocache);
+                                            
+                                            // Maintenant envoyer l'événement
+                                            const pointData = {
+                                                latitude: latitude,
+                                                longitude: longitude,
+                                                geocacheId: data.id,
+                                                source: 'plugin',
+                                                label: `Point détecté par plugin`
+                                            };
+                                            
+                                            const event = new CustomEvent('addCalculatedPointToMap', {
+                                                detail: pointData,
+                                                bubbles: true
+                                            });
+                                            
+                                            window.dispatchEvent(event);
+                                            
+                                            // Ajouter un indicateur visuel
+                                            setTimeout(() => {
+                                                const buttonContainer = rootElement.querySelector('.show-on-map');
+                                                if (buttonContainer) {
+                                                    const message = document.createElement('div');
+                                                    message.className = 'text-xs text-green-400 mt-1';
+                                                    message.textContent = 'Point automatiquement affiché sur la carte';
+                                                    buttonContainer.parentNode.appendChild(message);
+                                                }
+                                            }, 500);
+                                        })
+                                        .catch(error => {
+                                            console.error("Erreur lors de la récupération de l'ID de géocache:", error);
+                                        });
+                                } else {
+                                    console.warn("Pas de géocache associée pour l'affichage automatique");
+                                }
+                            } else {
+                                console.warn("Format de coordonnées non reconnu pour l'affichage automatique");
+                            }
+                        } catch (error) {
+                            console.error("Erreur lors de l'affichage automatique du point (format scoring):", error);
+                        }
                     }
                     
                     // Si aucune coordonnée n'est trouvée, émettre un événement avec exist=false
@@ -558,6 +869,13 @@
                                                     data-lat="${coordinates.ddm_lat || ''}" 
                                                     data-lon="${coordinates.ddm_lon || ''}">
                                                 Créer WP auto
+                                            </button>
+                                            <button type="button" 
+                                                    class="text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded cursor-pointer show-on-map"
+                                                    data-ddm="${coordinates.ddm || ''}" 
+                                                    data-lat="${coordinates.ddm_lat || ''}" 
+                                                    data-lon="${coordinates.ddm_lon || ''}">
+                                                Afficher sur la carte
                                             </button>
                                         </div>
                                     </div>
@@ -919,6 +1237,286 @@
                                 this,
                                 pluginName
                             );
+                        }
+                    }
+                } else {
+                    console.error("Impossible de trouver l'élément parent avec data-controller='plugin-interface'");
+                }
+            });
+        });
+        
+        // Gestion des boutons "Afficher sur la carte"
+        document.querySelectorAll('.show-on-map').forEach(button => {
+            if (button.dataset.eventSetup) return; // Éviter la duplication des événements
+            
+            button.dataset.eventSetup = "true";
+            button.addEventListener('click', function(event) {
+                // Récupérer les coordonnées du bouton
+                const coordinates = {
+                    ddm: this.dataset.ddm,
+                    ddm_lat: this.dataset.lat,
+                    ddm_lon: this.dataset.lon
+                };
+                
+                if (!coordinates.ddm || !coordinates.ddm_lat || !coordinates.ddm_lon) {
+                    console.error("Coordonnées manquantes dans les attributs data du bouton");
+                    showNotification('Erreur: coordonnées manquantes', 'bg-red-600');
+                    return;
+                }
+                
+                // Trouver le contrôleur Stimulus
+                const element = this.closest('[data-controller="plugin-interface"]');
+                if (element) {
+                    // Chercher le contrôleur Stimulus
+                    const controller = window.StimulusApp && window.StimulusApp.controllers.find(
+                        c => c.context.identifier === 'plugin-interface' && c.element === element
+                    );
+                    
+                                         if (controller && typeof controller.convertGCCoordsToDecimal === 'function' && typeof controller.addCalculatedPointToMap === 'function') {
+                        // Utiliser les méthodes du contrôleur Stimulus
+                        const decimalCoords = controller.convertGCCoordsToDecimal(coordinates.ddm_lat, coordinates.ddm_lon);
+                        if (decimalCoords) {
+                            // Feedback visuel immédiat
+                            const originalText = this.textContent;
+                            this.innerHTML = '⌛ En cours...';
+                            this.classList.add('bg-blue-800');
+                            this.classList.remove('bg-green-700', 'hover:bg-green-600');
+                            
+                            // Afficher le point sur la carte (récupère l'ID de la géocache si nécessaire)
+                            controller.addCalculatedPointToMap(decimalCoords.latitude, decimalCoords.longitude);
+                            
+                            // Mettre à jour l'apparence du bouton après un court délai
+                            setTimeout(() => {
+                                this.innerHTML = '✓ Affiché!';
+                                this.classList.remove('bg-blue-800');
+                                this.classList.add('bg-green-800');
+                                
+                                // Restaurer après un délai plus long
+                                setTimeout(() => {
+                                    this.textContent = originalText;
+                                    this.classList.remove('bg-green-800');
+                                    this.classList.add('bg-green-700', 'hover:bg-green-600');
+                                }, 1500);
+                            }, 500);
+                        } else {
+                            showNotification('Erreur: impossible de convertir les coordonnées', 'bg-red-600');
+                        }
+                    } else {
+                        // Fallback si le contrôleur n'est pas disponible
+                        console.warn("Contrôleur Stimulus non trouvé ou méthodes manquantes, utilisation du comportement par défaut");
+                        
+                        // Récupérer la géocache associée
+                        const pluginName = element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
+                        let geocache = null;
+                        
+                        if (pluginName) {
+                            const storageKey = `plugin_${pluginName}_geocache`;
+                            const savedGeocache = sessionStorage.getItem(storageKey);
+                            if (savedGeocache) {
+                                try {
+                                    geocache = JSON.parse(savedGeocache);
+                                } catch (e) {
+                                    console.error("Erreur lors du chargement de la géocache associée:", e);
+                                }
+                            }
+                        }
+                        
+                        // Si aucune géocache n'est trouvée, essayer d'utiliser la variable globale
+                        if (!geocache && window.lastAssociatedGeocache) {
+                            geocache = window.lastAssociatedGeocache;
+                        }
+                        
+                        // Si nous n'avons pas de géocache associée, afficher une erreur
+                        if (!geocache || !geocache.code) {
+                            showNotification('Erreur: aucune géocache associée', 'bg-red-600');
+                            return;
+                        }
+                        
+                        // Sauvegarde du bouton pour les callbacks
+                        const buttonElement = this;
+                        const originalText = buttonElement.textContent;
+                        
+                        // Si nous n'avons pas d'ID de base de données, le récupérer d'abord
+                        if (!geocache.databaseId) {
+                            // Afficher l'état de chargement sur le bouton
+                            buttonElement.disabled = true;
+                            buttonElement.innerHTML = '⌛ Chargement...';
+                            buttonElement.classList.add('bg-blue-800');
+                            buttonElement.classList.remove('bg-green-700', 'hover:bg-green-600');
+                            
+                            // Récupérer l'ID de la géocache à partir du code GC
+                            fetch(`/api/geocaches/by-code/${geocache.code}`)
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error(`Impossible de récupérer les détails de la géocache`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    // Mettre à jour l'ID et sauvegarder
+                                    geocache.databaseId = data.id;
+                                    if (pluginName) {
+                                        const storageKey = `plugin_${pluginName}_geocache`;
+                                        sessionStorage.setItem(storageKey, JSON.stringify(geocache));
+                                    }
+                                    
+                                    // Mettre à jour window.lastAssociatedGeocache également
+                                    if (window.lastAssociatedGeocache) {
+                                        window.lastAssociatedGeocache.databaseId = data.id;
+                                    }
+                                    
+                                    // Réactiver le bouton
+                                    buttonElement.disabled = false;
+                                    
+                                    // Continuer avec la conversion des coordonnées
+                                    try {
+                                        // Extraire les composants pour la latitude
+                                        const latMatch = coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                                        if (!latMatch) {
+                                            showNotification('Format de latitude non reconnu', 'bg-red-600');
+                                            buttonElement.innerHTML = originalText;
+                                            buttonElement.classList.remove('bg-blue-800');
+                                            buttonElement.classList.add('bg-green-700', 'hover:bg-green-600');
+                                            return;
+                                        }
+                                        
+                                        const latDir = latMatch[1].toUpperCase();
+                                        const latDeg = parseInt(latMatch[2], 10);
+                                        const latMin = parseFloat(latMatch[3]);
+                                        
+                                        // Extraire les composants pour la longitude
+                                        const lonMatch = coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                                        if (!lonMatch) {
+                                            showNotification('Format de longitude non reconnu', 'bg-red-600');
+                                            buttonElement.innerHTML = originalText;
+                                            buttonElement.classList.remove('bg-blue-800');
+                                            buttonElement.classList.add('bg-green-700', 'hover:bg-green-600');
+                                            return;
+                                        }
+                                        
+                                        const lonDir = lonMatch[1].toUpperCase();
+                                        const lonDeg = parseInt(lonMatch[2], 10);
+                                        const lonMin = parseFloat(lonMatch[3]);
+                                        
+                                        // Calculer les coordonnées décimales
+                                        let latitude = latDeg + (latMin / 60);
+                                        if (latDir === 'S') latitude = -latitude;
+                                        
+                                        let longitude = lonDeg + (lonMin / 60);
+                                        if (lonDir === 'W') longitude = -longitude;
+                                        
+                                        // Créer et envoyer l'événement
+                                        const pointData = {
+                                            latitude: latitude,
+                                            longitude: longitude,
+                                            geocacheId: geocache.databaseId,
+                                            source: 'plugin',
+                                            label: `Point détecté par ${pluginName || 'plugin'}`
+                                        };
+                                        
+                                        const event = new CustomEvent('addCalculatedPointToMap', {
+                                            detail: pointData,
+                                            bubbles: true
+                                        });
+                                        
+                                        window.dispatchEvent(event);
+                                        
+                                        // Feedback visuel
+                                        buttonElement.innerHTML = '✓ Affiché!';
+                                        buttonElement.classList.remove('bg-blue-800');
+                                        buttonElement.classList.add('bg-green-800');
+                                        
+                                        setTimeout(() => {
+                                            buttonElement.textContent = originalText;
+                                            buttonElement.classList.remove('bg-green-800');
+                                            buttonElement.classList.add('bg-green-700', 'hover:bg-green-600');
+                                        }, 1500);
+                                        
+                                        showNotification('Point affiché sur la carte', 'bg-green-600');
+                                    } catch (error) {
+                                        console.error("Erreur lors de la conversion des coordonnées:", error);
+                                        showNotification('Erreur lors de la conversion des coordonnées', 'bg-red-600');
+                                        buttonElement.innerHTML = originalText;
+                                        buttonElement.classList.remove('bg-blue-800');
+                                        buttonElement.classList.add('bg-green-700', 'hover:bg-green-600');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error("Erreur lors de la récupération de l'ID:", error);
+                                    buttonElement.disabled = false;
+                                    buttonElement.innerHTML = originalText;
+                                    buttonElement.classList.remove('bg-blue-800');
+                                    buttonElement.classList.add('bg-green-700', 'hover:bg-green-600');
+                                    showNotification('Erreur: ' + error.message, 'bg-red-600');
+                                });
+                            return;
+                        }
+                        
+                        // Si nous avons déjà l'ID, convertir directement les coordonnées
+                        // Convertir les coordonnées DMM en décimales
+                        try {
+                            // Extraire les composants pour la latitude
+                            const latMatch = coordinates.ddm_lat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            if (!latMatch) {
+                                showNotification('Format de latitude non reconnu', 'bg-red-600');
+                                return;
+                            }
+                            
+                            const latDir = latMatch[1].toUpperCase();
+                            const latDeg = parseInt(latMatch[2], 10);
+                            const latMin = parseFloat(latMatch[3]);
+                            
+                            // Extraire les composants pour la longitude
+                            const lonMatch = coordinates.ddm_lon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+                            if (!lonMatch) {
+                                showNotification('Format de longitude non reconnu', 'bg-red-600');
+                                return;
+                            }
+                            
+                            const lonDir = lonMatch[1].toUpperCase();
+                            const lonDeg = parseInt(lonMatch[2], 10);
+                            const lonMin = parseFloat(lonMatch[3]);
+                            
+                            // Calculer les coordonnées décimales
+                            let latitude = latDeg + (latMin / 60);
+                            if (latDir === 'S') latitude = -latitude;
+                            
+                            let longitude = lonDeg + (lonMin / 60);
+                            if (lonDir === 'W') longitude = -longitude;
+                            
+                            // Créer et envoyer l'événement
+                            const pointData = {
+                                latitude: latitude,
+                                longitude: longitude,
+                                geocacheId: geocache.databaseId,
+                                source: 'plugin',
+                                label: `Point détecté par ${pluginName || 'plugin'}`
+                            };
+                            
+                            const event = new CustomEvent('addCalculatedPointToMap', {
+                                detail: pointData,
+                                bubbles: true
+                            });
+                            
+                            window.dispatchEvent(event);
+                            
+                            // Feedback visuel
+                            const originalText = this.textContent;
+                            this.innerHTML = '✓ Affiché!';
+                            this.classList.add('bg-green-800');
+                            this.classList.remove('bg-green-700', 'hover:bg-green-600');
+                            
+                            setTimeout(() => {
+                                this.textContent = originalText;
+                                this.classList.remove('bg-green-800');
+                                this.classList.add('bg-green-700', 'hover:bg-green-600');
+                            }, 1500);
+                            
+                            showNotification('Point affiché sur la carte', 'bg-green-600');
+                            
+                        } catch (error) {
+                            console.error("Erreur lors de la conversion des coordonnées:", error);
+                            showNotification('Erreur lors de la conversion des coordonnées', 'bg-red-600');
                         }
                     }
                 } else {

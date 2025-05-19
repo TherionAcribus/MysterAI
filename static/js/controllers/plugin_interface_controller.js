@@ -1280,6 +1280,112 @@ class PluginInterfaceController extends Controller {
         this.showSuccessMessage("Création du waypoint en cours...");
     }
     
+    // Méthode pour afficher un point sur la carte
+    addCalculatedPointToMap(latitude, longitude, label) {
+        // Vérifier si nous avons une géocache associée
+        if (!this.associatedGeocache || !this.associatedGeocache.code) {
+            console.error("Impossible d'afficher le point sur la carte: pas de géocache associée");
+            this.showErrorMessage("Vous devez d'abord associer une géocache pour afficher un point sur la carte");
+            return;
+        }
+
+        console.log(`Préparation de l'ajout d'un point sur la carte: ${latitude}, ${longitude}`);
+        
+        // Si nous n'avons pas d'ID de base de données, le récupérer d'abord
+        if (!this.associatedGeocache.databaseId) {
+            console.log("Récupération de l'ID de base de données pour la géocache", this.associatedGeocache.code);
+            
+            // Afficher un message temporaire
+            this.showSuccessMessage("Récupération des données de la géocache...");
+            
+            // Récupérer l'ID de la géocache à partir du code GC
+            fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Impossible de récupérer les détails de la géocache`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Données de géocache récupérées:", data);
+                    
+                    // Mettre à jour l'ID de la géocache dans l'objet associé
+                    this.associatedGeocache.databaseId = data.id;
+                    
+                    // Sauvegarder cette mise à jour
+                    this.saveGeocacheAssociation();
+                    
+                    // Maintenant que nous avons l'ID, afficher le point
+                    this._displayCalculatedPoint(latitude, longitude, label);
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la récupération de l'ID de géocache:", error);
+                    this.showErrorMessage(`Erreur: ${error.message}`);
+                });
+        } else {
+            // Nous avons déjà l'ID, afficher directement le point
+            this._displayCalculatedPoint(latitude, longitude, label);
+        }
+    }
+    
+    // Méthode interne pour envoyer l'événement d'ajout de point à la carte
+    _displayCalculatedPoint(latitude, longitude, label) {
+        console.log(`Ajout d'un point sur la carte: ${latitude}, ${longitude} (ID géocache: ${this.associatedGeocache.databaseId})`);
+
+        // Créer l'événement pour ajouter le point à la carte
+        const pointData = {
+            latitude: latitude,
+            longitude: longitude,
+            geocacheId: this.associatedGeocache.databaseId,
+            source: 'plugin',
+            label: label || `Point détecté par ${this.pluginName || 'plugin'}`
+        };
+
+        const event = new CustomEvent('addCalculatedPointToMap', {
+            detail: pointData,
+            bubbles: true
+        });
+
+        // Déclencher l'événement
+        window.dispatchEvent(event);
+        
+        // Ajouter un message de confirmation
+        this.showSuccessMessage("Point affiché sur la carte");
+    }
+    
+    // Fonction pour convertir les coordonnées DDM en décimales
+    convertGCCoordsToDecimal(gcLat, gcLon) {
+        try {
+            // Extraire les composants pour la latitude
+            const latMatch = gcLat.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+            if (!latMatch) return null;
+            
+            const latDir = latMatch[1].toUpperCase();
+            const latDeg = parseInt(latMatch[2], 10);
+            const latMin = parseFloat(latMatch[3]);
+            
+            // Extraire les composants pour la longitude
+            const lonMatch = gcLon.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)['']/i);
+            if (!lonMatch) return null;
+            
+            const lonDir = lonMatch[1].toUpperCase();
+            const lonDeg = parseInt(lonMatch[2], 10);
+            const lonMin = parseFloat(lonMatch[3]);
+            
+            // Calculer les coordonnées décimales
+            let latitude = latDeg + (latMin / 60);
+            if (latDir === 'S') latitude = -latitude;
+            
+            let longitude = lonDeg + (lonMin / 60);
+            if (lonDir === 'W') longitude = -longitude;
+            
+            return { latitude, longitude };
+        } catch (error) {
+            console.error("Erreur lors de la conversion des coordonnées:", error);
+            return null;
+        }
+    }
+    
     // Méthode pour nettoyer les associations de géocache dans le sessionStorage
     clearCachedAssociations() {
         // Nettoyer uniquement les associations obsolètes (pas de code GC)
