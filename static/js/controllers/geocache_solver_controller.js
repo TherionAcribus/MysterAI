@@ -852,10 +852,14 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     // Ajouter la nouvelle notification
                     resultContainer.appendChild(notificationDiv);
                     
-                    // Ajouter le bouton "Créer WP auto"
+                    // Ajouter les boutons d'action pour les coordonnées
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.className = 'flex flex-col sm:flex-row gap-2 mt-3';
+                    
+                    // Bouton "Créer WP auto"
                     const createWpBtn = document.createElement('button');
                     createWpBtn.id = 'create-wp-auto-btn';
-                    createWpBtn.className = 'mt-3 flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors';
+                    createWpBtn.className = 'flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors';
                     createWpBtn.innerHTML = `
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5 5a3 3 0 015-2.236A3 3 0 0114.83 6H16a2 2 0 110 4h-5V9a1 1 0 10-2 0v1H4a2 2 0 110-4h1.17C5.06 5.687 5 5.35 5 5zm4 1V5a1 1 0 10-1 1h1zm3 0a1 1 0 10-1-1v1h1z" clip-rule="evenodd" />
@@ -864,7 +868,23 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         <span>Créer WP auto</span>
                     `;
                     createWpBtn.addEventListener('click', () => this.createWaypointAuto(coordinates));
-                    resultContainer.appendChild(createWpBtn);
+                    
+                    // Bouton "Ajouter WP" pour ouvrir le formulaire
+                    const addWpBtn = document.createElement('button');
+                    addWpBtn.id = 'add-wp-btn';
+                    addWpBtn.className = 'flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition-colors';
+                    addWpBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Ajouter WP</span>
+                    `;
+                    addWpBtn.addEventListener('click', () => this.addAsWaypoint(coordinates));
+                    
+                    // Ajouter les boutons au conteneur
+                    buttonsDiv.appendChild(createWpBtn);
+                    buttonsDiv.appendChild(addWpBtn);
+                    resultContainer.appendChild(buttonsDiv);
                 }
             } catch (error) {
                 console.error('Erreur lors de l\'exécution du plugin:', error);
@@ -2155,5 +2175,228 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 document.body.removeChild(notification);
             }, 500);
         }, 5000);
+    }
+    
+    // Ajouter les coordonnées détectées comme waypoint (ouverture du formulaire)
+    addAsWaypoint(coordinates = null) {
+        // Récupérer l'ID de la géocache
+        const geocacheId = this.geocacheIdValue;
+        if (!geocacheId) {
+            this.showNotification('ID de géocache non disponible', 'error');
+            return;
+        }
+        
+        // Vérifier si des coordonnées sont fournies
+        if (!coordinates && typeof coordinates !== 'object') {
+            // Si des coordonnées ne sont pas explicitement fournies, chercher à partir du contexte actuel
+            // (Cette partie est différente du Formula Solver car la structure est différente)
+            
+            // Chercher dans les éléments HTML qui pourraient contenir des coordonnées DDM
+            const coordElements = document.querySelectorAll('.coordinates-container, [data-coordinates]');
+            for (const el of coordElements) {
+                const coordText = el.getAttribute('data-coordinates') || el.textContent;
+                if (coordText) {
+                    coordinates = coordText.trim();
+                    break;
+                }
+            }
+            
+            // Si toujours pas de coordonnées, chercher si un point est affiché sur la carte
+            if (!coordinates) {
+                const mapNotif = document.querySelector('.map-point-notification');
+                if (mapNotif) {
+                    // Utiliser les coordonnées du dernier événement addCalculatedPointToMap si disponible
+                    // (Ceci est différent du Formula Solver, adapté à notre contexte)
+                    const lastCoords = this.lastDetectedCoordinatesValue;
+                    if (lastCoords && lastCoords.latitude !== undefined && lastCoords.longitude !== undefined) {
+                        coordinates = {
+                            latitude: lastCoords.latitude,
+                            longitude: lastCoords.longitude
+                        };
+                    }
+                }
+            }
+        }
+        
+        // Vérifier si nous avons des coordonnées à utiliser
+        if (!coordinates) {
+            this.showNotification('Aucune coordonnée détectée disponible', 'error');
+            return;
+        }
+        
+        console.log(`Ajout d'un waypoint avec coordonnées:`, coordinates);
+        
+        // Variables pour stocker les coordonnées au format GC
+        let gcLat, gcLon;
+        
+        // Traiter le cas où coordinates est un objet avec latitude/longitude (coordonnées décimales)
+        if (typeof coordinates === 'object' && coordinates.latitude !== undefined && coordinates.longitude !== undefined) {
+            console.log("Conversion des coordonnées décimales en format standard");
+            // Convertir les coordonnées décimales en format standard
+            const latDegrees = Math.floor(Math.abs(coordinates.latitude));
+            const latMinutes = (Math.abs(coordinates.latitude) - latDegrees) * 60;
+            const lonDegrees = Math.floor(Math.abs(coordinates.longitude));
+            const lonMinutes = (Math.abs(coordinates.longitude) - lonDegrees) * 60;
+            
+            const latDir = coordinates.latitude >= 0 ? 'N' : 'S';
+            const lonDir = coordinates.longitude >= 0 ? 'E' : 'W';
+            
+            gcLat = `${latDir} ${latDegrees}° ${latMinutes.toFixed(3)}'`;
+            gcLon = `${lonDir} ${lonDegrees}° ${lonMinutes.toFixed(3)}'`;
+            
+            coordinates = `${gcLat} ${gcLon}`;
+        } 
+        // Traiter le cas où coordinates est une chaîne (format DDM)
+        else if (typeof coordinates === 'string') {
+            console.log("Utilisation des coordonnées au format texte:", coordinates);
+            // Extraire les coordonnées au format standard
+            const coordParts = coordinates.match(/([NS][^EW]+)([EW].+)/);
+            if (coordParts && coordParts.length >= 3) {
+                gcLat = coordParts[1].trim();
+                gcLon = coordParts[2].trim();
+            } else {
+                // Tentative alternative avec un autre format
+                const parts = coordinates.split(' ');
+                if (parts.length >= 2) {
+                    // Supposer que le premier élément est la latitude et le second la longitude
+                    gcLat = parts[0].trim();
+                    gcLon = parts[1].trim();
+                }
+            }
+        }
+        
+        // Vérifier si nous avons bien obtenu les coordonnées au format GC
+        if (!gcLat || !gcLon) {
+            this.showNotification('Format de coordonnées non reconnu', 'error');
+            return;
+        }
+        
+        // Trouver le panneau de détails de la géocache et le formulaire de waypoint
+        let waypointForm = document.querySelector('[data-controller="waypoint-form"]');
+        
+        if (!waypointForm) {
+            console.error("Panneau de détails de la géocache ou formulaire de waypoint non trouvé");
+            
+            // Proposer d'ouvrir automatiquement les détails de la géocache
+            const shouldOpenDetails = confirm(
+                'Le panneau des détails de la géocache n\'est pas ouvert.\n\n' +
+                'Pour ajouter un waypoint, vous devez ouvrir l\'onglet des détails de la géocache.\n\n' +
+                'Souhaitez-vous ouvrir l\'onglet des détails de la géocache maintenant?'
+            );
+            
+            if (shouldOpenDetails && window.openGeocacheDetailsTab) {
+                // Tenter d'ouvrir l'onglet des détails de la géocache
+                window.openGeocacheDetailsTab(geocacheId);
+                
+                // Afficher un message informant l'utilisateur de réessayer après l'ouverture
+                setTimeout(() => {
+                    alert('L\'onglet des détails de la géocache est en cours d\'ouverture.\nVeuillez réessayer d\'ajouter le waypoint dans quelques secondes.');
+                }, 500);
+            }
+            
+            return;
+        }
+        
+        // Générer un nom de waypoint par défaut
+        let waypointName = "Point détecté";
+        let pluginName = "Geocache Solver";
+        
+        // Utiliser le nom du dernier plugin exécuté s'il est disponible
+        if (this.pluginsHistoryValue && this.pluginsHistoryValue.length > 0) {
+            const lastPlugin = this.pluginsHistoryValue[this.pluginsHistoryValue.length - 1];
+            if (lastPlugin && lastPlugin.pluginName) {
+                pluginName = lastPlugin.pluginName;
+                waypointName = `Point ${pluginName}`;
+            }
+        }
+        
+        // Préparer les notes avec les informations disponibles
+        let notes = `Point détecté avec le plugin ${pluginName}.\nCoordonnées: ${coordinates}`;
+        
+        // Récupérer les éléments du formulaire
+        const prefixInput = waypointForm.querySelector('[data-waypoint-form-target="prefixInput"]');
+        const nameInput = waypointForm.querySelector('[data-waypoint-form-target="nameInput"]');
+        const gcLatInput = waypointForm.querySelector('[data-waypoint-form-target="gcLatInput"]');
+        const gcLonInput = waypointForm.querySelector('[data-waypoint-form-target="gcLonInput"]');
+        const noteInput = waypointForm.querySelector('[data-waypoint-form-target="noteInput"]');
+        const formToggleButton = waypointForm.querySelector('[data-action="click->waypoint-form#toggleForm"]');
+        const form = waypointForm.querySelector('[data-waypoint-form-target="form"]');
+        
+        // Afficher un message de succès pour le bouton "Ajouter WP"
+        const addWpBtn = document.getElementById('add-wp-btn');
+        if (addWpBtn) {
+            this.showAddWaypointSuccess(addWpBtn);
+        } else {
+            this.showNotification('Formulaire de waypoint ouvert', 'success');
+        }
+        
+        // Vérifier si le formulaire est actuellement caché et l'afficher si nécessaire
+        if (form && form.classList.contains('hidden') && formToggleButton) {
+            formToggleButton.click();
+        }
+        
+        // Remplir le formulaire avec les données calculées
+        if (prefixInput) prefixInput.value = "GS"; // Geocache Solver
+        if (nameInput) nameInput.value = waypointName;
+        if (gcLatInput && gcLat) gcLatInput.value = gcLat;
+        if (gcLonInput && gcLon) gcLonInput.value = gcLon;
+        if (noteInput) noteInput.value = notes;
+        
+        // Faire défiler jusqu'au formulaire pour que l'utilisateur puisse le voir
+        if (form) {
+            form.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    }
+    
+    showAddWaypointSuccess(button) {
+        // Sauvegarder le contenu original du bouton
+        button._originalHTML = button.innerHTML;
+        
+        // Changer temporairement le texte du bouton pour indiquer le succès
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Waypoint créé!</span>
+        `;
+        button.classList.remove("bg-green-600", "hover:bg-green-700");
+        button.classList.add("bg-teal-600", "hover:bg-teal-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = button._originalHTML;
+            button.classList.remove("bg-teal-600", "hover:bg-teal-700");
+            button.classList.add("bg-green-600", "hover:bg-green-700");
+        }, 2000);
+    }
+    
+    showAddWaypointError(message, button) {
+        console.error('Erreur lors de l\'ajout du waypoint:', message);
+        
+        // Sauvegarder le contenu original du bouton
+        button._originalHTML = button.innerHTML;
+        
+        // Déterminer le message à afficher
+        let displayMessage = "Erreur";
+        if (message) {
+            displayMessage = message;
+        }
+        
+        // Mettre à jour le bouton avec un message d'erreur
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>${displayMessage}</span>
+        `;
+        button.classList.remove("bg-green-600", "hover:bg-green-700");
+        button.classList.add("bg-red-600", "hover:bg-red-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = button._originalHTML;
+            button.classList.remove("bg-red-600", "hover:bg-red-700");
+            button.classList.add("bg-green-600", "hover:bg-green-700");
+        }, 3000); // Augmenter le délai pour donner à l'utilisateur plus de temps pour lire le message
     }
 }
