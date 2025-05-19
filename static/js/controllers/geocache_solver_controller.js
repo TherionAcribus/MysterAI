@@ -881,9 +881,23 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     `;
                     addWpBtn.addEventListener('click', () => this.addAsWaypoint(coordinates));
                     
+                    // Bouton "Copier les coordonnées"
+                    const copyBtn = document.createElement('button');
+                    copyBtn.id = 'copy-coords-btn';
+                    copyBtn.className = 'flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-colors';
+                    copyBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                        <span>Copier</span>
+                    `;
+                    copyBtn.addEventListener('click', () => this.copyCoordinates(coordinates));
+                    
                     // Ajouter les boutons au conteneur
                     buttonsDiv.appendChild(createWpBtn);
                     buttonsDiv.appendChild(addWpBtn);
+                    buttonsDiv.appendChild(copyBtn);
                     resultContainer.appendChild(buttonsDiv);
                 }
             } catch (error) {
@@ -2398,5 +2412,111 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             button.classList.remove("bg-red-600", "hover:bg-red-700");
             button.classList.add("bg-green-600", "hover:bg-green-700");
         }, 3000); // Augmenter le délai pour donner à l'utilisateur plus de temps pour lire le message
+    }
+    
+    // Copier les coordonnées GPS détectées dans le presse-papier
+    copyCoordinates(coordinates) {
+        try {
+            // Récupérer le format DDM des coordonnées
+            let coordText = "";
+            
+            // Si c'est un objet avec latitude/longitude (coordonnées décimales)
+            if (typeof coordinates === 'object' && coordinates.latitude !== undefined && coordinates.longitude !== undefined) {
+                // Convertir en format DDM
+                const latDegrees = Math.floor(Math.abs(coordinates.latitude));
+                const latMinutes = (Math.abs(coordinates.latitude) - latDegrees) * 60;
+                const lonDegrees = Math.floor(Math.abs(coordinates.longitude));
+                const lonMinutes = (Math.abs(coordinates.longitude) - lonDegrees) * 60;
+                
+                const latDir = coordinates.latitude >= 0 ? 'N' : 'S';
+                const lonDir = coordinates.longitude >= 0 ? 'E' : 'W';
+                
+                coordText = `${latDir} ${latDegrees}° ${latMinutes.toFixed(3)}' ${lonDir} ${lonDegrees}° ${lonMinutes.toFixed(3)}'`;
+            } 
+            // Si les coordonnées sont dans un format spécifique (chaîne avec attributs)
+            else if (typeof coordinates === 'object' && coordinates.ddm) {
+                coordText = coordinates.ddm;
+            }
+            // Si c'est une chaîne simple
+            else if (typeof coordinates === 'string') {
+                coordText = coordinates;
+            }
+            
+            // Vérifier si nous avons des coordonnées à copier
+            if (!coordText) {
+                throw new Error("Format de coordonnées non reconnu");
+            }
+            
+            // Copier dans le presse-papier
+            navigator.clipboard.writeText(coordText)
+                .then(() => {
+                    // Afficher un message de succès
+                    const copyBtn = document.getElementById('copy-coords-btn');
+                    if (copyBtn) {
+                        this.showCopySuccess(copyBtn);
+                    } else {
+                        this.showNotification('Coordonnées copiées!', 'success');
+                    }
+                })
+                .catch(err => {
+                    throw new Error(`Erreur lors de la copie: ${err.message}`);
+                });
+        } catch (error) {
+            console.error('Erreur lors de la copie des coordonnées:', error);
+            
+            // Afficher un message d'erreur
+            const copyBtn = document.getElementById('copy-coords-btn');
+            if (copyBtn) {
+                this.showCopyError(copyBtn, error.message);
+            } else {
+                this.showNotification(`Erreur: ${error.message}`, 'error');
+            }
+        }
+    }
+    
+    // Affiche un message de succès sur le bouton de copie
+    showCopySuccess(button) {
+        // Sauvegarder le contenu original du bouton
+        button._originalHTML = button.innerHTML;
+        
+        // Changer temporairement le texte du bouton pour indiquer le succès
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>Copié!</span>
+        `;
+        button.classList.remove("bg-purple-600", "hover:bg-purple-700");
+        button.classList.add("bg-green-600", "hover:bg-green-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = button._originalHTML;
+            button.classList.remove("bg-green-600", "hover:bg-green-700");
+            button.classList.add("bg-purple-600", "hover:bg-purple-700");
+        }, 2000);
+    }
+    
+    // Affiche un message d'erreur sur le bouton de copie
+    showCopyError(button, message = "Erreur") {
+        // Sauvegarder le contenu original du bouton
+        button._originalHTML = button.innerHTML;
+        
+        // Mettre à jour le bouton avec un message d'erreur
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Erreur</span>
+        `;
+        button.classList.remove("bg-purple-600", "hover:bg-purple-700");
+        button.classList.add("bg-red-600", "hover:bg-red-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = button._originalHTML;
+            button.classList.remove("bg-red-600", "hover:bg-red-700");
+            button.classList.add("bg-purple-600", "hover:bg-purple-700");
+        }, 3000);
     }
 }
