@@ -851,6 +851,20 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     resultContainer.querySelectorAll('.map-point-notification').forEach(el => el.remove());
                     // Ajouter la nouvelle notification
                     resultContainer.appendChild(notificationDiv);
+                    
+                    // Ajouter le bouton "Créer WP auto"
+                    const createWpBtn = document.createElement('button');
+                    createWpBtn.id = 'create-wp-auto-btn';
+                    createWpBtn.className = 'mt-3 flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors';
+                    createWpBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5 5a3 3 0 015-2.236A3 3 0 0114.83 6H16a2 2 0 110 4h-5V9a1 1 0 10-2 0v1H4a2 2 0 110-4h1.17C5.06 5.687 5 5.35 5 5zm4 1V5a1 1 0 10-1 1h1zm3 0a1 1 0 10-1-1v1h1z" clip-rule="evenodd" />
+                            <path d="M9 11H3v5a2 2 0 002 2h4v-7zM11 18h4a2 2 0 002-2v-5h-6v7z" />
+                        </svg>
+                        <span>Créer WP auto</span>
+                    `;
+                    createWpBtn.addEventListener('click', () => this.createWaypointAuto(coordinates));
+                    resultContainer.appendChild(createWpBtn);
                 }
             } catch (error) {
                 console.error('Erreur lors de l\'exécution du plugin:', error);
@@ -1748,5 +1762,398 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             console.error("Erreur lors de l'extraction des coordonnées numériques:", error);
             return null;
         }
+    }
+
+    // Méthode pour créer automatiquement un waypoint avec les coordonnées détectées
+    createWaypointAuto(coordinates = null) {
+        // Récupérer l'ID de la géocache
+        const geocacheId = this.geocacheIdValue;
+        if (!geocacheId) {
+            this.showNotification('ID de géocache manquant', 'error');
+            return;
+        }
+        
+        // Variables pour stocker les coordonnées
+        let gcLat, gcLon;
+        
+        // Si des coordonnées spécifiques sont fournies, les utiliser
+        if (coordinates && coordinates.latitude && coordinates.longitude) {
+            console.log(`Utilisation des coordonnées décimales fournies: ${coordinates.latitude}, ${coordinates.longitude}`);
+            
+            // Convertir les coordonnées décimales en format standard
+            const latDegrees = Math.floor(Math.abs(coordinates.latitude));
+            const latMinutes = (Math.abs(coordinates.latitude) - latDegrees) * 60;
+            const lonDegrees = Math.floor(Math.abs(coordinates.longitude));
+            const lonMinutes = (Math.abs(coordinates.longitude) - lonDegrees) * 60;
+            
+            const latDir = coordinates.latitude >= 0 ? 'N' : 'S';
+            const lonDir = coordinates.longitude >= 0 ? 'E' : 'W';
+            
+            gcLat = `${latDir} ${latDegrees}° ${latMinutes.toFixed(3)}'`;
+            gcLon = `${lonDir} ${lonDegrees}° ${lonMinutes.toFixed(3)}'`;
+            coordinates = `${gcLat} ${gcLon}`;
+        } else {
+            // Sinon, chercher les coordonnées dans le DOM (résultat du plugin)
+            console.log("Recherche des coordonnées dans les résultats de plugin...");
+            
+            // Chercher dans tous les conteneurs de résultats de plugin
+            const coordElements = document.querySelectorAll('.coordinates-container, [data-coordinates]');
+            
+            if (coordElements.length > 0) {
+                for (const el of coordElements) {
+                    const coordText = el.getAttribute('data-coordinates') || el.textContent;
+                    if (coordText) {
+                        coordinates = coordText.trim();
+                        break;
+                    }
+                }
+            }
+            
+            // Si toujours pas de coordonnées, essayer de les extraire des classes map-point-notification
+            if (!coordinates) {
+                // S'il y a une notification d'affichage de point sur la carte, 
+                // on peut supposer que des coordonnées existent
+                const mapNotif = document.querySelector('.map-point-notification');
+                if (mapNotif) {
+                    // Récupérer le dernier événement addCalculatedPointToMap
+                    const mapEvent = document.createEvent('CustomEvent');
+                    if (mapEvent && mapEvent.detail) {
+                        const detail = mapEvent.detail;
+                        if (detail.latitude && detail.longitude) {
+                            // Convertir les coordonnées décimales en format standard
+                            const latDegrees = Math.floor(Math.abs(detail.latitude));
+                            const latMinutes = (Math.abs(detail.latitude) - latDegrees) * 60;
+                            const lonDegrees = Math.floor(Math.abs(detail.longitude));
+                            const lonMinutes = (Math.abs(detail.longitude) - lonDegrees) * 60;
+                            
+                            const latDir = detail.latitude >= 0 ? 'N' : 'S';
+                            const lonDir = detail.longitude >= 0 ? 'E' : 'W';
+                            
+                            gcLat = `${latDir} ${latDegrees}° ${latMinutes.toFixed(3)}'`;
+                            gcLon = `${lonDir} ${lonDegrees}° ${lonMinutes.toFixed(3)}'`;
+                            coordinates = `${gcLat} ${gcLon}`;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Vérifier qu'on a bien des coordonnées
+        if (!coordinates) {
+            this.showNotification('Aucune coordonnée disponible', 'error');
+            return;
+        }
+        
+        console.log(`Coordonnées pour création de waypoint: ${coordinates}`);
+        
+        // Si nous n'avons pas encore extrait les parties latitude/longitude, le faire maintenant
+        if (!gcLat || !gcLon) {
+            const regex = /([NS][\s]*\d+°[\s]*\d+\.\d+)[\s]*([EW][\s]*\d+°[\s]*\d+\.\d+)/;
+            const match = coordinates.match(regex);
+            
+            if (!match || match.length < 3) {
+                this.showNotification('Format de coordonnées non reconnu', 'error');
+                return;
+            }
+            
+            gcLat = match[1].trim();
+            gcLon = match[2].trim();
+        }
+        
+        // Générer un nom de waypoint par défaut basé sur le plugin utilisé
+        let waypointName = "Point détecté";
+        let pluginName = "Geocache Solver";
+        
+        // Chercher le nom du dernier plugin utilisé
+        if (this.pluginsHistoryValue && this.pluginsHistoryValue.length > 0) {
+            const lastPlugin = this.pluginsHistoryValue[this.pluginsHistoryValue.length - 1];
+            if (lastPlugin && lastPlugin.pluginName) {
+                pluginName = lastPlugin.pluginName;
+                waypointName = `Point ${pluginName}`;
+            }
+        }
+        
+        // Préparer la note
+        let note = `Point détecté automatiquement avec le plugin ${pluginName}.\nCoordonnées: ${coordinates}`;
+        
+        // Préparer les données pour la création du waypoint
+        const waypointData = {
+            geocache_id: geocacheId,
+            name: waypointName,
+            prefix: "GS", // Geocache Solver
+            gc_lat: gcLat,
+            gc_lon: gcLon,
+            note: note
+        };
+        
+        // Afficher l'indicateur de chargement
+        const createWPBtn = document.getElementById('create-wp-auto-btn');
+        if (createWPBtn) {
+            this.showCreateWaypointAutoLoading('Création...', createWPBtn);
+        } else {
+            this.showNotification('Création du waypoint en cours...', 'info');
+        }
+        
+        // Appeler l'API pour créer le waypoint
+        fetch(`/api/geocaches/${geocacheId}/waypoints`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(waypointData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            // Vérifier d'abord le type de contenu pour savoir si on attend du JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            } else {
+                // Si ce n'est pas du JSON, traiter comme du texte
+                return response.text().then(text => {
+                    // Si la réponse est vide ou non-JSON, créer un objet factice avec les données essentielles
+                    console.log("Réponse non-JSON reçue:", text);
+                    return {
+                        id: new Date().getTime(), // ID temporaire unique
+                        name: waypointName,
+                        prefix: "GS",
+                        gc_lat: gcLat,
+                        gc_lon: gcLon,
+                        // Convertir les coordonnées GC en latitude/longitude
+                        latitude: this.convertGCToDecimal(gcLat, "lat"),
+                        longitude: this.convertGCToDecimal(gcLon, "lon"),
+                        note: note,
+                        _success: true // Marqueur indiquant que l'opération a réussi malgré la réponse non-JSON
+                    };
+                });
+            }
+        })
+        .then(data => {
+            // Vérifier si on a une structure de données valide
+            if (data && (data.id || data._success)) {
+                console.log("Waypoint créé avec succès:", data);
+                
+                if (createWPBtn) {
+                    this.showCreateWaypointAutoSuccess(createWPBtn);
+                } else {
+                    this.showNotification(`Waypoint "${waypointName}" créé avec succès!`, 'success');
+                }
+                
+                // Annoncer la création du waypoint pour mettre à jour la carte
+                const event = new CustomEvent('waypointSaved', {
+                    detail: {
+                        waypoint: data,
+                        geocacheId: geocacheId,
+                        isNew: true
+                    },
+                    bubbles: true
+                });
+                document.dispatchEvent(event);
+                
+                // Mettre à jour la liste des waypoints dans l'interface
+                this.updateWaypointsList(geocacheId);
+            } else {
+                throw new Error("Structure de données invalide ou incomplète");
+            }
+        })
+        .catch(error => {
+            console.error("Erreur lors de la création du waypoint:", error);
+            
+            if (createWPBtn) {
+                this.showCreateWaypointAutoError(error.message || "Erreur", createWPBtn);
+            } else {
+                this.showNotification(`Erreur lors de la création du waypoint: ${error.message || "Erreur inconnue"}`, 'error');
+            }
+        });
+    }
+    
+    // Méthode pour mettre à jour la liste des waypoints
+    async updateWaypointsList(geocacheId) {
+        try {
+            console.log("Mise à jour de la liste des waypoints...");
+            
+            // Trouver tous les conteneurs de liste de waypoints dans tous les onglets ouverts
+            const waypointsListContainers = document.querySelectorAll('[data-waypoint-form-target="waypointsList"]');
+            
+            if (waypointsListContainers.length === 0) {
+                console.warn("Aucun conteneur de liste de waypoints trouvé dans l'interface");
+                return;
+            }
+            
+            console.log(`Trouvé ${waypointsListContainers.length} conteneur(s) de liste de waypoints`);
+            
+            // Récupérer la liste mise à jour des waypoints
+            const listResponse = await fetch(`/api/geocaches/${geocacheId}/waypoints/list`);
+            
+            if (listResponse.ok) {
+                const listHtml = await listResponse.text();
+                
+                // Mettre à jour tous les conteneurs trouvés
+                waypointsListContainers.forEach((container, index) => {
+                    container.innerHTML = listHtml;
+                    console.log(`Liste des waypoints #${index+1} mise à jour avec succès`);
+                });
+                
+                // Déclencher un événement pour informer que les waypoints ont été mis à jour
+                document.dispatchEvent(new CustomEvent('waypointsListUpdated', {
+                    detail: { geocacheId: geocacheId }
+                }));
+            } else {
+                console.warn(`Échec de la récupération de la liste des waypoints: ${listResponse.status} ${listResponse.statusText}`);
+                
+                // Tentative alternative: recharger la section complète de waypoints
+                const fullListResponse = await fetch(`/geocaches/${geocacheId}/details-panel`);
+                if (fullListResponse.ok) {
+                    const fullHtml = await fullListResponse.text();
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = fullHtml;
+                    
+                    const newWaypointList = tempDiv.querySelector('#waypoints-list-container');
+                    if (newWaypointList) {
+                        waypointsListContainers.forEach((container, index) => {
+                            container.innerHTML = newWaypointList.innerHTML;
+                            console.log(`Liste des waypoints #${index+1} récupérée à partir des détails complets`);
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour de la liste des waypoints:", error);
+        }
+    }
+    
+    // Méthode utilitaire pour convertir les coordonnées GC en coordonnées décimales
+    convertGCToDecimal(coordStr, type) {
+        try {
+            if (type === "lat") {
+                // Format N/S DD° MM.MMM
+                const match = coordStr.match(/([NS])\s*(\d+)°\s*(\d+\.\d+)/);
+                if (match) {
+                    const direction = match[1];
+                    const degrees = parseInt(match[2]);
+                    const minutes = parseFloat(match[3]);
+                    let decimal = degrees + (minutes / 60);
+                    if (direction === 'S') decimal = -decimal;
+                    return decimal;
+                }
+            } else if (type === "lon") {
+                // Format E/W DDD° MM.MMM
+                const match = coordStr.match(/([EW])\s*(\d+)°\s*(\d+\.\d+)/);
+                if (match) {
+                    const direction = match[1];
+                    const degrees = parseInt(match[2]);
+                    const minutes = parseFloat(match[3]);
+                    let decimal = degrees + (minutes / 60);
+                    if (direction === 'W') decimal = -decimal;
+                    return decimal;
+                }
+            }
+            // En cas d'échec de parsing, retourner 0
+            return 0;
+        } catch (error) {
+            console.error("Erreur de conversion des coordonnées:", error);
+            return 0;
+        }
+    }
+    
+    // Afficher l'état de chargement du bouton "Créer WP auto"
+    showCreateWaypointAutoLoading(buttonText, button) {
+        // Sauvegarder le contenu original du bouton
+        button._originalHTML = button.innerHTML;
+        
+        // Mettre à jour le bouton avec l'animation de chargement
+        button.innerHTML = `
+            <svg class="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span>${buttonText}</span>
+        `;
+        button.disabled = true;
+        button.classList.add("opacity-75");
+    }
+    
+    // Afficher l'état de succès du bouton "Créer WP auto"
+    showCreateWaypointAutoSuccess(button) {
+        // Changer temporairement le texte du bouton pour indiquer le succès
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>WP créé!</span>
+        `;
+        button.disabled = false;
+        button.classList.remove("opacity-75");
+        button.classList.remove("bg-blue-600", "hover:bg-blue-700");
+        button.classList.add("bg-green-600", "hover:bg-green-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = button._originalHTML;
+            button.classList.remove("bg-green-600", "hover:bg-green-700");
+            button.classList.add("bg-blue-600", "hover:bg-blue-700");
+        }, 3000);
+    }
+    
+    // Afficher l'état d'erreur du bouton "Créer WP auto"
+    showCreateWaypointAutoError(message, button) {
+        // Sauvegarder le contenu original du bouton
+        const originalButtonHTML = button._originalHTML || button.innerHTML;
+        
+        // Mettre à jour le bouton avec un message d'erreur
+        button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>${message}</span>
+        `;
+        button.classList.remove("bg-blue-600", "hover:bg-blue-700");
+        button.classList.add("bg-red-600", "hover:bg-red-700");
+        
+        // Rétablir le bouton après un délai
+        setTimeout(() => {
+            button.innerHTML = originalButtonHTML;
+            button.classList.remove("bg-red-600", "hover:bg-red-700");
+            button.classList.add("bg-blue-600", "hover:bg-blue-700");
+        }, 3000);
+    }
+    
+    // Afficher une notification générale
+    showNotification(message, type = 'info') {
+        // Créer l'élément de notification
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-500 translate-y-0 z-50';
+
+        // Définir les styles en fonction du type
+        switch (type) {
+            case 'success':
+                notification.classList.add('bg-green-600', 'text-white');
+                break;
+            case 'error':
+                notification.classList.add('bg-red-600', 'text-white');
+                break;
+            case 'warning':
+                notification.classList.add('bg-yellow-500', 'text-gray-900');
+                break;
+            default: // info
+                notification.classList.add('bg-blue-600', 'text-white');
+                break;
+        }
+
+        // Définir le contenu de la notification
+        notification.innerHTML = message;
+
+        // Ajouter la notification au document
+        document.body.appendChild(notification);
+
+        // Supprimer la notification après un délai
+        setTimeout(() => {
+            notification.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 500);
+        }, 5000);
     }
 }
