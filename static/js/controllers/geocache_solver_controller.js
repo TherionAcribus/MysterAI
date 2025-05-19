@@ -649,6 +649,15 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                         </div>
                                     </div>
                                 </div>`;
+                            
+                            // Si les coordonnées ont des valeurs décimales, les mémoriser pour l'affichage sur la carte
+                            if (currentCoordinates.decimal && 
+                                currentCoordinates.decimal.latitude !== null && 
+                                currentCoordinates.decimal.longitude !== null) {
+                                
+                                coordinates = currentCoordinates.decimal;
+                                console.log("Coordonnées décimales trouvées:", coordinates);
+                            }
                         }
                         
                         resultHtml += `</div>`;
@@ -702,8 +711,26 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     // Vérifier si des coordonnées sont présentes dans l'ancien format
                     if (data.coordinates && data.coordinates.exist) {
                         coordinates = data.coordinates;
+                        
+                        // Si les coordonnées ont des valeurs décimales, les mémoriser pour l'affichage sur la carte
+                        if (data.coordinates.decimal && 
+                            data.coordinates.decimal.latitude !== null && 
+                            data.coordinates.decimal.longitude !== null) {
+                            
+                            coordinates = data.coordinates.decimal;
+                            console.log("Coordonnées décimales trouvées (format ancien):", coordinates);
+                        }
                     } else if (data.result && data.result.coordinates && data.result.coordinates.exist) {
                         coordinates = data.result.coordinates;
+                        
+                        // Si les coordonnées ont des valeurs décimales, les mémoriser pour l'affichage sur la carte
+                        if (data.result.coordinates.decimal && 
+                            data.result.coordinates.decimal.latitude !== null && 
+                            data.result.coordinates.decimal.longitude !== null) {
+                            
+                            coordinates = data.result.coordinates.decimal;
+                            console.log("Coordonnées décimales trouvées (dans result):", coordinates);
+                        }
                     }
                     
                     // Générer HTML pour l'affichage simple
@@ -799,6 +826,32 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     resultContainer.querySelector('button#apply-new-plugin-btn').parentNode.remove();
                 }
                 resultContainer.appendChild(buttonContainer);
+                
+                // Afficher automatiquement les coordonnées sur la carte si disponibles
+                if (coordinates && coordinates.latitude !== null && coordinates.longitude !== null) {
+                    console.log(`Affichage automatique du point sur la carte: ${coordinates.latitude}, ${coordinates.longitude}`);
+                    
+                    // Créer l'événement pour ajouter le point sur la carte
+                    const event = new CustomEvent('addCalculatedPointToMap', {
+                        detail: {
+                            latitude: coordinates.latitude,
+                            longitude: coordinates.longitude,
+                            label: 'Coordonnée détectée',
+                            color: 'rgba(0, 150, 255, 0.8)' // Bleu par défaut
+                        }
+                    });
+                    document.dispatchEvent(event);
+                    
+                    // Afficher une indication que le point a été ajouté
+                    const notificationDiv = document.createElement('div');
+                    notificationDiv.className = 'mt-2 text-sm text-green-500 map-point-notification';
+                    notificationDiv.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Point affiché sur la carte';
+                    
+                    // Supprimer les notifications précédentes de ce type
+                    resultContainer.querySelectorAll('.map-point-notification').forEach(el => el.remove());
+                    // Ajouter la nouvelle notification
+                    resultContainer.appendChild(notificationDiv);
+                }
             } catch (error) {
                 console.error('Erreur lors de l\'exécution du plugin:', error);
                 if (resultTextContainer) {

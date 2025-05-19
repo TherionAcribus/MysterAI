@@ -452,6 +452,9 @@ class PluginManager:
                         decoded_result["scoring"] = scoring_result
                         break
 
+        # Convertir toutes les coordonnées DDM en décimal avant de retourner le résultat
+        result = self._convert_all_coordinates(result)
+        
         return result
 
     def get_plugin_status(self) -> Dict[str, Dict]:
@@ -493,6 +496,49 @@ class PluginManager:
     # ---------------------------------------------------------
     # Méthodes internes
     # ---------------------------------------------------------
+
+    def _convert_all_coordinates(self, result_dict: Dict) -> Dict:
+        """
+        Parcourt récursivement le dictionnaire des résultats et convertit toutes 
+        les coordonnées DDM en coordonnées décimales.
+        
+        :param result_dict: Dictionnaire de résultats (peut contenir des structures imbriquées)
+        :return: Le dictionnaire avec toutes les coordonnées converties
+        """
+        from app.routes.coordinates import convert_ddm_to_decimal
+        
+        # Si ce n'est pas un dictionnaire, on ne fait rien
+        if not isinstance(result_dict, dict):
+            return result_dict
+            
+        # Vérifier si le dictionnaire actuel contient un objet coordinates
+        if 'coordinates' in result_dict and isinstance(result_dict['coordinates'], dict):
+            coords = result_dict['coordinates']
+            # Vérifier si c'est un objet coordinates avec DDM mais sans décimal
+            if coords.get('exist') and coords.get('ddm_lat') and coords.get('ddm_lon'):
+                # Si decimal est none ou contient des valeurs nulles, le recalculer
+                if not coords.get('decimal') or (
+                    isinstance(coords.get('decimal'), dict) and 
+                    (coords['decimal'].get('latitude') is None or coords['decimal'].get('longitude') is None)
+                ):
+                    print(f"[DEBUG] _convert_all_coordinates: Conversion des coordonnées: {coords['ddm_lat']} {coords['ddm_lon']}")
+                    decimal_coords = convert_ddm_to_decimal(coords['ddm_lat'], coords['ddm_lon'])
+                    coords['decimal'] = decimal_coords
+                    print(f"[DEBUG] _convert_all_coordinates: Coordonnées décimales ajoutées: {decimal_coords}")
+        
+        # Parcourir récursivement tous les sous-dictionnaires
+        for key, value in result_dict.items():
+            if isinstance(value, dict):
+                # Récursion sur les dictionnaires
+                result_dict[key] = self._convert_all_coordinates(value)
+            elif isinstance(value, list):
+                # Récursion sur les listes
+                result_dict[key] = [
+                    self._convert_all_coordinates(item) if isinstance(item, dict) else item 
+                    for item in value
+                ]
+                
+        return result_dict
 
     def _normalize_text(self, text: str) -> str:
         """
