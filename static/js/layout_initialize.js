@@ -23,6 +23,19 @@ function initializeLayout() {
         
         let mainLayout = new GoldenLayout(config, document.getElementById('layoutContainer'));
         window.mainLayout = mainLayout;
+        // Variable globale pour suivre l'onglet actif de façon fiable
+        window.lastActiveTab = null;
+
+        // Ajouter un écouteur pour l'état global
+        window.mainLayout.on('stateChanged', function() {
+            console.log('=== DEBUG: État de GoldenLayout changé ===');
+            console.log('selectedItem:', window.mainLayout.selectedItem);
+            console.log('Root content items:', window.mainLayout.root.contentItems.map(item => ({
+                type: item.type,
+                id: item.id,
+                isActive: item.isActive
+            })));
+        });
 
         // Déclencher un événement pour indiquer que GoldenLayout est initialisé
         document.dispatchEvent(new CustomEvent('goldenLayoutInitialized', {
@@ -53,6 +66,10 @@ function initializeLayout() {
 
         mainLayout.on('activeContentItemChanged', function(component) {
             if (!component || !component.isComponent) return;
+            
+            // Mémoriser explicitement l'onglet actif
+            window.lastActiveTab = component;
+            console.log('=== DEBUG: Onglet actif mémorisé ===', component);
             
             const componentInfo = {
                 id: component.id,
@@ -1139,10 +1156,40 @@ function initializeLayout() {
     }
 }
 
+// Fonction utilitaire pour rechercher un composant existant de manière récursive
+function findExistingComponent(rootItem, criteria) {
+    if (!rootItem) {
+        console.log('=== DEBUG: Item racine null ou undefined ===');
+        return null;
+    }
+    
+    console.log('=== DEBUG: Recherche dans:', rootItem.type, rootItem.id);
+    
+    // Si c'est un composant qui correspond aux critères
+    if (criteria(rootItem)) {
+        console.log('=== DEBUG: Composant correspondant trouvé! ===', rootItem.id);
+        return rootItem;
+    }
+    
+    // Si l'item a des enfants, chercher récursivement
+    if (rootItem.contentItems && rootItem.contentItems.length > 0) {
+        console.log(`=== DEBUG: Examen des ${rootItem.contentItems.length} enfants de ${rootItem.id || rootItem.type} ===`);
+        for (let i = 0; i < rootItem.contentItems.length; i++) {
+            const childItem = rootItem.contentItems[i];
+            const found = findExistingComponent(childItem, criteria);
+            if (found) return found;
+        }
+    }
+    
+    // Rien trouvé dans cette branche
+    return null;
+}
+
 // Fonction pour ouvrir un onglet de plugin
 window.openPluginTab = function(pluginName, title, params = {}) {
     try {
         console.log('openPluginTab called with:', { pluginName, title, params });
+        console.log('Type de params.geocacheId:', typeof params.geocacheId);
         
         const componentState = {
             pluginName: pluginName,
@@ -1151,45 +1198,109 @@ window.openPluginTab = function(pluginName, title, params = {}) {
         
         // Chercher si un onglet avec ce plugin existe déjà
         let existingComponent = null;
-        window.mainLayout.root.contentItems.forEach(function(item) {
-            item.contentItems.forEach(function(subItem) {
-                if (subItem.config.componentName === 'plugin' && 
-                    subItem.config.componentState.pluginName === pluginName) {
-                    existingComponent = subItem;
+        
+        // Pour le plugin analysis_web_page avec un geocacheId, chercher un composant GeocacheAnalysis
+        if (pluginName === 'analysis_web_page' && params.geocacheId) {
+            console.log('=== DEBUG: Début de recherche des onglets GeocacheAnalysis existants (récursive) ===');
+            
+            // Critère de recherche pour GeocacheAnalysis
+            const criteria = function(item) {
+                if (item.config && item.config.componentName === 'GeocacheAnalysis') {
+                    const state = item.config.componentState || {};
+                    const itemGeocacheId = state.geocacheId;
+                    
+                    console.log(`Vérification GeocacheAnalysis:`, {
+                        itemGeocacheId: itemGeocacheId,
+                        providedGeocacheId: params.geocacheId,
+                        itemGeocacheIdType: typeof itemGeocacheId,
+                        providedGeocacheIdType: typeof params.geocacheId,
+                        areEqual: String(itemGeocacheId) === String(params.geocacheId)
+                    });
+                    
+                    return String(itemGeocacheId) === String(params.geocacheId);
                 }
-            });
-        });
+                return false;
+            };
+            
+            // Recherche récursive à partir de la racine
+            for (let i = 0; i < window.mainLayout.root.contentItems.length; i++) {
+                existingComponent = findExistingComponent(window.mainLayout.root.contentItems[i], criteria);
+                if (existingComponent) break;
+            }
+            
+            console.log('=== DEBUG: Fin de recherche récursive, existingComponent:', existingComponent ? 'trouvé' : 'non trouvé');
+        } else {
+            // Sinon, chercher un composant plugin standard
+            console.log('=== DEBUG: Début de recherche des onglets plugin standard (récursive) ===');
+            
+            // Critère de recherche pour plugin standard
+            const criteria = function(item) {
+                if (item.config && item.config.componentName === 'plugin') {
+                    const state = item.config.componentState || {};
+                    return state.pluginName === pluginName;
+                }
+                return false;
+            };
+            
+            // Recherche récursive à partir de la racine
+            for (let i = 0; i < window.mainLayout.root.contentItems.length; i++) {
+                existingComponent = findExistingComponent(window.mainLayout.root.contentItems[i], criteria);
+                if (existingComponent) break;
+            }
+            
+            console.log('=== DEBUG: Fin de recherche récursive, existingComponent:', existingComponent ? 'trouvé' : 'non trouvé');
+        }
 
         if (existingComponent) {
             // Si l'onglet existe, le mettre en focus
+            console.log('=== DEBUG: Onglet existant trouvé, focus ===');
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
             // Vérifier si les onglets doivent s'ouvrir dans la même section
-            let openInSameSection = true; // Valeur par défaut
+            // MODIFICATION: Utiliser prioritairement le paramètre openInSameTab s'il est fourni
+            let openInSameSection = params.openInSameTab !== undefined ? params.openInSameTab : true;
             
-            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
-            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+            // Si openInSameTab n'est pas défini, utiliser la configuration globale
+            if (params.openInSameTab === undefined && window.PluginGoldenLayoutIntegration && 
+                typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
                 openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
-                console.log(`=== DEBUG: openPluginTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
             }
+            
+            console.log(`=== DEBUG: openPluginTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
             
             // Pour le plugin analysis_web_page avec un geocacheId, utiliser le composant GeocacheAnalysis
             if (pluginName === 'analysis_web_page' && params.geocacheId) {
                 // Trouver le conteneur actif où ajouter le composant
-                let targetContainer = openInSameSection ? 
-                    window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
-                    window.mainLayout.root.contentItems[0];
+                let targetContainer;
+                
+                if (openInSameSection && window.lastActiveTab && window.lastActiveTab.parent) {
+                    // Utiliser directement le parent de l'onglet actif mémorisé
+                    targetContainer = window.lastActiveTab.parent;
+                    console.log('=== DEBUG: Utilisation du parent direct du dernier onglet actif ===', {
+                        parentType: targetContainer.type,
+                        parentId: targetContainer.id
+                    });
+                } else {
+                    // Fallback sur la racine ou l'item sélectionné
+                    targetContainer = window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0];
+                    console.log('=== DEBUG: Fallback sur selectedItem ou la racine ===');
+                }
                 
                 // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
-                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
-                    targetContainer = targetContainer.parent;
+                // Mais seulement si on n'a pas déjà un parent direct fiable
+                if (!window.lastActiveTab || !window.lastActiveTab.parent) {
+                    while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                        targetContainer = targetContainer.parent;
+                    }
                 }
                 
                 // Si on n'a pas trouvé de conteneur approprié, utiliser le root
                 if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
                     targetContainer = window.mainLayout.root.contentItems[0];
+                    console.log('=== DEBUG: Fallback ultime sur la racine ===');
                 }
                 
+                console.log('=== DEBUG: Création d\'un nouveau composant GeocacheAnalysis ===');
                 targetContainer.addChild({
                     type: 'component',
                     componentName: 'GeocacheAnalysis',
@@ -1202,20 +1313,36 @@ window.openPluginTab = function(pluginName, title, params = {}) {
             } else {
                 // Sinon, créer un nouvel onglet de plugin standard
                 // Trouver le conteneur actif où ajouter le composant
-                let targetContainer = openInSameSection ? 
-                    window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
-                    window.mainLayout.root.contentItems[0];
+                let targetContainer;
+                
+                if (openInSameSection && window.lastActiveTab && window.lastActiveTab.parent) {
+                    // Utiliser directement le parent de l'onglet actif mémorisé
+                    targetContainer = window.lastActiveTab.parent;
+                    console.log('=== DEBUG: Utilisation du parent direct du dernier onglet actif ===', {
+                        parentType: targetContainer.type,
+                        parentId: targetContainer.id
+                    });
+                } else {
+                    // Fallback sur la racine ou l'item sélectionné
+                    targetContainer = window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0];
+                    console.log('=== DEBUG: Fallback sur selectedItem ou la racine ===');
+                }
                 
                 // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
-                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
-                    targetContainer = targetContainer.parent;
+                // Mais seulement si on n'a pas déjà un parent direct fiable
+                if (!window.lastActiveTab || !window.lastActiveTab.parent) {
+                    while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                        targetContainer = targetContainer.parent;
+                    }
                 }
                 
                 // Si on n'a pas trouvé de conteneur approprié, utiliser le root
                 if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
                     targetContainer = window.mainLayout.root.contentItems[0];
+                    console.log('=== DEBUG: Fallback ultime sur la racine ===');
                 }
                 
+                console.log('=== DEBUG: Création d\'un nouveau composant plugin standard ===');
                 targetContainer.addChild({
                     type: 'component',
                     componentName: 'plugin',
@@ -1230,53 +1357,99 @@ window.openPluginTab = function(pluginName, title, params = {}) {
 };
 
 // Fonction pour ouvrir le Solver dans un nouvel onglet
-window.openSolverTab = function(geocacheId = null, gcCode = null) {
+window.openSolverTab = function(geocacheId = null, gcCode = null, openInSameTab = true) {
     try {
-        console.log('openSolverTab called with:', { geocacheId, gcCode });
+        console.log('openSolverTab called with:', { geocacheId, gcCode, openInSameTab });
+        console.log('Type de geocacheId:', typeof geocacheId);
         
         // Titre par défaut si aucune géocache n'est spécifiée
         const title = geocacheId ? `Solver - ${gcCode}` : "Solver";
         
-        // Chercher si un onglet Solver existe déjà (sans géocache spécifique)
+        // Chercher si un onglet Solver existe déjà avec ce geocacheId spécifique
         let existingComponent = null;
-        window.mainLayout.root.contentItems.forEach(function(item) {
-            item.contentItems.forEach(function(subItem) {
-                if (subItem.config.componentName === 'geocache-solver' && 
-                    !subItem.config.componentState.geocacheId) {
-                    existingComponent = subItem;
-                }
-            });
-        });
+        
+        console.log('=== DEBUG: Début de recherche des onglets Solver existants (récursive) ===');
+        
+        // Critère de recherche pour geocache-solver
+        const criteria = function(item) {
+            if (item.config && item.config.componentName === 'geocache-solver') {
+                const state = item.config.componentState || {};
+                const itemGeocacheId = state.geocacheId;
+                
+                console.log(`Vérification geocache-solver:`, {
+                    itemGeocacheId: itemGeocacheId,
+                    providedGeocacheId: geocacheId,
+                    itemGeocacheIdType: typeof itemGeocacheId,
+                    providedGeocacheIdType: typeof geocacheId,
+                    areEqual: geocacheId ? (String(itemGeocacheId) === String(geocacheId)) : !itemGeocacheId
+                });
+                
+                // Soit un onglet sans geocacheId si on n'en a pas fourni
+                // Soit un onglet avec le même geocacheId si on en a fourni un
+                return geocacheId ? 
+                    (String(itemGeocacheId) === String(geocacheId)) : 
+                    !itemGeocacheId;
+            }
+            return false;
+        };
+        
+        // Recherche récursive à partir de la racine
+        for (let i = 0; i < window.mainLayout.root.contentItems.length; i++) {
+            existingComponent = findExistingComponent(window.mainLayout.root.contentItems[i], criteria);
+            if (existingComponent) break;
+        }
+        
+        console.log('=== DEBUG: Fin de recherche récursive, existingComponent:', existingComponent ? 'trouvé' : 'non trouvé');
 
-        if (existingComponent && !geocacheId) {
-            // Si l'onglet existe et qu'on n'a pas spécifié de géocache, le mettre en focus
+        if (existingComponent) {
+            // Si l'onglet existe, le mettre en focus
+            console.log('=== DEBUG: Onglet Solver existant trouvé, focus ===');
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
             // Vérifier si les onglets doivent s'ouvrir dans la même section
-            let openInSameSection = true; // Valeur par défaut
+            // MODIFICATION: Utiliser prioritairement le paramètre openInSameTab s'il est fourni
+            let openInSameSection = openInSameTab; // Utiliser directement le paramètre
             
-            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
-            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+            // Si le paramètre n'est pas défini explicitement, utiliser la configuration globale
+            if (openInSameTab === undefined && window.PluginGoldenLayoutIntegration && 
+                typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
                 openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
-                console.log(`=== DEBUG: openSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
             }
             
+            console.log(`=== DEBUG: openSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
+            
             // Trouver le conteneur actif où ajouter le composant
-            let targetContainer = openInSameSection ? 
-                window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
-                window.mainLayout.root.contentItems[0];
+            let targetContainer;
+                
+            if (openInSameSection && window.lastActiveTab && window.lastActiveTab.parent) {
+                // Utiliser directement le parent de l'onglet actif mémorisé
+                targetContainer = window.lastActiveTab.parent;
+                console.log('=== DEBUG: Utilisation du parent direct du dernier onglet actif ===', {
+                    parentType: targetContainer.type,
+                    parentId: targetContainer.id
+                });
+            } else {
+                // Fallback sur la racine ou l'item sélectionné
+                targetContainer = window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0];
+                console.log('=== DEBUG: Fallback sur selectedItem ou la racine ===');
+            }
             
             // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
-            while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
-                targetContainer = targetContainer.parent;
+            // Mais seulement si on n'a pas déjà un parent direct fiable
+            if (!window.lastActiveTab || !window.lastActiveTab.parent) {
+                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                    targetContainer = targetContainer.parent;
+                }
             }
             
             // Si on n'a pas trouvé de conteneur approprié, utiliser le root
             if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
                 targetContainer = window.mainLayout.root.contentItems[0];
+                console.log('=== DEBUG: Fallback ultime sur la racine ===');
             }
             
-            // Sinon, créer un nouvel onglet
+            // Créer un nouvel onglet
+            console.log('=== DEBUG: Création d\'un nouveau composant Solver ===');
             targetContainer.addChild({
                 type: 'component',
                 componentName: 'geocache-solver',
@@ -1293,53 +1466,99 @@ window.openSolverTab = function(geocacheId = null, gcCode = null) {
 };
 
 // Fonction pour ouvrir le Formula Solver dans un nouvel onglet
-window.openFormulaSolverTab = function(geocacheId = null, gcCode = null) {
+window.openFormulaSolverTab = function(geocacheId = null, gcCode = null, openInSameTab = true) {
     try {
-        console.log('openFormulaSolverTab called with:', { geocacheId, gcCode });
+        console.log('openFormulaSolverTab called with:', { geocacheId, gcCode, openInSameTab });
+        console.log('Type de geocacheId:', typeof geocacheId);
         
         // Titre par défaut si aucune géocache n'est spécifiée
         const title = geocacheId ? `Formula Solver - ${gcCode}` : "Formula Solver";
         
         // Chercher si un onglet Formula Solver existe déjà pour cette géocache
         let existingComponent = null;
-        window.mainLayout.root.contentItems.forEach(function(item) {
-            item.contentItems.forEach(function(subItem) {
-                if (subItem.config.componentName === 'FormulaSolver' && 
-                    subItem.config.componentState.geocacheId === geocacheId) {
-                    existingComponent = subItem;
-                }
-            });
-        });
+        
+        console.log('=== DEBUG: Début de recherche des onglets FormulaSolver existants (récursive) ===');
+        
+        // Critère de recherche pour FormulaSolver
+        const criteria = function(item) {
+            if (item.config && item.config.componentName === 'FormulaSolver') {
+                const state = item.config.componentState || {};
+                const itemGeocacheId = state.geocacheId;
+                
+                console.log(`Vérification FormulaSolver:`, {
+                    itemGeocacheId: itemGeocacheId,
+                    providedGeocacheId: geocacheId,
+                    itemGeocacheIdType: typeof itemGeocacheId,
+                    providedGeocacheIdType: typeof geocacheId,
+                    areEqual: geocacheId ? (String(itemGeocacheId) === String(geocacheId)) : !itemGeocacheId
+                });
+                
+                // Soit un onglet sans geocacheId si on n'en a pas fourni
+                // Soit un onglet avec le même geocacheId si on en a fourni un
+                return geocacheId ? 
+                    (String(itemGeocacheId) === String(geocacheId)) : 
+                    !itemGeocacheId;
+            }
+            return false;
+        };
+        
+        // Recherche récursive à partir de la racine
+        for (let i = 0; i < window.mainLayout.root.contentItems.length; i++) {
+            existingComponent = findExistingComponent(window.mainLayout.root.contentItems[i], criteria);
+            if (existingComponent) break;
+        }
+        
+        console.log('=== DEBUG: Fin de recherche récursive, existingComponent:', existingComponent ? 'trouvé' : 'non trouvé');
 
         if (existingComponent) {
             // Si l'onglet existe, le mettre en focus
+            console.log('=== DEBUG: Onglet Formula Solver existant trouvé, focus ===');
             existingComponent.parent.setActiveContentItem(existingComponent);
         } else {
             // Vérifier si les onglets doivent s'ouvrir dans la même section
-            let openInSameSection = true; // Valeur par défaut
+            // MODIFICATION: Utiliser prioritairement le paramètre openInSameTab s'il est fourni
+            let openInSameSection = openInSameTab; // Utiliser directement le paramètre
             
-            // Utiliser la configuration depuis PluginGoldenLayoutIntegration si disponible
-            if (window.PluginGoldenLayoutIntegration && typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+            // Si le paramètre n'est pas défini explicitement, utiliser la configuration globale
+            if (openInSameTab === undefined && window.PluginGoldenLayoutIntegration && 
+                typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
                 openInSameSection = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
-                console.log(`=== DEBUG: openFormulaSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
             }
             
+            console.log(`=== DEBUG: openFormulaSolverTab: Utilisation du paramètre openInSameSection = ${openInSameSection} ===`);
+            
             // Trouver le conteneur actif où ajouter le composant
-            let targetContainer = openInSameSection ? 
-                window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0] : 
-                window.mainLayout.root.contentItems[0];
+            let targetContainer;
+                
+            if (openInSameSection && window.lastActiveTab && window.lastActiveTab.parent) {
+                // Utiliser directement le parent de l'onglet actif mémorisé
+                targetContainer = window.lastActiveTab.parent;
+                console.log('=== DEBUG: Utilisation du parent direct du dernier onglet actif ===', {
+                    parentType: targetContainer.type,
+                    parentId: targetContainer.id
+                });
+            } else {
+                // Fallback sur la racine ou l'item sélectionné
+                targetContainer = window.mainLayout.selectedItem || window.mainLayout.root.contentItems[0];
+                console.log('=== DEBUG: Fallback sur selectedItem ou la racine ===');
+            }
             
             // Si le conteneur actif n'est pas un "stack" ou "row", remonter jusqu'à en trouver un
-            while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
-                targetContainer = targetContainer.parent;
+            // Mais seulement si on n'a pas déjà un parent direct fiable
+            if (!window.lastActiveTab || !window.lastActiveTab.parent) {
+                while (targetContainer && targetContainer.type !== 'stack' && targetContainer.type !== 'row' && targetContainer.parent) {
+                    targetContainer = targetContainer.parent;
+                }
             }
             
             // Si on n'a pas trouvé de conteneur approprié, utiliser le root
             if (!targetContainer || (targetContainer.type !== 'stack' && targetContainer.type !== 'row')) {
                 targetContainer = window.mainLayout.root.contentItems[0];
+                console.log('=== DEBUG: Fallback ultime sur la racine ===');
             }
             
-            // Sinon, créer un nouvel onglet
+            // Créer un nouvel onglet
+            console.log('=== DEBUG: Création d\'un nouveau composant Formula Solver ===');
             targetContainer.addChild({
                 type: 'component',
                 componentName: 'FormulaSolver',

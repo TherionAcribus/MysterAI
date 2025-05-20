@@ -135,3 +135,104 @@ Pour assurer le bon fonctionnement dans Electron :
 7. **Checkers** (si présents)
    - Liens vers les outils de vérification
    - Ouverture dans un nouvel onglet
+
+## Menus Contextuels pour les Boutons d'Action
+
+Les boutons d'action dans le panneau de détails (Analyser, Solver, Formula Solver) sont équipés d'un système de menu contextuel permettant de choisir où ouvrir le contenu.
+
+### Fonctionnalités
+
+1. **Options d'ouverture**
+   - Ouvrir dans l'onglet actuel (comportement par défaut)
+   - Ouvrir dans un nouvel onglet
+
+2. **Méthodes d'interaction**
+   - Clic gauche : Exécute l'action avec le comportement par défaut (même onglet)
+   - Clic droit : Affiche un menu contextuel avec les options d'ouverture
+   - Ctrl+Clic (ou Cmd+Clic sur Mac) : Force l'ouverture dans un nouvel onglet
+
+### Implémentation technique
+
+1. **Marquage des boutons**
+   ```html
+   <button class="... geocache-action-button"
+           data-geocache-id="{{ geocache.id }}"
+           data-gc-code="{{ geocache.gc_code }}"
+           data-action-type="solver">
+       ...
+   </button>
+   ```
+
+2. **Gestionnaire du menu contextuel**
+   ```javascript
+   function showContextMenu(event, button) {
+       // Créer et afficher le menu contextuel
+       const menu = document.createElement('div');
+       menu.className = 'context-menu';
+       menu.innerHTML = `
+           <div class="context-menu-item" data-action="same">
+               <i class="fas fa-exchange-alt"></i> Ouvrir dans l'onglet actuel
+           </div>
+           <div class="context-menu-item" data-action="new">
+               <i class="fas fa-external-link-alt"></i> Ouvrir dans un nouvel onglet
+           </div>
+       `;
+       // Positionnement et gestion des événements...
+   }
+   ```
+
+3. **Exécution de l'action**
+   ```javascript
+   function executeButtonAction(button, tabMode) {
+       const actionType = button.dataset.actionType;
+       const geocacheId = button.dataset.geocacheId;
+       const gcCode = button.dataset.gcCode;
+       
+       // Exécuter l'action en fonction du type et du mode d'ouverture
+       switch (actionType) {
+           case 'analyze':
+               window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+                   geocacheId: geocacheId, 
+                   gcCode: gcCode,
+                   openInSameTab: tabMode === 'same'
+               });
+               break;
+           // autres cas...
+       }
+   }
+   ```
+
+### Styles CSS
+
+```css
+.context-menu {
+    position: fixed;
+    z-index: 10000;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0;
+    min-width: 160px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: #e5e7eb;
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: #374151;
+}
+```
+
+### Avantages
+
+1. Interface utilisateur cohérente et intuitive
+2. Flexibilité dans l'organisation des onglets
+3. Raccourcis clavier (Ctrl+Clic) pour les utilisateurs avancés
+4. Architecture extensible pour ajouter d'autres options au menu contextuel

@@ -1,3 +1,220 @@
+<!-- Script pour intercepter le clic droit, injecté au tout début de la page -->
+<script>
+    // Créer l'écouteur d'événement personnalisé immédiatement
+    if (!window.__actionButtonContextMenuInitialized) {
+        window.__actionButtonContextMenuInitialized = true;
+        
+        // Écouteur global pour notre événement personnalisé
+        document.addEventListener('actionButtonContextMenu', function(event) {
+            console.log('=== DEBUG: Événement personnalisé actionButtonContextMenu reçu ===', event.detail);
+            
+            if (event.detail && event.detail.button) {
+                // Afficher notre menu contextuel
+                showActionButtonContextMenu(event.detail.x, event.detail.y, event.detail.button);
+            }
+        });
+        
+        // Fonction pour afficher le menu contextuel des boutons d'action
+        window.showActionButtonContextMenu = function(clientX, clientY, button) {
+            // Supprimer tout menu contextuel existant
+            const existingMenu = document.querySelector('.action-button-context-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            // Récupérer les informations du bouton
+            const actionType = button.dataset.actionType;
+            const geocacheId = button.dataset.geocacheId;
+            const gcCode = button.dataset.gcCode;
+            
+            console.log('=== SHOW MENU: Affichage du menu pour ===', actionType);
+            
+            // Créer le menu contextuel avec style Tailwind
+            const menu = document.createElement('div');
+            menu.className = 'action-button-context-menu fixed z-50 bg-gray-800 rounded-lg shadow-lg border border-gray-700 py-1 min-w-[200px]';
+            menu.style.left = `${clientX}px`;
+            menu.style.top = `${clientY}px`;
+            
+            // En-tête du menu
+            const header = document.createElement('div');
+            header.className = 'px-4 py-2 text-gray-400 text-sm border-b border-gray-700';
+            header.textContent = `Action: ${getActionName(actionType)}`;
+            menu.appendChild(header);
+            
+            // Option d'ouverture dans l'onglet actuel
+            const sameTabOption = document.createElement('div');
+            sameTabOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            sameTabOption.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Ouvrir dans l\'onglet actuel';
+            sameTabOption.onclick = () => {
+                executeButtonAction(button, 'same');
+                menu.remove();
+            };
+            menu.appendChild(sameTabOption);
+            
+            // Option d'ouverture dans un nouvel onglet
+            const newTabOption = document.createElement('div');
+            newTabOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            newTabOption.innerHTML = '<i class="fas fa-external-link-alt mr-2"></i>Ouvrir dans un nouvel onglet';
+            newTabOption.onclick = () => {
+                executeButtonAction(button, 'new');
+                menu.remove();
+            };
+            menu.appendChild(newTabOption);
+            
+            // Ajouter le menu au document
+            document.body.appendChild(menu);
+            
+            // Ajuster la position si le menu dépasse les limites de la fenêtre
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.right > window.innerWidth) {
+                menu.style.left = `${clientX - menuRect.width}px`;
+            }
+            if (menuRect.bottom > window.innerHeight) {
+                menu.style.top = `${clientY - menuRect.height}px`;
+            }
+            
+            // Fermer le menu contextuel sur un clic ailleurs
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            
+            // Petit délai pour éviter la fermeture immédiate
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu);
+            }, 50);
+        };
+        
+        // Helper pour obtenir le nom lisible de l'action
+        window.getActionName = function(actionType) {
+            switch (actionType) {
+                case 'analyze': return 'Analyser';
+                case 'solver': return 'Solver';
+                case 'formula-solver': return 'Formula Solver';
+                default: return actionType;
+            }
+        };
+    }
+
+    // Fonction immédiatement exécutée pour intercepter les clics droits le plus tôt possible
+    (function() {
+        // Notre version originale du gestionnaire contextmenu 
+        const originalContextMenu = function(event) {
+            // Vérifier si c'est un de nos boutons d'action
+            let target = event.target;
+            while (target && target !== document) {
+                if (target.classList && target.classList.contains('geocache-action-button')) {
+                    // C'est un de nos boutons, prévenir le comportement par défaut
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    // Stocker les données pour traitement ultérieur
+                    window.__contextMenuData = {
+                        x: event.clientX,
+                        y: event.clientY,
+                        button: target
+                    };
+                    
+                    console.log('=== INTERCEPT: Clic droit sur bouton d\'action capturé ===', target.dataset.actionType);
+                    
+                    // Créer un événement personnalisé pour que notre code principal puisse gérer cela plus tard
+                    // Appeler directement la fonction plutôt que d'utiliser un événement
+                    if (typeof window.showActionButtonContextMenu === 'function') {
+                        window.showActionButtonContextMenu(event.clientX, event.clientY, target);
+                    } else {
+                        // Fallback si la fonction n'est pas encore définie
+                        setTimeout(function() {
+                            const customEvent = new CustomEvent('actionButtonContextMenu', {
+                                detail: window.__contextMenuData
+                            });
+                            document.dispatchEvent(customEvent);
+                        }, 0);
+                    }
+                    
+                    return false;
+                }
+                target = target.parentElement;
+            }
+        };
+        
+        // Ajouter notre gestionnaire le plus tôt possible
+        document.addEventListener('contextmenu', originalContextMenu, true);
+        console.log('=== INTERCEPT: Gestionnaire de clic droit injecté avec succès ===');
+    })();
+    
+    // Script pour visualiser l'onglet actif (aide au débogage)
+    (function() {
+        // Fonction pour mettre à jour l'indicateur d'onglet actif
+        function updateActiveTabIndicator() {
+            // Supprimer d'abord tous les indicateurs existants
+            document.querySelectorAll('.active-tab-indicator').forEach(el => el.remove());
+            
+            // Ajouter un indicateur visuel pour l'onglet actif
+            if (window.lastActiveTab) {
+                try {
+                    // Vérification plus robuste de la structure des objets
+                    // Le chemin vers l'élément peut varier selon le type d'élément GoldenLayout
+                    let tabElement = null;
+                    
+                    // Essayer différentes structures pour trouver l'élément de l'onglet
+                    if (window.lastActiveTab.tab && window.lastActiveTab.tab.element) {
+                        // Structure normale pour les components
+                        tabElement = window.lastActiveTab.tab.element;
+                    } else if (window.lastActiveTab.header && window.lastActiveTab.header.tabs) {
+                        // Pour les stacks, prendre le premier tab de header
+                        const activeTab = window.lastActiveTab.header.tabs.find(tab => tab.isActive);
+                        if (activeTab && activeTab.element) {
+                            tabElement = activeTab.element;
+                        }
+                    } else if (window.lastActiveTab.element) {
+                        // Accès direct à l'élément si disponible
+                        tabElement = window.lastActiveTab.element;
+                    }
+                    
+                    // Si nous avons trouvé un élément, ajouter l'indicateur
+                    if (tabElement && tabElement instanceof Element) {
+                        // Vérifier que tabElement est bien un élément DOM
+                        try {
+                            // S'assurer que l'élément a une position relative
+                            if (window.getComputedStyle(tabElement).position !== 'relative') {
+                                tabElement.style.position = 'relative';
+                            }
+                            
+                            // Ajouter un badge visible
+                            const indicator = document.createElement('div');
+                            indicator.className = 'active-tab-indicator bg-green-500 text-xs px-1 absolute top-0 right-0 rounded-bl';
+                            indicator.textContent = 'Actif';
+                            indicator.style.zIndex = '9999';
+                            tabElement.appendChild(indicator);
+                            
+                            console.log('=== DEBUG: Indicateur ajouté à l\'onglet actif ===', 
+                                window.lastActiveTab.config?.title || 'Onglet sans titre');
+                        } catch (styleError) {
+                            console.log('=== DEBUG: Élément non valide pour le DOM ===', tabElement);
+                        }
+                    } else {
+                        console.log('=== DEBUG: Élément de l\'onglet actif non trouvé ou non valide ===', window.lastActiveTab);
+                    }
+                } catch (e) {
+                    console.error('Erreur lors de l\'ajout de l\'indicateur:', e);
+                }
+            }
+        }
+        
+        // Mettre à jour l'indicateur périodiquement
+        setInterval(updateActiveTabIndicator, 2000);
+        
+        // Écouter aussi les changements de layout
+        if (window.mainLayout) {
+            window.mainLayout.on('activeContentItemChanged', function() {
+                setTimeout(updateActiveTabIndicator, 100);
+            });
+        }
+    })();
+</script>
+
 <div class="w-full h-full bg-gray-900 overflow-auto p-4" 
      hx-ext="include-vals" 
      hx-headers='{"X-Layout-Component": "true"}'
@@ -111,10 +328,11 @@
                     <!-- Boutons d'action pour les coordonnées -->
                     <div class="flex justify-end mt-3">
                         <button
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 geocache-action-button"
                             data-action="click->geocache-coordinates#openAnalysis"
                             data-geocache-id="{{ geocache.id }}"
-                            data-gc-code="{{ geocache.gc_code }}">
+                            data-gc-code="{{ geocache.gc_code }}"
+                            data-action-type="analyze">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                                 <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
@@ -122,20 +340,20 @@
                             Analyser
                         </button>
                         <button
-                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
-                            data-action="click->geocache-coordinates#openSolver"
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2 geocache-action-button"
                             data-geocache-id="{{ geocache.id }}"
-                            data-gc-code="{{ geocache.gc_code }}">
+                            data-gc-code="{{ geocache.gc_code }}"
+                            data-action-type="solver">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
                             </svg>
                             Solver
                         </button>
                         <button
-                            class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
-                            onclick="window.openFormulaSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                            class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2 geocache-action-button"
                             data-geocache-id="{{ geocache.id }}"
-                            data-gc-code="{{ geocache.gc_code }}">
+                            data-gc-code="{{ geocache.gc_code }}"
+                            data-action-type="formula-solver">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                                 <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
@@ -154,10 +372,10 @@
                 <div class="flex">
                     <button 
                         id="analyze-geocache-button"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
-                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}', gcCode: '{{ geocache.gc_code }}'})"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 geocache-action-button"
                         data-geocache-id="{{ geocache.id }}"
-                        data-gc-code="{{ geocache.gc_code }}">
+                        data-gc-code="{{ geocache.gc_code }}"
+                        data-action-type="analyze">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.96-.421-2.632-1.102l-.547-.547z" />
                         </svg>
@@ -165,10 +383,10 @@
                     </button>
                     <button 
                         id="solver-geocache-button"
-                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2 geocache-action-button"
                         data-geocache-id="{{ geocache.id }}"
-                        data-gc-code="{{ geocache.gc_code }}">
+                        data-gc-code="{{ geocache.gc_code }}"
+                        data-action-type="solver">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
                         </svg>
@@ -176,10 +394,10 @@
                     </button>
                     <button 
                         id="formula-solver-button"
-                        class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="window.openFormulaSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2 geocache-action-button"
                         data-geocache-id="{{ geocache.id }}"
-                        data-gc-code="{{ geocache.gc_code }}">
+                        data-gc-code="{{ geocache.gc_code }}"
+                        data-action-type="formula-solver">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
@@ -188,7 +406,6 @@
                     <button 
                         id="ai-chat-geocache-button"
                         class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', {{ geocache.name|tojson }})"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}"
                         data-geocache-name="{{ geocache.name|tojson }}">
@@ -598,4 +815,95 @@
             console.error("Le panneau de chat n'a pas été trouvé.");
         }
     }
+
+    // Système pour nos propres menus contextuels des boutons d'action
+    document.addEventListener('DOMContentLoaded', function() {
+        setupGeocacheActionButtons();
+        
+        // L'écouteur d'événement actionButtonContextMenu est déjà défini au début du document
+        // Ne pas le redéfinir ici pour éviter les doublons
+        
+        // Fermer le menu contextuel sur un clic ailleurs
+        document.addEventListener('click', function(event) {
+            const menu = document.querySelector('.action-button-context-menu');
+            if (menu && !menu.contains(event.target)) {
+                menu.remove();
+            }
+        });
+    });
+    
+    // Fonction pour configurer les boutons d'action géocache
+    function setupGeocacheActionButtons() {
+        // Sélectionner tous les boutons qui devraient avoir des actions spéciales
+        const buttons = document.querySelectorAll('.geocache-action-button');
+        
+        buttons.forEach(button => {
+            // Remplacer les gestionnaires de clics existants
+            button.removeAttribute('onclick');
+            
+            // Conserver le comportement normal pour le clic gauche
+            button.addEventListener('click', function(event) {
+                if (!event.ctrlKey && !event.metaKey) {
+                    // Clic gauche standard - exécuter l'action par défaut
+                    executeButtonAction(button, 'same');
+                } else {
+                    // Ctrl+Clic ou Cmd+Clic - forcer l'ouverture dans un nouvel onglet
+                    executeButtonAction(button, 'new');
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            });
+        });
+    }
+    
+    // La fonction showActionButtonContextMenu est maintenant définie au début du document
+    // pour éviter les problèmes de timing
+    
+    // Fonction pour exécuter l'action du bouton
+    function executeButtonAction(button, tabMode) {
+        const actionType = button.dataset.actionType;
+        const geocacheId = button.dataset.geocacheId;
+        const gcCode = button.dataset.gcCode;
+        
+        console.log(`=== DEBUG: Exécution de l'action ${actionType} pour la géocache ${gcCode} en mode ${tabMode} ===`);
+        
+        // Exécuter l'action en fonction du type
+        switch (actionType) {
+            case 'analyze':
+                const analyzeOptions = {
+                    geocacheId: geocacheId, 
+                    gcCode: gcCode,
+                    openInSameTab: tabMode === 'same'
+                };
+                console.log('=== DEBUG: Options pour analyse ===', analyzeOptions);
+                window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, analyzeOptions);
+                break;
+                
+            case 'solver':
+                console.log(`=== DEBUG: Appel de openSolverTab avec openInSameTab=${tabMode === 'same'} ===`);
+                window.openSolverTab(geocacheId, gcCode, tabMode === 'same');
+                break;
+                
+            case 'formula-solver':
+                console.log(`=== DEBUG: Appel de openFormulaSolverTab avec openInSameTab=${tabMode === 'same'} ===`);
+                window.openFormulaSolverTab(geocacheId, gcCode, tabMode === 'same');
+                break;
+                
+            default:
+                console.error(`Type d'action inconnu: ${actionType}`);
+        }
+    }
+
+    // Ajouter le gestionnaire de clic au bouton Chat IA après le chargement du DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatButton = document.getElementById('ai-chat-geocache-button');
+        if (chatButton) {
+            chatButton.addEventListener('click', function() {
+                const geocacheId = this.dataset.geocacheId;
+                const gcCode = this.dataset.gcCode;
+                const geocacheName = this.dataset.geocacheName;
+                openGeocacheAIChat(geocacheId, gcCode, JSON.parse(geocacheName));
+            });
+        }
+    });
 </script>

@@ -112,6 +112,47 @@ sequenceDiagram
 - Gestion des événements layout
 - Intégration avec le gestionnaire d'état
 
+### 5. Configuration des Onglets
+
+**Fichier**: `static/js/plugin_golden_layout_integration.js`
+
+**Responsabilités**:
+- Gestion des options d'affichage des onglets
+- Intégration avec les paramètres utilisateur
+- Contrôle du comportement d'ouverture des onglets
+
+**Configuration**:
+```javascript
+// Configuration par défaut
+let goldenLayoutConfig = {
+    openTabsInSameSection: true // Par défaut, les onglets s'ouvrent dans la même section
+};
+```
+
+**Paramètres utilisateur**:
+- Option dans les paramètres généraux pour contrôler si les onglets doivent s'ouvrir dans la même section
+- Synchronisation en temps réel des changements via des événements personnalisés
+
+**Chargement des paramètres**:
+```javascript
+function loadGoldenLayoutSettings() {
+    fetch('/api/settings/general')
+        .then(response => response.json())
+        .then(data => {
+            goldenLayoutConfig.openTabsInSameSection = data.settings.open_tabs_in_same_section;
+        });
+}
+```
+
+**Événements**:
+```javascript
+document.addEventListener('goldenLayoutSettingChange', function(event) {
+    if (event.detail.setting === 'openTabsInSameSection') {
+        goldenLayoutConfig.openTabsInSameSection = event.detail.value;
+    }
+});
+```
+
 ## Types de Composants
 
 ### 1. Composant Welcome
@@ -151,6 +192,27 @@ sequenceDiagram
     Layout->>API: Charge détails
     API-->>Layout: Retourne HTML
     Layout->>User: Affiche onglet
+```
+
+### 2. Comportement d'Ouverture des Onglets
+```mermaid
+sequenceDiagram
+    participant User
+    participant Layout
+    participant Config
+
+    User->>User: Action ouvrir onglet
+    Layout->>Config: shouldOpenInSameSection()
+    
+    alt openTabsInSameSection = true
+        Config-->>Layout: true
+        Layout->>Layout: Ouvre dans la stack active
+    else openTabsInSameSection = false
+        Config-->>Layout: false
+        Layout->>Layout: Crée nouvelle stack
+    end
+    
+    Layout->>User: Affiche nouvel onglet
 ```
 
 ## Gestion des Événements
@@ -211,6 +273,20 @@ function updateGeocacheCode(contentItem) {
 - Clic direct sur un onglet
 - Création d'un nouveau composant
 
+### 6. Événements de Configuration
+```mermaid
+sequenceDiagram
+    participant User
+    participant Settings
+    participant Event
+    participant Config
+
+    User->>Settings: Change openTabsInSameSection
+    Settings->>Event: Dispatch goldenLayoutSettingChange
+    Event->>Config: Update openTabsInSameSection
+    Config->>Config: Mise à jour configuration
+```
+
 ## Interface Utilisateur
 
 ### 1. Panneau Inférieur
@@ -246,6 +322,22 @@ function updateGeocacheCode(contentItem) {
 </div>
 ```
 
+### 4. Paramètres d'Affichage
+```html
+<div class="flex items-start">
+    <div class="flex items-center h-5">
+        <input type="checkbox" 
+               id="open_tabs_in_same_section" 
+               data-general-settings-target="openTabsInSameSection"
+               class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+    </div>
+    <div class="ml-3 text-sm">
+        <label for="open_tabs_in_same_section" class="font-medium text-gray-300">Ouvrir les onglets dans la même section</label>
+        <p class="text-gray-400">Détermine si les nouveaux onglets doivent s'ouvrir dans la même section ou créer une nouvelle section</p>
+    </div>
+</div>
+```
+
 ## Bonnes Pratiques
 
 ### 1. Gestion d'État
@@ -262,6 +354,11 @@ function updateGeocacheCode(contentItem) {
 - Réutiliser les onglets existants
 - Charger le contenu de manière asynchrone
 - Optimiser les mises à jour d'état
+
+### 4. Configuration des Onglets
+- Respecter les préférences utilisateur pour l'ouverture des onglets
+- Utiliser `shouldOpenInSameSection()` pour déterminer le comportement
+- Propager les changements de configuration via des événements personnalisés
 
 ## Debugging
 
@@ -286,6 +383,14 @@ function updateGeocacheCode(contentItem) {
 Error: HTTP error! status: 404
 ```
 
+### 3. Vérification des Paramètres
+```javascript
+// Affichage de la configuration actuelle
+=== DEBUG: Configuration GoldenLayout === {
+    openTabsInSameSection: true
+}
+```
+
 ## Prochaines Étapes
 
 ### 1. Améliorations
@@ -297,3 +402,4 @@ Error: HTTP error! status: 404
 - [ ] Prévisualisation des détails
 - [ ] Historique des modifications
 - [ ] Synchronisation en temps réel
+- [x] Configuration de l'ouverture des onglets
