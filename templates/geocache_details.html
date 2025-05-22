@@ -14,7 +14,7 @@
             }
         });
         
-        // Fonction pour afficher le menu contextuel des boutons d'action
+                // Fonction pour afficher le menu contextuel des boutons d'action
         window.showActionButtonContextMenu = function(clientX, clientY, button) {
             // Supprimer tout menu contextuel existant
             const existingMenu = document.querySelector('.action-button-context-menu');
@@ -28,6 +28,14 @@
             const gcCode = button.dataset.gcCode;
             
             console.log('=== SHOW MENU: Affichage du menu pour ===', actionType);
+            
+            // Vérifier la préférence utilisateur pour l'affichage des onglets
+            let defaultBehavior = true; // Par défaut, ouvrir dans le même onglet
+            if (window.PluginGoldenLayoutIntegration && 
+                typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                // Récupérer le paramètre configuré par l'utilisateur
+                defaultBehavior = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+            }
             
             // Créer le menu contextuel avec style Tailwind
             const menu = document.createElement('div');
@@ -45,6 +53,12 @@
             const sameTabOption = document.createElement('div');
             sameTabOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
             sameTabOption.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Ouvrir dans l\'onglet actuel';
+            
+            // Ajouter une indication si c'est le comportement par défaut
+            if (defaultBehavior) {
+                sameTabOption.innerHTML += ' <span class="ml-2 text-xs bg-blue-600 px-1 rounded">Défaut</span>';
+            }
+            
             sameTabOption.onclick = () => {
                 executeButtonAction(button, 'same');
                 menu.remove();
@@ -55,6 +69,12 @@
             const newTabOption = document.createElement('div');
             newTabOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
             newTabOption.innerHTML = '<i class="fas fa-external-link-alt mr-2"></i>Ouvrir dans un nouvel onglet';
+            
+            // Ajouter une indication si c'est le comportement par défaut
+            if (!defaultBehavior) {
+                newTabOption.innerHTML += ' <span class="ml-2 text-xs bg-blue-600 px-1 rounded">Défaut</span>';
+            }
+            
             newTabOption.onclick = () => {
                 executeButtonAction(button, 'new');
                 menu.remove();
@@ -144,67 +164,104 @@
         console.log('=== INTERCEPT: Gestionnaire de clic droit injecté avec succès ===');
     })();
     
-    // Script pour visualiser l'onglet actif (aide au débogage)
+        // Script pour visualiser l'onglet actif (aide au débogage)
     (function() {
+        let lastLoggedMessage = '';
+        let messageRepeatCount = 0;
+        
         // Fonction pour mettre à jour l'indicateur d'onglet actif
         function updateActiveTabIndicator() {
             // Supprimer d'abord tous les indicateurs existants
             document.querySelectorAll('.active-tab-indicator').forEach(el => el.remove());
             
-            // Ajouter un indicateur visuel pour l'onglet actif
-            if (window.lastActiveTab) {
-                try {
-                    // Vérification plus robuste de la structure des objets
-                    // Le chemin vers l'élément peut varier selon le type d'élément GoldenLayout
-                    let tabElement = null;
-                    
-                    // Essayer différentes structures pour trouver l'élément de l'onglet
-                    if (window.lastActiveTab.tab && window.lastActiveTab.tab.element) {
-                        // Structure normale pour les components
-                        tabElement = window.lastActiveTab.tab.element;
-                    } else if (window.lastActiveTab.header && window.lastActiveTab.header.tabs) {
-                        // Pour les stacks, prendre le premier tab de header
-                        const activeTab = window.lastActiveTab.header.tabs.find(tab => tab.isActive);
-                        if (activeTab && activeTab.element) {
-                            tabElement = activeTab.element;
-                        }
-                    } else if (window.lastActiveTab.element) {
-                        // Accès direct à l'élément si disponible
-                        tabElement = window.lastActiveTab.element;
+            // Si aucun onglet actif n'est défini, sortir sans erreur
+            if (!window.lastActiveTab) {
+                return;
+            }
+            
+            try {
+                // Vérifier si l'objet a la structure attendue
+                if (typeof window.lastActiveTab !== 'object' || !window.lastActiveTab) {
+                    return;
+                }
+                
+                // Vérification plus robuste de la structure des objets
+                // Le chemin vers l'élément peut varier selon le type d'élément GoldenLayout
+                let tabElement = null;
+                
+                // Essayer différentes structures pour trouver l'élément de l'onglet
+                if (window.lastActiveTab.tab && window.lastActiveTab.tab.element) {
+                    // Structure normale pour les components
+                    tabElement = window.lastActiveTab.tab.element;
+                } else if (window.lastActiveTab.header && window.lastActiveTab.header.tabs) {
+                    // Pour les stacks, prendre le premier tab de header
+                    const activeTab = window.lastActiveTab.header.tabs.find(tab => tab.isActive);
+                    if (activeTab && activeTab.element) {
+                        tabElement = activeTab.element;
                     }
-                    
-                    // Si nous avons trouvé un élément, ajouter l'indicateur
-                    if (tabElement && tabElement instanceof Element) {
-                        // Vérifier que tabElement est bien un élément DOM
-                        try {
-                            // S'assurer que l'élément a une position relative
-                            if (window.getComputedStyle(tabElement).position !== 'relative') {
-                                tabElement.style.position = 'relative';
+                } else if (window.lastActiveTab.element) {
+                    // Accès direct à l'élément si disponible
+                    tabElement = window.lastActiveTab.element;
+                }
+                
+                // Si nous avons trouvé un élément, ajouter l'indicateur
+                if (tabElement && tabElement instanceof Element) {
+                    // Vérifier que tabElement est bien un élément DOM
+                    try {
+                        // S'assurer que l'élément a une position relative
+                        if (window.getComputedStyle(tabElement).position !== 'relative') {
+                            tabElement.style.position = 'relative';
+                        }
+                        
+                        // Ajouter un badge visible
+                        const indicator = document.createElement('div');
+                        indicator.className = 'active-tab-indicator bg-green-500 text-xs px-1 absolute top-0 right-0 rounded-bl';
+                        indicator.textContent = 'Actif';
+                        indicator.style.zIndex = '9999';
+                        tabElement.appendChild(indicator);
+                        
+                        // Réinitialiser le compteur de messages répétés
+                        messageRepeatCount = 0;
+                        lastLoggedMessage = '';
+                        
+                        // Ajout d'un log informatif
+                        console.log('=== DEBUG: Indicateur ajouté à l\'onglet actif ===', 
+                            window.lastActiveTab.config?.title || 'Onglet sans titre');
+                    } catch (styleError) {
+                        // Ne pas générer trop de messages d'erreur similaires
+                        const errorMsg = 'Élément non valide pour le DOM';
+                        if (lastLoggedMessage === errorMsg) {
+                            messageRepeatCount++;
+                            if (messageRepeatCount > 5) {
+                                return; // Ne pas continuer à générer des logs
                             }
-                            
-                            // Ajouter un badge visible
-                            const indicator = document.createElement('div');
-                            indicator.className = 'active-tab-indicator bg-green-500 text-xs px-1 absolute top-0 right-0 rounded-bl';
-                            indicator.textContent = 'Actif';
-                            indicator.style.zIndex = '9999';
-                            tabElement.appendChild(indicator);
-                            
-                            console.log('=== DEBUG: Indicateur ajouté à l\'onglet actif ===', 
-                                window.lastActiveTab.config?.title || 'Onglet sans titre');
-                        } catch (styleError) {
-                            console.log('=== DEBUG: Élément non valide pour le DOM ===', tabElement);
+                        } else {
+                            lastLoggedMessage = errorMsg;
+                            messageRepeatCount = 0;
+                        }
+                        console.warn('=== AVERTISSEMENT: ' + errorMsg + ' ===');
+                    }
+                } else {
+                    // Limiter les messages d'erreur répétitifs
+                    const errorMsg = 'Élément de l\'onglet actif non trouvé';
+                    if (lastLoggedMessage === errorMsg) {
+                        messageRepeatCount++;
+                        if (messageRepeatCount > 2) {
+                            return; // Ne pas continuer à générer des logs
                         }
                     } else {
-                        console.log('=== DEBUG: Élément de l\'onglet actif non trouvé ou non valide ===', window.lastActiveTab);
+                        lastLoggedMessage = errorMsg;
+                        messageRepeatCount = 0;
                     }
-                } catch (e) {
-                    console.error('Erreur lors de l\'ajout de l\'indicateur:', e);
+                    console.warn('=== AVERTISSEMENT: ' + errorMsg + ' ===');
                 }
+            } catch (e) {
+                console.error('Erreur lors de l\'ajout de l\'indicateur:', e);
             }
         }
         
-        // Mettre à jour l'indicateur périodiquement
-        setInterval(updateActiveTabIndicator, 2000);
+        // Mettre à jour l'indicateur périodiquement, mais moins fréquemment
+        setInterval(updateActiveTabIndicator, 3000);
         
         // Écouter aussi les changements de layout
         if (window.mainLayout) {
@@ -834,64 +891,121 @@
     
     // Fonction pour configurer les boutons d'action géocache
     function setupGeocacheActionButtons() {
+        console.log('=== DEBUG: setupGeocacheActionButtons appelée ===');
+        
         // Sélectionner tous les boutons qui devraient avoir des actions spéciales
         const buttons = document.querySelectorAll('.geocache-action-button');
+        console.log(`=== DEBUG: ${buttons.length} boutons d'action trouvés ===`);
         
-        buttons.forEach(button => {
-            // Remplacer les gestionnaires de clics existants
-            button.removeAttribute('onclick');
+        buttons.forEach((button, index) => {
+            console.log(`=== DEBUG: Configuration du bouton ${index} de type ${button.dataset.actionType} ===`);
             
-            // Conserver le comportement normal pour le clic gauche
-            button.addEventListener('click', function(event) {
+            // Supprimer tous les gestionnaires d'événements existants
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            
+            // Ajouter un nouveau gestionnaire de clic avec une fonction anonyme
+            newButton.addEventListener('click', function(event) {
+                console.log(`=== DEBUG: Clic sur le bouton de type ${this.dataset.actionType} ===`);
+                
+                // Récupérer les informations du bouton
+                const actionType = this.dataset.actionType;
+                const geocacheId = this.dataset.geocacheId;
+                const gcCode = this.dataset.gcCode;
+                
                 if (!event.ctrlKey && !event.metaKey) {
-                    // Clic gauche standard - exécuter l'action par défaut
-                    executeButtonAction(button, 'same');
+                    // Clic gauche standard
+                    console.log(`=== DEBUG: Clic gauche standard détecté ===`);
+                    
+                    let shouldUseExistingTab = true; // Valeur par défaut
+                    
+                    // Vérifier si PluginGoldenLayoutIntegration est disponible
+                    if (window.PluginGoldenLayoutIntegration && 
+                        typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                        // Utiliser la configuration globale
+                        shouldUseExistingTab = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+                        console.log(`=== DEBUG: shouldOpenInSameSection retourne ${shouldUseExistingTab} ===`);
+                    } else {
+                        console.log('=== DEBUG: window.PluginGoldenLayoutIntegration non disponible, utilisation du comportement par défaut ===');
+                    }
+                    
+                    // Exécuter l'action en fonction du type
+                    try {
+                        switch (actionType) {
+                            case 'analyze':
+                                console.log(`=== DEBUG: Exécution de l'action analyze pour ${gcCode} ===`);
+                                if (typeof window.openPluginTab === 'function') {
+                                    window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+                                        geocacheId: geocacheId,
+                                        gcCode: gcCode,
+                                        openInSameTab: shouldUseExistingTab
+                                    });
+                                } else {
+                                    console.error('=== ERREUR: La fonction openPluginTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            case 'solver':
+                                console.log(`=== DEBUG: Exécution de l'action solver pour ${gcCode} ===`);
+                                if (typeof window.openSolverTab === 'function') {
+                                    window.openSolverTab(geocacheId, gcCode, shouldUseExistingTab);
+                                } else {
+                                    console.error('=== ERREUR: La fonction openSolverTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            case 'formula-solver':
+                                console.log(`=== DEBUG: Exécution de l'action formula-solver pour ${gcCode} ===`);
+                                if (typeof window.openFormulaSolverTab === 'function') {
+                                    window.openFormulaSolverTab(geocacheId, gcCode, shouldUseExistingTab);
+                                } else {
+                                    console.error('=== ERREUR: La fonction openFormulaSolverTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            default:
+                                console.error(`Type d'action inconnu: ${actionType}`);
+                        }
+                    } catch (error) {
+                        console.error('=== ERREUR lors de l\'exécution de l\'action ===', error);
+                    }
                 } else {
                     // Ctrl+Clic ou Cmd+Clic - forcer l'ouverture dans un nouvel onglet
-                    executeButtonAction(button, 'new');
+                    console.log(`=== DEBUG: Ctrl+Clic ou Cmd+Clic détecté ===`);
+                    
+                    try {
+                        switch (actionType) {
+                            case 'analyze':
+                                if (typeof window.openPluginTab === 'function') {
+                                    window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+                                        geocacheId: geocacheId,
+                                        gcCode: gcCode,
+                                        openInSameTab: false
+                                    });
+                                }
+                                break;
+                                
+                            case 'solver':
+                                if (typeof window.openSolverTab === 'function') {
+                                    window.openSolverTab(geocacheId, gcCode, false);
+                                }
+                                break;
+                                
+                            case 'formula-solver':
+                                if (typeof window.openFormulaSolverTab === 'function') {
+                                    window.openFormulaSolverTab(geocacheId, gcCode, false);
+                                }
+                                break;
+                        }
+                    } catch (error) {
+                        console.error('=== ERREUR lors de l\'exécution de l\'action ===', error);
+                    }
+                    
                     event.preventDefault();
                     event.stopPropagation();
                 }
             });
         });
-    }
-    
-    // La fonction showActionButtonContextMenu est maintenant définie au début du document
-    // pour éviter les problèmes de timing
-    
-    // Fonction pour exécuter l'action du bouton
-    function executeButtonAction(button, tabMode) {
-        const actionType = button.dataset.actionType;
-        const geocacheId = button.dataset.geocacheId;
-        const gcCode = button.dataset.gcCode;
-        
-        console.log(`=== DEBUG: Exécution de l'action ${actionType} pour la géocache ${gcCode} en mode ${tabMode} ===`);
-        
-        // Exécuter l'action en fonction du type
-        switch (actionType) {
-            case 'analyze':
-                const analyzeOptions = {
-                    geocacheId: geocacheId, 
-                    gcCode: gcCode,
-                    openInSameTab: tabMode === 'same'
-                };
-                console.log('=== DEBUG: Options pour analyse ===', analyzeOptions);
-                window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, analyzeOptions);
-                break;
-                
-            case 'solver':
-                console.log(`=== DEBUG: Appel de openSolverTab avec openInSameTab=${tabMode === 'same'} ===`);
-                window.openSolverTab(geocacheId, gcCode, tabMode === 'same');
-                break;
-                
-            case 'formula-solver':
-                console.log(`=== DEBUG: Appel de openFormulaSolverTab avec openInSameTab=${tabMode === 'same'} ===`);
-                window.openFormulaSolverTab(geocacheId, gcCode, tabMode === 'same');
-                break;
-                
-            default:
-                console.error(`Type d'action inconnu: ${actionType}`);
-        }
     }
 
     // Ajouter le gestionnaire de clic au bouton Chat IA après le chargement du DOM
@@ -906,4 +1020,178 @@
             });
         }
     });
+
+    // Script d'initialisation pour s'assurer que les dépendances sont chargées
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('=== DEBUG: Vérification des dépendances ===');
+        console.log('window.PluginGoldenLayoutIntegration disponible:', typeof window.PluginGoldenLayoutIntegration !== 'undefined');
+        if (window.PluginGoldenLayoutIntegration) {
+            console.log('shouldOpenInSameSection disponible:', typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function');
+        }
+        console.log('window.openPluginTab disponible:', typeof window.openPluginTab === 'function');
+        console.log('window.openSolverTab disponible:', typeof window.openSolverTab === 'function');
+        console.log('window.openFormulaSolverTab disponible:', typeof window.openFormulaSolverTab === 'function');
+        
+        // Forcer une réinitialisation des boutons après chargement complet
+        setTimeout(() => {
+            console.log('=== DEBUG: Réinitialisation forcée des boutons d\'action ===');
+            if (typeof setupGeocacheActionButtons === 'function') {
+                setupGeocacheActionButtons();
+            } else {
+                console.error('=== ERREUR: La fonction setupGeocacheActionButtons n\'est pas disponible ===');
+            }
+        }, 1000);
+    });
 </script>
+
+<script src="{{ url_for('static', filename='js/diagnostics.js') }}"></script>
+
+<!-- Scripts de correction des boutons -->
+<script src="{{ url_for('static', filename='js/button_fix.js') }}"></script>
+<script src="{{ url_for('static', filename='js/button_direct.js') }}"></script>
+
+</div>
+
+                // Récupérer les informations du bouton
+                const actionType = this.dataset.actionType;
+                const geocacheId = this.dataset.geocacheId;
+                const gcCode = this.dataset.gcCode;
+                
+                if (!event.ctrlKey && !event.metaKey) {
+                    // Clic gauche standard
+                    console.log(`=== DEBUG: Clic gauche standard détecté ===`);
+                    
+                    let shouldUseExistingTab = true; // Valeur par défaut
+                    
+                    // Vérifier si PluginGoldenLayoutIntegration est disponible
+                    if (window.PluginGoldenLayoutIntegration && 
+                        typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function') {
+                        // Utiliser la configuration globale
+                        shouldUseExistingTab = window.PluginGoldenLayoutIntegration.shouldOpenInSameSection();
+                        console.log(`=== DEBUG: shouldOpenInSameSection retourne ${shouldUseExistingTab} ===`);
+                    } else {
+                        console.log('=== DEBUG: window.PluginGoldenLayoutIntegration non disponible, utilisation du comportement par défaut ===');
+                    }
+                    
+                    // Exécuter l'action en fonction du type
+                    try {
+                        switch (actionType) {
+                            case 'analyze':
+                                console.log(`=== DEBUG: Exécution de l'action analyze pour ${gcCode} ===`);
+                                if (typeof window.openPluginTab === 'function') {
+                                    window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+                                        geocacheId: geocacheId,
+                                        gcCode: gcCode,
+                                        openInSameTab: shouldUseExistingTab
+                                    });
+                                } else {
+                                    console.error('=== ERREUR: La fonction openPluginTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            case 'solver':
+                                console.log(`=== DEBUG: Exécution de l'action solver pour ${gcCode} ===`);
+                                if (typeof window.openSolverTab === 'function') {
+                                    window.openSolverTab(geocacheId, gcCode, shouldUseExistingTab);
+                                } else {
+                                    console.error('=== ERREUR: La fonction openSolverTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            case 'formula-solver':
+                                console.log(`=== DEBUG: Exécution de l'action formula-solver pour ${gcCode} ===`);
+                                if (typeof window.openFormulaSolverTab === 'function') {
+                                    window.openFormulaSolverTab(geocacheId, gcCode, shouldUseExistingTab);
+                                } else {
+                                    console.error('=== ERREUR: La fonction openFormulaSolverTab n\'est pas disponible ===');
+                                }
+                                break;
+                                
+                            default:
+                                console.error(`Type d'action inconnu: ${actionType}`);
+                        }
+                    } catch (error) {
+                        console.error('=== ERREUR lors de l\'exécution de l\'action ===', error);
+                    }
+                } else {
+                    // Ctrl+Clic ou Cmd+Clic - forcer l'ouverture dans un nouvel onglet
+                    console.log(`=== DEBUG: Ctrl+Clic ou Cmd+Clic détecté ===`);
+                    
+                    try {
+                        switch (actionType) {
+                            case 'analyze':
+                                if (typeof window.openPluginTab === 'function') {
+                                    window.openPluginTab('analysis_web_page', `Analyse ${gcCode}`, {
+                                        geocacheId: geocacheId,
+                                        gcCode: gcCode,
+                                        openInSameTab: false
+                                    });
+                                }
+                                break;
+                                
+                            case 'solver':
+                                if (typeof window.openSolverTab === 'function') {
+                                    window.openSolverTab(geocacheId, gcCode, false);
+                                }
+                                break;
+                                
+                            case 'formula-solver':
+                                if (typeof window.openFormulaSolverTab === 'function') {
+                                    window.openFormulaSolverTab(geocacheId, gcCode, false);
+                                }
+                                break;
+                        }
+                    } catch (error) {
+                        console.error('=== ERREUR lors de l\'exécution de l\'action ===', error);
+                    }
+                    
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+            });
+        });
+    }
+
+    // Ajouter le gestionnaire de clic au bouton Chat IA après le chargement du DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatButton = document.getElementById('ai-chat-geocache-button');
+        if (chatButton) {
+            chatButton.addEventListener('click', function() {
+                const geocacheId = this.dataset.geocacheId;
+                const gcCode = this.dataset.gcCode;
+                const geocacheName = this.dataset.geocacheName;
+                openGeocacheAIChat(geocacheId, gcCode, JSON.parse(geocacheName));
+            });
+        }
+    });
+
+    // Script d'initialisation pour s'assurer que les dépendances sont chargées
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('=== DEBUG: Vérification des dépendances ===');
+        console.log('window.PluginGoldenLayoutIntegration disponible:', typeof window.PluginGoldenLayoutIntegration !== 'undefined');
+        if (window.PluginGoldenLayoutIntegration) {
+            console.log('shouldOpenInSameSection disponible:', typeof window.PluginGoldenLayoutIntegration.shouldOpenInSameSection === 'function');
+        }
+        console.log('window.openPluginTab disponible:', typeof window.openPluginTab === 'function');
+        console.log('window.openSolverTab disponible:', typeof window.openSolverTab === 'function');
+        console.log('window.openFormulaSolverTab disponible:', typeof window.openFormulaSolverTab === 'function');
+        
+        // Forcer une réinitialisation des boutons après chargement complet
+        setTimeout(() => {
+            console.log('=== DEBUG: Réinitialisation forcée des boutons d\'action ===');
+            if (typeof setupGeocacheActionButtons === 'function') {
+                setupGeocacheActionButtons();
+            } else {
+                console.error('=== ERREUR: La fonction setupGeocacheActionButtons n\'est pas disponible ===');
+            }
+        }, 1000);
+    });
+</script>
+
+<script src="{{ url_for('static', filename='js/diagnostics.js') }}"></script>
+
+<!-- Scripts de correction des boutons -->
+<script src="{{ url_for('static', filename='js/button_fix.js') }}"></script>
+<script src="{{ url_for('static', filename='js/button_direct.js') }}"></script>
+
+</div>

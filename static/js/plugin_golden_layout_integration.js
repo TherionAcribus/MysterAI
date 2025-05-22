@@ -248,6 +248,8 @@ function registerPluginInterfaceComponent(layout) {
 
 // Fonction pour vérifier si les onglets doivent s'ouvrir dans la même section
 function shouldOpenInSameSection() {
+    console.log('=== DEBUG: shouldOpenInSameSection appelée ===');
+    console.log('=== DEBUG: Valeur actuelle de openTabsInSameSection:', goldenLayoutConfig.openTabsInSameSection);
     return goldenLayoutConfig.openTabsInSameSection;
 }
 
@@ -400,5 +402,9 @@ window.PluginGoldenLayoutIntegration = {
     registerPluginInterfaceComponent,
     directAPICall,
     updateRootElementWithContainerId,
-    shouldOpenInSameSection
-} 
+    shouldOpenInSameSection,
+    loadGoldenLayoutSettings
+}
+
+// Appeler loadGoldenLayoutSettings au chargement du script
+document.addEventListener('DOMContentLoaded', loadGoldenLayoutSettings); 
