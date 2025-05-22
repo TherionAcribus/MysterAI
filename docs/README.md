@@ -74,6 +74,25 @@ window.API_BASE_URL = 'http://127.0.0.1:3000';
    npm run build
    ```
 
+### Système de Configuration avec Cache
+
+L'application utilise un système de gestion de configuration optimisé pour améliorer les performances:
+
+1. **Backend (Python)**
+   - Modèle `AppConfig` pour stocker les paramètres en base de données
+   - Gestionnaire `ConfigManager` avec cache côté serveur
+   - Organisation des paramètres par catégories (general, formula, ai, etc.)
+   - Préchargement au démarrage de l'application
+
+2. **Frontend (JavaScript)**
+   - Client `configManager` avec cache côté navigateur
+   - Synchronisation automatique avec le serveur
+   - Invalidation intelligente du cache après modifications
+
+La documentation détaillée est disponible ici:
+- [Système de Configuration (Python)](config_manager.md)
+- [Utilisation du Système de Configuration (JavaScript)](config_manager_js_usage.md)
+
 ## Composants Principaux
 
 ### 1. Interface Principale
@@ -119,6 +138,8 @@ window.API_BASE_URL = 'http://127.0.0.1:3000';
    - `/api/zones` : Liste des zones
    - `/geocaches/table/:zoneId` : Tableau des géocaches
    - `/geocaches/:id/details-panel` : Détails d'une géocache
+   - `/api/settings/:category` : Paramètres par catégorie
+   - `/api/settings/param/:key` : Paramètre individuel
 
 2. **Gestion des URLs**
    ```javascript
@@ -140,7 +161,12 @@ window.API_BASE_URL = 'http://127.0.0.1:3000';
    - Utiliser les composants réutilisables
    - Maintenir la cohérence visuelle
 
-3. **Documentation**
+3. **Configuration**
+   - Utiliser le gestionnaire de configuration plutôt que des valeurs codées en dur
+   - Organiser les paramètres par catégories logiques
+   - Fournir des valeurs par défaut pertinentes
+
+4. **Documentation**
    - Documenter les nouvelles fonctionnalités
    - Maintenir la documentation à jour
    - Inclure des exemples de code
@@ -156,6 +182,14 @@ window.API_BASE_URL = 'http://127.0.0.1:3000';
    - Tester les fonctionnalités principales
    - Vérifier la compatibilité Electron
    - Valider les performances
+
+## Documentation Technique
+
+- [Système de Configuration](config_manager.md)
+- [Utilisation JavaScript du Système de Configuration](config_manager_js_usage.md)
+- [Système de Plugins](plugin_system.md)
+- [Intégration GoldenLayout](stimulus_goldenlayout_integration.md)
+- [Système de Scoring](scoring_system.md)
 
 ## Contribution
 

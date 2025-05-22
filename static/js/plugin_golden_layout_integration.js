@@ -109,7 +109,7 @@ function updateRootElementWithContainerId(container) {
 function loadGoldenLayoutSettings() {
     console.log('=== DEBUG: Chargement des paramètres pour GoldenLayout ===');
     
-    fetch('/api/settings/general')
+    fetch('/api/settings/param/open_tabs_in_same_section')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Erreur HTTP: ${response.status}`);
@@ -117,12 +117,11 @@ function loadGoldenLayoutSettings() {
             return response.json();
         })
         .then(data => {
-            console.log('=== DEBUG: Paramètres GoldenLayout chargés ===', data);
+            console.log('=== DEBUG: Paramètre open_tabs_in_same_section chargé ===', data);
             
-            if (data.success && data.settings) {
+            if (data.success) {
                 // Mettre à jour la configuration
-                goldenLayoutConfig.openTabsInSameSection = data.settings.open_tabs_in_same_section !== undefined ? 
-                    data.settings.open_tabs_in_same_section : true;
+                goldenLayoutConfig.openTabsInSameSection = data.value !== undefined ? data.value : true;
                 
                 console.log('=== DEBUG: Configuration GoldenLayout mise à jour ===', goldenLayoutConfig);
             }
@@ -249,7 +248,39 @@ function registerPluginInterfaceComponent(layout) {
 // Fonction pour vérifier si les onglets doivent s'ouvrir dans la même section
 function shouldOpenInSameSection() {
     console.log('=== DEBUG: shouldOpenInSameSection appelée ===');
-    console.log('=== DEBUG: Valeur actuelle de openTabsInSameSection:', goldenLayoutConfig.openTabsInSameSection);
+    
+    // Vérifier si la configuration est déjà chargée
+    if (goldenLayoutConfig.openTabsInSameSection === undefined) {
+        // Si la configuration n'est pas encore chargée, la charger de manière synchrone
+        console.log('=== DEBUG: Configuration non chargée, récupération synchrone ===');
+        
+        try {
+            // Effectuer une requête synchrone (déconseillée en général, mais nécessaire ici)
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/settings/param/open_tabs_in_same_section', false); // 'false' rend la requête synchrone
+            xhr.send();
+            
+            if (xhr.status === 200) {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    goldenLayoutConfig.openTabsInSameSection = response.value;
+                    console.log('=== DEBUG: Paramètre open_tabs_in_same_section chargé de manière synchrone ===', response.value);
+                }
+            } else {
+                console.error('=== DEBUG: Erreur lors du chargement synchrone des paramètres ===');
+            }
+        } catch (error) {
+            console.error('=== DEBUG: Exception lors du chargement synchrone des paramètres ===', error);
+        }
+    }
+    
+    // Utiliser la valeur par défaut si toujours undefined après tentative de chargement
+    if (goldenLayoutConfig.openTabsInSameSection === undefined) {
+        console.log('=== DEBUG: Paramètre toujours non défini, utilisation de la valeur par défaut (true) ===');
+        goldenLayoutConfig.openTabsInSameSection = true;
+    }
+    
+    console.log('=== DEBUG: Valeur de openTabsInSameSection:', goldenLayoutConfig.openTabsInSameSection);
     return goldenLayoutConfig.openTabsInSameSection;
 }
 

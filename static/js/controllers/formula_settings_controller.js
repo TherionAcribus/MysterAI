@@ -32,34 +32,25 @@
         }
         
         /**
-         * Charger les paramètres depuis le serveur
+         * Charger les paramètres depuis le gestionnaire de configuration
          */
-        loadSettings() {
+        async loadSettings() {
             console.log('=== DEBUG: Chargement des paramètres Formula Solver ===');
             
-            fetch('/api/settings/formula')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erreur HTTP: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('=== DEBUG: Réponse du serveur ===', data);
-                    
-                    if (data.success) {
-                        this.updateUI(data.settings);
-                    } else {
-                        console.error('Erreur lors du chargement des paramètres:', data.error);
-                        // En cas d'erreur, définir les valeurs par défaut
-                        this.resetToDefaults();
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur lors du chargement des paramètres:', error);
-                    // En cas d'erreur, définir les valeurs par défaut
+            try {
+                // Utiliser le ConfigManager pour récupérer les paramètres formula
+                const settings = await window.configManager.getCategory('formula');
+                
+                if (settings) {
+                    this.updateUI(settings);
+                } else {
+                    console.error('Erreur lors du chargement des paramètres: Aucune donnée reçue');
                     this.resetToDefaults();
-                });
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des paramètres:', error);
+                this.resetToDefaults();
+            }
         }
         
         /**
@@ -140,7 +131,7 @@
         /**
          * Enregistrer les paramètres
          */
-        saveSettings() {
+        async saveSettings() {
             console.log('=== DEBUG: Enregistrement des paramètres ===');
             
             // Récupérer la méthode d'extraction de formule
@@ -170,47 +161,38 @@
             
             console.log('=== DEBUG: Paramètres à enregistrer ===', settings);
             
-            fetch('/api/settings/formula/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(settings)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erreur HTTP: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('=== DEBUG: Réponse après enregistrement ===', data);
+            try {
+                // Utiliser le ConfigManager pour sauvegarder les paramètres
+                const success = await window.configManager.saveCategory('formula', settings);
                 
-                if (data.success) {
+                if (success) {
                     this.showNotification('Paramètres enregistrés avec succès!');
                     
-                    // Charger à nouveau les paramètres pour s'assurer que l'UI est à jour
+                    // Forcer un rafraîchissement des paramètres après 500ms
                     setTimeout(() => {
+                        window.configManager.clearCache('formula');
                         this.loadSettings();
                     }, 500);
                 } else {
-                    this.showNotification('Erreur: ' + data.error, true);
+                    this.showNotification('Erreur lors de l\'enregistrement des paramètres', true);
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('=== ERREUR lors de l\'enregistrement ===', error);
                 this.showNotification('Erreur: ' + error.message, true);
-            });
+            }
         }
         
         /**
          * Réinitialiser les paramètres aux valeurs par défaut
          */
-        resetDefaults() {
+        async resetDefaults() {
             console.log('=== DEBUG: Réinitialisation des paramètres ===');
             
             this.resetToDefaults();
-            this.saveSettings();
+            await this.saveSettings();
+            
+            // Vider le cache pour forcer un rafraîchissement
+            window.configManager.clearCache('formula');
             
             this.showNotification('Paramètres réinitialisés aux valeurs par défaut');
         }

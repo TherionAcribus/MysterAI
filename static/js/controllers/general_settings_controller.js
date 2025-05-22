@@ -53,9 +53,9 @@
         }
         
         /**
-         * Charger les paramètres depuis le serveur
+         * Charger les paramètres depuis le gestionnaire de configuration
          */
-        loadSettings() {
+        async loadSettings() {
             console.log('=== DEBUG: Chargement des paramètres généraux ===');
             
             // Vérifier que les cibles sont disponibles
@@ -66,29 +66,20 @@
                 return;
             }
             
-            fetch('/api/settings/general')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erreur HTTP: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('=== DEBUG: Réponse du serveur ===', data);
-                    
-                    if (data.success) {
-                        this.updateUI(data.settings);
-                    } else {
-                        console.error('Erreur lors du chargement des paramètres:', data.error);
-                        // En cas d'erreur, définir les valeurs par défaut
-                        this.resetToDefaults();
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur lors du chargement des paramètres:', error);
-                    // En cas d'erreur, définir les valeurs par défaut
+            try {
+                // Utiliser le ConfigManager pour récupérer les paramètres généraux
+                const settings = await window.configManager.getCategory('general');
+                
+                if (settings) {
+                    this.updateUI(settings);
+                } else {
+                    console.error('Erreur lors du chargement des paramètres: Aucune donnée reçue');
                     this.resetToDefaults();
-                });
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des paramètres:', error);
+                this.resetToDefaults();
+            }
         }
         
         /**
@@ -157,7 +148,7 @@
         /**
          * Enregistrer les paramètres
          */
-        saveSettings() {
+        async saveSettings() {
             console.log('=== DEBUG: Enregistrement des paramètres ===');
             
             if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || 
@@ -176,35 +167,22 @@
             
             console.log('=== DEBUG: Paramètres à enregistrer ===', settings);
             
-            fetch('/api/settings/general/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(settings)
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erreur HTTP: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('=== DEBUG: Réponse après enregistrement ===', data);
+            try {
+                // Utiliser le ConfigManager pour sauvegarder les paramètres
+                const success = await window.configManager.saveCategory('general', settings);
                 
-                if (data.success) {
+                if (success) {
                     this.showNotification('Paramètres enregistrés avec succès!');
                     
                     // Émettre des événements pour les paramètres modifiés
                     this.notifySettingsChanged(settings);
                 } else {
-                    this.showNotification('Erreur: ' + data.error, true);
+                    this.showNotification('Erreur lors de l\'enregistrement des paramètres', true);
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('=== ERREUR lors de l\'enregistrement ===', error);
                 this.showNotification('Erreur: ' + error.message, true);
-            });
+            }
         }
         
         /**
@@ -228,7 +206,7 @@
         /**
          * Réinitialiser les paramètres aux valeurs par défaut
          */
-        resetDefaults() {
+        async resetDefaults() {
             console.log('=== DEBUG: Réinitialisation des paramètres ===');
             
             if (!this.hasAutoMarkSolvedTarget || !this.hasAutoCorrectCoordinatesTarget || 
@@ -245,7 +223,10 @@
             this.openTabsInSameSectionTarget.checked = true;
             
             // Enregistrer les valeurs par défaut
-            this.saveSettings();
+            await this.saveSettings();
+            
+            // Effacer le cache pour cette catégorie pour forcer un rechargement
+            window.configManager.clearCache('general');
             
             this.showNotification('Paramètres réinitialisés aux valeurs par défaut');
         }
