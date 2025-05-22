@@ -157,5 +157,25 @@ def create_app():
         logger.info("Loading plugins...")
         app.plugin_manager.load_plugins()
         logger.info("PluginManager initialized.")
+        
+        # Préchargement des paramètres de l'application
+        try:
+            logger.info("Preloading application settings...")
+            from app.models.config_manager import ConfigManager
+            config_manager = ConfigManager.get_instance()
+            
+            # Charger les paramètres généraux
+            general_settings = config_manager.load_category('general')
+            logger.info(f"Preloaded {len(general_settings)} general settings")
+            
+            # Charger les paramètres formula
+            formula_settings = config_manager.load_category('formula')
+            logger.info(f"Preloaded {len(formula_settings)} formula settings")
+            
+            # Ajouter le gestionnaire de configuration à l'application pour y accéder facilement
+            app.config_manager = config_manager
+            logger.info("Application settings preloaded successfully")
+        except Exception as e:
+            logger.error(f"Error preloading application settings: {str(e)}")
 
     return app

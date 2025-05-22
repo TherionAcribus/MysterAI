@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template
 from app.models.app_config import AppConfig
+from app.models.config_manager import ConfigManager
 import logging
 
 # Configurer le logger
@@ -43,12 +44,21 @@ def get_general_settings():
     """
     logger.info("=== DEBUG: Route /api/settings/general appelée ===")
     try:
-        settings = {
-            'auto_mark_solved': AppConfig.get_value('auto_mark_solved', True),
-            'auto_correct_coordinates': AppConfig.get_value('auto_correct_coordinates', True),
-            'enable_auto_scoring': AppConfig.get_value('enable_auto_scoring', True),
-            'open_tabs_in_same_section': AppConfig.get_value('open_tabs_in_same_section', True)
+        # Utiliser le ConfigManager pour récupérer tous les paramètres de la catégorie 'general'
+        config_manager = ConfigManager.get_instance()
+        settings = config_manager.get_all_category_values('general')
+        
+        # S'assurer que nous avons les paramètres essentiels avec des valeurs par défaut
+        essential_params = {
+            'auto_mark_solved': True,
+            'auto_correct_coordinates': True,
+            'enable_auto_scoring': True,
+            'open_tabs_in_same_section': True
         }
+        
+        for key, default_value in essential_params.items():
+            if key not in settings:
+                settings[key] = config_manager.get_value(key, default_value)
         
         logger.info(f"=== DEBUG: Paramètres récupérés: {settings} ===")
         return jsonify({
@@ -69,10 +79,19 @@ def get_formula_settings():
     """
     logger.info("=== DEBUG: Route /api/settings/formula appelée ===")
     try:
-        settings = {
-            'formula_extraction_method': AppConfig.get_value('formula_extraction_method', 'regex'),
-            'question_extraction_method': AppConfig.get_value('question_extraction_method', 'regex')
+        # Utiliser le ConfigManager pour récupérer tous les paramètres de la catégorie 'formula'
+        config_manager = ConfigManager.get_instance()
+        settings = config_manager.get_all_category_values('formula')
+        
+        # S'assurer que nous avons les paramètres essentiels avec des valeurs par défaut
+        essential_params = {
+            'formula_extraction_method': 'regex',
+            'question_extraction_method': 'regex'
         }
+        
+        for key, default_value in essential_params.items():
+            if key not in settings:
+                settings[key] = config_manager.get_value(key, default_value)
         
         logger.info(f"=== DEBUG: Paramètres Formula Solver récupérés: {settings} ===")
         return jsonify({
@@ -102,29 +121,31 @@ def save_general_settings():
                 'error': 'Format de données invalide'
             }), 400
         
+        config_manager = ConfigManager.get_instance()
+        
         # Enregistrer les paramètres
-        AppConfig.set_value(
+        config_manager.set_value(
             'auto_mark_solved', 
             data.get('auto_mark_solved', True),
             category='general',
             description='Marquer automatiquement une géocache comme "résolue" quand on corrige les coordonnées'
         )
         
-        AppConfig.set_value(
+        config_manager.set_value(
             'auto_correct_coordinates', 
             data.get('auto_correct_coordinates', True),
             category='general',
             description='Dans le Solver, corriger automatiquement les coordonnées quand on trouve des coordonnées valides'
         )
         
-        AppConfig.set_value(
+        config_manager.set_value(
             'enable_auto_scoring', 
             data.get('enable_auto_scoring', True),
             category='general',
             description='Activer le système de scoring automatique pour évaluer la pertinence des résultats de déchiffrement'
         )
         
-        AppConfig.set_value(
+        config_manager.set_value(
             'open_tabs_in_same_section', 
             data.get('open_tabs_in_same_section', True),
             category='general',
@@ -167,24 +188,26 @@ def save_formula_settings():
         logger.info(f"=== DEBUG: Méthode d'extraction de formule à enregistrer: {formula_extraction_method} ===")
         logger.info(f"=== DEBUG: Méthode d'extraction de question à enregistrer: {question_extraction_method} ===")
         
+        config_manager = ConfigManager.get_instance()
+        
         # Enregistrer les paramètres
-        result1 = AppConfig.set_value(
+        config_manager.set_value(
             'formula_extraction_method', 
             formula_extraction_method,
             category='formula',
             description='Méthode d\'extraction des formules (ia ou regex)'
         )
         
-        result2 = AppConfig.set_value(
+        config_manager.set_value(
             'question_extraction_method', 
             question_extraction_method,
             category='formula',
             description='Méthode d\'extraction des questions (ia ou regex)'
         )
         
-        # Vérifier l'enregistrement
-        saved_formula_value = AppConfig.get_value('formula_extraction_method', 'regex')
-        saved_question_value = AppConfig.get_value('question_extraction_method', 'regex')
+        # Récupérer les valeurs enregistrées pour les retourner à l'utilisateur
+        saved_formula_value = config_manager.get_value('formula_extraction_method', 'regex')
+        saved_question_value = config_manager.get_value('question_extraction_method', 'regex')
         
         logger.info(f"=== DEBUG: Valeur de formule enregistrée en base: {saved_formula_value} ===")
         logger.info(f"=== DEBUG: Valeur de question enregistrée en base: {saved_question_value} ===")
@@ -213,7 +236,8 @@ def get_specific_param(param_name):
     """
     logger.info(f"=== DEBUG: Route /api/settings/param/{param_name} appelée ===")
     try:
-        value = AppConfig.get_value(param_name)
+        config_manager = ConfigManager.get_instance()
+        value = config_manager.get_value(param_name)
         logger.info(f"=== DEBUG: Valeur récupérée pour {param_name}: {value} ===")
         return jsonify({
             'success': True,
@@ -245,7 +269,8 @@ def debug_set_param(param_name, param_value):
             value = param_value
             
         # Enregistrer la valeur
-        AppConfig.set_value(param_name, value, category='general')
+        config_manager = ConfigManager.get_instance()
+        config_manager.set_value(param_name, value, category='general')
         
         logger.info(f"=== DEBUG: Paramètre {param_name} défini à {value} ===")
         return jsonify({
