@@ -34,6 +34,7 @@ const settings = await SettingsService.getGeneralSettings();
 | `auto_mark_solved` | Boolean | `true` | Marquer automatiquement comme "résolue" |
 | `auto_correct_coordinates` | Boolean | `true` | Corriger automatiquement les coordonnées |
 | `enable_auto_scoring` | Boolean | `true` | Activer le scoring automatique |
+| `open_tab_in_same_section` | Boolean | `true` | Ouvrir les nouveaux onglets dans la même section GoldenLayout |
 | `formula_extraction_method` | String | `'regex'` | Méthode d'extraction (`'regex'` ou `'ia'`) |
 | `question_extraction_method` | String | `'regex'` | Méthode d'extraction (`'regex'` ou `'ia'`) |
 

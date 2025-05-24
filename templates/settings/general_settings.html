@@ -88,6 +88,27 @@
                 </p>
             </div>
         </div>
+
+        <!-- Open tab in same section -->
+        <div class="flex items-start space-x-4">
+            <div class="flex items-center h-5 mt-1">
+                <input
+                    type="checkbox"
+                    id="open_tab_in_same_section"
+                    data-general-settings-target="openTabInSameSection"
+                    data-action="change->general-settings#settingChanged"
+                    class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800"
+                />
+            </div>
+            <div class="flex-1">
+                <label for="open_tab_in_same_section" class="text-sm font-medium text-gray-200 cursor-pointer">
+                    Ouvrir les nouveaux onglets dans la même section
+                </label>
+                <p class="text-sm text-gray-400 mt-1">
+                    Par défaut, ouvrir les nouveaux onglets dans la même section GoldenLayout plutôt que dans une nouvelle section
+                </p>
+            </div>
+        </div>
     </div>
 
     <!-- Boutons d'action -->

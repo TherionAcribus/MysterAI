@@ -77,7 +77,7 @@ async function initializeSettingsControllers() {
         class GeneralSettingsController extends window.BaseSettingsController {
             static targets = [
                 ...window.BaseSettingsController.targets,
-                "autoMarkSolved", "autoCorrectCoordinates", "enableAutoScoring"
+                "autoMarkSolved", "autoCorrectCoordinates", "enableAutoScoring", "openTabInSameSection"
             ]
             
             apiEndpoint = '/api/settings/general'
@@ -91,7 +91,8 @@ async function initializeSettingsControllers() {
                 const settings = {
                     auto_mark_solved: this.hasAutoMarkSolvedTarget ? this.autoMarkSolvedTarget.checked : true,
                     auto_correct_coordinates: this.hasAutoCorrectCoordinatesTarget ? this.autoCorrectCoordinatesTarget.checked : true,
-                    enable_auto_scoring: this.hasEnableAutoScoringTarget ? this.enableAutoScoringTarget.checked : true
+                    enable_auto_scoring: this.hasEnableAutoScoringTarget ? this.enableAutoScoringTarget.checked : true,
+                    open_tab_in_same_section: this.hasOpenTabInSameSectionTarget ? this.openTabInSameSectionTarget.checked : true
                 };
                 console.log('📤 GeneralSettings gatherSettings:', settings);
                 return settings;
@@ -120,13 +121,21 @@ async function initializeSettingsControllers() {
                 } else {
                     console.warn('⚠️ Target enableAutoScoring non trouvé');
                 }
+                
+                if (this.hasOpenTabInSameSectionTarget) {
+                    this.openTabInSameSectionTarget.checked = settings.open_tab_in_same_section !== false;
+                    console.log(`✅ open_tab_in_same_section mis à jour: ${this.openTabInSameSectionTarget.checked}`);
+                } else {
+                    console.warn('⚠️ Target openTabInSameSection non trouvé');
+                }
             }
             
             getDefaults() {
                 return {
                     auto_mark_solved: true,
                     auto_correct_coordinates: true,
-                    enable_auto_scoring: true
+                    enable_auto_scoring: true,
+                    open_tab_in_same_section: true
                 };
             }
         }
