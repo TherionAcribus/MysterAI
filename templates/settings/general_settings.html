@@ -1,60 +1,170 @@
-<div>
-    <h2 class="text-lg font-semibold mb-4">Paramètres généraux</h2>
-    
-    <div class="space-y-4">
-        <!-- Option 1: Marquer comme résolu -->
-        <div class="flex items-start">
-            <div class="flex items-center h-5">
-                <input type="checkbox" 
-                       id="auto_mark_solved" 
-                       data-general-settings-target="autoMarkSolved"
-                       class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+<div data-controller="general-settings" 
+     data-general-settings-api-endpoint-value="/api/settings/general"
+     class="space-y-6">
+    <!-- En-tête avec indicateurs de statut -->
+    <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-200">Paramètres Généraux</h3>
+        <div class="flex items-center space-x-4">
+            <!-- Spinner de chargement -->
+            <div data-general-settings-target="loadingIndicator" class="hidden">
+                <svg class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
             </div>
-            <div class="ml-3 text-sm">
-                <label for="auto_mark_solved" class="font-medium text-gray-300">Marquer automatiquement comme résolu</label>
-                <p class="text-gray-400">Marquer automatiquement une géocache comme "résolue" lorsque les coordonnées sont corrigées</p>
+           
+            <!-- Version du cache -->
+            <span class="text-sm text-gray-500">v<span data-general-settings-target="cacheVersion">-</span></span>
+           
+            <!-- Statut de synchronisation -->
+            <span data-general-settings-target="syncStatus" class="text-sm text-gray-500">-</span>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div data-general-settings-target="notification" class="hidden p-3 rounded-lg transition-all duration-300"></div>
+
+    <!-- Paramètres -->
+    <div class="space-y-6 bg-gray-800/50 rounded-lg p-6">
+        <!-- Auto mark solved -->
+        <div class="flex items-start space-x-4">
+            <div class="flex items-center h-5 mt-1">
+                <input
+                    type="checkbox"
+                    id="auto_mark_solved"
+                    data-general-settings-target="autoMarkSolved"
+                    data-action="change->general-settings#settingChanged"
+                    class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800"
+                />
+            </div>
+            <div class="flex-1">
+                <label for="auto_mark_solved" class="text-sm font-medium text-gray-200 cursor-pointer">
+                    Marquer automatiquement comme "résolue"
+                </label>
+                <p class="text-sm text-gray-400 mt-1">
+                    Marquer automatiquement une géocache comme "résolue" quand les coordonnées sont corrigées
+                </p>
             </div>
         </div>
-        
-        <!-- Option 2: Corriger automatiquement -->
-        <div class="flex items-start">
-            <div class="flex items-center h-5">
-                <input type="checkbox" 
-                       id="auto_correct_coordinates" 
-                       data-general-settings-target="autoCorrectCoordinates"
-                       class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+
+        <!-- Auto correct coordinates -->
+        <div class="flex items-start space-x-4">
+            <div class="flex items-center h-5 mt-1">
+                <input
+                    type="checkbox"
+                    id="auto_correct_coordinates"
+                    data-general-settings-target="autoCorrectCoordinates"
+                    data-action="change->general-settings#settingChanged"
+                    class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800"
+                />
             </div>
-            <div class="ml-3 text-sm">
-                <label for="auto_correct_coordinates" class="font-medium text-gray-300">Corriger automatiquement les coordonnées</label>
-                <p class="text-gray-400">Dans le Solver, corriger automatiquement les coordonnées lorsqu'une solution valide est trouvée</p>
+            <div class="flex-1">
+                <label for="auto_correct_coordinates" class="text-sm font-medium text-gray-200 cursor-pointer">
+                    Corriger automatiquement les coordonnées
+                </label>
+                <p class="text-sm text-gray-400 mt-1">
+                    Dans le Solver, corriger automatiquement les coordonnées quand des coordonnées valides sont trouvées
+                </p>
             </div>
         </div>
-        
-        <!-- Option 3: Activer le scoring automatique -->
-        <div class="flex items-start">
-            <div class="flex items-center h-5">
-                <input type="checkbox" 
-                       id="enable_auto_scoring" 
-                       data-general-settings-target="enableAutoScoring"
-                       class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+
+        <!-- Enable auto scoring -->
+        <div class="flex items-start space-x-4">
+            <div class="flex items-center h-5 mt-1">
+                <input
+                    type="checkbox"
+                    id="enable_auto_scoring"
+                    data-general-settings-target="enableAutoScoring"
+                    data-action="change->general-settings#settingChanged"
+                    class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-offset-gray-800"
+                />
             </div>
-            <div class="ml-3 text-sm">
-                <label for="enable_auto_scoring" class="font-medium text-gray-300">Activer le scoring automatique</label>
-                <p class="text-gray-400">Appliquer automatiquement le système de scoring pour évaluer la pertinence des résultats de déchiffrement</p>
+            <div class="flex-1">
+                <label for="enable_auto_scoring" class="text-sm font-medium text-gray-200 cursor-pointer">
+                    Activer le scoring automatique
+                </label>
+                <p class="text-sm text-gray-400 mt-1">
+                    Activer le système de scoring automatique pour évaluer la pertinence des résultats de déchiffrement
+                </p>
             </div>
         </div>
     </div>
-    
-    <div class="mt-6 flex space-x-4">
-        <button 
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            data-action="click->general-settings#saveSettings">
-            Enregistrer
-        </button>
-        <button 
-            class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-            data-action="click->general-settings#resetDefaults">
+
+    <!-- Boutons d'action -->
+    <div class="flex justify-between items-center pt-4 border-t border-gray-700">
+        <div class="flex space-x-3">
+            <button
+                data-general-settings-target="saveButton"
+                data-action="click->general-settings#manualSave"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                Enregistrer
+            </button>
+           
+            <button
+                data-action="click->general-settings#refreshSettings"
+                class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors"
+            >
+                Actualiser
+            </button>
+        </div>
+        
+        <button
+            data-action="click->general-settings#resetDefaults"
+            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors text-sm"
+        >
             Réinitialiser
         </button>
     </div>
-</div> 
+
+    <!-- Info sur la sauvegarde automatique -->
+    <div class="text-xs text-gray-500 bg-gray-800/30 rounded p-3 border-l-4 border-blue-500">
+        <div class="flex items-center space-x-2">
+            <svg class="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Les modifications sont automatiquement sauvegardées après 2 secondes</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Styles pour les notifications */
+    .notification.success {
+        background-color: rgba(6, 95, 70, 0.8);
+        border: 1px solid #10b981;
+        color: #d1fae5;
+    }
+   
+    .notification.error {
+        background-color: rgba(127, 29, 29, 0.8);
+        border: 1px solid #ef4444;
+        color: #fecaca;
+    }
+   
+    .notification.info {
+        background-color: rgba(30, 58, 138, 0.8);
+        border: 1px solid #3b82f6;
+        color: #dbeafe;
+    }
+   
+    /* Amélioration des checkboxes */
+    .form-checkbox:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+    }
+    
+    .form-checkbox:focus {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Animation pour les labels */
+    label:hover {
+        color: #f3f4f6;
+    }
+    
+    /* Effet de transition pour les boutons */
+    button:active {
+        transform: translateY(1px);
+    }
+</style> 

@@ -36,10 +36,41 @@ MysteryAI/
    - GoldenLayout pour l'interface à onglets
    - Tabulator pour les tableaux de données
    - HTMX pour les interactions dynamiques
+   - **Stimulus** pour les contrôleurs JavaScript
 
 3. **Application Bureau**
    - Electron pour l'application native
    - Node.js pour le runtime
+
+## Fonctionnalités Principales
+
+### Système de Settings
+
+MysteryAI dispose d'un système de paramètres moderne et modulaire :
+
+- **Architecture modulaire** avec contrôleurs Stimulus réutilisables
+- **Auto-save** avec debounce (2 secondes)
+- **Interface utilisateur moderne** avec notifications temps réel
+- **API REST** pour l'accès programmatique aux paramètres
+- **Gestion d'erreurs robuste** et protection contre la perte de données
+
+**📖 Documentation détaillée :**
+- [Système de Settings - Guide Développeur](systeme_settings.md)
+- [Accès aux Settings - Guide d'Intégration](acces_settings_donnees.md)
+
+### Interface et Navigation
+
+- **GoldenLayout** : Interface modulaire avec onglets et panneaux redimensionnables
+- **Communication inter-composants** via événements personnalisés
+- **Responsive design** avec Tailwind CSS
+- **Support complet Electron et navigateur web**
+
+### Gestion des Géocaches
+
+- **Import/Export GPX** avec validation automatique
+- **Tableau interactif** avec tri, filtrage et recherche
+- **Panneau de détails** intégré avec support HTML
+- **Système de zones** pour l'organisation géographique
 
 ## Configuration
 

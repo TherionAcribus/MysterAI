@@ -1,76 +1,162 @@
-<div data-controller="formula-settings">
-    <h2 class="text-lg font-semibold mb-4">Paramètres Formula Solver</h2>
-    
-    <div class="space-y-4">
-        <!-- Méthode d'extraction de formule -->
-        <div class="mb-6">
-            <label class="block text-gray-300 mb-2">Méthode d'extraction de formule</label>
-            <div class="space-y-2">
-                <div class="flex items-center">
-                    <input type="radio" 
-                           id="extraction_ia" 
-                           name="extraction_method" 
-                           value="ia" 
-                           data-formula-settings-target="extractionMethod"
-                           class="mr-2">
-                    <label for="extraction_ia" class="text-gray-300">Intelligence Artificielle</label>
-                </div>
-                <p class="text-gray-400 ml-5 text-sm">Utilise le modèle d'IA pour extraire les formules (plus précis mais plus lent)</p>
+<div data-controller="formula-settings" class="space-y-6">
+    <!-- En-tête avec indicateurs de statut -->
+    <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-200">Paramètres Formula Solver</h3>
+        <div class="flex items-center space-x-4">
+            <!-- Spinner de chargement -->
+            <div data-formula-settings-target="loadingIndicator" class="hidden">
+                <svg class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+           
+            <!-- Version du cache -->
+            <span class="text-sm text-gray-500">v<span data-formula-settings-target="cacheVersion">-</span></span>
+           
+            <!-- Statut de synchronisation -->
+            <span data-formula-settings-target="syncStatus" class="text-sm text-gray-500">-</span>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div data-formula-settings-target="notification" class="hidden p-3 rounded-lg transition-all duration-300"></div>
+
+    <!-- Paramètres -->
+    <div class="space-y-6 bg-gray-800/50 rounded-lg p-6">
+        <!-- Méthode d'extraction des formules -->
+        <div class="space-y-4">
+            <div class="flex items-center space-x-3">
+                <svg class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z" />
+                </svg>
+                <h4 class="text-md font-medium text-gray-200">Méthode d'extraction des formules</h4>
+            </div>
+            
+            <div class="ml-8 space-y-3">
+                <select 
+                    data-formula-settings-target="formulaExtractionMethod"
+                    data-action="change->formula-settings#settingChanged"
+                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                    <option value="regex">Expressions régulières (Regex)</option>
+                    <option value="ia">Intelligence Artificielle (IA)</option>
+                </select>
                 
-                <div class="flex items-center">
-                    <input type="radio" 
-                           id="extraction_regex" 
-                           name="extraction_method" 
-                           value="regex" 
-                           data-formula-settings-target="extractionMethod"
-                           class="mr-2" 
-                           checked>
-                    <label for="extraction_regex" class="text-gray-300">Expressions régulières</label>
+                <div class="text-sm text-gray-400 space-y-1">
+                    <div><strong>Regex :</strong> Extraction rapide et fiable basée sur des motifs</div>
+                    <div><strong>IA :</strong> Extraction intelligente mais plus lente</div>
                 </div>
-                <p class="text-gray-400 ml-5 text-sm">Utilise des patterns prédéfinis pour extraire les formules (plus rapide mais moins précis)</p>
             </div>
         </div>
-        
-        <!-- Méthode d'extraction de question -->
-        <div class="mb-6">
-            <label class="block text-gray-300 mb-2">Méthode d'extraction de question</label>
-            <div class="space-y-2">
-                <div class="flex items-center">
-                    <input type="radio" 
-                           id="question_extraction_ia" 
-                           name="question_extraction_method" 
-                           value="ia" 
-                           data-formula-settings-target="questionExtractionMethod"
-                           class="mr-2">
-                    <label for="question_extraction_ia" class="text-gray-300">Intelligence Artificielle</label>
-                </div>
-                <p class="text-gray-400 ml-5 text-sm">Utilise le modèle d'IA pour extraire les questions (plus précis mais plus lent)</p>
+
+        <!-- Séparateur -->
+        <div class="border-t border-gray-700"></div>
+
+        <!-- Méthode d'extraction des questions -->
+        <div class="space-y-4">
+            <div class="flex items-center space-x-3">
+                <svg class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h4 class="text-md font-medium text-gray-200">Méthode d'extraction des questions</h4>
+            </div>
+            
+            <div class="ml-8 space-y-3">
+                <select 
+                    data-formula-settings-target="questionExtractionMethod"
+                    data-action="change->formula-settings#settingChanged"
+                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                    <option value="regex">Expressions régulières (Regex)</option>
+                    <option value="ia">Intelligence Artificielle (IA)</option>
+                </select>
                 
-                <div class="flex items-center">
-                    <input type="radio" 
-                           id="question_extraction_regex" 
-                           name="question_extraction_method" 
-                           value="regex" 
-                           data-formula-settings-target="questionExtractionMethod"
-                           class="mr-2" 
-                           checked>
-                    <label for="question_extraction_regex" class="text-gray-300">Expressions régulières</label>
+                <div class="text-sm text-gray-400 space-y-1">
+                    <div><strong>Regex :</strong> Détection rapide des questions structurées</div>
+                    <div><strong>IA :</strong> Compréhension contextuelle avancée</div>
                 </div>
-                <p class="text-gray-400 ml-5 text-sm">Utilise des patterns prédéfinis pour extraire les questions (plus rapide mais moins précis)</p>
             </div>
         </div>
     </div>
-    
-    <div class="mt-6 flex space-x-4">
-        <button 
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-            data-action="click->formula-settings#saveSettings">
-            Enregistrer
-        </button>
-        <button 
-            class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-            data-action="click->formula-settings#resetDefaults">
+
+    <!-- Boutons d'action -->
+    <div class="flex justify-between items-center pt-4 border-t border-gray-700">
+        <div class="flex space-x-3">
+            <button
+                data-formula-settings-target="saveButton"
+                data-action="click->formula-settings#manualSave"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                Enregistrer
+            </button>
+           
+            <button
+                data-action="click->formula-settings#refreshSettings"
+                class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors"
+            >
+                Actualiser
+            </button>
+            
+            <button
+                data-action="click->formula-settings#previewExtractionMethod"
+                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors"
+            >
+                Aperçu
+            </button>
+        </div>
+        
+        <button
+            data-action="click->formula-settings#resetDefaults"
+            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-colors text-sm"
+        >
             Réinitialiser
         </button>
     </div>
-</div> 
+
+    <!-- Recommandations -->
+    <div class="text-xs text-gray-500 bg-amber-900/20 border border-amber-700 rounded p-3">
+        <div class="flex items-start space-x-2">
+            <svg class="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div class="space-y-1">
+                <div><strong>Recommandations :</strong></div>
+                <div>• <strong>Regex</strong> recommandé pour la plupart des cas (rapide et fiable)</div>
+                <div>• <strong>IA</strong> utile pour des textes complexes ou non-structurés</div>
+                <div>• Les modifications sont automatiquement sauvegardées après 2 secondes</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Styles pour les notifications */
+    .notification.success {
+        background-color: rgba(6, 95, 70, 0.8);
+        border: 1px solid #10b981;
+        color: #d1fae5;
+    }
+   
+    .notification.error {
+        background-color: rgba(127, 29, 29, 0.8);
+        border: 1px solid #ef4444;
+        color: #fecaca;
+    }
+   
+    .notification.info {
+        background-color: rgba(30, 58, 138, 0.8);
+        border: 1px solid #3b82f6;
+        color: #dbeafe;
+    }
+
+    /* Amélioration des selects */
+    select:focus {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Effet de transition pour les boutons */
+    button:active {
+        transform: translateY(1px);
+    }
+</style> 

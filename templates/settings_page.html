@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Paramètres - MysteryAI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- En-tête -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                <i class="fas fa-cog mr-3"></i>Paramètres de l'Application
+            </h1>
+            <p class="text-gray-400 text-lg">
+                Configurez le comportement de MysteryAI selon vos préférences
+            </p>
+        </div>
+
+        <!-- Notifications globales -->
+        <div id="global-notifications" class="mb-6"></div>
+
+        <!-- Grille des sections de paramètres -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Paramètres Généraux -->
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700" 
+                 data-controller="general-settings"
+                 data-general-settings-api-endpoint-value="/api/settings/general">
+                
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-semibold flex items-center">
+                        <i class="fas fa-sliders-h mr-3 text-blue-400"></i>
+                        Paramètres Généraux
+                    </h2>
+                    <div class="flex items-center space-x-3">
+                        <div data-general-settings-target="syncStatus" class="text-sm px-3 py-1 rounded bg-gray-700">
+                            Initialisation...
+                        </div>
+                        <div data-general-settings-target="loadingIndicator" class="hidden text-blue-400">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div data-general-settings-target="notification" class="notification hidden mb-4"></div>
+                
+                <div class="space-y-4 mb-6">
+                    <label class="flex items-start space-x-4 p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
+                        <input type="checkbox" 
+                               data-general-settings-target="autoMarkSolved"
+                               data-action="change->general-settings#settingChanged"
+                               class="mt-1 rounded text-blue-600 focus:ring-blue-500 focus:ring-2">
+                        <div class="flex-1">
+                            <div class="font-medium text-white">Marquer automatiquement comme "résolue"</div>
+                            <div class="text-sm text-gray-300 mt-1">
+                                Marque automatiquement une géocache comme résolue lorsque vous corrigez les coordonnées dans le Solver
+                            </div>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-start space-x-4 p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
+                        <input type="checkbox" 
+                               data-general-settings-target="autoCorrectCoordinates"
+                               data-action="change->general-settings#settingChanged"
+                               class="mt-1 rounded text-blue-600 focus:ring-blue-500 focus:ring-2">
+                        <div class="flex-1">
+                            <div class="font-medium text-white">Corriger automatiquement les coordonnées</div>
+                            <div class="text-sm text-gray-300 mt-1">
+                                Dans le Solver, corrige automatiquement les coordonnées lorsque des coordonnées valides sont trouvées
+                            </div>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-start space-x-4 p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer">
+                        <input type="checkbox" 
+                               data-general-settings-target="enableAutoScoring"
+                               data-action="change->general-settings#settingChanged"
+                               class="mt-1 rounded text-blue-600 focus:ring-blue-500 focus:ring-2">
+                        <div class="flex-1">
+                            <div class="font-medium text-white">Activer le scoring automatique</div>
+                            <div class="text-sm text-gray-300 mt-1">
+                                Active le système de scoring automatique pour évaluer la pertinence des résultats de déchiffrement
+                            </div>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-600">
+                    <div class="text-xs text-gray-400 space-x-4">
+                        <span>Cache: <span data-general-settings-target="cacheVersion" class="text-blue-400">-</span></span>
+                        <span>Auto-save: 2s</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button data-action="click->general-settings#manualSave"
+                                data-general-settings-target="saveButton"
+                                class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                            <i class="fas fa-save mr-1"></i>Sauvegarder
+                        </button>
+                        <button data-action="click->general-settings#refreshSettings"
+                                class="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-sync-alt mr-1"></i>Recharger
+                        </button>
+                        <button data-action="click->general-settings#resetDefaults"
+                                class="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors">
+                            <i class="fas fa-undo mr-1"></i>Défauts
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Paramètres Formula Solver -->
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700" 
+                 data-controller="formula-settings"
+                 data-formula-settings-api-endpoint-value="/api/settings/formula">
+                
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-semibold flex items-center">
+                        <i class="fas fa-calculator mr-3 text-purple-400"></i>
+                        Formula Solver
+                    </h2>
+                    <div class="flex items-center space-x-3">
+                        <div data-formula-settings-target="syncStatus" class="text-sm px-3 py-1 rounded bg-gray-700">
+                            Initialisation...
+                        </div>
+                        <div data-formula-settings-target="loadingIndicator" class="hidden text-purple-400">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div data-formula-settings-target="notification" class="notification hidden mb-4"></div>
+                
+                <div class="space-y-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
+                            Méthode d'extraction des formules
+                        </label>
+                        <select data-formula-settings-target="formulaExtractionMethod"
+                                data-action="change->formula-settings#settingChanged"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="regex">Expressions régulières (rapide)</option>
+                            <option value="ia">Intelligence artificielle (précis)</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">
+                            Choisissez comment extraire les formules du texte des géocaches
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
+                            Méthode d'extraction des questions
+                        </label>
+                        <select data-formula-settings-target="questionExtractionMethod"
+                                data-action="change->formula-settings#settingChanged"
+                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                            <option value="regex">Expressions régulières (rapide)</option>
+                            <option value="ia">Intelligence artificielle (précis)</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">
+                            Choisissez comment extraire les questions du texte des géocaches
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-600">
+                    <div class="text-xs text-gray-400 space-x-4">
+                        <span>Cache: <span data-formula-settings-target="cacheVersion" class="text-purple-400">-</span></span>
+                        <span>Auto-save: 2s</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button data-action="click->formula-settings#manualSave"
+                                data-formula-settings-target="saveButton"
+                                class="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                            <i class="fas fa-save mr-1"></i>Sauvegarder
+                        </button>
+                        <button data-action="click->formula-settings#refreshSettings"
+                                class="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-sync-alt mr-1"></i>Recharger
+                        </button>
+                        <button data-action="click->formula-settings#resetDefaults"
+                                class="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors">
+                            <i class="fas fa-undo mr-1"></i>Défauts
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Console de développement (mode debug) -->
+        <div id="dev-console-section" class="mt-8 bg-gray-900 rounded-lg p-6 border border-gray-600" style="display: none;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-yellow-400">
+                    <i class="fas fa-terminal mr-2"></i>Console de Développement
+                </h3>
+                <button onclick="clearDevConsole()" class="text-xs px-3 py-1 bg-gray-700 rounded hover:bg-gray-600">
+                    <i class="fas fa-trash mr-1"></i>Effacer
+                </button>
+            </div>
+            <div id="dev-console" class="h-32 overflow-y-auto text-xs font-mono bg-black p-3 rounded border"></div>
+        </div>
+        
+        <!-- Informations système -->
+        <div class="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <h3 class="text-lg font-semibold mb-4 text-gray-300">
+                <i class="fas fa-info-circle mr-2"></i>Informations Système
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div class="bg-gray-700 p-3 rounded">
+                    <div class="text-gray-400">Système de Settings</div>
+                    <div id="settings-system-status" class="text-green-400">Initialisation...</div>
+                </div>
+                <div class="bg-gray-700 p-3 rounded">
+                    <div class="text-gray-400">Contrôleurs Actifs</div>
+                    <div id="active-controllers" class="text-blue-400">-</div>
+                </div>
+                <div class="bg-gray-700 p-3 rounded">
+                    <div class="text-gray-400">Auto-save</div>
+                    <div class="text-green-400">Activé (2s)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notification {
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-radius: 0.5rem;
+        border: 1px solid;
+        transition: all 0.3s ease;
+    }
+    .notification.success {
+        background-color: #065f46;
+        color: #10b981;
+        border-color: #10b981;
+    }
+    .notification.error {
+        background-color: #7f1d1d;
+        color: #ef4444;
+        border-color: #ef4444;
+    }
+    .notification.info {
+        background-color: #1e3a8a;
+        color: #3b82f6;
+        border-color: #3b82f6;
+    }
+    .notification.hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Console de développement (optionnelle)
+    let devConsoleVisible = false;
+    
+    function toggleDevConsole() {
+        devConsoleVisible = !devConsoleVisible;
+        document.getElementById('dev-console-section').style.display = devConsoleVisible ? 'block' : 'none';
+    }
+    
+    function clearDevConsole() {
+        document.getElementById('dev-console').innerHTML = '';
+    }
+    
+    function addToDevConsole(message, type = 'info') {
+        const console = document.getElementById('dev-console');
+        const div = document.createElement('div');
+        const colors = {
+            'error': 'text-red-400',
+            'success': 'text-green-400',
+            'warning': 'text-yellow-400',
+            'info': 'text-blue-400'
+        };
+        div.className = colors[type] || 'text-gray-300';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        console.appendChild(div);
+        console.scrollTop = console.scrollHeight;
+    }
+    
+    // Écouter les événements du système de settings
+    window.addEventListener('SettingsSystemReady', (event) => {
+        document.getElementById('settings-system-status').textContent = 'Opérationnel';
+        document.getElementById('active-controllers').textContent = event.detail.controllers.join(', ');
+        addToDevConsole('Système de settings prêt', 'success');
+    });
+    
+    // Raccourci clavier pour la console de dev (Ctrl+Shift+D)
+    document.addEventListener('keydown', (event) => {
+        if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+            toggleDevConsole();
+        }
+    });
+    
+    // Log initial
+    document.addEventListener('DOMContentLoaded', () => {
+        addToDevConsole('Page des paramètres chargée', 'info');
+        console.log('🔧 Page des paramètres MysteryAI chargée');
+    });
+</script>
+{% endblock %} 
