@@ -606,19 +606,28 @@ function initializeLayout() {
         
         // Enregistrer le composant geocaches-map (pour une liste de géocaches)
         mainLayout.registerComponent('geocaches-map', function(container, componentState) {
+            console.log('🗺️ Composant geocaches-map initialisé avec componentState:', componentState);
+            
             const { geocacheIds } = componentState;
+            console.log('🗺️ geocacheIds extraits:', geocacheIds);
             
             if (!geocacheIds || !Array.isArray(geocacheIds) || geocacheIds.length === 0) {
+                console.error('❌ Aucune géocache à afficher - geocacheIds:', geocacheIds);
                 container.getElement().html(`
                     <div class="w-full h-full bg-gray-900 p-4">
                         <div class="text-red-500 mb-4">
                             <i class="fas fa-exclamation-triangle mr-2"></i>
                             Aucune géocache à afficher
                         </div>
+                        <div class="text-gray-400 text-sm">
+                            Debug: geocacheIds = ${JSON.stringify(geocacheIds)}
+                        </div>
                     </div>
                 `);
                 return;
             }
+            
+            console.log(`✅ Initialisation de la carte avec ${geocacheIds.length} géocaches:`, geocacheIds);
             
             // Afficher un état de chargement
             container.getElement().html(`
@@ -651,6 +660,8 @@ function initializeLayout() {
                     </div>
                 </div>
             `);
+            
+            console.log('🗺️ HTML de la carte injecté avec geocacheIds:', geocacheIds);
             
             // Démarrer Stimulus pour initialiser le contrôleur
             if (window.StimulusApp) {

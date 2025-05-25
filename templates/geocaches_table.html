@@ -164,46 +164,27 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             <!-- Barre de lancement rapide simplifiée -->
             <div class="w-full mb-2">
                 <div class="flex flex-wrap gap-2 justify-center bg-gray-800 p-3 rounded-lg shadow-lg">
-                    <button id="quickMap-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" data-zone-id="{{ zone_id }}" title="Carte" onclick="(function() { 
-                        // Récupérer les IDs des géocaches filtrées
-                        const geocacheIds = getFilteredGeocacheIds();
-                        
-                        // Vérifier s'il y a des géocaches
-                        if (!geocacheIds || geocacheIds.length === 0) {
-                            alert('Aucune géocache filtrée à afficher sur la carte');
-                            return;
-                        }
-                        
-                        // Créer le composant de carte dans GoldenLayout
-                        const newItemConfig = {
-                            type: 'component',
-                            componentName: 'geocaches-map',
-                            title: `Carte (${geocacheIds.length} géocaches)`,
-                            componentState: { 
-                                geocacheIds: geocacheIds
-                            }
-                        };
-                        
-                        // Vérifier que GoldenLayout est disponible
-                        if (window.mainLayout && window.mainLayout.root) {
-                            // Ajouter à la première ligne si elle existe, sinon créer une nouvelle ligne
-                            if (window.mainLayout.root.contentItems[0].type === 'row') {
-                                window.mainLayout.root.contentItems[0].addChild(newItemConfig);
-                            } else {
-                                window.mainLayout.root.contentItems[0].addChild({
-                                    type: 'row',
-                                    content: [newItemConfig]
-                                });
-                            }
-                            
-                            console.log(`Carte ouverte avec ${geocacheIds.length} géocaches dans un nouvel onglet`);
-                        } else {
-                            alert('Impossible d\'ouvrir la carte: le layout principal n\'est pas accessible');
-                        }
-                    })();">
+                    <button id="quickMap-{{ zone_id }}" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" 
+                            data-zone-id="{{ zone_id }}"
+                            title="Carte"
+                            data-tab-opener="geocaches-map"
+                            data-tab-title="Carte"
+                            data-tab-component="geocaches-map"
+                            data-tab-unique-id="geocaches-map-{{ zone_id }}"
+                            data-tab-config-zoneid="{{ zone_id }}"
+                            onclick="return handleMapClick(this, event)">
                         <i class="fas fa-map-marked-alt text-xl"></i>
                     </button>
-                    <button id="quickSolve-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" title="Résoudre les caches filtrées" onclick="openMultiSolver();">
+                    <button id="quickSolve-{{ zone_id }}" 
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center w-12 h-12" 
+                            title="Résoudre les caches filtrées"
+                            data-tab-opener="multi-solver"
+                            data-tab-title="Multi-Solver"
+                            data-tab-component="multi-solver"
+                            data-tab-unique-id="multi-solver-{{ zone_id }}"
+                            data-tab-config-zoneid="{{ zone_id }}"
+                            onclick="return handleMultiSolverClick(this, event)">
                         <i class="fas fa-puzzle-piece text-xl"></i>
                     </button>
                 </div>
@@ -233,7 +214,15 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                      class="hidden bg-gray-800 p-4 rounded-b-lg shadow-lg border border-gray-700 border-t-0 w-full overflow-hidden transition-all duration-300"
                      style="max-height: 0;">
                     <div class="flex flex-wrap gap-2 justify-center">
-                        <button id="openMapButton-{{ zone_id }}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center" data-zone-id="{{ zone_id }}">
+                        <button id="openMapButton-{{ zone_id }}" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center" 
+                                data-zone-id="{{ zone_id }}"
+                                data-tab-opener="geocaches-map"
+                                data-tab-title="Carte"
+                                data-tab-component="geocaches-map"
+                                data-tab-unique-id="geocaches-map-actions-{{ zone_id }}"
+                                data-tab-config-zoneid="{{ zone_id }}"
+                                onclick="return handleMapClick(this, event)">
                             <i class="fas fa-map-marked-alt mr-2"></i> Carte
                         </button>
                         <button id="keep-filtered-btn-{{ zone_id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center">
@@ -245,7 +234,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         <button id="move-to-zone-btn-{{ zone_id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded flex items-center">
                             <i class="fas fa-share mr-2"></i> Déplacer vers une zone
                         </button>
-                        <button id="solve-filtered-btn-{{ zone_id }}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                        <button id="solve-filtered-btn-{{ zone_id }}" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded flex items-center"
+                                data-tab-opener="multi-solver"
+                                data-tab-title="Multi-Solver"
+                                data-tab-component="multi-solver"
+                                data-tab-unique-id="multi-solver-{{ zone_id }}"
+                                data-tab-config-zoneid="{{ zone_id }}"
+                                onclick="return handleMultiSolverClick(this, event)">
                             <i class="fas fa-puzzle-piece mr-2"></i> Résoudre les caches filtrées
                         </button>
                         <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex items-center">
@@ -578,6 +574,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         @apply bg-red-500 hover:bg-red-700 text-white action-button;
     }
 </style>
+
+<!-- Scripts TabOpener pour gérer l'ouverture intelligente des onglets -->
+<script src="/js/services/tab_opener_service.js"></script>
+<script src="/js/layout_tab_opener_integration.js"></script>
+<script src="/js/debug_tab_opener.js"></script>
 
 <script type="text/javascript">
     // S'assurer que le script s'exécute dans l'iframe
@@ -2251,7 +2252,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         document.querySelector('#delete-selected-btn-{{ zone_id }}').addEventListener('click', openDeleteMultipleModal);
         document.querySelector('#keep-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
         document.querySelector('#copy-to-zone-btn-{{ zone_id }}').addEventListener('click', openCopyToZoneModal);
-        document.querySelector('#solve-filtered-btn-{{ zone_id }}').addEventListener('click', openMultiSolver);
+        document.querySelector('#solve-filtered-btn-{{ zone_id }}').addEventListener('click', openKeepFilteredModal);
 
         // Gestionnaires pour la modale de copie vers une zone
         const elements = getModalElements();
@@ -3186,10 +3187,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         });
 
         // Gestionnaires pour les boutons de lancement rapide
-        document.querySelector('#quickMap-{{ zone_id }}').addEventListener('click', function() {
-            // Utiliser la fonction showGeocachesMapPanel existante
-            window.showGeocachesMapPanel();
-        });
+        // DÉSACTIVÉ: Conflit avec TabOpenerService qui gère déjà les clics via data-tab-opener
+        // document.querySelector('#quickMap-{{ zone_id }}').addEventListener('click', function() {
+        //     // Utiliser la fonction handleMapClick intelligente
+        //     handleMapClick(this);
+        // });
         
         document.querySelector('#quickSolve-{{ zone_id }}').addEventListener('click', function() {
             // Utiliser la même fonction que le bouton "Résoudre les caches filtrées"
@@ -3494,5 +3496,68 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         // Extraire les IDs
         return filteredGeocaches.map(g => g.id);
+    }
+
+    // Nouvelles fonctions pour les boutons intelligents avec TabOpenerService
+    function handleMapClick(button, event) {
+        console.log('🗺️ Gestion intelligente du bouton Carte');
+        
+        // Empêcher la propagation de l'événement
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+        
+        // Récupérer les géocaches filtrées
+        const geocacheIds = getFilteredGeocacheIds();
+        
+        // Vérifier s'il y a des géocaches
+        if (!geocacheIds || geocacheIds.length === 0) {
+            alert('Aucune géocache filtrée à afficher sur la carte');
+            return false; // Empêcher TabOpenerService de continuer
+        }
+        
+        console.log(`🗺️ Ouverture de la carte avec ${geocacheIds.length} géocaches`);
+        
+        // Appeler directement showGeocachesMapPanel
+        const title = `Carte (${geocacheIds.length} géocaches)`;
+        const zoneId = parseInt('{{ zone_id }}');
+        showGeocachesMapPanel(geocacheIds, zoneId, title);
+        
+        // IMPORTANT: Retourner false pour empêcher TabOpenerService
+        console.log('🛑 handleMapClick: Retour false pour empêcher TabOpenerService');
+        return false;
+    }
+
+    function handleMultiSolverClick(button, event) {
+        console.log('🧩 Gestion intelligente du bouton Multi-Solver');
+        
+        // Empêcher la propagation de l'événement
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+        
+        // Récupérer les géocaches filtrées
+        const geocacheIds = getFilteredGeocacheIds();
+        
+        // Vérifier s'il y a des géocaches
+        if (!geocacheIds || geocacheIds.length === 0) {
+            alert('Aucune géocache filtrée à résoudre');
+            return false; // Empêcher TabOpenerService de continuer
+        }
+        
+        console.log(`🧩 Ouverture du Multi-Solver avec ${geocacheIds.length} géocaches`);
+        
+        // Appeler directement showMultiSolverPanel
+        const title = `Multi-Solver (${geocacheIds.length} géocaches)`;
+        const zoneId = parseInt('{{ zone_id }}');
+        showMultiSolverPanel(geocacheIds, zoneId, title);
+        
+        // IMPORTANT: Retourner false pour empêcher TabOpenerService
+        console.log('🛑 handleMultiSolverClick: Retour false pour empêcher TabOpenerService');
+        return false;
     }
 </script>

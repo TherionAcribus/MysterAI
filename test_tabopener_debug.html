@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test TabOpener - Debug</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #1a1a1a; color: #e5e5e5; }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center text-blue-400">
+            🔍 Test TabOpener Debug
+        </h1>
+        
+        <!-- Test basic -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">🧪 Test Basique</h2>
+            
+            <!-- Test fonction directe -->
+            <div class="mb-4 p-4 border border-gray-600 rounded">
+                <h3 class="font-semibold mb-2">Test window.openSolverTab()</h3>
+                <button onclick="testDirectFunction()" 
+                        class="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700">
+                    Tester openSolverTab() si disponible
+                </button>
+                <div id="direct-result" class="text-sm text-gray-300 mt-2"></div>
+            </div>
+            
+            <!-- Test changement du paramètre -->
+            <div class="mb-4 p-4 border border-gray-600 rounded">
+                <h3 class="font-semibold mb-2">Test Changement Paramètre</h3>
+                <button onclick="toggleParameter()" 
+                        class="px-4 py-2 bg-yellow-600 rounded hover:bg-yellow-700">
+                    Changer open_tab_in_same_section
+                </button>
+                <div id="parameter-status" class="text-sm text-gray-300 mt-2">Paramètre: ?</div>
+            </div>
+        </div>
+        
+        <!-- Console -->
+        <div class="bg-gray-900 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-yellow-400">🖥️ Console Debug</h3>
+                <button onclick="clearConsole()" class="px-3 py-1 bg-gray-700 rounded text-sm">
+                    Effacer
+                </button>
+            </div>
+            <div id="console" class="h-40 overflow-y-auto text-xs font-mono bg-black p-3 rounded"></div>
+        </div>
+    </div>
+
+    <!-- Charger les scripts avec les bons chemins relatifs -->
+    <script src="static/js/services/tab_opener_service.js"></script>
+    <script src="static/js/layout_tab_opener_integration.js"></script>
+
+    <script>
+        // Mock GoldenLayout minimal
+        window.mainLayout = {
+            root: {
+                contentItems: [{
+                    type: 'stack',
+                    contentItems: [],
+                    addChild: function(config) {
+                        log('📌 Mock: Onglet ajouté à stack existante: ' + JSON.stringify(config), 'success');
+                    }
+                }]
+            }
+        };
+        
+        // Console debug
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const div = document.createElement('div');
+            const colors = {
+                'error': 'text-red-400',
+                'success': 'text-green-400', 
+                'warning': 'text-yellow-400',
+                'info': 'text-blue-400'
+            };
+            div.className = colors[type] || 'text-gray-300';
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            console.appendChild(div);
+            console.scrollTop = console.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+        }
+        
+        // Test fonction directe
+        function testDirectFunction() {
+            log('🧪 Test de la fonction openSolverTab() directe...', 'info');
+            
+            if (typeof window.openSolverTab === 'function') {
+                log('✅ window.openSolverTab existe', 'success');
+                document.getElementById('direct-result').textContent = 'Fonction trouvée';
+                
+                try {
+                    // Appeler la fonction avec des paramètres de test
+                    window.openSolverTab('test123', 'GC123');
+                    log('✅ Fonction appelée avec succès', 'success');
+                    document.getElementById('direct-result').textContent = 'Fonction appelée - vérifiez les logs';
+                } catch (error) {
+                    log(`❌ Erreur lors de l'appel: ${error.message}`, 'error');
+                    document.getElementById('direct-result').textContent = 'Erreur: ' + error.message;
+                }
+            } else {
+                log('❌ window.openSolverTab non trouvée', 'error');
+                document.getElementById('direct-result').textContent = 'Fonction non trouvée';
+            }
+        }
+        
+        // Test changement paramètre
+        async function toggleParameter() {
+            log('🧪 Test changement de paramètre...', 'info');
+            
+            try {
+                // Récupérer le paramètre actuel
+                const response = await fetch('/api/settings/general');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const currentValue = data.settings.open_tab_in_same_section;
+                    const newValue = !currentValue;
+                    
+                    log(`📋 Paramètre actuel: ${currentValue}, nouveau: ${newValue}`, 'info');
+                    
+                    // Changer la valeur
+                    const saveResponse = await fetch('/api/settings/general/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            open_tab_in_same_section: newValue,
+                            auto_mark_solved: data.settings.auto_mark_solved,
+                            auto_correct_coordinates: data.settings.auto_correct_coordinates,
+                            enable_auto_scoring: data.settings.enable_auto_scoring
+                        })
+                    });
+                    
+                    const saveData = await saveResponse.json();
+                    if (saveData.success) {
+                        log(`✅ Paramètre modifié: ${newValue}`, 'success');
+                        document.getElementById('parameter-status').textContent = `Paramètre: ${newValue}`;
+                        
+                        // Invalider le cache si TabOpenerService existe
+                        if (window.TabOpenerService) {
+                            window.TabOpenerService.invalidateCache();
+                            log('🔄 Cache invalidé', 'info');
+                        }
+                    } else {
+                        throw new Error(saveData.error || 'Erreur de sauvegarde');
+                    }
+                } else {
+                    throw new Error(data.error || 'Erreur de récupération');
+                }
+            } catch (error) {
+                log(`❌ Erreur changement paramètre: ${error.message}`, 'error');
+                document.getElementById('parameter-status').textContent = 'Erreur: ' + error.message;
+            }
+        }
+        
+        // Écouter les erreurs
+        window.addEventListener('error', (event) => {
+            log(`❌ Erreur JS: ${event.message} (${event.filename}:${event.lineno})`, 'error');
+        });
+        
+        // Vérifications initiales
+        log('🚀 Page de test chargée', 'info');
+        
+        // Vérifier TabOpenerService après un délai
+        setTimeout(() => {
+            if (window.TabOpenerService) {
+                log('✅ TabOpenerService trouvé', 'success');
+            } else {
+                log('❌ TabOpenerService non trouvé', 'error');
+            }
+            
+            if (window.openSolverTab) {
+                log('✅ window.openSolverTab trouvée', 'success');
+            } else {
+                log('❌ window.openSolverTab non trouvée', 'error');
+            }
+        }, 2000);
+    </script>
+</body>
+</html> 

@@ -84,7 +84,19 @@
     </footer>
     
     <!-- Scripts JavaScript -->
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+        <!-- Scripts existants -->
+        <script src="{{ url_for('static', filename='js/layout_state_manager.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/layout_initialize.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/plugin_golden_layout_integration.js') }}"></script>
+        
+        <!-- Nouveau système de TabOpener -->
+        <script src="{{ url_for('static', filename='js/services/tab_opener_service.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/layout_tab_opener_integration.js') }}"></script>
+        
+        <!-- Autres scripts spécifiques à la page -->
+        {% block page_scripts %}{% endblock %}
+    {% endblock %}
 
     <!-- Script d'initialisation de GoldenLayout -->
     <script>

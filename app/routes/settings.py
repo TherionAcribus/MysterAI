@@ -824,3 +824,17 @@ def test_minimal():
 """
    
     return html_content 
+
+@settings_bp.route('/test_tabopener', methods=['GET'])
+def test_tabopener():
+    """
+    Page de test pour diagnostiquer le TabOpenerService
+    """
+    logger.info("=== DEBUG: Route /api/settings/test_tabopener appelée ===")
+    try:
+        with open('test_tabopener_debug.html', 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return html_content
+    except Exception as e:
+        logger.error(f"=== ERREUR lors du chargement du test TabOpener: {str(e)} ===")
+        return f"Erreur lors du chargement de la page de test: {str(e)}", 500 
