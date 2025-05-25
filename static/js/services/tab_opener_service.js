@@ -7,6 +7,7 @@ class TabOpenerService {
         this.CACHE_DURATION = 30000; // 30 secondes
         this.settingsCache = null;
         this.cacheExpiry = null;
+        this.eventListenersInitialized = false; // Flag pour éviter les doublons
         
         console.log('🔧 TabOpenerService: Initialisation du service');
         this.initializeEventListeners();
@@ -16,6 +17,12 @@ class TabOpenerService {
      * Initialise les écouteurs d'événements pour les boutons data-tab-opener
      */
     initializeEventListeners() {
+        // Éviter d'ajouter plusieurs fois les mêmes écouteurs
+        if (this.eventListenersInitialized) {
+            console.log('🎧 TabOpenerService: Écouteurs déjà initialisés, ignoré');
+            return;
+        }
+        
         console.log('🎧 TabOpenerService: Configuration des écouteurs d\'événements');
         
         // Écouter les clics sur tous les boutons avec data-tab-opener
@@ -56,6 +63,9 @@ class TabOpenerService {
         document.addEventListener('goldenLayoutInitialized', () => {
             console.log('✅ TabOpenerService: GoldenLayout initialisé, service prêt');
         });
+        
+        this.eventListenersInitialized = true;
+        console.log('✅ TabOpenerService: Écouteurs d\'événements initialisés');
     }
     
     /**
@@ -152,7 +162,9 @@ class TabOpenerService {
                     }
                 }
                 
-                state[key] = value;
+                // Mapper les clés pour corriger la casse (HTML convertit tout en minuscules)
+                const mappedKey = this.mapAttributeKey(key);
+                state[mappedKey] = value;
             }
         }
         
@@ -428,6 +440,7 @@ class TabOpenerService {
             'formula-solver': 'FormulaSolver',
             'geocache-details': 'geocache-details',
             'geocaches-map': 'geocaches-map',
+            'geocaches-table': 'geocaches-table',
             'multi-solver': 'multi-solver',
             'web-search': 'WebSearch',
             'external-url': 'external-url'
@@ -436,6 +449,23 @@ class TabOpenerService {
         const componentName = mapping[type] || 'plugin';
         console.log(`🔧 TabOpener: Nom du composant pour type "${type}": ${componentName}`);
         return componentName;
+    }
+    
+    /**
+     * Mappe les clés d'attributs pour corriger la casse
+     * (HTML convertit automatiquement les attributs en minuscules)
+     */
+    mapAttributeKey(key) {
+        const mapping = {
+            'zoneid': 'zoneId',
+            'zonename': 'zoneName',
+            'geocacheid': 'geocacheId',
+            'gccode': 'gcCode',
+            'pluginname': 'pluginName',
+            'uniqueid': 'uniqueId'
+        };
+        
+        return mapping[key] || key;
     }
     
     /**

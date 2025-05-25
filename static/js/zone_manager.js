@@ -58,10 +58,4 @@ function closeDeleteZoneModal() {
     if (deleteModal) {
         deleteModal.classList.add('hidden');
     }
-}
-
-// Fonction pour ouvrir un onglet avec la liste des géocaches d'une zone
-window.openGeocachesTab = function(zoneId, zoneName) {
-    console.log('Redirection vers la liste des géocaches pour la zone', zoneId, zoneName);
-    window.location.href = `/geocaches?zone_id=${zoneId}`;
-}; 
+} 

@@ -35,7 +35,12 @@
                         <p class="text-gray-300 mb-4">{{ zone.description }}</p>
                     {% endif %}
                     
-                    <button onclick="openGeocachesTab('{{ zone.id }}', '{{ zone.name | escape }}')"
+                    <button data-tab-opener="geocaches-table"
+                            data-tab-title="Géocaches - {{ zone.name | escape }}"
+                            data-tab-component="geocaches-table"
+                            data-tab-unique-id="geocaches-table-{{ zone.id }}"
+                            data-tab-config-zoneId="{{ zone.id }}"
+                            data-tab-config-zoneName="{{ zone.name | escape }}"
                             class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors inline-flex items-center">
                         <i class="fas fa-table mr-2"></i>
                         Voir les géocaches
@@ -170,9 +175,6 @@
                         setTimeout(function() {
                             console.log("Réinitialisation des gestionnaires d'événements après suppression");
                             initZoneEvents();
-                            
-                            // Réactiver les boutons HTMX
-                            htmx.process(document.getElementById('geocaches-panel-content'));
                         }, 100);
                     } else {
                         console.error('Erreur lors de la suppression de la zone:', xhr.status);
@@ -223,49 +225,89 @@
             }, 100);
         }
     });
-    
-    // Fonction pour ouvrir un nouvel onglet avec le tableau des géocaches d'une zone
-    function openGeocachesTab(zoneId, zoneName) {
-        console.log("Ouverture d'un nouvel onglet pour la zone", zoneId, zoneName);
+</script>
+
+<!-- Script de debug pour les boutons intelligents -->
+<script>
+    // Debug pour vérifier si TabOpenerService est disponible
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🔍 DEBUG: Vérification TabOpenerService');
+        console.log('  - TabOpenerService disponible:', !!window.TabOpenerService);
+        console.log('  - mainLayout disponible:', !!window.mainLayout);
         
-        // Vérifier si nous sommes dans un iframe (dans GoldenLayout)
-        if (window.parent && window.parent.mainLayout) {
-            // Utiliser GoldenLayout pour ouvrir un nouvel onglet
-            try {
-                window.parent.mainLayout.root.contentItems[0].addChild({
-                    type: 'component',
-                    componentName: 'geocaches-table',
-                    title: 'Géocaches: ' + zoneName,
-                    componentState: {
-                        zoneId: zoneId,
-                        zoneName: zoneName
-                    }
+        // Vérifier les boutons avec data-tab-opener
+        setTimeout(function() {
+            const buttons = document.querySelectorAll('[data-tab-opener]');
+            console.log('🔍 DEBUG: Boutons data-tab-opener trouvés:', buttons.length);
+            
+            buttons.forEach((button, index) => {
+                console.log(`  Bouton ${index + 1}:`, {
+                    opener: button.getAttribute('data-tab-opener'),
+                    title: button.getAttribute('data-tab-title'),
+                    uniqueId: button.getAttribute('data-tab-unique-id'),
+                    element: button
                 });
-            } catch (error) {
-                console.error("Erreur lors de l'ajout du composant:", error);
-                // Fallback: rediriger vers la page du tableau
-                window.location.href = '/geocaches/table/' + zoneId;
-            }
-        } else if (window.mainLayout) {
-            // Si nous sommes dans la fenêtre principale
-            try {
-                window.mainLayout.root.contentItems[0].addChild({
-                    type: 'component',
-                    componentName: 'geocaches-table',
-                    title: 'Géocaches: ' + zoneName,
-                    componentState: {
-                        zoneId: zoneId,
-                        zoneName: zoneName
-                    }
+                
+                // Ajouter un écouteur de test
+                button.addEventListener('click', function(e) {
+                    console.log('🖱️ DEBUG: Clic détecté sur bouton intelligent:', this);
+                    console.log('🖱️ DEBUG: Attributs:', {
+                        opener: this.getAttribute('data-tab-opener'),
+                        title: this.getAttribute('data-tab-title'),
+                        uniqueId: this.getAttribute('data-tab-unique-id')
+                    });
                 });
-            } catch (error) {
-                console.error("Erreur lors de l'ajout du composant:", error);
-                // Fallback: rediriger vers la page du tableau
-                window.location.href = '/geocaches/table/' + zoneId;
-            }
-        } else {
-            // Fallback: rediriger vers la page du tableau
-            window.location.href = '/geocaches/table/' + zoneId;
+            });
+        }, 1000);
+    });
+    
+    // Debug pour les événements HTMX
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'geocaches-panel-content') {
+            console.log('🔄 DEBUG: Contenu HTMX rechargé, re-vérification des boutons');
+            
+            setTimeout(function() {
+                const buttons = document.querySelectorAll('[data-tab-opener]');
+                console.log('🔍 DEBUG: Boutons data-tab-opener après HTMX:', buttons.length);
+                
+                buttons.forEach((button, index) => {
+                    console.log(`  Bouton ${index + 1} après HTMX:`, {
+                        opener: button.getAttribute('data-tab-opener'),
+                        title: button.getAttribute('data-tab-title'),
+                        uniqueId: button.getAttribute('data-tab-unique-id')
+                    });
+                });
+            }, 500);
         }
-    }
+    });
+    
+    // Fonction de test pour forcer un clic
+    window.testGeocachesButton = function() {
+        console.log('🧪 TEST: Recherche du bouton "Voir les géocaches"');
+        const button = document.querySelector('[data-tab-opener="geocaches-table"]');
+        
+        if (button) {
+            console.log('✅ TEST: Bouton trouvé:', button);
+            console.log('📋 TEST: Attributs du bouton:', {
+                opener: button.getAttribute('data-tab-opener'),
+                title: button.getAttribute('data-tab-title'),
+                uniqueId: button.getAttribute('data-tab-unique-id'),
+                zoneId: button.getAttribute('data-tab-config-zoneId'),
+                zoneName: button.getAttribute('data-tab-config-zoneName')
+            });
+            
+            // Simuler un clic
+            console.log('🖱️ TEST: Simulation du clic...');
+            const event = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            
+            button.dispatchEvent(event);
+            console.log('✅ TEST: Clic simulé');
+        } else {
+            console.error('❌ TEST: Bouton non trouvé');
+        }
+    };
 </script>
