@@ -173,6 +173,94 @@ Ce guide explique comment tester le nouveau système de boutons intelligents qui
 
 2. **Vérifier** que les objets retournés correspondent aux stacks GoldenLayout réelles
 
+### 8. Test des Liens des Codes GC (Nouveau)
+
+#### Liens Intelligents dans le Tableau des Géocaches
+
+**Localisation** : Page des géocaches d'une zone (`/zones/<zone_id>/geocaches`)
+
+**Éléments à tester** :
+- 🔗 **Liens des codes GC** : Cliquables dans la colonne "GC Code" du tableau
+- 🔍 **Boutons "Détails"** : Dans la colonne "Actions" du tableau
+
+#### Test avec paramètre ACTIVÉ (open_tab_in_same_section = true)
+
+1. **Activer le paramètre** dans les Settings
+2. **Créer un environnement multi-sections** :
+   - Ouvrir quelques géocaches dans différentes sections
+   - S'assurer d'avoir au moins 2 sections distinctes
+3. **Test de précision des liens GC** :
+   - Cliquer sur un onglet spécifique pour l'activer
+   - Cliquer sur un code GC dans le tableau (ex: GC12345)
+   - ✅ **Résultat attendu** : L'onglet des détails s'ouvre dans la même section que l'onglet actif
+   - ❌ **Ancien comportement** : L'onglet s'ouvre dans la première section
+
+4. **Test de changement de section avec boutons Détails** :
+   - Cliquer sur un onglet dans une autre section
+   - Cliquer sur le bouton "Détails" d'une géocache
+   - ✅ **Résultat attendu** : L'onglet des détails s'ouvre dans la nouvelle section active
+
+#### Test avec paramètre DÉSACTIVÉ (open_tab_in_same_section = false)
+
+1. **Désactiver le paramètre** dans les Settings
+2. **Ouvrir une page de géocaches** avec quelques géocaches
+3. **Cliquer sur un code GC** :
+   - ✅ **Résultat attendu** : L'onglet des détails s'ouvre dans une nouvelle section/colonne
+   - ❌ **Problème** : L'onglet s'ouvre dans la même section
+
+4. **Cliquer sur un bouton "Détails"** :
+   - ✅ **Résultat attendu** : L'onglet des détails s'ouvre dans une nouvelle section/colonne
+   - ❌ **Problème** : L'onglet s'ouvre dans la même section
+
+#### Test d'Ajout de Géocache
+
+**Scénario spécial** : Quand une nouvelle géocache est ajoutée avec succès
+
+1. **Ajouter une nouvelle géocache** via le formulaire en haut de la page
+2. **Vérifier l'ouverture automatique** :
+   - ✅ **Résultat attendu** : L'onglet des détails de la nouvelle géocache s'ouvre selon le paramètre
+   - Avec paramètre activé : Dans la section active
+   - Avec paramètre désactivé : Dans une nouvelle section
+
+### 9. Vérification des Logs pour les Liens GC
+
+**Ouvrir la Console du Navigateur** (F12) et chercher ces nouveaux messages :
+
+#### Messages pour les Liens des Codes GC
+```
+🔍 Gestion intelligente du lien Géocache Details
+🔍 Ouverture des détails pour GC12345 - Nom de la géocache
+📦 Utilisation de TabOpenerService pour les détails de géocache
+✅ TabOpener: Onglet ajouté à la stack active
+```
+
+#### Messages de Fallback pour les Liens GC
+```
+⚠️ TabOpenerService non disponible, utilisation de la méthode classique
+```
+
+### 10. Test de Détection des Doublons pour les Détails
+
+1. **Cliquer plusieurs fois sur le même code GC** (ex: GC12345)
+2. **Résultat attendu** : 
+   - Premier clic : Ouvre un nouvel onglet des détails
+   - Clics suivants : Active l'onglet existant au lieu d'en créer un nouveau
+3. **Message dans la console** :
+   ```
+   ✅ TabOpener: Onglet existant trouvé, activation
+   ```
+
+### 11. Test de Compatibilité Rétroactive
+
+#### Vérification que l'Ancien Système Fonctionne Toujours
+
+1. **Désactiver temporairement TabOpenerService** :
+   - Dans la console : `window.TabOpenerService = null;`
+2. **Cliquer sur un code GC** :
+   - ✅ **Résultat attendu** : L'onglet s'ouvre avec l'ancienne méthode (postMessage)
+   - Message dans la console : "⚠️ TabOpenerService non disponible, utilisation de la méthode classique"
+3. **Recharger la page** pour restaurer TabOpenerService
+
 ## Dépannage
 
 ### Problème : Les boutons ne respectent pas le paramètre
@@ -229,6 +317,8 @@ Après ces tests, vous devriez constater :
 4. **Logs détaillés** : Messages clairs dans la console pour le debug
 5. **Fonctionnement fluide** : Aucune régression par rapport à l'ancien système
 6. **Suivi d'activité** : Le système suit correctement quelle section est active
+7. **🆕 Liens intelligents** : Les codes GC et boutons Détails respectent le paramètre
+8. **🆕 Ouverture automatique** : Les nouvelles géocaches s'ouvrent intelligemment
 
 ---
 

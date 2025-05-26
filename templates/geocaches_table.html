@@ -580,6 +580,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 <script src="/js/layout_tab_opener_integration.js"></script>
 <script src="/js/debug_tab_opener.js"></script>
 
+<!-- Script de test pour les liens intelligents des géocaches (développement) -->
+<!-- <script src="/js/test_geocache_links.js"></script> -->
+
+
+
 <script type="text/javascript">
     // S'assurer que le script s'exécute dans l'iframe
     (function() {
@@ -821,18 +826,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                           const gcCode = data.gc_code;
                           const name = data.name;
                           
+                          // Vérifier que l'ID est valide
+                          if (!geocacheId) {
+                              return `<span class="text-red-500">${gcCode} (ID manquant)</span>`;
+                          }
+                          
                           // Échapper les caractères spéciaux pour JavaScript
                           const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
                           const escapedName = name.replace(/['\\]/g, '\\$&');
                           
                           return `<a href="javascript:void(0)" 
                                     class="text-blue-500 hover:text-blue-300 hover:underline"
-                                    onclick="window.parent.postMessage({ 
-                                      type: 'openGeocacheDetails', 
-                                      geocacheId: ${geocacheId},
-                                      gcCode: '${escapedGcCode}',
-                                      name: '${escapedName}'
-                                    }, '*')"
+                                    onclick="handleGeocacheDetailsClick(${geocacheId}, '${escapedGcCode}', '${escapedName}', event)"
                                  >${gcCode}</a>`;
                       }
                     },
@@ -892,18 +897,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             const gcCode = data.gc_code;
                             const name = data.name;
                             
+                            // Vérifier que l'ID est valide
+                            if (!geocacheId) {
+                                return `<span class="text-red-500">ID manquant</span>`;
+                            }
+                            
                             // Échapper les caractères spéciaux pour JavaScript
                             const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
                             const escapedName = name.replace(/['\\]/g, '\\$&');
                             
                             return `<button 
                                 class="details-button"
-                                onclick="window.parent.postMessage({ 
-                                    type: 'openGeocacheDetails', 
-                                    geocacheId: ${geocacheId},
-                                    gcCode: '${escapedGcCode}',
-                                    name: '${escapedName}'
-                                }, '*')"
+                                onclick="handleGeocacheDetailsClick(${geocacheId}, '${escapedGcCode}', '${escapedName}', event)"
                             >
                                 Détails
                             </button>
@@ -920,7 +925,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     // Remplir dynamiquement le filtre de type avec les valeurs uniques de la colonne
                     const table = window[`tabulator_${tableId}`];
                     const allData = table.getData();
-                    console.log(`Tableau initialisé avec ${allData.length} géocaches au total.`);
                     
                     const uniqueTypes = [...new Set(allData.map(row => row.cache_type))].filter(Boolean).sort();
                     
@@ -2050,15 +2054,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     // Recharger le tableau
                     await reloadTable();
 
-                    // Ouvrir la page de détails de la nouvelle géocache
-                    const apiUrl = window.API_BASE_URL || '';
-                    const detailsUrl = `${apiUrl}/geocaches/${data.id}/details-panel`;
-                    window.parent.postMessage({
-                        type: 'openGeocacheDetails',
-                        geocacheId: data.id,
-                        containerId: window.currentContainerId,
-                        detailsUrl: detailsUrl
-                    }, '*');
+                    // Ouvrir la page de détails de la nouvelle géocache avec la fonction intelligente
+                    handleGeocacheDetailsClick(data.id, data.gc_code, data.name, null);
                 } else {
                     // Afficher le message d'erreur
                     messageDiv.textContent = data.error || 'Une erreur est survenue';
@@ -3558,6 +3555,56 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         // IMPORTANT: Retourner false pour empêcher TabOpenerService
         console.log('🛑 handleMultiSolverClick: Retour false pour empêcher TabOpenerService');
+        return false;
+    }
+
+    // Fonction intelligente pour les liens des codes GC et boutons Détails
+    async function handleGeocacheDetailsClick(geocacheId, gcCode, name, event) {
+        // Vérifier si geocacheId est valide
+        if (!geocacheId || geocacheId === 'undefined' || geocacheId === undefined) {
+            console.error('Erreur: geocacheId invalide:', geocacheId);
+            alert(`Erreur: ID de géocache invalide. Impossible d'ouvrir les détails.`);
+            return false;
+        }
+        
+        // Empêcher la propagation de l'événement
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+        
+        // Vérifier si TabOpenerService est disponible
+        if (window.TabOpenerService) {
+            // Récupérer le paramètre open_tab_in_same_section
+            const openInSameSection = await window.TabOpenerService.getSetting('open_tab_in_same_section');
+            
+            // Configuration pour TabOpenerService
+            const config = {
+                type: 'component',
+                componentName: 'geocache-details',
+                title: `${gcCode} - ${name}`,
+                uniqueId: `geocache-details-${geocacheId}`,
+                state: {
+                    url: `/geocaches/${geocacheId}/details-panel`,
+                    geocacheId: geocacheId,
+                    gcCode: gcCode,
+                    name: name
+                }
+            };
+            
+            // Utiliser TabOpenerService pour ouvrir l'onglet intelligemment
+            await window.TabOpenerService.openTab(config, openInSameSection);
+        } else {
+            // Fallback vers la méthode classique
+            window.parent.postMessage({
+                type: 'openGeocacheDetails',
+                geocacheId: geocacheId,
+                gcCode: gcCode,
+                name: name
+            }, '*');
+        }
+        
         return false;
     }
 </script>
