@@ -1,6 +1,6 @@
 /**
  * Service pour gérer l'ouverture intelligente des onglets
- * Respecte le paramètre open_tab_in_same_section
+ * Respecte le paramètre open_tab_in_same_section et propose un menu contextuel
  */
 class TabOpenerService {
     constructor() {
@@ -8,9 +8,11 @@ class TabOpenerService {
         this.settingsCache = null;
         this.cacheExpiry = null;
         this.eventListenersInitialized = false; // Flag pour éviter les doublons
+        this.currentContextMenu = null; // Menu contextuel actuel
         
         console.log('🔧 TabOpenerService: Initialisation du service');
         this.initializeEventListeners();
+        this.initializeContextMenu();
     }
     
     /**
@@ -25,11 +27,11 @@ class TabOpenerService {
         
         console.log('🎧 TabOpenerService: Configuration des écouteurs d\'événements');
         
-        // Écouter les clics sur tous les boutons avec data-tab-opener
+        // Écouter les clics gauches sur tous les boutons avec data-tab-opener
         document.addEventListener('click', (event) => {
             const button = event.target.closest('[data-tab-opener]');
-            if (button) {
-                console.log('🖱️ TabOpenerService: Clic détecté sur bouton avec data-tab-opener:', button);
+            if (button && event.button === 0) { // Clic gauche uniquement
+                console.log('🖱️ TabOpenerService: Clic gauche détecté sur bouton avec data-tab-opener:', button);
                 
                 // Si le bouton a un onclick, l'exécuter d'abord
                 if (button.onclick) {
@@ -59,6 +61,23 @@ class TabOpenerService {
             }
         });
         
+        // Écouter les clics droits pour le menu contextuel
+        document.addEventListener('contextmenu', (event) => {
+            const button = event.target.closest('[data-tab-opener]');
+            if (button) {
+                console.log('🖱️ TabOpenerService: Clic droit détecté sur bouton avec data-tab-opener:', button);
+                
+                // Parser la configuration du bouton
+                const config = this.parseButtonConfig(button);
+                if (config) {
+                    console.log('🎯 TabOpener: Configuration parsée pour menu contextuel:', config);
+                    this.showContextMenu(event, config);
+                } else {
+                    console.error('❌ TabOpener: Impossible de parser la configuration pour le menu contextuel');
+                }
+            }
+        });
+        
         // Écouter l'événement d'initialisation de GoldenLayout pour s'assurer que tout est prêt
         document.addEventListener('goldenLayoutInitialized', () => {
             console.log('✅ TabOpenerService: GoldenLayout initialisé, service prêt');
@@ -66,6 +85,668 @@ class TabOpenerService {
         
         this.eventListenersInitialized = true;
         console.log('✅ TabOpenerService: Écouteurs d\'événements initialisés');
+    }
+    
+    /**
+     * Initialise le système de menu contextuel
+     */
+    initializeContextMenu() {
+        console.log('🎯 TabOpenerService: Initialisation du menu contextuel');
+        
+        // Créer le conteneur du menu contextuel
+        this.createContextMenuElement();
+        
+        // Écouter les clics en dehors du menu pour le fermer
+        document.addEventListener('click', (event) => {
+            if (this.currentContextMenu && !this.currentContextMenu.contains(event.target)) {
+                this.hideContextMenu();
+            }
+        });
+        
+        // Écouter la touche Échap pour fermer le menu
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.currentContextMenu) {
+                this.hideContextMenu();
+            }
+        });
+    }
+    
+    /**
+     * Crée l'élément DOM du menu contextuel
+     */
+    createContextMenuElement() {
+        // Supprimer l'ancien menu s'il existe
+        const existingMenu = document.getElementById('tab-opener-context-menu');
+        if (existingMenu) {
+            existingMenu.remove();
+        }
+        
+        // Créer le nouveau menu
+        const menu = document.createElement('div');
+        menu.id = 'tab-opener-context-menu';
+        menu.className = 'tab-opener-context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            z-index: 10000;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            padding: 4px 0;
+            min-width: 200px;
+            display: none;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        `;
+        
+        document.body.appendChild(menu);
+        console.log('✅ TabOpenerService: Menu contextuel créé');
+    }
+    
+    /**
+     * Affiche le menu contextuel
+     */
+    showContextMenu(event, buttonConfig) {
+        console.log('📋 TabOpenerService: Affichage du menu contextuel');
+        
+        let menu = document.getElementById('tab-opener-context-menu');
+        if (!menu) {
+            console.log('⚠️ TabOpenerService: Menu contextuel non trouvé, création...');
+            this.createContextMenuElement();
+            menu = document.getElementById('tab-opener-context-menu');
+            
+            if (!menu) {
+                console.error('❌ TabOpenerService: Impossible de créer le menu contextuel');
+                return;
+            }
+        }
+        
+        // Vider le menu
+        menu.innerHTML = '';
+        
+        // Créer les options du menu
+        this.createContextMenuItems(menu, buttonConfig);
+        
+        // Positionner le menu
+        menu.style.left = event.pageX + 'px';
+        menu.style.top = event.pageY + 'px';
+        menu.style.display = 'block';
+        
+        // Ajuster la position si le menu dépasse de l'écran
+        this.adjustMenuPosition(menu, event);
+        
+        this.currentContextMenu = menu;
+        
+        // Empêcher la propagation de l'événement
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    /**
+     * Crée les éléments du menu contextuel
+     */
+    createContextMenuItems(menu, buttonConfig) {
+        console.log('🎯 TabOpenerService: Création des éléments du menu contextuel');
+        
+        // Option 1: Ouvrir dans la même section
+        const sameSection = this.createMenuItem(
+            '📌 Ouvrir dans la même section',
+            'Ajouter l\'onglet à une section existante',
+            () => {
+                console.log('📌 Menu: Ouverture dans la même section');
+                this.hideContextMenu();
+                this.openTab(buttonConfig, true);
+            }
+        );
+        menu.appendChild(sameSection);
+        
+        // Option 2: Ouvrir dans une nouvelle section
+        const newSection = this.createMenuItem(
+            '🆕 Ouvrir dans une nouvelle section',
+            'Créer une nouvelle section pour cet onglet',
+            () => {
+                console.log('🆕 Menu: Ouverture dans une nouvelle section');
+                this.hideContextMenu();
+                this.openTab(buttonConfig, false);
+            }
+        );
+        menu.appendChild(newSection);
+        
+        // Séparateur
+        const separator = document.createElement('div');
+        separator.style.cssText = `
+            height: 1px;
+            background: #eee;
+            margin: 4px 0;
+        `;
+        menu.appendChild(separator);
+        
+        // Option 3: Ouvrir selon les préférences (par défaut)
+        const defaultBehavior = this.createMenuItem(
+            '⚙️ Selon les préférences',
+            'Utiliser le paramètre open_tab_in_same_section',
+            async () => {
+                console.log('⚙️ Menu: Ouverture selon les préférences');
+                this.hideContextMenu();
+                const openInSameSection = await this.getSetting('open_tab_in_same_section');
+                this.openTab(buttonConfig, openInSameSection);
+            }
+        );
+        menu.appendChild(defaultBehavior);
+        
+        // Ajouter des options personnalisées si le bouton en a
+        this.addCustomMenuItems(menu, buttonConfig);
+    }
+    
+    /**
+     * Crée un élément de menu
+     */
+    createMenuItem(text, tooltip, onClick) {
+        const item = document.createElement('div');
+        item.className = 'tab-opener-menu-item';
+        item.textContent = text;
+        item.title = tooltip;
+        item.style.cssText = `
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        `;
+        
+        // Événements hover
+        item.addEventListener('mouseenter', () => {
+            item.style.backgroundColor = '#f0f0f0';
+        });
+        
+        item.addEventListener('mouseleave', () => {
+            item.style.backgroundColor = 'transparent';
+        });
+        
+        // Événement clic
+        item.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onClick();
+        });
+        
+        return item;
+    }
+    
+    /**
+     * Ajoute des options personnalisées au menu selon le type de bouton
+     */
+    addCustomMenuItems(menu, buttonConfig) {
+        console.log('🎨 TabOpenerService: Vérification des options personnalisées');
+        
+        // Exemple d'options personnalisées selon le type
+        switch (buttonConfig.type) {
+            case 'plugin':
+                this.addPluginCustomItems(menu, buttonConfig);
+                break;
+            case 'formula-solver':
+                this.addFormulaSolverCustomItems(menu, buttonConfig);
+                break;
+            case 'geocache-details':
+                this.addGeocacheDetailsCustomItems(menu, buttonConfig);
+                break;
+            case 'geocaches-table':
+                this.addGeocachesTableCustomItems(menu, buttonConfig);
+                break;
+        }
+        
+        // Vérifier les attributs data-tab-menu-* pour des options personnalisées
+        this.addDataAttributeMenuItems(menu, buttonConfig);
+    }
+    
+    /**
+     * Ajoute des options personnalisées pour les plugins
+     */
+    addPluginCustomItems(menu, buttonConfig) {
+        if (buttonConfig.state && buttonConfig.state.pluginName) {
+            // Séparateur pour les options du plugin
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Option: Ouvrir l'aide du plugin
+            const helpItem = this.createMenuItem(
+                '❓ Aide du plugin',
+                'Afficher l\'aide pour ce plugin',
+                () => {
+                    console.log('❓ Menu: Ouverture de l\'aide du plugin');
+                    this.hideContextMenu();
+                    this.openPluginHelp(buttonConfig.state.pluginName);
+                }
+            );
+            menu.appendChild(helpItem);
+        }
+    }
+    
+    /**
+     * Ajoute des options personnalisées pour le Formula Solver
+     */
+    addFormulaSolverCustomItems(menu, buttonConfig) {
+        if (buttonConfig.state && buttonConfig.state.geocacheId) {
+            // Séparateur
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Option: Ouvrir les détails de la géocache
+            const detailsItem = this.createMenuItem(
+                '🗺️ Détails de la géocache',
+                'Voir les détails de cette géocache',
+                () => {
+                    console.log('🗺️ Menu: Ouverture des détails de la géocache');
+                    this.hideContextMenu();
+                    this.openGeocacheDetails(buttonConfig.state.geocacheId);
+                }
+            );
+            menu.appendChild(detailsItem);
+        }
+    }
+    
+    /**
+     * Ajoute des options personnalisées pour les détails de géocache
+     */
+    addGeocacheDetailsCustomItems(menu, buttonConfig) {
+        if (buttonConfig.state && buttonConfig.state.geocacheId) {
+            // Séparateur
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Option: Ouvrir le Formula Solver
+            const solverItem = this.createMenuItem(
+                '🧮 Formula Solver',
+                'Ouvrir le Formula Solver pour cette géocache',
+                () => {
+                    console.log('🧮 Menu: Ouverture du Formula Solver');
+                    this.hideContextMenu();
+                    this.openFormulaSolver(buttonConfig.state.geocacheId, buttonConfig.state.gcCode);
+                }
+            );
+            menu.appendChild(solverItem);
+        }
+    }
+    
+    /**
+     * Ajoute des options personnalisées pour les tables de géocaches
+     */
+    addGeocachesTableCustomItems(menu, buttonConfig) {
+        if (buttonConfig.state && buttonConfig.state.zoneName) {
+            // Séparateur
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Option: Ouvrir sur la carte
+            const mapItem = this.createMenuItem(
+                '🗺️ Voir sur la carte',
+                'Afficher cette zone sur la carte des géocaches',
+                () => {
+                    console.log('🗺️ Menu: Ouverture de la carte pour la zone');
+                    this.hideContextMenu();
+                    this.openZoneOnMap(buttonConfig.state.zoneId, buttonConfig.state.zoneName);
+                }
+            );
+            menu.appendChild(mapItem);
+            
+            // Option: Exporter la zone
+            const exportItem = this.createMenuItem(
+                '📤 Exporter la zone',
+                'Exporter les géocaches de cette zone',
+                () => {
+                    console.log('📤 Menu: Export de la zone');
+                    this.hideContextMenu();
+                    this.exportZone(buttonConfig.state.zoneId, buttonConfig.state.zoneName);
+                }
+            );
+            menu.appendChild(exportItem);
+        }
+    }
+    
+    /**
+     * Ajoute des options personnalisées basées sur les attributs data-tab-menu-*
+     */
+    addDataAttributeMenuItems(menu, buttonConfig) {
+        // Cette fonction sera utilisée pour des options définies via les attributs HTML
+        // Par exemple: data-tab-menu-option1="Texte|tooltip|action"
+        console.log('📋 TabOpenerService: Vérification des options data-tab-menu-*');
+        
+        // Chercher le bouton original pour récupérer les attributs data-tab-menu-*
+        const buttons = document.querySelectorAll('[data-tab-opener]');
+        let sourceButton = null;
+        
+        for (const button of buttons) {
+            const config = this.parseButtonConfig(button);
+            if (config && config.uniqueId === buttonConfig.uniqueId) {
+                sourceButton = button;
+                break;
+            }
+        }
+        
+        if (!sourceButton) {
+            console.log('⚠️ TabOpenerService: Bouton source non trouvé pour les options personnalisées');
+            return;
+        }
+        
+        // Récupérer tous les attributs data-tab-menu-*
+        const customMenuItems = [];
+        for (const attr of sourceButton.attributes) {
+            if (attr.name.startsWith('data-tab-menu-')) {
+                const optionName = attr.name.replace('data-tab-menu-', '');
+                const optionValue = attr.value;
+                
+                // Format: "Texte|tooltip|action" ou "Texte|tooltip|action|target"
+                const parts = optionValue.split('|');
+                if (parts.length >= 3) {
+                    customMenuItems.push({
+                        name: optionName,
+                        text: parts[0],
+                        tooltip: parts[1],
+                        action: parts[2],
+                        target: parts[3] || null
+                    });
+                }
+            }
+        }
+        
+        // Ajouter les options personnalisées au menu
+        if (customMenuItems.length > 0) {
+            console.log('🎨 TabOpenerService: Ajout d\'options personnalisées:', customMenuItems);
+            
+            // Séparateur
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Ajouter chaque option personnalisée
+            customMenuItems.forEach(item => {
+                const menuItem = this.createMenuItem(
+                    item.text,
+                    item.tooltip,
+                    () => {
+                        console.log(`🎯 Menu: Exécution de l'action personnalisée: ${item.action}`);
+                        this.hideContextMenu();
+                        this.executeCustomAction(item.action, item.target, buttonConfig);
+                    }
+                );
+                menu.appendChild(menuItem);
+            });
+        }
+    }
+    
+    /**
+     * Exécute une action personnalisée définie par les attributs data-tab-menu-*
+     */
+    executeCustomAction(action, target, buttonConfig) {
+        console.log('⚡ TabOpenerService: Exécution d\'action personnalisée:', action, target);
+        
+        switch (action) {
+            case 'open-url':
+                if (target) {
+                    // Remplacer les placeholders dans l'URL
+                    const url = this.replacePlaceholders(target, buttonConfig);
+                    console.log('🌐 Action: Ouverture d\'URL:', url);
+                    window.open(url, '_blank');
+                } else {
+                    console.error('❌ Action open-url: target URL manquante');
+                }
+                break;
+                
+            case 'copy-to-clipboard':
+                if (target) {
+                    // Remplacer les placeholders dans le texte
+                    const text = this.replacePlaceholders(target, buttonConfig);
+                    console.log('📋 Action: Copie vers le presse-papiers:', text);
+                    navigator.clipboard.writeText(text).then(() => {
+                        console.log('✅ Texte copié avec succès');
+                        this.showNotification('Texte copié dans le presse-papiers');
+                    }).catch(err => {
+                        console.error('❌ Erreur copie presse-papiers:', err);
+                    });
+                } else {
+                    console.error('❌ Action copy-to-clipboard: target text manquant');
+                }
+                break;
+                
+            case 'execute-function':
+                if (target && typeof window[target] === 'function') {
+                    console.log('🔧 Action: Exécution de fonction:', target);
+                    window[target](buttonConfig);
+                } else {
+                    console.error('❌ Action execute-function: fonction non trouvée:', target);
+                }
+                break;
+                
+            case 'open-tab':
+                if (target) {
+                    // Format: "type|title|component|state"
+                    const parts = target.split('|');
+                    if (parts.length >= 3) {
+                        const config = {
+                            type: parts[0],
+                            title: this.replacePlaceholders(parts[1], buttonConfig),
+                            componentName: parts[2],
+                            uniqueId: `custom-${parts[0]}-${Date.now()}`,
+                            state: parts[3] ? JSON.parse(this.replacePlaceholders(parts[3], buttonConfig)) : {}
+                        };
+                        console.log('🚀 Action: Ouverture d\'onglet personnalisé:', config);
+                        this.openTab(config, true);
+                    } else {
+                        console.error('❌ Action open-tab: format incorrect');
+                    }
+                } else {
+                    console.error('❌ Action open-tab: target manquant');
+                }
+                break;
+                
+            default:
+                console.warn('⚠️ Action personnalisée non reconnue:', action);
+                break;
+        }
+    }
+    
+    /**
+     * Remplace les placeholders dans une chaîne de caractères
+     */
+    replacePlaceholders(text, buttonConfig) {
+        if (!text || typeof text !== 'string') return text;
+        
+        let result = text;
+        
+        // Remplacer les placeholders de base
+        if (buttonConfig.state) {
+            Object.keys(buttonConfig.state).forEach(key => {
+                const placeholder = `{${key}}`;
+                const value = buttonConfig.state[key];
+                if (result.includes(placeholder)) {
+                    result = result.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+                }
+            });
+        }
+        
+        // Placeholders spéciaux
+        result = result.replace(/{title}/g, buttonConfig.title || '');
+        result = result.replace(/{type}/g, buttonConfig.type || '');
+        result = result.replace(/{uniqueId}/g, buttonConfig.uniqueId || '');
+        
+        console.log('🔄 Placeholder replacement:', text, '→', result);
+        return result;
+    }
+    
+    /**
+     * Affiche une notification temporaire
+     */
+    showNotification(message) {
+        console.log('📢 TabOpenerService: Notification:', message);
+        
+        // Créer l'élément de notification
+        const notification = document.createElement('div');
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            z-index: 10001;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Animation d'apparition
+        setTimeout(() => {
+            notification.style.opacity = '1';
+        }, 10);
+        
+        // Supprimer après 3 secondes
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+    
+    /**
+     * Ajuste la position du menu pour qu'il reste dans l'écran
+     */
+    adjustMenuPosition(menu, event) {
+        const rect = menu.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        // Ajuster horizontalement
+        if (rect.right > windowWidth) {
+            menu.style.left = (event.pageX - rect.width) + 'px';
+        }
+        
+        // Ajuster verticalement
+        if (rect.bottom > windowHeight) {
+            menu.style.top = (event.pageY - rect.height) + 'px';
+        }
+    }
+    
+    /**
+     * Cache le menu contextuel
+     */
+    hideContextMenu() {
+        const menu = document.getElementById('tab-opener-context-menu');
+        if (menu) {
+            menu.style.display = 'none';
+            console.log('🚫 TabOpenerService: Menu contextuel masqué');
+        } else {
+            console.log('⚠️ TabOpenerService: Menu contextuel introuvable lors de la fermeture');
+        }
+        this.currentContextMenu = null;
+    }
+    
+    /**
+     * Ouvre l'aide d'un plugin
+     */
+    openPluginHelp(pluginName) {
+        console.log('❓ TabOpenerService: Ouverture de l\'aide du plugin:', pluginName);
+        
+        const config = {
+            type: 'plugin',
+            title: `Aide - ${pluginName}`,
+            componentName: 'plugin',
+            uniqueId: `plugin-help-${pluginName}`,
+            state: {
+                pluginName: 'plugin_help',
+                targetPlugin: pluginName
+            }
+        };
+        
+        this.openTab(config, true);
+    }
+    
+    /**
+     * Ouvre les détails d'une géocache
+     */
+    openGeocacheDetails(geocacheId) {
+        console.log('🗺️ TabOpenerService: Ouverture des détails de la géocache:', geocacheId);
+        
+        const config = {
+            type: 'geocache-details',
+            title: `Détails - ${geocacheId}`,
+            componentName: 'geocache-details',
+            uniqueId: `geocache-details-${geocacheId}`,
+            state: {
+                geocacheId: geocacheId
+            }
+        };
+        
+        this.openTab(config, true);
+    }
+    
+    /**
+     * Ouvre le Formula Solver pour une géocache
+     */
+    openFormulaSolver(geocacheId, gcCode) {
+        console.log('🧮 TabOpenerService: Ouverture du Formula Solver:', geocacheId, gcCode);
+        
+        const config = {
+            type: 'formula-solver',
+            title: `Formula Solver - ${gcCode || geocacheId}`,
+            componentName: 'FormulaSolver',
+            uniqueId: `formula-solver-${geocacheId}`,
+            state: {
+                geocacheId: geocacheId,
+                gcCode: gcCode
+            }
+        };
+        
+        this.openTab(config, true);
+    }
+    
+    /**
+     * Ouvre une zone sur la carte
+     */
+    openZoneOnMap(zoneId, zoneName) {
+        console.log('🗺️ TabOpenerService: Ouverture de la carte pour la zone:', zoneId, zoneName);
+        
+        const config = {
+            type: 'geocaches-map',
+            title: `Carte - ${zoneName}`,
+            componentName: 'geocaches-map',
+            uniqueId: `geocaches-map-zone-${zoneId}`,
+            state: {
+                zoneId: zoneId,
+                zoneName: zoneName,
+                filterByZone: true
+            }
+        };
+        
+        this.openTab(config, true);
+    }
+    
+    /**
+     * Exporte une zone
+     */
+    exportZone(zoneId, zoneName) {
+        console.log('📤 TabOpenerService: Export de la zone:', zoneId, zoneName);
+        
+        // Créer un lien de téléchargement
+        const exportUrl = `/api/zones/${zoneId}/export`;
+        const link = document.createElement('a');
+        link.href = exportUrl;
+        link.download = `zone_${zoneName.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        this.showNotification(`Export de la zone "${zoneName}" démarré`);
     }
     
     /**
@@ -514,6 +1195,25 @@ class TabOpenerService {
         console.log('🗑️ TabOpener: Invalidation du cache des paramètres');
         this.settingsCache = null;
         this.cacheExpiry = null;
+    }
+    
+    /**
+     * Réinitialise le service (utile après des changements DOM dynamiques)
+     */
+    reinitialize() {
+        console.log('🔄 TabOpenerService: Réinitialisation du service');
+        
+        // Recréer le menu contextuel si nécessaire
+        const existingMenu = document.getElementById('tab-opener-context-menu');
+        if (!existingMenu) {
+            console.log('🔧 TabOpenerService: Recréation du menu contextuel');
+            this.createContextMenuElement();
+        }
+        
+        // Invalider le cache
+        this.invalidateCache();
+        
+        console.log('✅ TabOpenerService: Service réinitialisé');
     }
 }
 

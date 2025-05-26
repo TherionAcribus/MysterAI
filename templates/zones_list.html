@@ -41,6 +41,8 @@
                             data-tab-unique-id="geocaches-table-{{ zone.id }}"
                             data-tab-config-zoneId="{{ zone.id }}"
                             data-tab-config-zoneName="{{ zone.name | escape }}"
+                            data-tab-menu-map="🗺️ Voir sur la carte|Afficher la zone sur la carte|open-tab|geocaches-map|Carte - {{ zone.name | escape }}|geocaches-map|{\"zoneId\": {{ zone.id }}, \"zoneName\": \"{{ zone.name | escape }}\", \"filterByZone\": true}"
+                            data-tab-menu-export="📤 Exporter|Exporter les géocaches de cette zone|execute-function|exportZoneFromMenu"
                             class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors inline-flex items-center">
                         <i class="fas fa-table mr-2"></i>
                         Voir les géocaches
@@ -220,6 +222,14 @@
             setTimeout(function() {
                 initZoneEvents();
                 
+                // Réinitialiser le TabOpenerService après les changements HTMX
+                if (window.TabOpenerService) {
+                    console.log("🔄 HTMX: Réinitialisation du TabOpenerService");
+                    window.TabOpenerService.reinitialize();
+                } else {
+                    console.warn("⚠️ HTMX: TabOpenerService non disponible");
+                }
+                
                 // Réactiver les boutons HTMX
                 htmx.process(document.getElementById('geocaches-panel-content'));
             }, 100);
@@ -234,6 +244,14 @@
         console.log('🔍 DEBUG: Vérification TabOpenerService');
         console.log('  - TabOpenerService disponible:', !!window.TabOpenerService);
         console.log('  - mainLayout disponible:', !!window.mainLayout);
+        
+        // Initialiser ou réinitialiser le TabOpenerService si nécessaire
+        if (window.TabOpenerService) {
+            console.log("🔧 DEBUG: Réinitialisation du TabOpenerService au chargement");
+            window.TabOpenerService.reinitialize();
+        } else {
+            console.warn("⚠️ DEBUG: TabOpenerService non disponible au chargement de la page");
+        }
         
         // Vérifier les boutons avec data-tab-opener
         setTimeout(function() {
@@ -280,6 +298,29 @@
             }, 500);
         }
     });
+    
+    // Fonction pour l'export de zone depuis le menu contextuel
+    window.exportZoneFromMenu = function(buttonConfig) {
+        console.log('📤 EXPORT: Export de zone depuis le menu contextuel:', buttonConfig);
+        
+        if (buttonConfig.state && buttonConfig.state.zoneId && buttonConfig.state.zoneName) {
+            const zoneId = buttonConfig.state.zoneId;
+            const zoneName = buttonConfig.state.zoneName;
+            
+            console.log(`📤 EXPORT: Lancement de l'export pour la zone ${zoneId} - ${zoneName}`);
+            
+            // Utiliser la méthode du TabOpenerService
+            if (window.TabOpenerService) {
+                window.TabOpenerService.exportZone(zoneId, zoneName);
+            } else {
+                console.error('❌ EXPORT: TabOpenerService non disponible');
+                alert('Erreur: Service d\'export non disponible');
+            }
+        } else {
+            console.error('❌ EXPORT: Informations de zone manquantes:', buttonConfig);
+            alert('Erreur: Informations de zone manquantes');
+        }
+    };
     
     // Fonction de test pour forcer un clic
     window.testGeocachesButton = function() {

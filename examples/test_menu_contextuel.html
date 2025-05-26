@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Menu Contextuel Boutons Intelligents</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .button-group {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background: #fafafa;
+        }
+        
+        .button-group h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .button-group p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        
+        .btn-warning {
+            background-color: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #d97706;
+        }
+        
+        .btn-info {
+            background-color: #06b6d4;
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background-color: #0891b2;
+        }
+        
+        .info-box {
+            background: #e0f2fe;
+            border: 1px solid #0891b2;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .info-box h4 {
+            margin-top: 0;
+            color: #0891b2;
+        }
+        
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Test - Menu Contextuel Boutons Intelligents</h1>
+        
+        <div class="info-box">
+            <h4>Instructions</h4>
+            <p><strong>Clic gauche :</strong> Ouvre l'onglet selon vos préférences</p>
+            <p><strong>Clic droit :</strong> Affiche le menu contextuel avec les options d'ouverture et les actions personnalisées</p>
+            <p>Ouvrez la console pour voir les logs détaillés.</p>
+        </div>
+        
+        <div class="button-group">
+            <h3>📦 Boutons Basiques</h3>
+            <p>Boutons avec menu contextuel standard (3 options d'ouverture + options contextuelles)</p>
+            
+            <button data-tab-opener="plugin"
+                    data-tab-title="Caesar Code" 
+                    data-tab-component="plugin"
+                    data-tab-unique-id="plugin-caesar_code-global"
+                    data-tab-config-pluginname="caesar_code"
+                    class="btn-primary">
+                🔤 Caesar Code
+            </button>
+            
+            <button data-tab-opener="formula-solver"
+                    data-tab-title="Formula Solver - GC12345"
+                    data-tab-component="FormulaSolver"
+                    data-tab-unique-id="formula-solver-12345"
+                    data-tab-config-geocacheid="12345"
+                    data-tab-config-gccode="GC12345"
+                    class="btn-success">
+                🧮 Formula Solver
+            </button>
+            
+            <button data-tab-opener="geocache-details"
+                    data-tab-title="Détails - GC67890"
+                    data-tab-component="geocache-details"
+                    data-tab-unique-id="geocache-details-67890"
+                    data-tab-config-geocacheid="67890"
+                    data-tab-config-gccode="GC67890"
+                    class="btn-info">
+                🗺️ Détails Géocache
+            </button>
+        </div>
+        
+        <div class="button-group">
+            <h3>🎨 Boutons avec Options Personnalisées</h3>
+            <p>Boutons avec des actions personnalisées ajoutées via <code>data-tab-menu-*</code></p>
+            
+            <button data-tab-opener="plugin"
+                    data-tab-title="Analysis - GC11111"
+                    data-tab-component="plugin"
+                    data-tab-unique-id="plugin-analysis-11111"
+                    data-tab-config-pluginname="analysis_web_page"
+                    data-tab-config-geocacheid="11111"
+                    data-tab-config-gccode="GC11111"
+                    data-tab-menu-geocaching="🌐 Geocaching.com|Voir sur le site officiel|open-url|https://geocaching.com/geocache/{gcCode}"
+                    data-tab-menu-copy="📋 Copier GC Code|Copier dans le presse-papiers|copy-to-clipboard|{gcCode}"
+                    class="btn-warning">
+                🔍 Analysis + Options
+            </button>
+            
+            <button data-tab-opener="web-search"
+                    data-tab-title="Recherche Web"
+                    data-tab-component="WebSearch"
+                    data-tab-unique-id="web-search-demo"
+                    data-tab-menu-bookmark="⭐ Simuler Favori|Simuler l'ajout aux favoris|execute-function|simulateBookmark"
+                    data-tab-menu-share="🔗 Simuler Partage|Simuler le partage|execute-function|simulateShare"
+                    data-tab-menu-google="🔍 Google|Rechercher sur Google|open-url|https://google.com/search?q=geocaching"
+                    class="btn-info">
+                🌐 Recherche + Actions
+            </button>
+        </div>
+        
+        <div class="button-group">
+            <h3>🔗 Boutons avec Ouverture d'Onglets</h3>
+            <p>Boutons qui peuvent ouvrir d'autres types d'onglets via le menu contextuel</p>
+            
+            <button data-tab-opener="geocache-details"
+                    data-tab-title="Détails Complets - GC99999"
+                    data-tab-component="geocache-details"
+                    data-tab-unique-id="geocache-details-99999"
+                    data-tab-config-geocacheid="99999"
+                    data-tab-config-gccode="GC99999"
+                    data-tab-menu-map="🗺️ Voir sur la carte|Afficher sur la carte des géocaches|open-tab|geocaches-map|Carte - {gcCode}|geocaches-map|{\"selectedGeocache\": {geocacheId}}"
+                    data-tab-menu-solver="🧮 Formula Solver|Ouvrir le solver pour cette cache|open-tab|formula-solver|Formula Solver - {gcCode}|FormulaSolver|{\"geocacheId\": {geocacheId}, \"gcCode\": \"{gcCode}\"}"
+                    class="btn-success">
+                📋 Détails + Liens
+            </button>
+        </div>
+        
+        <div class="button-group">
+            <h3>🧪 Test avec Placeholders</h3>
+            <p>Boutons qui testent le système de remplacement de placeholders</p>
+            
+            <button data-tab-opener="plugin"
+                    data-tab-title="Multi Decoder - Test"
+                    data-tab-component="plugin"
+                    data-tab-unique-id="plugin-multi-decoder-test"
+                    data-tab-config-pluginname="multi_decoder"
+                    data-tab-config-text="ABCDEF"
+                    data-tab-config-mode="auto"
+                    data-tab-config-geocacheid="55555"
+                    data-tab-config-gccode="GC55555"
+                    data-tab-menu-copy-text="📄 Copier le texte|Copier le texte à décoder|copy-to-clipboard|{text}"
+                    data-tab-menu-copy-gc="📋 Copier GC|Copier le code géocache|copy-to-clipboard|{gcCode}"
+                    data-tab-menu-info="ℹ️ Infos Debug|Afficher les infos de debug|execute-function|showDebugInfo"
+                    class="btn-warning">
+                🔢 Multi Decoder + Placeholders
+            </button>
+        </div>
+    </div>
+    
+    <!-- Simuler quelques dépendances pour les tests -->
+    <script>
+        // Simuler les objets globaux nécessaires
+        window.mainLayout = {
+            root: {
+                contentItems: []
+            }
+        };
+        
+        window.layoutStateManager = {
+            getActiveGoldenLayoutStack: function() { return null; },
+            getMostRecentActiveStack: function() { return null; },
+            getStacksByActivity: function() { return []; }
+        };
+        
+        // Fonctions de test pour les actions personnalisées
+        window.simulateBookmark = function(buttonConfig) {
+            console.log('🔗 SIMULATION: Ajout aux favoris', buttonConfig);
+            alert('✅ Simulation: Recherche ajoutée aux favoris !');
+        };
+        
+        window.simulateShare = function(buttonConfig) {
+            console.log('📤 SIMULATION: Partage', buttonConfig);
+            alert('✅ Simulation: Lien de partage copié !');
+        };
+        
+        window.showDebugInfo = function(buttonConfig) {
+            console.log('🔍 SIMULATION: Debug Info', buttonConfig);
+            const info = JSON.stringify(buttonConfig, null, 2);
+            alert('🔍 Debug Info:\n\n' + info);
+        };
+        
+        // Simuler l'API fetch pour les settings
+        window.fetch = function(url) {
+            if (url === '/api/settings/general') {
+                return Promise.resolve({
+                    json: () => Promise.resolve({
+                        success: true,
+                        settings: {
+                            open_tab_in_same_section: true
+                        }
+                    })
+                });
+            }
+            return Promise.reject('Unknown URL');
+        };
+        
+        console.log('🎯 Page de test chargée. Cliquez droit sur les boutons pour voir les menus contextuels !');
+    </script>
+    
+    <!-- Charger le TabOpenerService -->
+    <script src="../static/js/services/tab_opener_service.js"></script>
+</body>
+</html> 
