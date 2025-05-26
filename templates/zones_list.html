@@ -41,7 +41,7 @@
                             data-tab-unique-id="geocaches-table-{{ zone.id }}"
                             data-tab-config-zoneId="{{ zone.id }}"
                             data-tab-config-zoneName="{{ zone.name | escape }}"
-                            data-tab-menu-map="🗺️ Voir sur la carte|Afficher la zone sur la carte|open-tab|geocaches-map|Carte - {{ zone.name | escape }}|geocaches-map|{\"zoneId\": {{ zone.id }}, \"zoneName\": \"{{ zone.name | escape }}\", \"filterByZone\": true}"
+                            data-tab-menu-map="🗺️ Voir sur la carte|Afficher la zone sur la carte|open-tab|geocaches-map&amp;title=Carte - {{ zone.name | escape }}&amp;state={\"zoneId\": {{ zone.id }}, \"zoneName\": \"{{ zone.name | escape }}\", \"filterByZone\": true}"
                             data-tab-menu-export="📤 Exporter|Exporter les géocaches de cette zone|execute-function|exportZoneFromMenu"
                             class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors inline-flex items-center">
                         <i class="fas fa-table mr-2"></i>
@@ -225,6 +225,13 @@
                 // Réinitialiser le TabOpenerService après les changements HTMX
                 if (window.TabOpenerService) {
                     console.log("🔄 HTMX: Réinitialisation du TabOpenerService");
+                    
+                    // Forcer la fermeture du menu s'il était ouvert
+                    if (window.TabOpenerService.currentContextMenu) {
+                        console.log("🚫 HTMX: Fermeture forcée du menu contextuel");
+                        window.TabOpenerService.hideContextMenu();
+                    }
+                    
                     window.TabOpenerService.reinitialize();
                 } else {
                     console.warn("⚠️ HTMX: TabOpenerService non disponible");
@@ -322,6 +329,31 @@
         }
     };
     
+    // Fonction de test pour le menu contextuel
+    window.testContextMenuClosing = function() {
+        console.log('🧪 TEST: Vérification de la fermeture du menu contextuel');
+        
+        // Vérifier l'état du service
+        if (window.TabOpenerService) {
+            console.log('✅ TEST: TabOpenerService disponible');
+            console.log('📋 TEST: État du menu:', {
+                currentContextMenu: !!window.TabOpenerService.currentContextMenu,
+                menuElement: !!document.getElementById('tab-opener-context-menu'),
+                documentClickHandler: !!window.TabOpenerService.documentClickHandler
+            });
+            
+            // Tester la fermeture du menu
+            if (window.TabOpenerService.currentContextMenu) {
+                console.log('🚫 TEST: Fermeture du menu actuel');
+                window.TabOpenerService.hideContextMenu();
+            } else {
+                console.log('ℹ️ TEST: Aucun menu ouvert actuellement');
+            }
+        } else {
+            console.error('❌ TEST: TabOpenerService non disponible');
+        }
+    };
+    
     // Fonction de test pour forcer un clic
     window.testGeocachesButton = function() {
         console.log('🧪 TEST: Recherche du bouton "Voir les géocaches"');
@@ -350,5 +382,345 @@
         } else {
             console.error('❌ TEST: Bouton non trouvé');
         }
+    };
+    
+    // Fonction de test pour le menu contextuel
+    window.testContextMenu = function() {
+        console.log('🧪 TEST: Test du menu contextuel');
+        
+        if (!window.TabOpenerService) {
+            console.error('❌ TEST: TabOpenerService non disponible');
+            return;
+        }
+        
+        // Debug de l'état
+        window.TabOpenerService.debugMenuState();
+        
+        const button = document.querySelector('[data-tab-opener="geocaches-table"]');
+        if (button) {
+            console.log('🖱️ TEST: Simulation du clic droit...');
+            
+            // Créer un événement contextmenu
+            const contextEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 2, // Bouton droit
+                clientX: 100,
+                clientY: 100,
+                pageX: 100,
+                pageY: 100
+            });
+            
+            button.dispatchEvent(contextEvent);
+            console.log('✅ TEST: Clic droit simulé');
+            
+            // Attendre et tester la fermeture
+            setTimeout(() => {
+                console.log('🧪 TEST: Test de fermeture dans 3 secondes...');
+                
+                setTimeout(() => {
+                    console.log('🖱️ TEST: Simulation d\'un clic pour fermer le menu');
+                    const clickEvent = new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        clientX: 200,
+                        clientY: 200,
+                        pageX: 200,
+                        pageY: 200
+                    });
+                    
+                    document.dispatchEvent(clickEvent);
+                    
+                    // Vérifier l'état après
+                    setTimeout(() => {
+                        window.TabOpenerService.debugMenuState();
+                    }, 500);
+                }, 3000);
+            }, 1000);
+        } else {
+            console.error('❌ TEST: Bouton non trouvé pour le test');
+        }
+    };
+    
+    // Fonction pour forcer la fermeture du menu
+    window.forceCloseMenu = function() {
+        console.log('🔧 TEST: Fermeture forcée du menu');
+        if (window.TabOpenerService) {
+            window.TabOpenerService.hideContextMenu();
+            window.TabOpenerService.debugMenuState();
+        }
+    };
+    
+    // Test simple du menu avec bouton de fermeture
+    window.testMenuSimple = function() {
+        console.log('🧪 TEST SIMPLE: Test du menu avec bouton de fermeture');
+        
+        const button = document.querySelector('[data-tab-opener="geocaches-table"]');
+        if (!button) {
+            console.error('❌ TEST: Aucun bouton trouvé');
+            return;
+        }
+        
+        console.log('✅ TEST: Simulation du clic droit...');
+        
+        // Créer et déclencher l'événement contextmenu
+        const event = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 2,
+            clientX: 100,
+            clientY: 100,
+            pageX: 100,
+            pageY: 100
+        });
+        
+        button.dispatchEvent(event);
+        
+        // Vérifier après 500ms
+        setTimeout(() => {
+            const menu = document.getElementById('tab-opener-context-menu');
+            if (menu && menu.style.display !== 'none') {
+                console.log('✅ TEST: Menu ouvert avec succès');
+                console.log('📋 TEST: Chercher le bouton "❌ Fermer" dans le menu...');
+                
+                const closeButton = Array.from(menu.querySelectorAll('.tab-opener-menu-item'))
+                    .find(item => item.textContent.includes('Fermer'));
+                    
+                if (closeButton) {
+                    console.log('✅ TEST: Bouton "Fermer" trouvé');
+                    console.log('🖱️ TEST: Clic sur le bouton de fermeture dans 2 secondes...');
+                    
+                    setTimeout(() => {
+                        closeButton.click();
+                        console.log('✅ TEST: Clic sur "Fermer" effectué');
+                        
+                        // Vérifier la fermeture
+                        setTimeout(() => {
+                            const menuAfter = document.getElementById('tab-opener-context-menu');
+                            if (!menuAfter || menuAfter.style.display === 'none') {
+                                console.log('🎉 TEST: Menu fermé avec succès !');
+                            } else {
+                                console.error('❌ TEST: Menu toujours ouvert');
+                            }
+                        }, 200);
+                    }, 2000);
+                } else {
+                    console.error('❌ TEST: Bouton "Fermer" non trouvé');
+                }
+            } else {
+                console.error('❌ TEST: Menu non ouvert');
+            }
+        }, 500);
+    };
+    
+    // Test spécifique pour les zones
+    window.testZoneButton = function() {
+        console.log('🧪 ZONE TEST: Test spécifique pour les boutons de zones');
+        
+        const zoneButton = document.querySelector('[data-tab-opener="geocaches-table"]');
+        if (!zoneButton) {
+            console.error('❌ ZONE TEST: Aucun bouton de zone trouvé');
+            return;
+        }
+        
+        console.log('✅ ZONE TEST: Bouton trouvé:', zoneButton);
+        console.log('📋 ZONE TEST: Attributs du bouton:');
+        
+        // Lister tous les attributs data-*
+        for (const attr of zoneButton.attributes) {
+            if (attr.name.startsWith('data-')) {
+                console.log(`  ${attr.name}: ${attr.value}`);
+            }
+        }
+        
+        // Test du clic droit
+        console.log('🖱️ ZONE TEST: Simulation du clic droit...');
+        const contextEvent = new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            button: 2,
+            clientX: 150,
+            clientY: 150,
+            pageX: 150,
+            pageY: 150
+        });
+        
+        zoneButton.dispatchEvent(contextEvent);
+        console.log('✅ ZONE TEST: Clic droit simulé');
+        
+        // Vérifier l'état du menu après 1 seconde
+        setTimeout(() => {
+            console.log('🔍 ZONE TEST: Vérification de l\'état du menu...');
+            if (window.TabOpenerService) {
+                window.TabOpenerService.debugMenuState();
+            }
+            
+            const menu = document.getElementById('tab-opener-context-menu');
+            if (menu && menu.style.display !== 'none') {
+                console.log('✅ ZONE TEST: Menu affiché avec succès');
+                console.log('📋 ZONE TEST: Contenu du menu:', menu.innerHTML);
+            } else {
+                console.error('❌ ZONE TEST: Menu non affiché');
+            }
+        }, 1000);
+    };
+    
+    // Tests automatiques pour le debug
+    window.runMenuDiagnostic = function() {
+        console.log('🧪 DIAGNOSTIC: Début des tests du menu contextuel');
+        
+        if (!window.TabOpenerService) {
+            console.error('❌ DIAGNOSTIC: TabOpenerService non disponible');
+            return;
+        }
+        
+        // Test 1: État initial
+        console.log('🔍 DIAGNOSTIC: Test 1 - État initial');
+        const initialState = window.TabOpenerService.debugMenuState();
+        
+        // Test 2: Simuler ouverture du menu
+        console.log('🔍 DIAGNOSTIC: Test 2 - Simulation ouverture menu');
+        const button = document.querySelector('[data-tab-opener="geocaches-table"]');
+        if (button) {
+            const contextEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 2,
+                clientX: 100,
+                clientY: 100,
+                pageX: 100,
+                pageY: 100
+            });
+            
+            button.dispatchEvent(contextEvent);
+            
+            // Vérifier l'état après ouverture
+            setTimeout(() => {
+                console.log('🔍 DIAGNOSTIC: État après ouverture');
+                const afterOpenState = window.TabOpenerService.debugMenuState();
+                
+                // Test 3: Simuler fermeture par clic
+                console.log('🔍 DIAGNOSTIC: Test 3 - Simulation fermeture par clic');
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: 300,
+                    clientY: 300,
+                    pageX: 300,
+                    pageY: 300
+                });
+                
+                document.dispatchEvent(clickEvent);
+                
+                // Vérifier l'état après fermeture
+                setTimeout(() => {
+                    console.log('🔍 DIAGNOSTIC: État après tentative de fermeture');
+                    const afterCloseState = window.TabOpenerService.debugMenuState();
+                    
+                    console.log('📊 DIAGNOSTIC: Résumé des tests:', {
+                        initial: initialState,
+                        afterOpen: afterOpenState,
+                        afterClose: afterCloseState
+                    });
+                    
+                    // Test 4: Forcer la fermeture si le menu est encore ouvert
+                    if (afterCloseState.currentContextMenu) {
+                        console.log('🔧 DIAGNOSTIC: Fermeture forcée nécessaire');
+                        window.TabOpenerService.hideContextMenu();
+                        
+                        setTimeout(() => {
+                            console.log('🔍 DIAGNOSTIC: État final après fermeture forcée');
+                            window.TabOpenerService.debugMenuState();
+                        }, 100);
+                    }
+                }, 500);
+            }, 500);
+        } else {
+            console.error('❌ DIAGNOSTIC: Bouton non trouvé');
+        }
+    };
+    
+    // Tests de compatibilité avec différents types d'événements
+    window.testEventCompatibility = function() {
+        console.log('🧪 COMPATIBILITY: Test de compatibilité des événements');
+        
+        const events = [
+            { name: 'click', button: 0 },
+            { name: 'mousedown', button: 0 },
+            { name: 'mouseup', button: 0 },
+            { name: 'pointerdown', button: 0 },
+            { name: 'pointerup', button: 0 }
+        ];
+        
+        let testIndex = 0;
+        
+        function runNextTest() {
+            if (testIndex >= events.length) {
+                console.log('✅ COMPATIBILITY: Tous les tests terminés');
+                return;
+            }
+            
+            const eventConfig = events[testIndex];
+            console.log(`🔍 COMPATIBILITY: Test ${testIndex + 1} - ${eventConfig.name}`);
+            
+            // Ouvrir le menu d'abord
+            const button = document.querySelector('[data-tab-opener="geocaches-table"]');
+            if (button) {
+                const contextEvent = new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    button: 2,
+                    clientX: 100,
+                    clientY: 100,
+                    pageX: 100,
+                    pageY: 100
+                });
+                
+                button.dispatchEvent(contextEvent);
+                
+                // Attendre puis tester la fermeture avec l'événement
+                setTimeout(() => {
+                    const testEvent = new MouseEvent(eventConfig.name, {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window,
+                        button: eventConfig.button,
+                        clientX: 300,
+                        clientY: 300,
+                        pageX: 300,
+                        pageY: 300
+                    });
+                    
+                    document.dispatchEvent(testEvent);
+                    
+                    // Vérifier si ça a fonctionné
+                    setTimeout(() => {
+                        const menu = document.getElementById('tab-opener-context-menu');
+                        const closed = !menu || menu.style.display === 'none' || !window.TabOpenerService.currentContextMenu;
+                        
+                        console.log(`${closed ? '✅' : '❌'} COMPATIBILITY: ${eventConfig.name} - ${closed ? 'Fermé' : 'Encore ouvert'}`);
+                        
+                        // Forcer la fermeture avant le test suivant
+                        if (!closed && window.TabOpenerService) {
+                            window.TabOpenerService.hideContextMenu();
+                        }
+                        
+                        testIndex++;
+                        setTimeout(runNextTest, 500);
+                    }, 200);
+                }, 300);
+            } else {
+                console.error('❌ COMPATIBILITY: Bouton non trouvé');
+            }
+        }
+        
+        runNextTest();
     };
 </script>

@@ -63,9 +63,15 @@ class TabOpenerService {
         
         // Écouter les clics droits pour le menu contextuel
         document.addEventListener('contextmenu', (event) => {
+            console.log('🖱️ DEBUG: Événement contextmenu détecté sur:', event.target);
             const button = event.target.closest('[data-tab-opener]');
             if (button) {
                 console.log('🖱️ TabOpenerService: Clic droit détecté sur bouton avec data-tab-opener:', button);
+                console.log('🔍 DEBUG: Attributs du bouton:', {
+                    opener: button.getAttribute('data-tab-opener'),
+                    title: button.getAttribute('data-tab-title'),
+                    uniqueId: button.getAttribute('data-tab-unique-id')
+                });
                 
                 // Parser la configuration du bouton
                 const config = this.parseButtonConfig(button);
@@ -75,6 +81,8 @@ class TabOpenerService {
                 } else {
                     console.error('❌ TabOpener: Impossible de parser la configuration pour le menu contextuel');
                 }
+            } else {
+                console.log('🖱️ DEBUG: Clic droit sur élément sans data-tab-opener');
             }
         });
         
@@ -96,29 +104,145 @@ class TabOpenerService {
         // Créer le conteneur du menu contextuel
         this.createContextMenuElement();
         
-        // Écouter les clics en dehors du menu pour le fermer
-        document.addEventListener('click', (event) => {
-            if (this.currentContextMenu && !this.currentContextMenu.contains(event.target)) {
-                this.hideContextMenu();
-            }
-        });
+        // Initialiser les écouteurs pour fermer le menu
+        this.initializeContextMenuCloseListeners();
+    }
+    
+    /**
+     * Initialise les écouteurs pour fermer le menu contextuel
+     */
+    initializeContextMenuCloseListeners() {
+        console.log('🎧 TabOpenerService: Initialisation des écouteurs de fermeture du menu');
         
-        // Écouter la touche Échap pour fermer le menu
-        document.addEventListener('keydown', (event) => {
+        // Supprimer les anciens écouteurs s'ils existent
+        if (this.documentClickHandler) {
+            document.removeEventListener('click', this.documentClickHandler, true);
+            document.removeEventListener('click', this.documentClickHandler, false);
+            console.log('🗑️ TabOpenerService: Ancien documentClickHandler supprimé');
+        }
+        if (this.documentKeyHandler) {
+            document.removeEventListener('keydown', this.documentKeyHandler);
+            console.log('🗑️ TabOpenerService: Ancien documentKeyHandler supprimé');
+        }
+        if (this.documentScrollHandler) {
+            document.removeEventListener('scroll', this.documentScrollHandler, true);
+            window.removeEventListener('resize', this.documentScrollHandler);
+            console.log('🗑️ TabOpenerService: Ancien documentScrollHandler supprimé');
+        }
+        
+        // Créer les nouvelles fonctions de gestion
+        this.documentClickHandler = (event) => {
+            console.log('🖱️ DEBUG: Clic détecté:', {
+                currentContextMenu: !!this.currentContextMenu,
+                target: event.target,
+                button: event.button
+            });
+            
+            // Vérifier si le menu est ouvert
+            if (!this.currentContextMenu) {
+                console.log('🖱️ DEBUG: Pas de menu ouvert, ignoré');
+                return;
+            }
+            
+            const menu = document.getElementById('tab-opener-context-menu');
+            if (!menu) {
+                console.log('🖱️ DEBUG: Menu DOM introuvable, reset currentContextMenu');
+                this.currentContextMenu = null;
+                return;
+            }
+            
+            if (menu.style.display === 'none') {
+                console.log('🖱️ DEBUG: Menu caché, reset currentContextMenu');
+                this.currentContextMenu = null;
+                return;
+            }
+            
+            // Vérifier si le clic est en dehors du menu
+            const isClickOutside = !menu.contains(event.target);
+            console.log('🖱️ DEBUG: Clic en dehors du menu?', isClickOutside);
+            
+            if (isClickOutside) {
+                console.log('🖱️ TabOpenerService: Clic en dehors du menu, fermeture');
+                this.hideContextMenu();
+            } else {
+                console.log('🖱️ DEBUG: Clic à l\'intérieur du menu, pas de fermeture');
+            }
+        };
+        
+        this.documentKeyHandler = (event) => {
             if (event.key === 'Escape' && this.currentContextMenu) {
+                console.log('⌨️ TabOpenerService: Touche Échap pressée, fermeture du menu');
                 this.hideContextMenu();
             }
-        });
+        };
+        
+        // Écouteur pour le scroll (fermer le menu si on scroll)
+        this.documentScrollHandler = () => {
+            if (this.currentContextMenu) {
+                console.log('📜 TabOpenerService: Scroll détecté, fermeture du menu');
+                this.hideContextMenu();
+            }
+        };
+        
+        // Ajouter les nouveaux écouteurs avec une approche plus robuste
+        document.addEventListener('click', this.documentClickHandler, true); // Phase de capture
+        document.addEventListener('click', this.documentClickHandler, false); // Phase de bubble
+        document.addEventListener('keydown', this.documentKeyHandler);
+        document.addEventListener('scroll', this.documentScrollHandler, true);
+        window.addEventListener('resize', this.documentScrollHandler);
+        
+        // Ajouter un écouteur de sauvegarde avec un délai
+        this.backupClickHandler = (event) => {
+            setTimeout(() => {
+                if (this.currentContextMenu) {
+                    const menu = document.getElementById('tab-opener-context-menu');
+                    if (menu && menu.style.display !== 'none') {
+                        if (!menu.contains(event.target)) {
+                            console.log('🔄 TabOpenerService: Fermeture via backup handler');
+                            this.hideContextMenu();
+                        }
+                    }
+                }
+            }, 10);
+        };
+        
+        // Ajouter le handler de sauvegarde
+        setTimeout(() => {
+            document.addEventListener('mousedown', this.backupClickHandler, true);
+        }, 100);
+        
+        console.log('✅ TabOpenerService: Écouteurs de fermeture initialisés (avec backup)');
     }
     
     /**
      * Crée l'élément DOM du menu contextuel
      */
     createContextMenuElement() {
+        // Vérifier que document.body existe
+        if (!document.body) {
+            console.log('⚠️ TabOpenerService: document.body non disponible, attente...');
+            
+            // Retarder la création jusqu'à ce que le DOM soit prêt
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    console.log('📅 TabOpenerService: DOM prêt, création du menu contextuel');
+                    this.createContextMenuElement();
+                });
+                return;
+            } else {
+                // Si le readyState n'est pas 'loading' mais body n'existe pas, attendre un peu
+                setTimeout(() => {
+                    this.createContextMenuElement();
+                }, 100);
+                return;
+            }
+        }
+        
         // Supprimer l'ancien menu s'il existe
         const existingMenu = document.getElementById('tab-opener-context-menu');
         if (existingMenu) {
             existingMenu.remove();
+            console.log('🗑️ TabOpenerService: Ancien menu supprimé');
         }
         
         // Créer le nouveau menu
@@ -129,29 +253,50 @@ class TabOpenerService {
             position: fixed;
             z-index: 10000;
             background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            padding: 4px 0;
-            min-width: 200px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 6px 0;
+            min-width: 220px;
             display: none;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 14px;
+            opacity: 1;
+            transition: opacity 0.1s ease;
         `;
         
-        document.body.appendChild(menu);
-        console.log('✅ TabOpenerService: Menu contextuel créé');
+        try {
+            document.body.appendChild(menu);
+            console.log('✅ TabOpenerService: Menu contextuel créé avec succès');
+        } catch (error) {
+            console.error('❌ TabOpenerService: Erreur lors de la création du menu:', error);
+            
+            // Réessayer dans un moment
+            setTimeout(() => {
+                console.log('🔄 TabOpenerService: Nouvel essai de création du menu...');
+                this.createContextMenuElement();
+            }, 500);
+        }
     }
     
     /**
      * Affiche le menu contextuel
      */
     showContextMenu(event, buttonConfig) {
-        console.log('📋 TabOpenerService: Affichage du menu contextuel');
+        console.log('📋 TabOpenerService: Affichage du menu contextuel pour:', buttonConfig);
+        console.log('🔍 DEBUG: Type de bouton:', buttonConfig.type);
+        console.log('🔍 DEBUG: État du bouton:', buttonConfig.state);
         
         let menu = document.getElementById('tab-opener-context-menu');
         if (!menu) {
             console.log('⚠️ TabOpenerService: Menu contextuel non trouvé, création...');
+            
+            // Vérifier que document.body existe avant de créer
+            if (!document.body) {
+                console.error('❌ TabOpenerService: document.body non disponible, impossible de créer le menu');
+                return;
+            }
+            
             this.createContextMenuElement();
             menu = document.getElementById('tab-opener-context-menu');
             
@@ -180,6 +325,14 @@ class TabOpenerService {
         // Empêcher la propagation de l'événement
         event.preventDefault();
         event.stopPropagation();
+        
+        console.log('✅ TabOpenerService: Menu contextuel affiché et état mis à jour');
+        console.log('📋 DEBUG: État du service après affichage:', {
+            currentContextMenu: !!this.currentContextMenu,
+            documentClickHandler: !!this.documentClickHandler,
+            menuVisible: menu.style.display,
+            menuPosition: { left: menu.style.left, top: menu.style.top }
+        });
     }
     
     /**
@@ -221,18 +374,16 @@ class TabOpenerService {
         `;
         menu.appendChild(separator);
         
-        // Option 3: Ouvrir selon les préférences (par défaut)
-        const defaultBehavior = this.createMenuItem(
-            '⚙️ Selon les préférences',
-            'Utiliser le paramètre open_tab_in_same_section',
-            async () => {
-                console.log('⚙️ Menu: Ouverture selon les préférences');
+        // Option 3: Fermer le menu
+        const closeMenu = this.createMenuItem(
+            '❌ Fermer',
+            'Fermer ce menu contextuel',
+            () => {
+                console.log('❌ Menu: Fermeture du menu');
                 this.hideContextMenu();
-                const openInSameSection = await this.getSetting('open_tab_in_same_section');
-                this.openTab(buttonConfig, openInSameSection);
             }
         );
-        menu.appendChild(defaultBehavior);
+        menu.appendChild(closeMenu);
         
         // Ajouter des options personnalisées si le bouton en a
         this.addCustomMenuItems(menu, buttonConfig);
@@ -247,25 +398,45 @@ class TabOpenerService {
         item.textContent = text;
         item.title = tooltip;
         item.style.cssText = `
-            padding: 8px 16px;
+            padding: 10px 16px;
             cursor: pointer;
             transition: background-color 0.2s;
             white-space: nowrap;
+            border-radius: 2px;
+            margin: 1px 4px;
+            user-select: none;
         `;
         
         // Événements hover
         item.addEventListener('mouseenter', () => {
-            item.style.backgroundColor = '#f0f0f0';
+            item.style.backgroundColor = '#e3f2fd';
+            item.style.color = '#1976d2';
         });
         
         item.addEventListener('mouseleave', () => {
             item.style.backgroundColor = 'transparent';
+            item.style.color = 'inherit';
         });
         
-        // Événement clic
+        // Événement clic avec meilleure gestion
         item.addEventListener('click', (event) => {
+            console.log('🖱️ Menu: Clic sur option:', text);
+            event.preventDefault();
             event.stopPropagation();
-            onClick();
+            event.stopImmediatePropagation();
+            
+            // Exécuter l'action
+            try {
+                onClick();
+            } catch (error) {
+                console.error('❌ Menu: Erreur lors de l\'exécution de l\'action:', error);
+            }
+        });
+        
+        // Aussi écouter mousedown pour être plus réactif
+        item.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
         });
         
         return item;
@@ -432,24 +603,37 @@ class TabOpenerService {
         
         // Récupérer tous les attributs data-tab-menu-*
         const customMenuItems = [];
+        console.log('🔍 DEBUG: Recherche des attributs data-tab-menu- pour le bouton:', sourceButton);
+        
         for (const attr of sourceButton.attributes) {
             if (attr.name.startsWith('data-tab-menu-')) {
                 const optionName = attr.name.replace('data-tab-menu-', '');
                 const optionValue = attr.value;
                 
+                console.log(`🔍 DEBUG: Attribut trouvé: ${attr.name} = ${optionValue}`);
+                
                 // Format: "Texte|tooltip|action" ou "Texte|tooltip|action|target"
                 const parts = optionValue.split('|');
+                console.log(`🔍 DEBUG: Parties de l'attribut ${optionName}:`, parts);
+                
                 if (parts.length >= 3) {
-                    customMenuItems.push({
+                    const menuItem = {
                         name: optionName,
                         text: parts[0],
                         tooltip: parts[1],
                         action: parts[2],
                         target: parts[3] || null
-                    });
+                    };
+                    
+                    console.log(`✅ DEBUG: Option menu ajoutée:`, menuItem);
+                    customMenuItems.push(menuItem);
+                } else {
+                    console.warn(`⚠️ DEBUG: Format incorrect pour ${optionName} (${parts.length} parties au lieu de 3+):`, parts);
                 }
             }
         }
+        
+        console.log('📋 DEBUG: Total des options personnalisées trouvées:', customMenuItems.length);
         
         // Ajouter les options personnalisées au menu
         if (customMenuItems.length > 0) {
@@ -521,21 +705,42 @@ class TabOpenerService {
                 
             case 'open-tab':
                 if (target) {
-                    // Format: "type|title|component|state"
-                    const parts = target.split('|');
-                    if (parts.length >= 3) {
-                        const config = {
-                            type: parts[0],
-                            title: this.replacePlaceholders(parts[1], buttonConfig),
-                            componentName: parts[2],
-                            uniqueId: `custom-${parts[0]}-${Date.now()}`,
-                            state: parts[3] ? JSON.parse(this.replacePlaceholders(parts[3], buttonConfig)) : {}
-                        };
-                        console.log('🚀 Action: Ouverture d\'onglet personnalisé:', config);
-                        this.openTab(config, true);
-                    } else {
-                        console.error('❌ Action open-tab: format incorrect');
+                    // Format simple: "componentType" - on utilisera les valeurs par défaut
+                    // Ou format étendu: "componentType&title=Titre&state={json}"
+                    let componentType = target;
+                    let customTitle = null;
+                    let customState = {};
+                    
+                    // Parser les paramètres s'ils sont présents
+                    if (target.includes('&')) {
+                        const parts = target.split('&');
+                        componentType = parts[0];
+                        
+                        for (let i = 1; i < parts.length; i++) {
+                            const param = parts[i];
+                            if (param.startsWith('title=')) {
+                                customTitle = decodeURIComponent(param.substring(6));
+                            } else if (param.startsWith('state=')) {
+                                try {
+                                    customState = JSON.parse(decodeURIComponent(param.substring(6)));
+                                } catch (e) {
+                                    console.warn('⚠️ Action open-tab: Erreur parsing state JSON:', e);
+                                }
+                            }
+                        }
                     }
+                    
+                    // Créer la configuration avec les valeurs du bouton source si pas de custom
+                    const config = {
+                        type: componentType,
+                        title: customTitle || `${componentType} - ${buttonConfig.state.zoneName || buttonConfig.state.geocacheId || 'Nouveau'}`,
+                        componentName: this.getDefaultComponentName(componentType),
+                        uniqueId: `custom-${componentType}-${buttonConfig.state.zoneId || buttonConfig.state.geocacheId || Date.now()}`,
+                        state: { ...buttonConfig.state, ...customState }
+                    };
+                    
+                    console.log('🚀 Action: Ouverture d\'onglet personnalisé:', config);
+                    this.openTab(config, true);
                 } else {
                     console.error('❌ Action open-tab: target manquant');
                 }
@@ -641,14 +846,26 @@ class TabOpenerService {
      * Cache le menu contextuel
      */
     hideContextMenu() {
+        console.log('🚫 TabOpenerService: Fermeture du menu contextuel');
+        
+        // Reset immédiat de l'état
+        this.currentContextMenu = null;
+        
         const menu = document.getElementById('tab-opener-context-menu');
         if (menu) {
-            menu.style.display = 'none';
-            console.log('🚫 TabOpenerService: Menu contextuel masqué');
+            // Animation de fermeture (optionnelle)
+            menu.style.opacity = '0';
+            
+            // Fermeture définitive après animation
+            setTimeout(() => {
+                menu.style.display = 'none';
+                menu.innerHTML = ''; // Vider le contenu
+                menu.style.opacity = '1'; // Reset pour la prochaine ouverture
+                console.log('✅ TabOpenerService: Menu fermé avec succès');
+            }, 100);
         } else {
-            console.log('⚠️ TabOpenerService: Menu contextuel introuvable lors de la fermeture');
+            console.log('⚠️ TabOpenerService: Menu introuvable');
         }
-        this.currentContextMenu = null;
     }
     
     /**
@@ -1203,6 +1420,11 @@ class TabOpenerService {
     reinitialize() {
         console.log('🔄 TabOpenerService: Réinitialisation du service');
         
+        // Fermer le menu s'il est ouvert
+        if (this.currentContextMenu) {
+            this.hideContextMenu();
+        }
+        
         // Recréer le menu contextuel si nécessaire
         const existingMenu = document.getElementById('tab-opener-context-menu');
         if (!existingMenu) {
@@ -1210,15 +1432,87 @@ class TabOpenerService {
             this.createContextMenuElement();
         }
         
+        // Réinitialiser les écouteurs de fermeture
+        this.initializeContextMenuCloseListeners();
+        
         // Invalider le cache
         this.invalidateCache();
         
         console.log('✅ TabOpenerService: Service réinitialisé');
     }
+    
+    /**
+     * Méthode de debug pour vérifier l'état du service
+     */
+    debugMenuState() {
+        const menu = document.getElementById('tab-opener-context-menu');
+        const state = {
+            serviceInitialized: this.eventListenersInitialized,
+            currentContextMenu: !!this.currentContextMenu,
+            menuElement: !!menu,
+            menuVisible: menu ? menu.style.display : 'n/a',
+            documentClickHandler: !!this.documentClickHandler,
+            documentKeyHandler: !!this.documentKeyHandler,
+            documentScrollHandler: !!this.documentScrollHandler,
+            menuPosition: menu ? { left: menu.style.left, top: menu.style.top } : 'n/a',
+            documentBodyAvailable: !!document.body,
+            documentReadyState: document.readyState
+        };
+        
+        console.log('🔍 DEBUG: État complet du TabOpenerService:', state);
+        return state;
+    }
+    
+    /**
+     * Vérifie si le service est prêt à être utilisé
+     */
+    isReady() {
+        return !!(
+            this.eventListenersInitialized && 
+            document.body && 
+            document.readyState !== 'loading'
+        );
+    }
 }
 
-// Créer l'instance globale
-window.TabOpenerService = new TabOpenerService();
+// Créer l'instance globale de manière sécurisée
+(function() {
+    function initializeTabOpenerService() {
+        console.log('🚀 Initialisation du TabOpenerService...');
+        
+        if (!window.TabOpenerService) {
+            try {
+                window.TabOpenerService = new TabOpenerService();
+                console.log('✅ TabOpenerService initialisé avec succès');
+            } catch (error) {
+                console.error('❌ Erreur lors de l\'initialisation du TabOpenerService:', error);
+                
+                // Réessayer après que le DOM soit prêt
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        console.log('🔄 Nouvelle tentative d\'initialisation après DOMContentLoaded');
+                        initializeTabOpenerService();
+                    });
+                } else {
+                    // Réessayer dans un moment
+                    setTimeout(() => {
+                        console.log('🔄 Nouvelle tentative d\'initialisation retardée');
+                        initializeTabOpenerService();
+                    }, 500);
+                }
+            }
+        } else {
+            console.log('ℹ️ TabOpenerService déjà initialisé');
+        }
+    }
+    
+    // Initialiser immédiatement ou attendre le DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeTabOpenerService);
+    } else {
+        initializeTabOpenerService();
+    }
+})();
 
 // Fonctions de compatibilité pour les anciens boutons
 window.openTabWithSettings = async function(type, title, config = {}) {
