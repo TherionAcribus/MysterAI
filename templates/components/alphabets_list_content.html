@@ -2,7 +2,13 @@
     {% for alphabet in alphabets %}
         <div class="bg-gray-700 rounded-lg p-4 hover:bg-gray-600 transition-colors"
             data-alphabet-id="{{ alphabet.id }}">
-            <div class="cursor-pointer" onclick="openAlphabetTab('{{ alphabet.id }}', '{{ alphabet.name }}')">
+            <div class="cursor-pointer" 
+                 data-tab-opener="alphabet-viewer"
+                 data-tab-title="Alphabet - {{ alphabet.name | escape }}"
+                 data-tab-component="alphabet-viewer"
+                 data-tab-unique-id="alphabet-viewer-{{ alphabet.id }}"
+                 data-tab-config-alphabetId="{{ alphabet.id }}"
+                 data-tab-config-alphabetName="{{ alphabet.name | escape }}">
                 <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
                 <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
             </div>

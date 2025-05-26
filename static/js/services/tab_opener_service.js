@@ -462,7 +462,9 @@ class TabOpenerService {
             'geocacheid': 'geocacheId',
             'gccode': 'gcCode',
             'pluginname': 'pluginName',
-            'uniqueid': 'uniqueId'
+            'uniqueid': 'uniqueId',
+            'alphabetid': 'alphabetId',
+            'alphabetname': 'alphabetName'
         };
         
         return mapping[key] || key;

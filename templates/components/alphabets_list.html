@@ -62,37 +62,12 @@
     </div>
 
     <script>
-    function openAlphabetTab(alphabetId, alphabetName) {
-        // Trouver le conteneur principal (row)
-        const rootContentItem = window.mainLayout.root.contentItems[0];
+    // Fonction pour initialiser les gestionnaires d'événements des alphabets
+    function initAlphabetEvents() {
+        console.log("Initialisation des gestionnaires d'événements pour les alphabets");
         
-        // Configuration du composant
-        const componentConfig = {
-            type: 'component',
-            componentName: 'alphabet-viewer',
-            componentState: { 
-                alphabetId: alphabetId,
-                alphabetName: alphabetName
-            },
-            title: `Alphabet - ${alphabetName}`,
-            id: `alphabet-${alphabetId}`
-        };
-
-        // Si c'est un stack, ajouter directement
-        if (rootContentItem.isStack) {
-            rootContentItem.addChild(componentConfig);
-        } else {
-            // Sinon, trouver ou créer un stack
-            let stack = rootContentItem.contentItems.find(item => item.isStack);
-            if (!stack) {
-                stack = window.mainLayout.createContentItem({
-                    type: 'stack',
-                    content: []
-                });
-                rootContentItem.addChild(stack);
-            }
-            stack.addChild(componentConfig);
-        }
+        // Pas de gestionnaires spéciaux nécessaires pour les alphabets
+        // Les boutons intelligents sont gérés automatiquement par TabOpenerService
     }
 
     // Fonctions pour gérer l'affichage des exemples
@@ -147,7 +122,21 @@
             .then(response => response.text())
             .then(html => {
                 document.getElementById('alphabets-list-container').innerHTML = html;
+                
+                // Réinitialiser les gestionnaires d'événements après la mise à jour du contenu
+                setTimeout(function() {
+                    console.log("Réinitialisation des gestionnaires d'événements après mise à jour des alphabets");
+                    initAlphabetEvents();
+                }, 100);
             });
     }
+    
+    // Initialiser les gestionnaires d'événements au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOMContentLoaded - Initialisation des gestionnaires d'événements pour les alphabets");
+        initAlphabetEvents();
+    });
     </script>
 </div>
+
+
