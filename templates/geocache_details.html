@@ -112,6 +112,13 @@
                     <div class="flex justify-end mt-3">
                         <button
                             class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2"
+                            data-tab-opener="plugin"
+                            data-tab-title="Analyse {{ geocache.gc_code }}"
+                            data-tab-component="plugin"
+                            data-tab-unique-id="plugin-analysis_web_page-{{ geocache.id }}"
+                            data-tab-config-pluginname="analysis_web_page"
+                            data-tab-config-geocacheid="{{ geocache.id }}"
+                            data-tab-config-gccode="{{ geocache.gc_code }}"
                             data-action="click->geocache-coordinates#openAnalysis"
                             data-geocache-id="{{ geocache.id }}"
                             data-gc-code="{{ geocache.gc_code }}">
@@ -123,6 +130,12 @@
                         </button>
                         <button
                             class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
+                            data-tab-opener="solver"
+                            data-tab-title="Solver - {{ geocache.gc_code }}"
+                            data-tab-component="geocache-solver"
+                            data-tab-unique-id="solver-{{ geocache.id }}"
+                            data-tab-config-geocacheid="{{ geocache.id }}"
+                            data-tab-config-gccode="{{ geocache.gc_code }}"
                             data-action="click->geocache-coordinates#openSolver"
                             data-geocache-id="{{ geocache.id }}"
                             data-gc-code="{{ geocache.gc_code }}">
@@ -133,7 +146,12 @@
                         </button>
                         <button
                             class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 ml-2"
-                            onclick="window.openFormulaSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                            data-tab-opener="formula-solver"
+                            data-tab-title="Formula Solver - {{ geocache.gc_code }}"
+                            data-tab-component="FormulaSolver"
+                            data-tab-unique-id="formula-solver-{{ geocache.id }}"
+                            data-tab-config-geocacheid="{{ geocache.id }}"
+                            data-tab-config-gccode="{{ geocache.gc_code }}"
                             data-geocache-id="{{ geocache.id }}"
                             data-gc-code="{{ geocache.gc_code }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -155,7 +173,13 @@
                     <button 
                         id="analyze-geocache-button"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
-                        onclick="window.openPluginTab('analysis_web_page', 'Analyse {{ geocache.gc_code }}', {geocacheId: '{{ geocache.id }}', gcCode: '{{ geocache.gc_code }}'})"
+                        data-tab-opener="plugin"
+                        data-tab-title="Analyse {{ geocache.gc_code }}"
+                        data-tab-component="plugin"
+                        data-tab-unique-id="plugin-analysis_web_page-{{ geocache.id }}"
+                        data-tab-config-pluginname="analysis_web_page"
+                        data-tab-config-geocacheid="{{ geocache.id }}"
+                        data-tab-config-gccode="{{ geocache.gc_code }}"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,7 +190,12 @@
                     <button 
                         id="solver-geocache-button"
                         class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="window.openSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        data-tab-opener="solver"
+                        data-tab-title="Solver - {{ geocache.gc_code }}"
+                        data-tab-component="geocache-solver"
+                        data-tab-unique-id="solver-{{ geocache.id }}"
+                        data-tab-config-geocacheid="{{ geocache.id }}"
+                        data-tab-config-gccode="{{ geocache.gc_code }}"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -177,11 +206,16 @@
                     <button 
                         id="formula-solver-button"
                         class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="window.openFormulaSolverTab('{{ geocache.id }}', '{{ geocache.gc_code }}')"
+                        data-tab-opener="formula-solver"
+                        data-tab-title="Formula Solver - {{ geocache.gc_code }}"
+                        data-tab-component="FormulaSolver"
+                        data-tab-unique-id="formula-solver-{{ geocache.id }}"
+                        data-tab-config-geocacheid="{{ geocache.id }}"
+                        data-tab-config-gccode="{{ geocache.gc_code }}"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
                         <span>Formula Solver</span>
                     </button>
