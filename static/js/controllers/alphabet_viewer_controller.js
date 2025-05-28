@@ -277,6 +277,9 @@
             this.associatedGeocacheCodeTarget.textContent = geocache.code;
             this.associatedGeocacheInfoTarget.classList.remove('hidden');
             
+            // Mettre à jour les attributs du bouton intelligent
+            this.updateSmartButtonAttributes();
+            
             // Activer le bouton d'envoi des coordonnées seulement si on a des coordonnées détectées
             this.updateSendCoordinatesButton();
             
@@ -305,6 +308,9 @@
                             this.associatedGeocache.databaseId = parseInt(geocacheData.id);
                             console.log("ID numérique récupéré:", this.associatedGeocache.databaseId);
                             
+                            // Mettre à jour à nouveau les attributs du bouton avec l'ID
+                            this.updateSmartButtonAttributes();
+                            
                             // Sauvegarder l'association mise à jour
                             this.saveGeocacheAssociation();
                         } else {
@@ -315,6 +321,45 @@
                         console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
                     });
             }
+        }
+        
+        /**
+         * Met à jour les attributs du bouton intelligent "Ouvrir Géocache"
+         */
+        updateSmartButtonAttributes() {
+            // Trouver le bouton "Ouvrir Géocache"
+            const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
+            if (!openButton) {
+                console.warn('Bouton "Ouvrir Géocache" non trouvé');
+                return;
+            }
+            
+            if (!this.associatedGeocache) {
+                console.log('Aucune géocache associée, désactivation du bouton intelligent');
+                // Supprimer les attributs du bouton intelligent si aucune géocache
+                openButton.removeAttribute('data-tab-opener');
+                openButton.removeAttribute('data-tab-title');
+                openButton.removeAttribute('data-tab-component');
+                openButton.removeAttribute('data-tab-unique-id');
+                openButton.removeAttribute('data-tab-config-geocacheid');
+                openButton.removeAttribute('data-tab-config-gccode');
+                return;
+            }
+            
+            const geocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id || 'unknown';
+            const gcCode = this.associatedGeocache.code || 'Unknown';
+            
+            console.log('Mise à jour des attributs du bouton intelligent:', { geocacheId, gcCode });
+            
+            // Mettre à jour les attributs du bouton intelligent
+            openButton.setAttribute('data-tab-opener', 'geocache-details');
+            openButton.setAttribute('data-tab-title', `Détails - ${gcCode}`);
+            openButton.setAttribute('data-tab-component', 'geocache-details');
+            openButton.setAttribute('data-tab-unique-id', `geocache-details-${geocacheId}`);
+            openButton.setAttribute('data-tab-config-geocacheid', geocacheId.toString());
+            openButton.setAttribute('data-tab-config-gccode', gcCode);
+            
+            console.log('✅ Attributs du bouton intelligent mis à jour');
         }
         
         // Charger et afficher les coordonnées d'origine
@@ -364,6 +409,9 @@
             this.associatedGeocache = null;
             this.associatedGeocacheInfoTarget.classList.add('hidden');
             this.geocacheSelectTarget.value = "";
+            
+            // Mettre à jour les attributs du bouton intelligent (les supprimer)
+            this.updateSmartButtonAttributes();
             
             // Réinitialiser l'affichage des coordonnées d'origine
             this.originalCoordinatesValueTarget.textContent = "";
@@ -1861,21 +1909,37 @@
         }
 
         /**
-         * Ouvre l'onglet de détails de la géocache associée
+         * Ouvre les détails de la géocache associée
          */
         openGeocacheDetails(event) {
-            if (event) {
-                event.preventDefault();
-            }
-            
             // Vérifier que nous avons une géocache associée
             if (!this.associatedGeocache || !this.associatedGeocache.code) {
                 console.error("Aucune géocache associée à ouvrir");
                 this.showErrorMessage("Veuillez d'abord associer une géocache");
-                return;
+                if (event) {
+                    event.preventDefault();
+                }
+                return false;
             }
             
-            console.log("Ouverture de la géocache:", this.associatedGeocache);
+            // Si le bouton intelligent est configuré et que nous avons un ID, laisser le TabOpenerService gérer
+            const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
+            const hasSmartButton = openButton && openButton.hasAttribute('data-tab-opener');
+            const hasGeocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+            
+            if (hasSmartButton && hasGeocacheId) {
+                console.log('🎯 Bouton intelligent configuré avec ID géocache, délégation au TabOpenerService');
+                // NE PAS faire preventDefault() pour permettre au TabOpenerService de traiter l'événement
+                // Retourner false pour indiquer que la méthode Stimulus ne doit pas continuer
+                return false;
+            }
+            
+            // Pour le mode legacy, faire preventDefault
+            if (event) {
+                event.preventDefault();
+            }
+            
+            console.log("Ouverture de la géocache via méthode legacy:", this.associatedGeocache);
             
             // Si nous n'avons pas d'ID de base de données, le récupérer
             if (!this.associatedGeocache.databaseId) {
@@ -1907,6 +1971,9 @@
                             id: this.associatedGeocache.id || null
                         };
                         
+                        // Mettre à jour les attributs du bouton intelligent
+                        this.updateSmartButtonAttributes();
+                        
                         // Sauvegarder l'association mise à jour
                         this.saveGeocacheAssociation();
                         
@@ -1921,6 +1988,8 @@
                 // Si nous avons déjà l'ID, ouvrir directement l'onglet
                 this.openGeocacheTab();
             }
+            
+            return true;
         }
         
         /**

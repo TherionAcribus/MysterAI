@@ -233,4 +233,96 @@ Pour tester que vos boutons fonctionnent correctement :
 
 ---
 
-*Ce guide sera mis à jour au fur et à mesure que de nouveaux patterns sont identifiés.* 
+*Ce guide sera mis à jour au fur et à mesure que de nouveaux patterns sont identifiés.*
+
+## Migrations Effectuées
+
+### Fichier `geocache_details.html` - Boutons des Détails de Géocache
+
+**Date de migration :** Décembre 2024
+
+**Boutons convertis :**
+
+#### Section Coordonnées
+1. **Bouton "Analyser"**
+   - **Avant :** `data-action="click->geocache-coordinates#openAnalysis"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="plugin"`
+   - **Configuration :** Plugin `analysis_web_page` avec `geocacheId` et `gcCode`
+
+2. **Bouton "Solver"**
+   - **Avant :** `data-action="click->geocache-coordinates#openSolver"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="solver"`
+   - **Configuration :** Composant `geocache-solver` avec `geocacheId` et `gcCode`
+
+3. **Bouton "Formula Solver"**
+   - **Avant :** `onclick="window.openFormulaSolverTab(...)"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="formula-solver"`
+   - **Configuration :** Composant `FormulaSolver` avec `geocacheId` et `gcCode`
+
+#### Section Description
+1. **Bouton "Analyser"**
+   - **Avant :** `onclick="window.openPluginTab('analysis_web_page', ...)"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="plugin"`
+   - **Configuration :** Plugin `analysis_web_page` avec `geocacheId` et `gcCode`
+
+2. **Bouton "Solver"**
+   - **Avant :** `onclick="window.openSolverTab(...)"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="solver"`
+   - **Configuration :** Composant `geocache-solver` avec `geocacheId` et `gcCode`
+
+3. **Bouton "Formula Solver"**
+   - **Avant :** `onclick="window.openFormulaSolverTab(...)"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="formula-solver"`
+   - **Configuration :** Composant `FormulaSolver` avec `geocacheId` et `gcCode`
+
+**Avantages obtenus :**
+- ✅ Respect du paramètre `open_tab_in_same_section`
+- ✅ Menu contextuel disponible (clic droit)
+- ✅ Évitement des doublons d'onglets
+- ✅ Rétrocompatibilité maintenue (les anciens `data-action` et attributs sont conservés)
+
+**Notes spéciales :**
+- Les boutons conservent leurs attributs `data-action` existants pour maintenir la compatibilité avec les contrôleurs Stimulus
+- Le bouton "Chat IA" n'a pas été converti car il utilise une fonction spéciale `openGeocacheAIChat()`
+- Les IDs uniques utilisent le pattern `{type}-{plugin/component}-{geocacheId}` pour garantir l'unicité
+
+### Fichier `alphabet_viewer.html` - Bouton "Ouvrir Géocache"
+
+**Date de migration :** Décembre 2024
+
+**Bouton converti :**
+
+1. **Bouton "Ouvrir Géocache"**
+   - **Avant :** `data-action="click->alphabet-viewer#openGeocacheDetails"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="geocache-details"`
+   - **Configuration :** Composant `geocache-details` avec `geocacheId` et `gcCode` dynamiques
+
+**Particularités de cette migration :**
+
+- **Configuration dynamique :** Les attributs du bouton intelligent sont mis à jour dynamiquement via JavaScript lorsqu'une géocache est associée
+- **Méthode `updateSmartButtonAttributes()`** : Nouvelle méthode dans le contrôleur qui met à jour les attributs `data-tab-*` selon la géocache associée
+- **Logique hybride :** La méthode `openGeocacheDetails()` vérifie si le bouton intelligent est configuré et délègue au `TabOpenerService` si c'est le cas
+- **Nettoyage automatique :** Les attributs du bouton intelligent sont supprimés quand l'association avec la géocache est retirée
+
+**Code ajouté dans le contrôleur :**
+```javascript
+updateSmartButtonAttributes() {
+    const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
+    if (!openButton || !this.associatedGeocache) return;
+    
+    const geocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+    const gcCode = this.associatedGeocache.code;
+    
+    openButton.setAttribute('data-tab-opener', 'geocache-details');
+    openButton.setAttribute('data-tab-title', `Détails - ${gcCode}`);
+    openButton.setAttribute('data-tab-unique-id', `geocache-details-${geocacheId}`);
+    // ... autres attributs
+}
+```
+
+**Avantages obtenus :**
+- ✅ Respect du paramètre `open_tab_in_same_section`
+- ✅ Menu contextuel disponible (clic droit)
+- ✅ Évitement des doublons d'onglets
+- ✅ Configuration dynamique selon la géocache associée
+- ✅ Rétrocompatibilité totale avec l'ancien système 
