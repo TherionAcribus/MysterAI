@@ -325,4 +325,73 @@ updateSmartButtonAttributes() {
 - ✅ Menu contextuel disponible (clic droit)
 - ✅ Évitement des doublons d'onglets
 - ✅ Configuration dynamique selon la géocache associée
-- ✅ Rétrocompatibilité totale avec l'ancien système 
+- ✅ Rétrocompatibilité totale avec l'ancien système
+
+### Fichier `plugin_interface.html` - Bouton "Ouvrir Géocache"
+
+**Date de migration :** Décembre 2024
+
+**Bouton converti :**
+
+1. **Bouton "Ouvrir Géocache"**
+   - **Avant :** `onclick="openGeocacheDetails(this.closest('[data-controller=\'plugin-interface\']'))"`
+   - **Après :** Bouton intelligent avec `data-tab-opener="geocache-details"`
+   - **Configuration :** Composant `geocache-details` avec `geocacheId` et `gcCode` dynamiques
+
+**Particularités de cette migration :**
+
+- **Configuration dynamique :** Les attributs du bouton intelligent sont mis à jour dynamiquement via JavaScript lorsqu'une géocache est associée
+- **Méthode `updateSmartButtonAttributes()`** : Même méthode que pour l'alphabet viewer, mise à jour des attributs `data-tab-*` selon la géocache associée
+- **Logique hybride :** La méthode `openGeocacheDetails()` vérifie si le bouton intelligent est configuré et délègue au `TabOpenerService` si c'est le cas
+- **Nettoyage automatique :** Les attributs du bouton intelligent sont supprimés quand l'association avec la géocache est retirée
+- **Modification importante :** Remplacement de l'`onclick` par un `data-action` Stimulus
+
+**Changements dans le template :**
+```html
+<!-- Avant -->
+<button onclick="openGeocacheDetails(this.closest('[data-controller=\'plugin-interface\']'))">
+
+<!-- Après -->
+<button data-action="click->plugin-interface#openGeocacheDetails">
+    Ouvrir Géocache
+</button>
+```
+
+**Avantages obtenus :**
+- ✅ Respect du paramètre `open_tab_in_same_section`
+- ✅ Menu contextuel disponible (clic droit)
+- ✅ Évitement des doublons d'onglets
+- ✅ Configuration dynamique selon la géocache associée
+- ✅ Rétrocompatibilité totale avec l'ancien système
+- ✅ Intégration native avec Stimulus (plus de `onclick`)
+
+---
+
+## Notes importantes sur l'implémentation
+
+### Configuration dynamique des attributs
+
+Pour les boutons "Ouvrir Géocache" dans `alphabet_viewer.html` et `plugin_interface.html`, les attributs `data-tab-*` ne sont **pas** définis dans le template HTML. Ils sont ajoutés dynamiquement par JavaScript uniquement quand :
+
+1. ✅ Une géocache est associée
+2. ✅ L'ID numérique de la géocache est récupéré
+3. ✅ Toutes les valeurs sont valides
+
+**Template HTML :**
+```html
+<!-- Seulement l'action Stimulus -->
+<button data-action="click->alphabet-viewer#openGeocacheDetails">
+    Ouvrir Géocache
+</button>
+```
+
+**JavaScript dynamique :**
+```javascript
+// Ajout des attributs uniquement avec de vraies valeurs
+openButton.setAttribute('data-tab-opener', 'geocache-details');
+openButton.setAttribute('data-tab-title', `Détails - ${gcCode}`);
+openButton.setAttribute('data-tab-unique-id', `geocache-details-${geocacheId}`);
+// ... etc
+```
+
+Cette approche garantit qu'aucun placeholder littéral comme `{geocacheId}` ne se retrouve dans les attributs, évitant les erreurs 404. 

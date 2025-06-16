@@ -248,44 +248,130 @@ class PluginInterfaceController extends Controller {
         this.gcCodeInputTarget.value = '';
     }
     
-    // Méthode commune pour associer une géocache
+    // Méthode pour associer une géocache au plugin
     associateGeocache(geocache) {
         console.log("Association de la géocache:", geocache);
         
-        // Vérifier que nous avons un code GC valide
-        if (!geocache || !geocache.code) {
-            console.error("Tentative d'association avec une géocache sans code GC:", geocache);
-            this.showErrorMessage("La géocache n'a pas de code GC valide");
+        this.associatedGeocache = geocache;
+        
+        // Mettre à jour l'affichage
+        this.associatedGeocacheNameTarget.textContent = geocache.name;
+        this.associatedGeocacheCodeTarget.textContent = geocache.code;
+        this.associatedGeocacheInfoTarget.classList.remove('hidden');
+        
+        // Mettre à jour les attributs du bouton intelligent (peut ne pas être activé si pas d'ID)
+        this.updateSmartButtonAttributes();
+        
+        // Sauvegarder l'association
+        this.saveGeocacheAssociation();
+        
+        // Charger automatiquement les coordonnées d'origine
+        this.loadAndDisplayOriginalCoordinates();
+        
+        // Récupérer l'ID numérique si nécessaire (même si nous en avons un, pour être sûr qu'il est correct)
+        if (geocache.code && (!geocache.databaseId || !Number.isInteger(Number(geocache.databaseId)))) {
+            console.log(`Récupération de l'ID numérique pour ${geocache.code}...`);
+            
+            fetch(`/api/geocaches/by-code/${geocache.code}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Impossible de récupérer les détails de la géocache ${geocache.code}`);
+                    }
+                    return response.json();
+                })
+                .then(geocacheData => {
+                    console.log("Données de la géocache récupérées:", geocacheData);
+                    
+                    // Mise à jour de l'objet associatedGeocache avec l'ID
+                    if (geocacheData.id && !isNaN(parseInt(geocacheData.id))) {
+                        const numericId = parseInt(geocacheData.id);
+                        this.associatedGeocache.databaseId = numericId;
+                        console.log("ID numérique récupéré et assigné:", numericId);
+                        
+                        // Mettre à jour à nouveau les attributs du bouton avec l'ID
+                        this.updateSmartButtonAttributes();
+                        
+                        // Sauvegarder l'association mise à jour
+                        this.saveGeocacheAssociation();
+                    } else {
+                        console.warn("ID numérique non disponible dans les données de la géocache:", geocacheData);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
+                });
+        }
+        
+        if (this.associatedGeocache) {
+            this.updateUI();
+            this.saveGeocacheAssociation();
+            this.updateSmartButtonAttributes();
+            console.log('✅ Géocache associée et bouton intelligent configuré');
+        }
+    }
+    
+    /**
+     * Met à jour les attributs du bouton intelligent "Ouvrir Géocache"
+     */
+    updateSmartButtonAttributes() {
+        console.log('🔧 updateSmartButtonAttributes: Début de la mise à jour');
+        
+        // Trouver le bouton "Ouvrir Géocache"
+        const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
+        console.log('🔧 updateSmartButtonAttributes: Bouton trouvé:', openButton);
+        
+        if (!openButton) {
+            console.warn('Bouton "Ouvrir Géocache" non trouvé');
             return;
         }
         
-        // Stocker la référence à la géocache
-        this.associatedGeocache = {
-            id: geocache.id || null,
-            name: geocache.name || "Sans nom",
-            code: geocache.code,
-            databaseId: geocache.databaseId || null
-        };
-        
-        // Mettre à jour l'affichage
-        if (this.hasAssociatedGeocacheNameTarget && this.hasAssociatedGeocacheCodeTarget && this.hasAssociatedGeocacheInfoTarget) {
-            this.associatedGeocacheNameTarget.textContent = this.associatedGeocache.name;
-            this.associatedGeocacheCodeTarget.textContent = this.associatedGeocache.code;
-            this.associatedGeocacheInfoTarget.classList.remove('hidden');
-            
-            // Mettre à jour le sélecteur si la géocache est ouverte
-            if (this.associatedGeocache.id && this.hasGeocacheSelectTarget) {
-                this.geocacheSelectTarget.value = this.associatedGeocache.id;
-            }
-        } else {
-            console.error("Éléments d'interface manquants pour afficher l'association");
+        if (!this.associatedGeocache) {
+            console.log('Aucune géocache associée, désactivation du bouton intelligent');
+            // Supprimer les attributs du bouton intelligent si aucune géocache
+            openButton.removeAttribute('data-tab-opener');
+            openButton.removeAttribute('data-tab-title');
+            openButton.removeAttribute('data-tab-component');
+            openButton.removeAttribute('data-tab-unique-id');
+            openButton.removeAttribute('data-tab-config-geocacheid');
+            openButton.removeAttribute('data-tab-config-gccode');
+            return;
         }
         
-        // Enregistrer l'association dans le sessionStorage
-        this.saveGeocacheAssociation();
+        // Priorité à metadata.geocacheId puis databaseId puis id
+        const geocacheId = this.associatedGeocache.geocacheId || this.associatedGeocache.databaseId || this.associatedGeocache.id;
+        const gcCode = this.associatedGeocache.code || 'Unknown';
         
-        // Charger les coordonnées d'origine
-        this.loadAndDisplayOriginalCoordinates();
+        console.log('🔧 updateSmartButtonAttributes: Données disponibles:', { 
+            geocacheId, 
+            gcCode, 
+            associatedGeocache: this.associatedGeocache 
+        });
+        
+        // Ne configurer le bouton intelligent que si nous avons un ID numérique valide
+        if (!geocacheId || geocacheId === 'unknown' || !Number.isInteger(Number(geocacheId))) {
+            console.log('ID géocache non disponible ou invalide, bouton intelligent non configuré:', { geocacheId, gcCode });
+            // Supprimer les attributs du bouton intelligent si l'ID n'est pas valide
+            openButton.removeAttribute('data-tab-opener');
+            openButton.removeAttribute('data-tab-title');
+            openButton.removeAttribute('data-tab-component');
+            openButton.removeAttribute('data-tab-unique-id');
+            openButton.removeAttribute('data-tab-config-geocacheid');
+            openButton.removeAttribute('data-tab-config-gccode');
+            return;
+        }
+        
+        console.log('🔧 updateSmartButtonAttributes: Configuration du bouton intelligent avec:', { geocacheId, gcCode });
+        
+        // Mettre à jour les attributs du bouton intelligent avec les vraies valeurs
+        openButton.setAttribute('data-tab-opener', 'geocache-details');
+        openButton.setAttribute('data-tab-title', `Détails - ${gcCode}`);
+        openButton.setAttribute('data-tab-component', 'geocache-details');
+        openButton.setAttribute('data-tab-unique-id', `geocache-details-${geocacheId}`);
+        openButton.setAttribute('data-tab-config-geocacheid', geocacheId.toString());
+        openButton.setAttribute('data-tab-config-gccode', gcCode);
+        
+        console.log('✅ Attributs du bouton intelligent mis à jour avec les vraies valeurs');
+        console.log('🔧 Bouton après mise à jour:', openButton.outerHTML.substring(0, 200) + '...');
     }
     
     // Méthode pour sauvegarder l'association dans le sessionStorage
@@ -409,19 +495,49 @@ class PluginInterfaceController extends Controller {
     
     // Méthode pour ouvrir les détails de la géocache
     openGeocacheDetails(event) {
-        if (event) {
-            event.preventDefault();
-        }
+        console.log('🎯 openGeocacheDetails: Début de la méthode');
         
         // Vérifier que nous avons une géocache associée
         if (!this.associatedGeocache || !this.associatedGeocache.code) {
             console.error("Aucune géocache associée à ouvrir");
             this.showErrorMessage("Veuillez d'abord associer une géocache");
-            return;
+            if (event) {
+                event.preventDefault();
+            }
+            return false;
         }
         
-        // Si nous n'avons pas d'ID de base de données, le récupérer
-        if (!this.associatedGeocache.databaseId) {
+        // Vérifier si le bouton intelligent est présent et configuré
+        const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
+        const hasSmartButton = openButton && openButton.hasAttribute('data-tab-opener');
+        
+        console.log('🎯 openGeocacheDetails: État du bouton:', {
+            openButton: !!openButton,
+            hasSmartButton,
+            associatedGeocache: this.associatedGeocache
+        });
+        
+        if (hasSmartButton) {
+            console.log('🎯 Bouton intelligent détecté, délégation au TabOpenerService');
+            // NE PAS faire preventDefault() pour permettre au TabOpenerService de traiter l'événement
+            // Retourner false pour indiquer que la méthode Stimulus ne doit pas continuer
+            return false;
+        }
+        
+        // Sinon, utiliser le mode legacy ou essayer de configurer le bouton intelligent
+        console.log('🔧 openGeocacheDetails: Aucun bouton intelligent, tentative de configuration...');
+        
+        // Priorité à metadata.geocacheId puis databaseId puis id
+        const geocacheId = this.associatedGeocache.geocacheId || this.associatedGeocache.databaseId || this.associatedGeocache.id;
+        const hasValidGeocacheId = geocacheId && Number.isInteger(Number(geocacheId));
+        
+        if (event) {
+            event.preventDefault();
+        }
+        
+        if (!hasValidGeocacheId) {
+            console.log('🔄 Récupération de l\'ID pour configurer le bouton intelligent...');
+            
             fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
                 .then(response => {
                     if (!response.ok) {
@@ -430,25 +546,72 @@ class PluginInterfaceController extends Controller {
                     return response.json();
                 })
                 .then(data => {
-                    this.associatedGeocache.databaseId = data.id;
-                    this.saveGeocacheAssociation(); // Mettre à jour avec l'ID
-                    this.openGeocacheTab();
+                    if (data.id && !isNaN(parseInt(data.id))) {
+                        const numericId = parseInt(data.id);
+                        // Mettre à jour avec le bon champ
+                        this.associatedGeocache.geocacheId = numericId;
+                        this.associatedGeocache.databaseId = numericId; // Pour compatibilité
+                        console.log('✅ ID récupéré et stocké:', numericId);
+                        
+                        // Mettre à jour les attributs du bouton intelligent
+                        this.updateSmartButtonAttributes();
+                        
+                        // Sauvegarder l'association mise à jour
+                        this.saveGeocacheAssociation();
+                        
+                        // Re-déclencher le clic pour que le TabOpenerService prenne le relais
+                        console.log('🔄 Re-déclenchement du clic avec bouton intelligent configuré');
+                        setTimeout(() => {
+                            openButton.click();
+                        }, 100);
+                    } else {
+                        throw new Error('ID numérique invalide reçu de l\'API');
+                    }
                 })
                 .catch(error => {
+                    console.error('Erreur lors de la récupération de l\'ID:', error);
                     this.showErrorMessage(`Erreur: ${error.message}`);
                 });
         } else {
-            // Ouvrir directement l'onglet
-            this.openGeocacheTab();
+            // Nous avons un ID valide, configurer le bouton intelligent
+            console.log('✅ ID valide disponible, configuration du bouton intelligent...');
+            this.updateSmartButtonAttributes();
+            this.saveGeocacheAssociation();
+            
+            // Re-déclencher le clic pour que le TabOpenerService prenne le relais
+            setTimeout(() => {
+                openButton.click();
+            }, 100);
         }
+        
+        return true;
     }
     
     // Méthode pour ouvrir l'onglet de la géocache
     openGeocacheTab() {
+        // Vérifier que nous avons un ID valide avant d'envoyer le message
+        const geocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+        
+        if (!geocacheId || !Number.isInteger(Number(geocacheId))) {
+            console.error('🚫 openGeocacheTab: ID géocache invalide ou manquant:', { 
+                databaseId: this.associatedGeocache.databaseId, 
+                id: this.associatedGeocache.id,
+                geocacheId: geocacheId 
+            });
+            this.showErrorMessage('Impossible d\'ouvrir l\'onglet : ID de géocache invalide');
+            return;
+        }
+        
+        const numericId = Number(geocacheId);
+        console.log('📤 openGeocacheTab: Envoi du message avec ID valide:', { 
+            geocacheId: numericId, 
+            gcCode: this.associatedGeocache.code 
+        });
+        
         // Utiliser le système de messaging pour ouvrir l'onglet
         window.parent.postMessage({ 
             type: 'openGeocacheDetails',
-            geocacheId: this.associatedGeocache.databaseId,
+            geocacheId: numericId,
             gcCode: this.associatedGeocache.code,
             name: this.associatedGeocache.name || this.associatedGeocache.code
         }, '*');
@@ -836,20 +999,19 @@ class PluginInterfaceController extends Controller {
     // Méthode pour supprimer l'association avec la géocache
     removeGeocacheAssociation() {
         this.associatedGeocache = null;
-        this.associatedGeocacheInfoTarget.classList.add('hidden');
+        this.updateUI();
         
-        if (this.hasGeocacheSelectTarget) {
-            this.geocacheSelectTarget.value = "";
-        }
-        
-        // Réinitialiser l'affichage des coordonnées d'origine
-        this.originalCoordinatesValueTarget.textContent = "";
-        
-        // Supprimer l'association du sessionStorage
-        const pluginName = this.element.querySelector('h1.text-2xl.font-bold.text-blue-400')?.textContent.trim();
+        // Supprimer de la session storage
+        const pluginName = this.element.dataset.pluginName;
         if (pluginName) {
-            sessionStorage.removeItem(`plugin_${pluginName}_geocache`);
+            const storageKey = `plugin_${pluginName}_geocache`;
+            sessionStorage.removeItem(storageKey);
         }
+        
+        // Mettre à jour les attributs du bouton intelligent (va supprimer les attributs)
+        this.updateSmartButtonAttributes();
+        
+        console.log('Association de géocache supprimée');
     }
     
     // Méthode pour afficher un message d'erreur

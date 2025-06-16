@@ -4,6 +4,21 @@
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.2.0",
+  "sources": [
+    {
+      "type": "reference",
+      "label": "Wikipedia - Code 39",
+      "url": "A MODIFIER",
+      "description": "A MODIFIER"
+    },
+    {
+      "type": "font",
+      "label": "Font utilisée",
+      "author": "IDAutomation",
+      "url": "A MODIFIER",
+      "description": "A MODIFIER"
+    }
+  ],
   "alphabetConfig": {
     "type": "font",
     "fontFile": "fonts/code39.ttf",

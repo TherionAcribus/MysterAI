@@ -1,0 +1,90 @@
+<!-- Template pour afficher les sources d'un alphabet -->
+<div class="alphabet-sources mt-3">
+    {% if alphabet.sources %}
+        <div class="sources-section">
+            <h6 class="sources-title mb-2">
+                <i class="fas fa-link me-1"></i>
+                Sources et crédits
+            </h6>
+            
+            <div class="sources-list">
+                {% for source in alphabet.sources %}
+                    <div class="source-item mb-2 p-2 bg-light rounded">
+                        <div class="source-header d-flex align-items-center">
+                            <!-- Icône selon le type -->
+                            {% if source.type == 'reference' %}
+                                <i class="fas fa-book text-primary me-2"></i>
+                            {% elif source.type == 'font' %}
+                                <i class="fas fa-font text-success me-2"></i>
+                            {% elif source.type == 'credit' %}
+                                <i class="fas fa-user-check text-info me-2"></i>
+                            {% elif source.type == 'author' %}
+                                <i class="fas fa-user text-warning me-2"></i>
+                            {% else %}
+                                <i class="fas fa-link text-secondary me-2"></i>
+                            {% endif %}
+                            
+                            <!-- Label et lien -->
+                            {% if source.url %}
+                                <a href="{{ source.url }}" target="_blank" class="source-label fw-bold text-decoration-none">
+                                    {{ source.label }}
+                                    <i class="fas fa-external-link-alt ms-1 small"></i>
+                                </a>
+                            {% else %}
+                                <span class="source-label fw-bold">{{ source.label }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Auteur si présent -->
+                        {% if source.author %}
+                            <div class="source-author text-muted small mt-1">
+                                <i class="fas fa-user me-1"></i>
+                                {{ source.author }}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Description si présente -->
+                        {% if source.description %}
+                            <div class="source-description text-muted small mt-1">
+                                {{ source.description }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.alphabet-sources {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.sources-title {
+    color: #495057;
+    font-weight: 600;
+}
+
+.source-item {
+    border: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
+}
+
+.source-item:hover {
+    background-color: #f8f9fa !important;
+}
+
+.source-label {
+    color: #495057;
+}
+
+.source-label:hover {
+    color: #0056b3;
+}
+
+.source-author {
+    font-style: italic;
+}
+</style> 

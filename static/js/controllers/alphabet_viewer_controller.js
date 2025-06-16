@@ -1922,19 +1922,74 @@
                 return false;
             }
             
-            // Si le bouton intelligent est configuré et que nous avons un ID, laisser le TabOpenerService gérer
+            // Vérifier si le bouton intelligent est présent (même sans configuration complète)
             const openButton = this.element.querySelector('[data-action*="openGeocacheDetails"]');
             const hasSmartButton = openButton && openButton.hasAttribute('data-tab-opener');
-            const hasGeocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+            const geocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+            const hasValidGeocacheId = geocacheId && Number.isInteger(Number(geocacheId));
             
-            if (hasSmartButton && hasGeocacheId) {
-                console.log('🎯 Bouton intelligent configuré avec ID géocache, délégation au TabOpenerService');
+            if (hasSmartButton && hasValidGeocacheId) {
+                console.log('🎯 Bouton intelligent configuré avec ID géocache valide, délégation au TabOpenerService');
                 // NE PAS faire preventDefault() pour permettre au TabOpenerService de traiter l'événement
                 // Retourner false pour indiquer que la méthode Stimulus ne doit pas continuer
                 return false;
             }
             
-            // Pour le mode legacy, faire preventDefault
+            // Si nous avons un bouton qui devrait être intelligent mais sans ID valide, 
+            // récupérer l'ID d'abord et NE PAS utiliser le mode legacy
+            if (openButton && !hasValidGeocacheId) {
+                console.log('🔄 Récupération de l\'ID pour configurer le bouton intelligent...');
+                if (event) {
+                    event.preventDefault();
+                }
+                
+                fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Impossible de récupérer les détails de la géocache ${this.associatedGeocache.code}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geocacheData => {
+                        // Vérifier que l'ID est bien un ID numérique
+                        if (!geocacheData.id || isNaN(parseInt(geocacheData.id))) {
+                            throw new Error(`ID invalide ou non numérique retourné pour la géocache: ${geocacheData.id}`);
+                        }
+                        
+                        const numericId = parseInt(geocacheData.id);
+                        console.log('✅ ID récupéré:', numericId);
+                        
+                        // Mise à jour de l'objet associatedGeocache avec les informations récupérées
+                        this.associatedGeocache = {
+                            ...this.associatedGeocache,
+                            databaseId: numericId,
+                            // Conserver les autres propriétés existantes
+                            name: this.associatedGeocache.name,
+                            code: this.associatedGeocache.code,
+                            id: this.associatedGeocache.id || null
+                        };
+                        
+                        // Mettre à jour les attributs du bouton intelligent
+                        this.updateSmartButtonAttributes();
+                        
+                        // Sauvegarder l'association mise à jour
+                        this.saveGeocacheAssociation();
+                        
+                        // Re-déclencher le clic pour que le TabOpenerService prenne le relais
+                        console.log('🔄 Re-déclenchement du clic avec bouton intelligent configuré');
+                        setTimeout(() => {
+                            openButton.click();
+                        }, 100);
+                    })
+                    .catch(error => {
+                        console.error("Erreur lors de la récupération de l'ID de la géocache:", error);
+                        this.showErrorMessage(`Impossible de récupérer les détails de la géocache. ${error.message}`);
+                    });
+                
+                return false;
+            }
+            
+            // Mode legacy uniquement si aucun bouton intelligent n'est détecté
             if (event) {
                 event.preventDefault();
             }
@@ -1942,7 +1997,7 @@
             console.log("Ouverture de la géocache via méthode legacy:", this.associatedGeocache);
             
             // Si nous n'avons pas d'ID de base de données, le récupérer
-            if (!this.associatedGeocache.databaseId) {
+            if (!hasValidGeocacheId) {
                 console.log(`Récupération de l'ID de la géocache pour le code ${this.associatedGeocache.code}...`);
                 
                 fetch(`/api/geocaches/by-code/${this.associatedGeocache.code}`)
@@ -1997,10 +2052,29 @@
          */
         openGeocacheTab() {
             try {
+                // Vérifier que nous avons un ID valide avant d'envoyer le message
+                const geocacheId = this.associatedGeocache.databaseId || this.associatedGeocache.id;
+                
+                if (!geocacheId || !Number.isInteger(Number(geocacheId))) {
+                    console.error('🚫 openGeocacheTab: ID géocache invalide ou manquant:', { 
+                        databaseId: this.associatedGeocache.databaseId, 
+                        id: this.associatedGeocache.id,
+                        geocacheId: geocacheId 
+                    });
+                    this.showErrorMessage('Impossible d\'ouvrir l\'onglet : ID de géocache invalide');
+                    return;
+                }
+                
+                const numericId = Number(geocacheId);
+                console.log('📤 openGeocacheTab: Envoi du message avec ID valide:', { 
+                    geocacheId: numericId, 
+                    gcCode: this.associatedGeocache.code 
+                });
+                
                 console.log("Ouverture de l'onglet via window.parent.postMessage");
                 window.parent.postMessage({ 
                     type: 'openGeocacheDetails',
-                    geocacheId: this.associatedGeocache.databaseId,
+                    geocacheId: numericId,
                     gcCode: this.associatedGeocache.code,
                     name: this.associatedGeocache.name || this.associatedGeocache.code
                 }, '*');

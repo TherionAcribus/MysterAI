@@ -182,6 +182,20 @@ def reorder_alphabet(alphabet_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@alphabets_bp.route('/api/alphabets/<alphabet_id>/sources', methods=['GET'])
+def get_alphabet_sources(alphabet_id):
+    """Récupère les sources et crédits d'un alphabet."""
+    config = load_alphabet_config(alphabet_id)
+    if not config:
+        return jsonify({"error": f"Alphabet {alphabet_id} non trouvé"}), 404
+        
+    sources = config.get('sources', [])
+    return jsonify({
+        "alphabet_id": alphabet_id,
+        "alphabet_name": config.get('name', alphabet_id),
+        "sources": sources
+    })
+
 @alphabets_bp.route('/api/alphabets/use/<alphabet_id>', methods=['GET'])
 def get_alphabet(alphabet_id):
     """Récupère la configuration d'un alphabet spécifique."""

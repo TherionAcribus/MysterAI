@@ -30,6 +30,15 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.0.0",
+  "sources": [                   // Sources et crédits (optionnel)
+    {
+      "type": "reference",       // Types: reference, font, credit, author
+      "label": "Wikipedia",
+      "url": "https://...",
+      "author": "@/contributeur",
+      "description": "Description de la source"
+    }
+  ],
   "alphabetConfig": {
     "type": "images",           // ou "font"
     "imageFormat": "png",       // Pour type="images"
@@ -52,6 +61,47 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
     }
   }
 }
+```
+
+### Sources et crédits
+Le champ `sources` permet d'ajouter multiple références et crédits :
+
+#### Types de sources supportés :
+- `reference` : Documentation, articles, spécifications
+- `font` : Sources des polices utilisées
+- `credit` : Crédits d'implémentation ou adaptation
+- `author` : Auteurs originaux
+
+#### Champs disponibles pour chaque source :
+- `type` (requis) : Type de source
+- `label` (requis) : Nom affiché de la source
+- `url` (optionnel) : Lien vers la ressource
+- `author` (optionnel) : Auteur ou contributeur (format @/nom recommandé)
+- `description` (optionnel) : Description détaillée
+
+#### Exemples de sources :
+```json
+"sources": [
+  {
+    "type": "reference",
+    "label": "Wikipedia - Morse",
+    "url": "https://fr.wikipedia.org/wiki/Code_Morse",
+    "description": "Documentation du code Morse"
+  },
+  {
+    "type": "font",
+    "label": "Police Braille",
+    "author": "National Institute for the Blind",
+    "url": "https://www.brailleinstitute.org/",
+    "description": "Police officielle Braille"
+  },
+  {
+    "type": "credit",
+    "label": "Adaptation MysteryAI",
+    "author": "@/code_39",
+    "description": "Implémentation et adaptation pour l'interface"
+  }
+]
 ```
 
 ### Options de configuration
@@ -97,11 +147,19 @@ L'interface affiche :
 - Une zone de texte pour composer le message
 - Une grille de caractères cliquables
 - Des boutons utilitaires (espace, retour, effacer)
+- **Sources et crédits** (si configurées)
 
 Les caractères sont organisés en sections :
 - Lettres
 - Chiffres
 - Caractères spéciaux
+
+### Affichage des sources
+Les sources s'affichent automatiquement en bas de l'interface de visualisation de l'alphabet :
+- **Icônes** différentes selon le type de source
+- **Liens cliquables** vers les ressources externes
+- **Informations d'auteur** avec le format @/nom
+- **Descriptions** détaillées pour chaque source
 
 ## Développement et maintenance
 Le système est conçu pour être facilement extensible :
