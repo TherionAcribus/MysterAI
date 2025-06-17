@@ -229,13 +229,11 @@ class NakNakCodePlugin:
         result = []
         last_pos = 0
 
-        print("Fragments to decode: " + str(fragments))
         
         for frag in sorted_fragments:
             result.append(text[last_pos:frag["start"]])
             result.append(self.decode(frag["value"]))
-            last_pos = frag["end"]
-            print("Fragment decoded: " + frag["value"] + " " + self.decode(frag["value"]))
+            last_pos = frag["end"]            
             
         result.append(text[last_pos:])
         return "".join(result)
@@ -290,10 +288,8 @@ class NakNakCodePlugin:
         # Parcourir tous les segments et essayer de les décoder
         current_hex = ""
         for segment in segments:
-            print("Segment: " + segment)
             # Vérifier si le segment est dans notre table de décodage
             hex_digit = self.decode_table.get(segment)
-            print("Hex digit: " + hex_digit)
 
             if hex_digit is not None:
                 current_hex += hex_digit
@@ -303,7 +299,6 @@ class NakNakCodePlugin:
                     try:
                         hex_chars.append(chr(int(current_hex, 16)))  # Convertir hex en ASCII
                         current_hex = ""
-                        print("Hex digit decoded: " + hex_digit + " " + str(int(current_hex, 16)))
                     except ValueError:
                         # Si la conversion échoue, conserver tel quel
                         current_hex = ""
@@ -348,7 +343,6 @@ class NakNakCodePlugin:
         # Supprimer les espaces multiples
         text = re.sub(r'\s+', ' ', text).strip()
         
-        print(f"Texte nettoyé pour scoring: {text}")
         return text
         
     def _get_text_score(self, text, context=None):
@@ -372,10 +366,8 @@ class NakNakCodePlugin:
         
         # Ajouter le contexte s'il est fourni
         if context:
-            data["context"] = context
-        
-        print(f"Évaluation du texte: {cleaned_text[:30]}...")
-        
+            data["context"] = context       
+     
         # Utiliser le service local si disponible
         if self.scoring_service:
             try:
@@ -491,10 +483,6 @@ class NakNakCodePlugin:
             elif mode == "decode":
                 # Vérifier si le texte contient du code Nak Nak
                 check_result = self.check_code(text, strict=strict_mode, allowed_chars=allowed_chars, embedded=embedded)
-                
-                print("Check result: " + str(check_result))
-                print("embedded: ", embedded)
-
 
                 if check_result["is_match"]:
                     # Si des fragments ont été trouvés, les décoder
@@ -502,7 +490,6 @@ class NakNakCodePlugin:
                         decoded_text = self.decode_fragments(text, check_result["fragments"])
                     else:
                         # En mode non-embedded, décodage direct
-                        print("Decoding text: " + text)
                         decoded_text = self.decode(text)
                         
                     # Évaluer la pertinence du résultat avec le scoring si activé
