@@ -95,3 +95,12 @@ def serve_geocache_image(gc_code, filename):
     except Exception as e:
         print(f"Erreur lors de l'envoi de l'image: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@main.route('/api/informations_panel')
+def informations_panel():
+    """Renvoie le contenu par défaut du panneau Informations."""
+    try:
+        return render_template('informations_panel.html')
+    except Exception as e:
+        print(f"Erreur panneau informations : {e}")
+        return jsonify({'error': str(e)}), 500

@@ -804,3 +804,51 @@ def test_scoring():
         </body>
         </html>
         """
+
+# -----------------------------------------------------------------------------
+# Nouvelle route : Panneau d'informations d'un plugin (README)
+# -----------------------------------------------------------------------------
+
+@plugins_bp.route('/api/plugins/<plugin_name>/info_panel')
+def get_plugin_info_panel(plugin_name):
+    """Renvoie le contenu du fichier README.md d'un plugin sous forme de panneau HTML."""
+    try:
+        from app.models import Plugin  # Import tardif pour éviter les boucles
+
+        # Rechercher le plugin en base
+        plugin = Plugin.query.filter_by(name=plugin_name).first()
+        if not plugin:
+            return jsonify({'error': 'Plugin non trouvé'}), 404
+
+        # Chercher le fichier README dans le dossier du plugin
+        possible_names = ["README.md", "Readme.md", "readme.md"]
+        readme_path = None
+        for filename in possible_names:
+            path_candidate = os.path.join(plugin.path, filename)
+            if os.path.isfile(path_candidate):
+                readme_path = path_candidate
+                break
+
+        if readme_path:
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                readme_content = f.read()
+
+            try:
+                import markdown
+            except ImportError:
+                # Fallback: texte brut si markdown n'est pas installé
+                readme_html = f"<pre>{readme_content}</pre>"
+            else:
+                readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
+        else:
+            readme_html = '<p class="text-gray-400">Aucun fichier README trouvé pour ce plugin.</p>'
+
+        return render_template(
+            'plugin_info_panel.html',
+            plugin_name=plugin.name,
+            readme_html=readme_html
+        )
+
+    except Exception as e:
+        print(f"Error loading plugin info panel: {str(e)}")
+        return jsonify({'error': str(e)}), 500

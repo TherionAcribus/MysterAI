@@ -400,9 +400,10 @@
                         <div id="logs-panel" class="panel-content" data-controller="logs" data-action="tab-activated@window->logs#onActivated">
                             <!-- Le contenu du panel sera chargé par HTMX -->
                         </div>
-                        <div id="informations-panel" class="panel-content">
-                            <h3>Panneau d'Informations</h3>
-                            <p>Retrouvez ici toutes les informations importantes sur le système et les mises à jour.</p>
+                        <div id="informations-panel" class="panel-content"
+                             hx-get="/api/informations_panel"
+                             hx-trigger="load"
+                             hx-swap="innerHTML">
                         </div>
                     </div>
                 </div>

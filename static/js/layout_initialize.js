@@ -109,21 +109,58 @@ function initializeLayout() {
             }
         }
 
+        // ------------------------------------------------------------------
+        // Mettre à jour le panneau Informations selon l'onglet actif
+        // ------------------------------------------------------------------
+        function updateInformationPanel(contentItem) {
+            try {
+                if (!contentItem || !contentItem.config) return;
+
+                const state = contentItem.config.componentState || {};
+
+                // Si l'onglet actif est un plugin, afficher son README
+                if (contentItem.componentName === 'plugin' && state.pluginName) {
+                    const infoPanel = document.getElementById('informations-panel');
+                    if (infoPanel) {
+                        htmx.ajax('GET', `/api/plugins/${encodeURIComponent(state.pluginName)}/info_panel`, {
+                            target: '#informations-panel',
+                            swap: 'innerHTML'
+                        });
+                    }
+                }
+                // Si l'onglet n'est PAS un plugin, on rétablit l'affichage générique
+                else {
+                    const infoPanel = document.getElementById('informations-panel');
+                    if (infoPanel) {
+                        htmx.ajax('GET', '/api/informations_panel', {
+                            target: '#informations-panel',
+                            swap: 'innerHTML'
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Erreur updateInformationPanel:', e);
+            }
+        }
+
         // Gestionnaire pour le changement de composant actif dans une stack
         mainLayout.on('activeContentItemChanged', function(contentItem) {
             updateGeocacheCode(contentItem);
+            updateInformationPanel(contentItem);
         });
 
         // Gestionnaire pour le focus d'une stack
         mainLayout.on('stackCreated', function(stack) {
             stack.on('activeContentItemChanged', function(contentItem) {
                 updateGeocacheCode(contentItem);
+                updateInformationPanel(contentItem);
             });
 
             // Gérer le clic sur les onglets de la stack
             stack.header.tabs.forEach(tab => {
                 tab.element.addEventListener('click', () => {
                     updateGeocacheCode(tab.contentItem);
+                    updateInformationPanel(tab.contentItem);
                 });
             });
         });
@@ -133,6 +170,7 @@ function initializeLayout() {
             if (item.type === 'stack') {
                 item.on('activeContentItemChanged', function(contentItem) {
                     updateGeocacheCode(contentItem);
+                    updateInformationPanel(contentItem);
                 });
             }
         });
@@ -142,6 +180,7 @@ function initializeLayout() {
             const activeContentItem = mainLayout.selectedItem;
             if (activeContentItem) {
                 updateGeocacheCode(activeContentItem);
+                updateInformationPanel(activeContentItem);
             }
         });
 

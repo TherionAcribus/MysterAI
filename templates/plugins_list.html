@@ -35,7 +35,11 @@
                         {% if category_plugins %}
                             {% for plugin in category_plugins %}
                                 <div class="bg-gray-700 rounded p-2 mb-1 hover:bg-gray-600 transition-colors cursor-pointer"
-                                     onclick="window.openPluginTab('{{ plugin.name }}', '{{ plugin.name | escape }}')">
+                                     onclick="window.openPluginTab('{{ plugin.name }}', '{{ plugin.name | escape }}')"
+                                     hx-get="/api/plugins/{{ plugin.name | urlencode }}/info_panel"
+                                     hx-target="#informations-panel"
+                                     hx-swap="innerHTML"
+                                     hx-trigger="click">
                                     <div class="flex justify-between items-center">
                                         <div>
                                             <h4 class="font-medium text-white">{{ plugin.name }}</h4>
