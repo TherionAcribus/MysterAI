@@ -8,7 +8,11 @@
                  data-tab-component="alphabet-viewer"
                  data-tab-unique-id="alphabet-viewer-{{ alphabet.id }}"
                  data-tab-config-alphabetId="{{ alphabet.id }}"
-                 data-tab-config-alphabetName="{{ alphabet.name | escape }}">
+                 data-tab-config-alphabetName="{{ alphabet.name | escape }}"
+                 hx-get="/api/alphabets/{{ alphabet.id | urlencode }}/info_panel"
+                 hx-target="#informations-panel"
+                 hx-swap="innerHTML"
+                 hx-trigger="click">
                 <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
                 <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
             </div>

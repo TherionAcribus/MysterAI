@@ -128,6 +128,16 @@ function initializeLayout() {
                         });
                     }
                 }
+                // Si l'onglet actif est un alphabet, afficher son README
+                else if (contentItem.componentName === 'alphabet-viewer' && state.alphabetId) {
+                    const infoPanel = document.getElementById('informations-panel');
+                    if (infoPanel) {
+                        htmx.ajax('GET', `/api/alphabets/${encodeURIComponent(state.alphabetId)}/info_panel`, {
+                            target: '#informations-panel',
+                            swap: 'innerHTML'
+                        });
+                    }
+                }
                 // Si l'onglet n'est PAS un plugin, on rétablit l'affichage générique
                 else {
                     const infoPanel = document.getElementById('informations-panel');

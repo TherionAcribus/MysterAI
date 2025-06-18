@@ -209,3 +209,41 @@ def get_alphabet(alphabet_id):
         return jsonify({"error": "Configuration de l'alphabet invalide"}), 500
         
     return jsonify(config)
+
+# -----------------------------------------------------------------------------
+# Nouvelle route : Panneau d'informations d'un alphabet (README)
+# -----------------------------------------------------------------------------
+
+@alphabets_bp.route('/api/alphabets/<alphabet_id>/info_panel')
+def get_alphabet_info_panel(alphabet_id):
+    """Renvoie le contenu du README.md d'un alphabet sous forme de panneau HTML."""
+    try:
+        alphabet_dir = os.path.join(ALPHABETS_DIR, alphabet_id)
+        if not os.path.exists(alphabet_dir):
+            return jsonify({"error": f"Alphabet {alphabet_id} not found"}), 404
+
+        # Chercher fichier README
+        possible_names = ["README.md", "Readme.md", "readme.md"]
+        readme_path = None
+        for name in possible_names:
+            candidate = os.path.join(alphabet_dir, name)
+            if os.path.isfile(candidate):
+                readme_path = candidate
+                break
+
+        if readme_path:
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                readme_content = f.read()
+
+            try:
+                import markdown
+                readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
+            except ImportError:
+                readme_html = f"<pre>{readme_content}</pre>"
+        else:
+            readme_html = '<p class="text-gray-400">Aucun README trouvé pour cet alphabet.</p>'
+
+        return render_template('alphabet_info_panel.html', alphabet_name=alphabet_id, readme_html=readme_html)
+    except Exception as e:
+        current_app.logger.error(f"Error loading alphabet info panel: {e}")
+        return jsonify({"error": str(e)}), 500
