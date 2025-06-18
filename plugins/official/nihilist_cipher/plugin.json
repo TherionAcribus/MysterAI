@@ -1,11 +1,11 @@
 {
-    "name": "tap_code",
-    "version": "1.0.0",
-    "description": "Plugin de chiffrement et déchiffrement utilisant le Tap Code (système de frappe)",
-    "author": "MysterAI",
+    "name": "nihilist_cipher",
+    "version": "1.2.1",
+    "description": "Plugin de chiffrement/déchiffrement basé sur le chiffre des Nihilistes, un surchiffrement du carré de Polybe",
+    "author": "MysterAI Team",
     "plugin_type": "python",
     "entry_point": "main.py",
-    "dependencies": [],
+    "dependencies": ["polybius_square"],
     "categories": ["AlphabetsDecryption"],
     "brute_force": false,
     "enable_scoring": true,
@@ -29,18 +29,35 @@
             "options": ["decode", "encode"],
             "default": "decode"
         },
+        "key": {
+            "type": "string",
+            "label": "Clé de surchiffrement",
+            "placeholder": "Entrez la clé ici..."
+        },
+        "grid_key": {
+            "type": "string",
+            "label": "Mot-clé pour la grille",
+            "placeholder": "Mot-clé pour mélanger l'alphabet (optionnel)",
+            "required": false
+        },
+        "alphabet_mode": {
+            "type": "select",
+            "label": "Mode alphabet",
+            "options": ["I=J", "C=K", "W=VV"],
+            "default": "I=J"
+        },
+        "output_format": {
+            "type": "select",
+            "label": "Format de sortie",
+            "options": ["separated", "concatenated"],
+            "default": "separated",
+            "condition": "mode == 'encode'"
+        },
         "strict": {
             "type": "select",
             "label": "Mode strict",
             "options": ["strict", "smooth"],
             "default": "smooth"
-        },
-        "output_format": {
-            "type": "select",
-            "label": "Format de sortie",
-            "options": ["taps", "dots", "numbers"],
-            "default": "taps",
-            "condition": "mode == 'encode'"
         }
     },
     "output_types": {
