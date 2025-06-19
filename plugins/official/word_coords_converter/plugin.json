@@ -1,0 +1,35 @@
+{
+  "name": "word_coords_converter",
+  "version": "1.0.0",
+  "description": "Convertit des coordonnées énoncées en toutes lettres (multilingue) vers le format géocaching standard DDM.",
+  "author": "MysteryAI Team",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "dependencies": [
+    "number-parser>=0.3.2",
+    "fasttext>=0.9.2",
+    "langdetect>=1.0.9"
+  ],
+  "categories": ["Coordinates", "Parsing"],
+  "accept_accents": true,
+  "enable_scoring": true,
+  "input_types": {
+    "text": {
+      "type": "string",
+      "label": "Texte contenant les coordonnées à convertir",
+      "placeholder": "Ex: north thirty nine degrees zeros point two six nine by west seventy six degrees forty five point seven seven four"
+    },
+    "language_override": {
+      "type": "select",
+      "label": "Forcer la langue (optionnel)",
+      "options": ["auto", "fr", "en"],
+      "default": "auto"
+    }
+  },
+  "output_types": {
+    "result": {
+      "type": "string",
+      "label": "Coordonnée convertie"
+    }
+  }
+} 
