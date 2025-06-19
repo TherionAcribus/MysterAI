@@ -11,6 +11,14 @@
         </button>
     </div>
     
+    <!-- Champ de recherche des plugins -->
+    <div class="mb-4">
+        <input type="text"
+               id="plugin-search"
+               placeholder="Rechercher un plugin..."
+               class="w-56 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    
     {% if categories %}
         <div class="space-y-2">
             {% for category in categories %}
@@ -34,7 +42,8 @@
                         
                         {% if category_plugins %}
                             {% for plugin in category_plugins %}
-                                <div class="bg-gray-700 rounded p-2 mb-1 hover:bg-gray-600 transition-colors cursor-pointer"
+                                <div class="plugin-item bg-gray-700 rounded p-2 mb-1 hover:bg-gray-600 transition-colors cursor-pointer"
+                                     data-plugin-name="{{ plugin.name|lower }}"
                                      onclick="window.openPluginTab('{{ plugin.name }}', '{{ plugin.name | escape }}')"
                                      hx-get="/api/plugins/{{ plugin.name | urlencode }}/info_panel"
                                      hx-target="#informations-panel"
@@ -71,4 +80,31 @@ function toggleCategory(categoryName) {
     chevron.classList.toggle('rotate-90');
     pluginsDiv.classList.toggle('hidden');
 }
+
+// Filtrage des plugins
+(function() {
+    const searchInput = document.getElementById('plugin-search');
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        const pluginItems = document.querySelectorAll('.plugin-item');
+
+        pluginItems.forEach(item => {
+            const name = item.dataset.pluginName || '';
+            if (!term || name.includes(term)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        // Masque/affiche les catégories selon la présence d'éléments visibles
+        const categoryContainers = document.querySelectorAll('[id^="plugins-"]');
+        categoryContainers.forEach(container => {
+            const hasVisible = Array.from(container.querySelectorAll('.plugin-item')).some(i => i.style.display !== 'none');
+            container.parentElement.style.display = hasVisible ? '' : 'none';
+        });
+    });
+})();
 </script>
