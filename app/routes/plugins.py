@@ -531,6 +531,7 @@ def execute_metadetection():
         strict = request.form.get('strict', 'smooth')  # 'strict' ou 'smooth'
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
+        key = request.form.get('key', None)
         
         # Normaliser le texte
         text = normalize_text(text)
@@ -567,6 +568,10 @@ def execute_metadetection():
         # Ajouter le plugin_name si fourni
         if plugin_name:
             inputs['plugin_name'] = plugin_name
+        
+        # Ajouter la clé si fournie
+        if key:
+            inputs['key'] = key
             
         # Obtenir le plugin manager
         from app import get_plugin_manager

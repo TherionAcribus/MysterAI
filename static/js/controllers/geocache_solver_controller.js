@@ -1123,6 +1123,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         const strict = document.getElementById('metasolver-strict').value;
         const embedded = document.getElementById('metasolver-embedded').checked;
         const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
+        // Nouvelle option : clé éventuelle pour certains plugins
+        const keyValueElement = document.getElementById('metasolver-key');
+        const keyValue = keyValueElement ? keyValueElement.value.trim() : "";
         
         // Récupérer les informations sur les caractères autorisés
         const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
@@ -1168,7 +1171,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
             formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
-            
+            // Ajouter la clé si fournie
+            if (keyValue) {
+                formData.append('key', keyValue);
+            }
             // Ajouter les caractères autorisés si nécessaire
             if (allowedCharsType !== 'all') {
                 formData.append('allowed_chars', JSON.stringify(allowedChars));
@@ -1180,6 +1186,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 strict: strict,
                 embedded: embedded,
                 enable_gps_detection: enableGpsDetection,
+                key: keyValue || undefined,
                 allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
             });
             
@@ -1241,6 +1248,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             const strict = document.getElementById('metasolver-strict').value;
             const embedded = document.getElementById('metasolver-embedded').checked;
             const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
+            const keyValueElementDecode = document.getElementById('metasolver-key');
+            const keyValueDecode = keyValueElementDecode ? keyValueElementDecode.value.trim() : "";
             
             // Récupérer les informations sur les caractères autorisés
             const allowedCharsType = document.getElementById('metasolver-allowed-chars').value;
@@ -1276,7 +1285,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('embedded', embedded ? 'true' : 'false');
             formData.append('plugin_name', pluginName);
             formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
-            
+            // Ajouter la clé si fournie
+            if (keyValueDecode) {
+                formData.append('key', keyValueDecode);
+            }
             // Ajouter les caractères autorisés si nécessaire
             if (allowedCharsType !== 'all') {
                 formData.append('allowed_chars', JSON.stringify(allowedChars));
@@ -1289,6 +1301,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 embedded: embedded,
                 plugin_name: pluginName,
                 enable_gps_detection: enableGpsDetection,
+                key: keyValueDecode || undefined,
                 allowed_chars: allowedCharsType !== 'all' ? allowedChars : "all"
             });
             
@@ -1347,6 +1360,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         
         // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
         let gpsCoordinatesHtml = '';
+        // Préparer éventuellement un encart pour les plugins en échec
+        let failedHtml = '';
+        if (result.failed_plugins && Array.isArray(result.failed_plugins) && result.failed_plugins.length > 0) {
+            failedHtml = `\n                <div class=\"bg-red-900/40 border border-red-600 rounded-lg p-4 mt-4\">\n                    <h3 class=\"text-md font-semibold text-red-300 mb-2\">Plugins sans résultat (${result.failed_plugins.length})</h3>\n                    <ul class=\"list-disc list-inside space-y-1 text-sm text-red-200\">\n                        ${result.failed_plugins.map(fp => `<li><strong>${fp.plugin}</strong> : ${fp.reason}</li>`).join('')}\n                    </ul>\n                </div>`;
+        }
         if (result.primary_coordinates) {
             console.log("formatMetaDetectionResults - Coordonnées primaires détectées:", result.primary_coordinates);
             // Stocker les coordonnées détectées pour une utilisation ultérieure
@@ -1475,13 +1493,6 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     </div>`;
             }
             
-            // Conteneur principal pour les résultats
-            html += `
-                <div class="bg-gray-700 p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultats de l'analyse</h3>
-                    <div class="space-y-3">
-            `;
-            
             // Traiter chaque résultat
             result.results.forEach((resultEntry, index) => {
                 console.log("formatMetaDetectionResults - Traitement du résultat", index, resultEntry);
@@ -1525,7 +1536,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format standardisé (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
+            return html + gpsCoordinatesHtml + failedHtml;
         }
         // Afficher les résultats des plugins combinés (nouveau format)
         else if (result.combined_results && Object.keys(result.combined_results).length > 0) {
@@ -1567,7 +1578,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format combined_results (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
+            return html + gpsCoordinatesHtml + failedHtml;
         }
         // Gérer l'ancien format (mode détection)
         else if (result.result && result.result.possible_codes && result.result.possible_codes.length > 0) {
@@ -1612,7 +1623,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format possible_codes (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
+            return html + gpsCoordinatesHtml + failedHtml;
         }
         // Gérer l'ancien format (décodage spécifique)
         else if (result.result && result.result.decoded_results && result.result.decoded_results.length > 0) {
@@ -1646,7 +1657,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format decoded_results (longueur):", html.length);
-            return html + gpsCoordinatesHtml;
+            return html + gpsCoordinatesHtml + failedHtml;
         } 
         // Gérer l'ancien format (décodage simple)
         else if (result.result && result.result.decoded_text) {

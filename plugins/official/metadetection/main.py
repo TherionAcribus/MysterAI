@@ -35,6 +35,7 @@ class MetaDetectionPlugin:
         mode = inputs.get("mode", "detect").lower()
         text = inputs.get("text", "")
         plugin_name = inputs.get("plugin_name")
+        key = inputs.get("key")
         
         # Récupération du mode strict/smooth
         strict = inputs.get("strict", True) == "strict"
@@ -138,7 +139,7 @@ class MetaDetectionPlugin:
             
         elif mode == "decode":
             # Récupérer les résultats de décodage (format standardisé uniquement)
-            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded)
+            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key)
             
             # Mesure du temps d'exécution
             execution_time = int((time.time() - start_time) * 1000)
@@ -177,6 +178,7 @@ class MetaDetectionPlugin:
                 "results": decode_results["results"],
                 "combined_results": decode_results["combined_results"],
                 "primary_coordinates": decode_results["primary_coordinates"],
+                "failed_plugins": decode_results.get("failed_plugins", []),
                 "summary": {
                     "best_result_id": decode_results["best_result_id"],
                     "total_results": len(decode_results["results"]),
@@ -223,7 +225,8 @@ class MetaDetectionPlugin:
             #"hexadecimal_encoder_decoder",
             "letter_value",
             "roman_numerals",
-            "wherigo_reverse_decoder"
+            "wherigo_reverse_decoder",
+            "gronsfeld_cipher"
         ]
         
         if not text:
@@ -282,7 +285,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -304,11 +307,29 @@ class MetaDetectionPlugin:
         
         # Liste des plugins à utiliser pour le test (phase de développement)
         included_plugins = [
-            #"abaddon_code",
+            "abaddon_code",
             "letter_value",
             "kenny_code",
             "roman_numerals",
-            "wherigo_reverse_decoder"
+            "wherigo_reverse_decoder",
+            "gronsfeld_cipher",
+            "beaufort_cipher",
+            "bifid_delastelle",
+            "vigenere_cipher",
+            "multiplicative_code",
+            "bacon_code",
+            "modulo_cipher",
+            "bifid_delastelle",
+            "nihilist_cipher",
+            "tap_code",
+            "polybius_square",
+            "nak_nak_code",
+            "atbash",
+            "chemical_elements",
+            "caesar_code",
+            "morse_code",
+            "alpha_decoder",
+            "checksum_code"
         ]
         
         # Structure du résultat standardisé
@@ -316,7 +337,8 @@ class MetaDetectionPlugin:
             "results": [],
             "combined_results": {},
             "primary_coordinates": None,
-            "best_result_id": None
+            "best_result_id": None,
+            "failed_plugins": []  # Suivi des échecs
         }
         
         if plugin_name:
@@ -347,6 +369,8 @@ class MetaDetectionPlugin:
                     "embedded": embedded,
                     "enable_gps_detection": True
                 }
+                if key:
+                    inputs["key"] = key
                 
                 # Ajouter les caractères autorisés si fournis
                 if allowed_chars:
@@ -359,6 +383,7 @@ class MetaDetectionPlugin:
                 
             except Exception as e:
                 print(f"Erreur lors du décodage avec {plugin_name}: {str(e)}")
+                result_structure["failed_plugins"].append({"plugin": plugin_name, "reason": str(e)})
                 return result_structure
         else:
             # Si aucun plugin spécifique n'est demandé, essayer tous les plugins
@@ -395,6 +420,8 @@ class MetaDetectionPlugin:
                         "embedded": embedded,
                         "enable_gps_detection": True
                     }
+                    if key:
+                        inputs["key"] = key
                     
                     # Ajouter les caractères autorisés si fournis
                     if allowed_chars:
@@ -411,8 +438,12 @@ class MetaDetectionPlugin:
                         all_results.extend(plugin_processed["results"])
                         
                         # Mettre à jour les résultats combinés
-                        for key, value in plugin_processed["combined_results"].items():
-                            combined_results[key] = value
+                        for comb_key, comb_value in plugin_processed["combined_results"].items():
+                            combined_results[comb_key] = comb_value
+                        
+                        # Fusionner les échecs
+                        if plugin_processed.get("failed_plugins"):
+                            result_structure["failed_plugins"].extend(plugin_processed["failed_plugins"])
                         
                         # Mettre à jour les coordonnées primaires si présentes
                         if plugin_processed["primary_coordinates"]:
@@ -420,6 +451,7 @@ class MetaDetectionPlugin:
                     
                 except Exception as e:
                     print(f"Erreur lors du décodage avec {plugin_name}: {str(e)}")
+                    result_structure["failed_plugins"].append({"plugin": plugin_name, "reason": str(e)})
                     continue
             
             # Trier les résultats par confiance
@@ -428,12 +460,13 @@ class MetaDetectionPlugin:
             # Définir le meilleur résultat
             best_result_id = all_results[0]["id"] if all_results else None
             
-            return {
+            result_structure.update({
                 "results": all_results,
                 "combined_results": combined_results,
                 "primary_coordinates": primary_coordinates,
                 "best_result_id": best_result_id
-            }
+            })
+            return result_structure
     
     def _is_standardized_format(self, result):
         """
@@ -452,11 +485,29 @@ class MetaDetectionPlugin:
         processed = {
             "results": [],
             "combined_results": {},
-            "primary_coordinates": None
+            "primary_coordinates": None,
+            "failed_plugins": []
         }
         
-        # Si le plugin a retourné une erreur ou n'a pas de résultats
-        if plugin_result.get("status") == "error" or not plugin_result.get("results"):
+        # Considérer comme échec si :
+        #   - status différent de "success"
+        #   - aucun résultat
+        #   - tous les text_output commencent par "Erreur:"
+        status_val = plugin_result.get("status", "success")
+        results_list = plugin_result.get("results", [])
+        all_error_outputs = True
+        for res in results_list:
+            text_out = res.get("text_output", "")
+            if not str(text_out).startswith("Erreur:"):
+                all_error_outputs = False
+                break
+
+        if status_val != "success" or not results_list or all_error_outputs:
+            reason = plugin_result.get("summary", {}).get("message", "aucun résultat")
+            if all_error_outputs and status_val == "success":
+                # cas particulier : status succès mais contenu erreur
+                reason = "aucun résultat (contenu Erreur)"
+            processed["failed_plugins"].append({"plugin": plugin_name, "reason": reason})
             return processed
         
         # Traiter chaque résultat du plugin
