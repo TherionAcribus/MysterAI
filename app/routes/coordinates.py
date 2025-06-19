@@ -1199,6 +1199,7 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
     print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}, origin_coords={origin_coords}")
     
     detection_functions = [
+        _detect_word_coordinates,       # Coordonnées exprimées en toutes lettres (plugin)
         _detect_compact_coordinates,  # Format compact sans séparateurs (ajouté en premier car très spécifique)
         _detect_roman_numerals_coordinates,  # Format avec chiffres romains
         _detect_dms_coordinates,      # Format DMS (degrés, minutes, secondes)
@@ -1332,3 +1333,55 @@ def detect_coordinates_in_text():
         print(f"[ERROR] Erreur lors de la détection des coordonnées: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+# ------------------------------------------------------------------------------
+# Détection des coordonnées exprimées en toutes lettres (plugin word_coords_converter)
+# ------------------------------------------------------------------------------
+
+try:
+    from plugins.official.word_coords_converter.main import WordCoordsConverterPlugin  # type: ignore
+except Exception:
+    WordCoordsConverterPlugin = None  # Le plugin peut ne pas être disponible dans certains contextes
+
+
+def _detect_word_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """Tente de détecter des coordonnées GPS exprimées en toutes lettres en utilisant
+    le plugin `word_coords_converter`. Retourne un dict au même format que les autres
+    fonctions de détection ou None si aucune coordonnée n'est trouvée."""
+    if WordCoordsConverterPlugin is None:
+        return None
+
+    try:
+        plugin = WordCoordsConverterPlugin()
+        plugin_result = plugin.execute({
+            "text": text,
+            "language_override": "auto",
+            "enable_scoring": False
+        })
+
+        if not plugin_result or not plugin_result.get("results"):
+            return None
+
+        # Récupérer la sortie texte du plugin
+        output_text = plugin_result["results"][0].get("text_output", "").strip()
+        if not output_text:
+            return None
+
+        # Extraire latitude et longitude à partir de l'expression DDM combinée
+        # Supposons que la latitude commence par N/S et la longitude par E/W
+        match = re.match(r"^([NS][^NSWE]+)[\s]+([EW].+)$", output_text, re.IGNORECASE)
+        if not match:
+            return None
+
+        ddm_lat = match.group(1).strip()
+        ddm_lon = match.group(2).strip()
+
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+    except Exception:
+        traceback.print_exc()
+        return None
