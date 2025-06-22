@@ -329,7 +329,8 @@ class MetaDetectionPlugin:
             "caesar_code",
             "morse_code",
             "alpha_decoder",
-            "checksum_code"
+            "checksum_code",
+            "base_converter"
         ]
         
         # Structure du résultat standardisé

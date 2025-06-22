@@ -511,16 +511,26 @@ class BaseConverterPlugin:
         target_base = inputs.get("target_base", "auto")
         strict_mode = inputs.get("strict", "").lower() == "strict"
         embedded = inputs.get("embedded", False)
-        bruteforce = inputs.get("brute_force", False)
-        
+        # Détection du mode bruteforce (plusieurs conventions possibles selon l'UI)
+        bruteforce_param1 = inputs.get("bruteforce", False)  # nouvelle clé sans underscore
+        bruteforce_param2 = inputs.get("brute_force", False) # clé historique avec underscore
+        mode_param = inputs.get("mode", "").lower()
+
+        # Le bruteforce est déclenché si l'un des paramètres est vrai ou si le mode explicite est "bruteforce"
+        do_bruteforce = bruteforce_param1 or bruteforce_param2 or (mode_param == "bruteforce")
+
+        # ------------------------------------------------------------------
+        #  Début du traitement principal
+        # ------------------------------------------------------------------
+
         # Vérifier si la valeur d'entrée est vide
         if not input_value:
             standardized_response["status"] = "error"
             standardized_response["summary"]["message"] = "Aucune valeur fournie à convertir."
             return standardized_response
-            
+
         # Mode bruteforce ou base auto => on essaye toutes les combinaisons
-        if bruteforce or source_base == "auto" or target_base == "auto":
+        if do_bruteforce or source_base == "auto" or target_base == "auto":
             # Lancer le bruteforce
             results = self.bruteforce_convert(input_value, strict_mode, embedded)
             
