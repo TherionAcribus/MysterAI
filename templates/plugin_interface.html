@@ -237,6 +237,14 @@
 </div>
 
 <script>
+    // ------------------------------------------------------------------
+    // Variables et constantes globales partagées par les fonctions ci-dessous
+    // ------------------------------------------------------------------
+
+    // Mémorise les coordonnées d'origine de la géocache associée afin
+    // d'éviter de multiples requêtes au backend
+    let cachedOriginalCoords = null;
+
     // Script optimisé pour exécuter les plugins dans GoldenLayout
     (function() {
         // Permettre au DOM de se charger complètement
@@ -899,8 +907,10 @@
                         // Mettre à jour le DOM avec le HTML généré
                         output.innerHTML = resultsHtml;
                         
-                        // Configurer les boutons de coordination
+                        // Configurer les boutons de coordination (immédiat puis différé)
                         setupCoordinateButtons();
+                        // Rappel différé pour s'assurer que le DOM est entièrement rendu
+                        setTimeout(setupCoordinateButtons, 100);
                         
                         // Ajouter l'événement pour afficher/masquer le format brut
                         const toggleButton = output.querySelector(`#toggle-raw-${uniqueId}`);
@@ -1537,6 +1547,40 @@
                 }
             });
         });
+
+        // ------------------------------------------------------------------
+        // Calcul de la distance par rapport au point d'origine (si applicable)
+        // ------------------------------------------------------------------
+
+        if (hasGeocache) {
+            // Rechercher tous les conteneurs de coordonnées actuellement affichés
+            document.querySelectorAll('[class*="coords-container-"]').forEach(container => {
+                const latInput = container.querySelector('input[id^="coords-lat-"]');
+                const lonInput = container.querySelector('input[id^="coords-lon-"]');
+                if (latInput && lonInput && latInput.value && lonInput.value) {
+                    // Ne pas recalculer si déjà présent
+                    if (!container.querySelector('.distance-message')) {
+                        calculateDistanceFromOrigin(latInput.value.trim(), lonInput.value.trim(), container);
+                    }
+                }
+            });
+        }
+
+        // Gestion du format standard (blocs ayant un bouton .add-waypoint)
+        if (hasGeocache) {
+            document.querySelectorAll('.add-waypoint').forEach(btn => {
+                const container = btn.closest('.mt-3');
+                if (!container) return;
+                // Éviter les doublons
+                if (container.querySelector('.distance-message')) return;
+
+                const lat = btn.dataset.lat;
+                const lon = btn.dataset.lon;
+                if (lat && lon) {
+                    calculateDistanceFromOrigin(lat.trim(), lon.trim(), container);
+                }
+            });
+        }
     }
     
     // Fonction d'implémentation directe de createWaypointWithJSON sans passer par le contrôleur
@@ -2271,6 +2315,144 @@
             }
         }
     });
+
+    // -------------------------------------------------------------
+    // Fonctions de calcul / affichage de la distance (≤ 2 miles)
+    // -------------------------------------------------------------
+
+    /**
+     * Calcule la distance entre un point détecté et le point d'origine de la cache
+     * @param {string} detectedLat - Latitude au format DDM (ex: N 48° 12.345)
+     * @param {string} detectedLon - Longitude au format DDM (ex: E 002° 34.567)
+     * @param {HTMLElement} container - Le conteneur DOM où afficher les messages
+     */
+    function calculateDistanceFromOrigin(detectedLat, detectedLon, container) {
+        if (!window.lastAssociatedGeocache || !window.lastAssociatedGeocache.code) {
+            console.log("Calcul de distance impossible : pas de géocache associée");
+            return;
+        }
+
+        // Si nous n'avons pas encore les coordonnées d'origine, les récupérer puis relancer le calcul
+        if (!cachedOriginalCoords) {
+            addLoadingDistanceMessage(container);
+            fetch(`/api/geocaches/by-code/${window.lastAssociatedGeocache.code}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Impossible de récupérer les coordonnées pour ${window.lastAssociatedGeocache.code}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.gc_lat || !data.gc_lon) {
+                        throw new Error("Les coordonnées d'origine ne sont pas disponibles");
+                    }
+                    cachedOriginalCoords = {
+                        gc_lat: data.gc_lat,
+                        gc_lon: data.gc_lon
+                    };
+
+                    // Relancer le calcul maintenant que nous avons les coordonnées d'origine
+                    requestDistanceCalculation(detectedLat, detectedLon, container);
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la récupération des coordonnées d'origine:", error);
+                    addDistanceErrorMessage(container, "Impossible de récupérer les coordonnées d'origine");
+                });
+        } else {
+            requestDistanceCalculation(detectedLat, detectedLon, container);
+        }
+    }
+
+    // Affiche un état de chargement
+    function addLoadingDistanceMessage(container) {
+        removeDistanceMessage(container);
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'text-xs text-gray-400 mt-2 flex items-center distance-message';
+        loadingMessage.innerHTML = `
+            <svg class="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span>Calcul de la distance...</span>
+        `;
+        container.appendChild(loadingMessage);
+    }
+
+    // Supprime un message de distance/chargement s'il existe
+    function removeDistanceMessage(container) {
+        const existing = container.querySelector('.distance-message');
+        if (existing) existing.remove();
+    }
+
+    // Affiche un message d'erreur
+    function addDistanceErrorMessage(container, errorText) {
+        removeDistanceMessage(container);
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'text-xs text-red-400 mt-2 distance-message';
+        errorMessage.textContent = errorText || 'Erreur lors du calcul de la distance';
+        container.appendChild(errorMessage);
+    }
+
+    // Demande à l'API le calcul de distance
+    function requestDistanceCalculation(detectedLat, detectedLon, container) {
+        addLoadingDistanceMessage(container);
+        const requestData = {
+            formula: `${detectedLat} ${detectedLon}`,
+            origin_lat: cachedOriginalCoords.gc_lat,
+            origin_lon: cachedOriginalCoords.gc_lon
+        };
+
+        fetch('/api/calculate_coordinates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data.distance_from_origin) {
+                displayDistance(container, data.distance_from_origin);
+            } else {
+                throw new Error('Distance non calculée');
+            }
+        })
+        .catch(err => {
+            console.error('Erreur distance:', err);
+            addDistanceErrorMessage(container, 'Erreur lors du calcul de la distance');
+        });
+    }
+
+    // Affiche la distance avec couleur appropriée
+    function displayDistance(container, distanceInfo) {
+        removeDistanceMessage(container);
+        let distanceClass = '';
+        let distanceMessage = '';
+
+        switch (distanceInfo.status) {
+            case 'ok':
+                distanceClass = 'text-green-400';
+                distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Conforme aux règles du géocaching`;
+                break;
+            case 'warning':
+                distanceClass = 'text-amber-300';
+                distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Proche de la limite de 2 miles`;
+                break;
+            case 'far':
+                distanceClass = 'text-red-500';
+                distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles) - Trop éloigné (> 2 miles)`;
+                break;
+            default:
+                distanceClass = 'text-gray-400';
+                distanceMessage = `Distance: ${distanceInfo.meters} m (${distanceInfo.miles} miles)`;
+        }
+
+        const distanceElement = document.createElement('div');
+        distanceElement.className = `text-xs mt-2 ${distanceClass} distance-message`;
+        distanceElement.textContent = distanceMessage;
+        container.appendChild(distanceElement);
+    }
 </script>
 
 <!-- Fonctions pour les actions d'association de geocache -->
@@ -2465,8 +2647,9 @@
             sessionStorage.removeItem(`plugin_${pluginName}_geocache`);
         }
         
-        // Réinitialiser la variable globale
+        // Réinitialiser les variables globales
         window.lastAssociatedGeocache = null;
+        cachedOriginalCoords = null;
  
         // Mettre à jour la visibilité des boutons après suppression
         setupCoordinateButtons();
@@ -3088,6 +3271,16 @@
                 coordsValueElement.textContent = coordsStr;
                 
                 console.log(`Coordonnées affichées: ${coordsStr}`);
+                
+                // Mémoriser pour les calculs de distance futurs
+                if (data.gc_lat && data.gc_lon) {
+                    cachedOriginalCoords = {
+                        gc_lat: data.gc_lat,
+                        gc_lon: data.gc_lon
+                    };
+                    // Recalculer la distance dès que l'origine est disponible
+                    setupCoordinateButtons();
+                }
             })
             .catch(error => {
                 console.error("Erreur lors du chargement des coordonnées:", error);
