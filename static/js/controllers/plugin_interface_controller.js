@@ -56,6 +56,9 @@ class PluginInterfaceController extends Controller {
         // Gestionnaire d'événement pour beforeunload
         this.beforeUnloadHandler = this.handleBeforeUnload.bind(this)
         window.addEventListener('beforeunload', this.beforeUnloadHandler)
+
+        // Mettre à jour l'état initial des boutons
+        this.updateCoordinateButtons();
     }
     
     disconnect() {
@@ -308,6 +311,9 @@ class PluginInterfaceController extends Controller {
             this.updateSmartButtonAttributes();
             console.log('✅ Géocache associée et bouton intelligent configuré');
         }
+
+        // Mettre à jour la visibilité des boutons après association
+        this.updateCoordinateButtons();
     }
     
     /**
@@ -1012,6 +1018,9 @@ class PluginInterfaceController extends Controller {
         this.updateSmartButtonAttributes();
         
         console.log('Association de géocache supprimée');
+
+        // Mettre à jour la visibilité des boutons après suppression
+        this.updateCoordinateButtons();
     }
     
     // Méthode pour afficher un message d'erreur
@@ -1294,6 +1303,9 @@ class PluginInterfaceController extends Controller {
             
             outputHtml += '</div>'
             this.outputTarget.innerHTML = outputHtml
+
+            // Mettre à jour la visibilité des boutons après rendu
+            this.updateCoordinateButtons();
         })
         .catch(error => {
             console.error('Error:', error)
@@ -1422,6 +1434,9 @@ class PluginInterfaceController extends Controller {
         
         resultsHtml += '</div>'
         this.outputTarget.innerHTML = resultsHtml
+
+        // Mettre à jour la visibilité des boutons après rendu
+        this.updateCoordinateButtons();
     }
 
     // Méthode pour créer un waypoint à partir des coordonnées détectées
@@ -1571,6 +1586,27 @@ class PluginInterfaceController extends Controller {
             }
         }
         return false;
+    }
+
+    /**
+     * Met à jour la visibilité des boutons liés aux géocaches (add-waypoint, create-waypoint, show-on-map)
+     * en fonction de l'état d'association d'une géocache.
+     */
+    updateCoordinateButtons() {
+        const hasAssociatedGeocache = this.associatedGeocache && this.associatedGeocache.code;
+        // Boutons présents dans la sortie des résultats
+        const container = this.hasOutputTarget ? this.outputTarget : this.element;
+        if (!container) return;
+
+        ['add-waypoint', 'create-waypoint', 'show-on-map'].forEach(cls => {
+            container.querySelectorAll(`.${cls}`).forEach(btn => {
+                if (hasAssociatedGeocache) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            });
+        });
     }
 }
 

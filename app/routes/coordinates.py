@@ -1206,6 +1206,8 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
         _detect_nord_est_variations,  # Format NORD/EST avec variations
         _detect_nord_est_format,      # Format NORD/EST avec chiffres séparés
         _detect_flexible_coordinates,   # Approche ultra-flexible
+        _detect_dmm_no_degree_symbol,  # Format DMM sans symbole de degré
+        _detect_dmm_no_symbol_no_dot,   # Format DMM sans ° ni . (avec espaces)
         _detect_simplified_coordinates,  # Approche simplifiée pour l'exemple exact
         _detect_specific_tabpoint_coordinates, # Format très spécifique pour l'exemple
         _detect_dmm_coordinates,      # Format DMM standard
@@ -1385,3 +1387,105 @@ def _detect_word_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
     except Exception:
         traceback.print_exc()
         return None
+
+# ------------------------------------------------------------------------------
+# Détection du format DMM sans symbole de degré (ex : "N 38 32.460 W 075 43.659")
+# ------------------------------------------------------------------------------
+
+def _detect_dmm_no_degree_symbol(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées DDM où le symbole ° est absent, par exemple :
+      - "N 38 32.460 W 075 43.659"
+      - "N38 32.460 W075 43.659"
+    Le séparateur entre degrés et minutes est simplement un ou plusieurs espaces.
+    """
+    print(f"[DEBUG] _detect_dmm_no_degree_symbol: Analyse du texte: '{text[:100]}...' (tronqué)")
+
+    # Regex tolérante aux espaces optionnels après la direction et au formatage varié.
+    # Latitude : N/S, 1-2 chiffres degrés, espace(s), minutes avec/sans décimales
+    # Longitude : E/W, 1-3 chiffres degrés, espace(s), minutes avec/sans décimales
+    dmm_nodg_regex = (
+        r'([NS])\s*(\d{1,2})\s+(\d{1,2}(?:[.,]\d+)?)\s*'  # Latitude
+        r'([EW])\s*(\d{1,3})\s+(\d{1,2}(?:[.,]\d+)?)'       # Longitude
+    )
+
+    print(f"[DEBUG] _detect_dmm_no_degree_symbol: Regex utilisée: {dmm_nodg_regex}")
+    match = re.search(dmm_nodg_regex, text)
+    if match:
+        print(f"[DEBUG] _detect_dmm_no_degree_symbol: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_deg, lat_min, lon_dir, lon_deg, lon_min = match.groups()
+
+        # Remplacer la virgule éventuelle par un point pour les décimales
+        lat_min = lat_min.replace(',', '.')
+        lon_min = lon_min.replace(',', '.')
+
+        # S'assurer que les valeurs minutes ont bien 3 décimales (format géocaching)
+        def _format_minutes(min_val_str: str) -> str:
+            if '.' in min_val_str:
+                whole, dec = min_val_str.split('.')
+                return f"{whole.zfill(2)}.{dec.ljust(3, '0')[:3]}"
+            else:
+                # Pas de décimales – on complète
+                return f"{min_val_str.zfill(2)}.000"
+
+        lat_min_fmt = _format_minutes(lat_min)
+        lon_min_fmt = _format_minutes(lon_min)
+
+        ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}'"
+        ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}'"
+
+        print(f"[DEBUG] _detect_dmm_no_degree_symbol: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+
+    print("[DEBUG] _detect_dmm_no_degree_symbol: Aucun match trouvé")
+    return None
+
+# ----------------------------------------------------------------------------
+# Détection du format DMM sans ° ni . (ex : "N 38 32 460 W 075 43 659")
+# ----------------------------------------------------------------------------
+
+def _detect_dmm_no_symbol_no_dot(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées DDM sans symbole ° ni point décimal :
+      - "N 38 32 460 W 075 43 659"
+    Séquence attendue :
+      N/S  deg  min  dec   E/W  deg   min  dec
+    avec espaces comme séparateurs.
+    """
+    print(f"[DEBUG] _detect_dmm_no_symbol_no_dot: Analyse du texte: '{text[:100]}...' (tronqué)")
+
+    pattern = (
+        r'([NS])\s*(\d{1,2})\s+(\d{1,2})\s+(\d{1,3})\s*'  # Latitude
+        r'([EW])\s*(\d{1,3})\s+(\d{1,2})\s+(\d{1,3})'      # Longitude
+    )
+
+    print(f"[DEBUG] _detect_dmm_no_symbol_no_dot: Regex utilisée: {pattern}")
+    match = re.search(pattern, text)
+    if match:
+        print(f"[DEBUG] _detect_dmm_no_symbol_no_dot: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_deg, lat_min, lat_dec, lon_dir, lon_deg, lon_min, lon_dec = match.groups()
+
+        # Mise en forme des composantes minutes + décimales
+        lat_min_fmt = lat_min.zfill(2)
+        lon_min_fmt = lon_min.zfill(2)
+        lat_dec_fmt = lat_dec.ljust(3, '0')[:3]
+        lon_dec_fmt = lon_dec.ljust(3, '0')[:3]
+
+        ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}.{lat_dec_fmt}'"
+        ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}.{lon_dec_fmt}'"
+
+        print(f"[DEBUG] _detect_dmm_no_symbol_no_dot: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+
+    print("[DEBUG] _detect_dmm_no_symbol_no_dot: Aucun match trouvé")
+    return None

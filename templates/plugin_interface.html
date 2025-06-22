@@ -1068,6 +1068,19 @@
     
     // Gestion des événements pour les boutons de coordonnées après le chargement des résultats
     function setupCoordinateButtons() {
+        // Déterminer si une géocache est associée (via variable globale partagée par l'interface)
+        const hasGeocache = window.lastAssociatedGeocache && window.lastAssociatedGeocache.code;
+        // Cacher ou montrer les boutons selon le cas
+        ['add-waypoint', 'create-waypoint', 'show-on-map'].forEach(cls => {
+            document.querySelectorAll(`.${cls}`).forEach(btn => {
+                if (hasGeocache) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            });
+        });
+        
         // Gestion des boutons de copie de coordonnées
         document.querySelectorAll('.copy-coords').forEach(button => {
             if (button.dataset.eventSetup) return; // Éviter la duplication des événements
@@ -2451,6 +2464,12 @@
         if (pluginName) {
             sessionStorage.removeItem(`plugin_${pluginName}_geocache`);
         }
+        
+        // Réinitialiser la variable globale
+        window.lastAssociatedGeocache = null;
+ 
+        // Mettre à jour la visibilité des boutons après suppression
+        setupCoordinateButtons();
     }
     
     function addAsWaypoint(event, element) {
@@ -2995,6 +3014,9 @@
         // Attachement global pour débogage
         window.lastAssociatedGeocache = geocache;
         console.log("Géocache associée et stockée dans window.lastAssociatedGeocache:", geocache);
+        
+        // Mettre à jour la visibilité des boutons (Copier / WP / etc.)
+        setupCoordinateButtons();
     }
     
     // Sauvegarder l'association dans sessionStorage

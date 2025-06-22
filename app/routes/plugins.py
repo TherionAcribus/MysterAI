@@ -3,6 +3,8 @@ from app.models.plugin_model import Plugin
 import json
 import os
 from app.services.scoring_service import get_scoring_service
+# Ajout pour la détection automatique de coordonnées GPS
+from app.routes.coordinates import detect_gps_coordinates
 
 plugins_bp = Blueprint('plugins', __name__)
 
@@ -261,6 +263,64 @@ def execute_plugin(plugin_name):
         
         try:
             result = plugin_manager.execute_plugin(plugin_name, converted_inputs)
+            
+            # ------------------------------------------------------------------
+            # Détection automatique de coordonnées GPS dans les résultats
+            # ------------------------------------------------------------------
+
+            def _add_coords_to_text(text: str):
+                """Retourne un dict de coordonnées détectées dans le texte (ou None)."""
+                if not text or not isinstance(text, str):
+                    return None
+                try:
+                    coords = detect_gps_coordinates(text, include_numeric_only=True)
+                    return coords if coords else None
+                except Exception as exc:
+                    # En cas d'erreur, on ne bloque pas l'exécution
+                    current_app.logger.error(f"Erreur détection GPS: {exc}")
+                    return None
+
+            def _ensure_coordinates(obj):
+                """Ajoute les coordonnées à un résultat de plugin si manquantes."""
+                if not isinstance(obj, dict):
+                    return obj
+
+                # Nouveau format standardisé avec liste de résultats
+                if 'results' in obj and isinstance(obj['results'], list):
+                    for res in obj['results']:
+                        if not res.get('coordinates') or not res.get('coordinates', {}).get('exist'):
+                            coords = _add_coords_to_text(res.get('text_output') or res.get('output'))
+                            if coords:
+                                res['coordinates'] = coords
+
+                    # Définir un champ racine "coordinates" basé sur le meilleur résultat si présent
+                    if 'summary' in obj and obj['summary'].get('best_result_id'):
+                        best_id = obj['summary']['best_result_id']
+                        best = next((r for r in obj['results'] if r.get('id') == best_id), None)
+                    else:
+                        best = obj['results'][0] if obj['results'] else None
+
+                    if best and best.get('coordinates'):
+                        obj['coordinates'] = best['coordinates']
+
+                # Ancien format plat
+                else:
+                    if not obj.get('coordinates') or not obj.get('coordinates', {}).get('exist'):
+                        # Chercher un champ texte plausible
+                        text_candidate = obj.get('text_output') or obj.get('output')
+                        if not text_candidate and 'result' in obj and isinstance(obj['result'], dict):
+                            nested = obj['result']
+                            text_candidate = nested.get('text_output') or nested.get('output')
+                            if not text_candidate and 'text' in nested and isinstance(nested['text'], dict):
+                                text_candidate = nested['text'].get('text_output')
+
+                        coords = _add_coords_to_text(text_candidate)
+                        if coords:
+                            obj['coordinates'] = coords
+                return obj
+
+            # Appliquer l'enrichissement
+            result = _ensure_coordinates(result)
             
             # Vérifier si le client a demandé du JSON 
             accept_header = request.headers.get('Accept', '')
