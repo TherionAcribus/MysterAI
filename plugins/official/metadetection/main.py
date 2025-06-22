@@ -28,6 +28,7 @@ class MetaDetectionPlugin:
                 - embedded: True si le texte peut contenir du code intégré, False si tout le texte doit être du code
                 - plugin_name: Nom du plugin à utiliser (optionnel)
                 - enable_gps_detection: True pour activer la détection des coordonnées GPS (optionnel)
+                - enable_bruteforce: True pour activer la force brute (optionnel)
                 
         Returns:
             Dictionnaire contenant le résultat de l'opération au format standardisé
@@ -51,6 +52,9 @@ class MetaDetectionPlugin:
         
         # Récupération du paramètre de détection GPS
         enable_gps_detection = inputs.get("enable_gps_detection", True)
+        
+        # Récupération du paramètre de force brute
+        enable_bruteforce = inputs.get("enable_bruteforce", True)
         
         if not text:
             return {
@@ -126,7 +130,8 @@ class MetaDetectionPlugin:
                     "mode": mode,
                     "text": text,
                     "strict": "strict" if strict else "smooth",
-                    "embedded": embedded
+                    "embedded": embedded,
+                    "enable_bruteforce": enable_bruteforce
                 },
                 "results": standardized_results,
                 "combined_results": combined_results,
@@ -139,7 +144,7 @@ class MetaDetectionPlugin:
             
         elif mode == "decode":
             # Récupérer les résultats de décodage (format standardisé uniquement)
-            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key)
+            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key, enable_bruteforce)
             
             # Mesure du temps d'exécution
             execution_time = int((time.time() - start_time) * 1000)
@@ -173,7 +178,8 @@ class MetaDetectionPlugin:
                     "text": text,
                     "strict": strict_param,
                     "embedded": embedded,
-                    "plugin_name": plugin_name
+                    "plugin_name": plugin_name,
+                    "enable_bruteforce": enable_bruteforce
                 },
                 "results": decode_results["results"],
                 "combined_results": decode_results["combined_results"],
@@ -285,7 +291,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -368,7 +374,10 @@ class MetaDetectionPlugin:
                     "strict": strict,
                     "mode": "decode",
                     "embedded": embedded,
-                    "enable_gps_detection": True
+                    "enable_gps_detection": True,
+                    "enable_bruteforce": brute_force,
+                    "bruteforce": brute_force,
+                    "brute_force": brute_force
                 }
                 if key:
                     inputs["key"] = key
@@ -419,7 +428,10 @@ class MetaDetectionPlugin:
                         "strict": strict,
                         "mode": "decode",
                         "embedded": embedded,
-                        "enable_gps_detection": True
+                        "enable_gps_detection": True,
+                        "enable_bruteforce": brute_force,
+                        "bruteforce": brute_force,
+                        "brute_force": brute_force
                     }
                     if key:
                         inputs["key"] = key

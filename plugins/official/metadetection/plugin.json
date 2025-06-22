@@ -29,6 +29,11 @@
             "type": "boolean",
             "label": "Détecter les coordonnées GPS",
             "default": true
+        },
+        "enable_bruteforce": {
+            "type": "boolean",
+            "label": "Mode Bruteforce",
+            "default": true
         }
     },
     "output_types": {
