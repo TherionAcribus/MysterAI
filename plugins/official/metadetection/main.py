@@ -336,7 +336,9 @@ class MetaDetectionPlugin:
             "morse_code",
             "alpha_decoder",
             "checksum_code",
-            "base_converter"
+            "base_converter",
+            "rail_fence_cipher",
+            "ubch_cipher"
         ]
         
         # Structure du résultat standardisé
