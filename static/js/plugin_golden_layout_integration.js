@@ -100,6 +100,34 @@ function updateRootElementWithContainerId(container) {
     }
 }
 
+// Fonction utilitaire : exécute à nouveau les balises <script> insérées dynamiquement
+function executeInlineScripts(root) {
+    if (!root) return;
+    // Sélectionner toutes les balises <script> à l'intérieur de l'élément racine
+    root.querySelectorAll('script').forEach(originalScript => {
+        // Ignorer si le script est déjà marqué comme exécuté
+        if (originalScript.dataset.executed) return;
+
+        const newScript = document.createElement('script');
+        // Copier le type, sinon il sera considéré comme du JS classique
+        if (originalScript.type) newScript.type = originalScript.type;
+
+        // Si le script possède un src, il suffit de fixer l'attribut src
+        if (originalScript.src) {
+            newScript.src = originalScript.src;
+        } else {
+            // Sinon, recopier le contenu inline
+            newScript.textContent = originalScript.textContent;
+        }
+
+        // Marquer l'ancien script pour éviter une double exécution éventuelle
+        originalScript.dataset.executed = "true";
+
+        // Remplacer l'ancien script par le nouveau pour déclencher l'exécution
+        originalScript.parentNode.replaceChild(newScript, originalScript);
+    });
+}
+
 // Enregistrer le composant plugin-interface dans GoldenLayout
 function registerPluginInterfaceComponent(layout) {
     if (!layout) {
@@ -134,6 +162,10 @@ function registerPluginInterfaceComponent(layout) {
             .then(html => {
                 // Insérer le HTML
                 container.getElement().innerHTML = html;
+                
+                // 👉  NOUVEAU : exécuter immédiatement les scripts inline afin que les gestionnaires
+                // et autres initialisations déclarés dans le template du plugin soient actifs
+                executeInlineScripts(container.getElement());
                 
                 // Ajouter un attribut pour identifier facilement ce conteneur
                 updateRootElementWithContainerId(container);

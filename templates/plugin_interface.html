@@ -243,7 +243,11 @@
 
     // Mémorise les coordonnées d'origine de la géocache associée afin
     // d'éviter de multiples requêtes au backend
-    let cachedOriginalCoords = null;
+    // Pour éviter les erreurs "Identifier has already been declared" lorsque plusieurs onglets
+    // injectent ce script, on ne déclare la variable qu'une seule fois.
+    if (typeof cachedOriginalCoords === 'undefined') {
+        var cachedOriginalCoords = null;
+    }
 
     // Script optimisé pour exécuter les plugins dans GoldenLayout
     (function() {
@@ -2459,7 +2463,9 @@
 <script>
     // Fonctions pour interagir directement avec les éléments
     // Compteur pour les logs
-    let pluginInterfaceCount = 0;
+    if (typeof pluginInterfaceCount === 'undefined') {
+        var pluginInterfaceCount = 0;
+    }
     
     function loadOpenGeocaches(element) {
         console.log("Chargement des géocaches ouvertes depuis le bouton");
