@@ -35,9 +35,9 @@ class ScoringService:
     # Constantes pour les seuils et configurations
     MIN_TEXT_LENGTH = 20
     NON_ALPHA_THRESHOLD = 0.4
-    COORD_BONUS_VALUE = 0.3
-    LEXICAL_WEIGHT = 0.7
-    GPS_WEIGHT = 0.3
+    COORD_BONUS_VALUE = 0.3  # Deprecated
+    LEXICAL_WEIGHT = 0.7     # Deprecated
+    GPS_WEIGHT = 0.3         # Deprecated
     ZIPF_NORMALIZATION = 7.0
     ZIPF_MIN_VALUE = 0.5  # Valeur minimum pour les mots absents du dictionnaire Zipf
     GEOCACHING_TERM_BONUS = 1.5  # Bonus pour les termes de géocaching (multiplicateur de Zipf)
@@ -185,18 +185,19 @@ class ScoringService:
             logger.debug(f"Texte très court ({len(text)} caractères), vérification directe des coordonnées")
             
             # Vérifier directement si c'est une coordonnée GPS
-            coord_bonus, coordinates = self._check_gps_coordinates(text)
+            gps_score, coordinates = self._check_gps_coordinates(text)
             
             if coordinates["exist"]:
-                # Si des coordonnées sont détectées, retourner un score élevé
+                # Si des coordonnées sont détectées, retourner directement le score GPS
                 result = {
-                    "score": self.COORD_BONUS_VALUE,
-                    "confidence_level": "high" if self.COORD_BONUS_VALUE >= self.CONFIDENCE_THRESHOLD_HIGH else "medium",
+                    "score": gps_score,
+                    "confidence_level": "high" if gps_score >= self.CONFIDENCE_THRESHOLD_HIGH else ("medium" if gps_score >= self.CONFIDENCE_THRESHOLD_MEDIUM else "low"),
                     "candidates": [{
                         "text": text,
-                        "score": self.COORD_BONUS_VALUE,
+                        "score": gps_score,
                         "lexical_score": 0.0,
-                        "gps_bonus": self.COORD_BONUS_VALUE,
+                        "gps_score": gps_score,
+                        "gps_bonus": gps_score,  # champ historique conservé pour compatibilité
                         "language": "unknown",
                         "words_found": [],
                         "coordinates": coordinates,
@@ -271,10 +272,18 @@ class ScoringService:
                 word_freqs[word] = wordfreq.zipf_frequency(word, lang)
             
             # 3.3 Vérifier la présence de coordonnées GPS
-            coord_bonus, coordinates = self._check_gps_coordinates(candidate_text)
+            gps_score, coordinates = self._check_gps_coordinates(candidate_text)
             
-            # 3.4 Calculer le score global
-            final_score = (self.LEXICAL_WEIGHT * lexical_score) + (self.GPS_WEIGHT * coord_bonus)
+            # 3.4 Nouveau calcul du score :
+            #   – Si une coordonnée GPS valide a été trouvée, le score final est
+            #     le score de confiance retourné (gps_score).
+            #   – Sinon, on utilise le score lexical.
+            #   – Cela garantit qu'une coordonnée correctement formée domine
+            #     toujours l'évaluation.
+            if gps_score > 0:
+                final_score = gps_score
+            else:
+                final_score = lexical_score
             
             # Calculer les statistiques Zipf
             zipf_values = list(word_freqs.values())
@@ -290,7 +299,8 @@ class ScoringService:
                 "text": candidate_text,
                 "score": final_score,
                 "lexical_score": lexical_score,
-                "gps_bonus": coord_bonus,
+                "gps_score": gps_score,
+                "gps_bonus": gps_score,  # compatibilité
                 "language": lang,
                 "words_found": found_words[:10],  # Limiter à 10 mots pour la clarté
                 "coordinates": coordinates,
@@ -685,7 +695,7 @@ class ScoringService:
         Returns:
             Un tuple contenant le bonus de coordonnées et les détails des coordonnées trouvées
         """
-        # Structure pour les coordonnées
+        # Structure pour les coordonnées retournées
         coordinates = {
             "exist": False,
             "ddm_lat": None,
@@ -694,79 +704,28 @@ class ScoringService:
             "decimal": {"latitude": None, "longitude": None},
             "patterns": []
         }
-        
-        # Essayer d'abord avec la fonction de détection complète
+
         try:
             # Import dynamique pour éviter la dépendance circulaire
             from app.routes.coordinates import detect_gps_coordinates
-            
+
             result = detect_gps_coordinates(text, include_numeric_only=True)
+
             if result.get("exist", False):
-                logger.debug(f"Coordonnées GPS détectées via fonction: {result.get('ddm')}")
-                
                 # Mettre à jour la structure de coordonnées
-                coordinates["exist"] = True
-                coordinates["ddm_lat"] = result.get("ddm_lat")
-                coordinates["ddm_lon"] = result.get("ddm_lon")
-                coordinates["ddm"] = result.get("ddm")
-                if "patterns" not in coordinates:
-                    coordinates["patterns"] = []
-                coordinates["patterns"].append(result.get("ddm", "Format détecté par fonction"))
-                
-                return self.COORD_BONUS_VALUE, coordinates
+                coordinates.update(result)
+
+                confidence = float(result.get("confidence", 0.9))
+
+                # Vérifier rapidement quelques faux positifs connus (N E N E)
+                if re.search(r"\bN\s*E\s*N\s*E\b", text, re.IGNORECASE):
+                    confidence = min(confidence, 0.2)
+
+                return confidence, coordinates
         except Exception as e:
             logger.warning(f"Erreur lors de la détection de coordonnées: {e}")
-        
-        # Si la fonction de détection échoue, utiliser l'approche par expressions régulières
-        # Expression régulière améliorée pour les coordonnées GPS
-        # Cette version est plus tolérante aux variations de format
-        gps_patterns = [
-            # Format standard N/S XX° YY.ZZZ E/W XX° YY.ZZZ
-            r'([NS])\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*([EW])\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
-            
-            # Format avec points cardinaux en texte
-            r'(nord|nord|north|south|sud)\s*(\d{1,2})[°\s](\d{1,2}\.\d+)\s*(est|ouest|east|west)\s*(\d{1,3})[°\s](\d{1,2}\.\d+)',
-            
-            # Format sans espaces
-            r'([NS])(\d{1,2})[°](\d{1,2}\.\d+)([EW])(\d{1,3})[°](\d{1,2}\.\d+)',
-            
-            # Format décimal
-            r'([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)',
-            
-            # Format compact (N4812123E00612123)
-            r'([NS])\s*(\d{7})\s*([EW])\s*(\d{6,8})'
-        ]
-        
-        # Rechercher les différents formats de coordonnées
-        found_coords = False
-        
-        for pattern in gps_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                found_coords = True
-                for match in matches:
-                    # Ajouter le motif complet à la liste des motifs trouvés
-                    match_text = re.search(pattern, text, re.IGNORECASE).group(0)
-                    if match_text not in coordinates["patterns"]:
-                        coordinates["patterns"].append(match_text)
-        
-        # Vérifier si des coordonnées ont été trouvées
-        if found_coords:
-            # Vérifier les faux positifs (séquence N E N E)
-            nene_patterns = ['N E N E', 'n e n e', 'NORD EST NORD EST', 'nord est nord est']
-            for nene in nene_patterns:
-                if nene in text.upper():
-                    # Réduire le bonus pour ces cas suspects
-                    return 0.1, coordinates
-            
-            # Mise à jour du statut des coordonnées
-            coordinates["exist"] = True
-            
-            # TODO: Implémenter l'extraction et la validation complète des coordonnées
-            # Pour le moment, simplement signaler leur présence
-            
-            return self.COORD_BONUS_VALUE, coordinates
-        
+
+        # Aucun résultat fiable
         return 0.0, coordinates
 
 

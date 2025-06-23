@@ -430,27 +430,44 @@ class PluginManager:
         enable_scoring = inputs.get("enable_scoring", True)
         print(f"[DEBUG] execute_plugin: Scoring automatique activé: {enable_scoring}")
         
-        if enable_scoring and decoded_text:
-            print(f"[DEBUG] execute_plugin: Lancement du scoring sur le texte décodé")
-            # Obtenir le service de scoring et effectuer l'évaluation
+        if enable_scoring:
+            # Applique le scoring universel sur toutes les entrées de résultats quelle que soit la structure
+            print(f"[DEBUG] execute_plugin: Application du scoring universel à tous les résultats")
             scoring_service = get_scoring_service()
-            
-            # Récupérer le contexte (coordonnées de la géocache originale) si présent
             context = inputs.get("context", {})
-            
-            # Effectuer le scoring
-            scoring_result = scoring_service.score_text(decoded_text, context)
-            print(f"[DEBUG] execute_plugin: Résultat du scoring: {scoring_result}")
-            
-            # Ajouter les métadonnées de scoring au résultat
-            result["scoring"] = scoring_result
-            
-            # Si le texte appartenait à un résultat décodé particulier, ajouter le score à ce résultat également
-            if "result" in result and "decoded_results" in result["result"] and isinstance(result["result"]["decoded_results"], list):
-                for decoded_result in result["result"]["decoded_results"]:
-                    if decoded_result.get("decoded_text") == decoded_text:
-                        decoded_result["scoring"] = scoring_result
-                        break
+
+            def _apply_universal_scoring(node):
+                """Parcourt récursivement les dict/list pour ajouter/mettre à jour le scoring."""
+                if isinstance(node, dict):
+                    # Cas d'un résultat standardisé (clé text_output)
+                    if "text_output" in node and isinstance(node["text_output"], str):
+                        text_to_score = node["text_output"]
+                        try:
+                            scr = scoring_service.score_text(text_to_score, context)
+                            node["scoring"] = scr
+                            # Mise à jour de la confiance si elle est inférieure au scoring
+                            if scr and scr.get("score") is not None:
+                                if "confidence" not in node or scr["score"] > node.get("confidence", 0):
+                                    node["confidence"] = scr["score"]
+                        except Exception as e:
+                            logger.warning(f"Scoring failed on text segment: {e}")
+
+                    # Récursion sur les valeurs
+                    for k, v in node.items():
+                        _apply_universal_scoring(v)
+                elif isinstance(node, list):
+                    for item in node:
+                        _apply_universal_scoring(item)
+
+            _apply_universal_scoring(result)
+
+            # Si le format standardisé possède une section summary, recalcule le meilleur résultat
+            try:
+                if isinstance(result.get("results"), list):
+                    best = max(result["results"], key=lambda x: x.get("confidence", 0))
+                    result.setdefault("summary", {})["best_result_id"] = best.get("id")
+            except Exception as e:
+                logger.debug(f"Unable to recompute best_result_id: {e}")
 
         # Convertir toutes les coordonnées DDM en décimal avant de retourner le résultat
         result = self._convert_all_coordinates(result)

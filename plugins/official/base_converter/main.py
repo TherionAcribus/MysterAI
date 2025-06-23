@@ -2,6 +2,13 @@ import re
 import time
 import base64
 
+# Détection GPS avancée (partagée avec MysteryAI)
+try:
+    # Import dynamique pour éviter l'échec si le module n'est pas disponible hors API
+    from app.routes.coordinates import detect_gps_coordinates  # type: ignore
+except Exception:
+    detect_gps_coordinates = None  # Fallback si indisponible
+
 class BaseConverterPlugin:
     """
     Plugin pour convertir des nombres entre différentes bases numériques et ASCII.
@@ -342,29 +349,39 @@ class BaseConverterPlugin:
         word_matches = re.findall(r'[a-zA-Z]{3,}', converted_value)
         word_like_patterns = len(word_matches)
         
-        # Vérifier la présence de coordonnées GPS
-        has_gps = False
-        gps_patterns = [
-            r'[NS]\s*\d{1,2}°\s*\d{1,2}\.\d{3}',  # N 49° 36.070
-            r'[EW]\s*\d{1,3}°\s*\d{1,2}\.\d{3}'   # E 005° 21.059
-        ]
-        
-        for pattern in gps_patterns:
-            if re.search(pattern, converted_value):
-                has_gps = True
-                break
-                
-        # Calcul du score final
+        # Détection GPS améliorée
+        gps_confidence = 0.0
+        if detect_gps_coordinates is not None:
+            try:
+                gps_result = detect_gps_coordinates(converted_value, include_numeric_only=True)
+                if gps_result.get("exist", False):
+                    gps_confidence = float(gps_result.get("confidence", 0.9))
+            except Exception:
+                # Si la détection échoue, on ignore simplement
+                gps_confidence = 0.0
+        else:
+            # Fallback simple : anciens patterns basiques
+            simple_gps_patterns = [
+                r'[NS]\s*\d{1,2}[° ]\s*\d{1,2}\.\d+',
+                r'[EW]\s*\d{1,3}[° ]\s*\d{1,2}\.\d+'
+            ]
+            for pattern in simple_gps_patterns:
+                if re.search(pattern, converted_value):
+                    gps_confidence = 0.6  # confiance modérée
+                    break
+
+        # Si nous avons détecté une coordonnée GPS fiable, prioriser ce score
+        if gps_confidence > 0:
+            # Assurer une valeur minimale raisonnable (évite 0.5 vs 0.9 incohérences)
+            return max(0.8, gps_confidence)
+
+        # Sinon, on retombe sur l'approche classique
         # Base: proportion de caractères imprimables
-        score = printable_ratio * 0.5
+        score = printable_ratio * 0.6  # légerement plus de poids au caractère lisible
         
         # Bonus pour les mots détectés
-        score += min(0.3, word_like_patterns * 0.05)
+        score += min(0.4, word_like_patterns * 0.05)
         
-        # Bonus pour les coordonnées GPS
-        if has_gps:
-            score += 0.2
-            
         return min(1.0, score)
         
     def bruteforce_convert(self, input_value: str, strict_mode: bool, embedded: bool) -> list:

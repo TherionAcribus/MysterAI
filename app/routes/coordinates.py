@@ -1198,36 +1198,49 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
     print(f"[DEBUG] detect_gps_coordinates: Extrait du texte: '{text[:100]}...' (tronqué)")
     print(f"[DEBUG] detect_gps_coordinates: include_numeric_only={include_numeric_only}, origin_coords={origin_coords}")
     
-    detection_functions = [
-        _detect_word_coordinates,       # Coordonnées exprimées en toutes lettres (plugin)
-        _detect_compact_coordinates,  # Format compact sans séparateurs (ajouté en premier car très spécifique)
-        _detect_roman_numerals_coordinates,  # Format avec chiffres romains
-        _detect_dms_coordinates,      # Format DMS (degrés, minutes, secondes)
-        _detect_nord_est_variations,  # Format NORD/EST avec variations
-        _detect_nord_est_format,      # Format NORD/EST avec chiffres séparés
-        _detect_flexible_coordinates,   # Approche ultra-flexible
-        _detect_dmm_no_degree_symbol,  # Format DMM sans symbole de degré
-        _detect_dmm_no_symbol_no_dot,   # Format DMM sans ° ni . (avec espaces)
-        _detect_simplified_coordinates,  # Approche simplifiée pour l'exemple exact
-        _detect_specific_tabpoint_coordinates, # Format très spécifique pour l'exemple
-        _detect_dmm_coordinates,      # Format DMM standard
-        _detect_tabspace_coordinates, # Format avec tabulations et espaces
-        _detect_variant_coordinates,  # Format variant
-    ]
+    # ------------------------------------------------------------------
+    # Carte <fonction de détection> -> score de confiance (0-1)
+    # Plus la valeur est élevée, plus le format est considéré fiable.
+    # Ces valeurs peuvent être ajustées facilement pour faire évoluer la
+    # pondération sans toucher au reste du code.
+    # ------------------------------------------------------------------
+    confidence_map = {
+        _detect_word_coordinates:            1.00,
+        _detect_compact_coordinates:         0.95,
+        _detect_dmm_coordinates:             0.95,
+        _detect_dms_coordinates:             0.92,
+        _detect_roman_numerals_coordinates:  0.90,
+        _detect_tabspace_coordinates:        0.90,
+        _detect_dmm_no_degree_symbol:        0.90,
+        _detect_nord_est_variations:         0.88,
+        _detect_nord_est_format:             0.85,
+        _detect_dmm_no_symbol_no_dot:        0.85,
+        _detect_specific_tabpoint_coordinates:0.82,
+        _detect_simplified_coordinates:      0.80,
+        _detect_flexible_coordinates:        0.75,
+        _detect_variant_coordinates:         0.70,
+    }
+
+    detection_functions = list(confidence_map.keys())
     
-    # Ajouter la détection de coordonnées numériques pures si demandé
     if include_numeric_only:
         print(f"[DEBUG] detect_gps_coordinates: Détection de coordonnées numériques pures activée")
         # Pour la détection numérique, on passe les coordonnées d'origine
         result = _detect_numeric_only_coordinates(text, origin_coords)
         if result and result.get("exist"):
             print(f"[DEBUG] detect_gps_coordinates: Coordonnées numériques pures trouvées: {result}")
+            # Attribuer une confiance légèrement inférieure au format compact complet
+            result["source"] = _detect_numeric_only_coordinates.__name__
+            result["confidence"] = 0.90
             return result
     
     for i, detect_func in enumerate(detection_functions):
         print(f"[DEBUG] detect_gps_coordinates: Essai de la fonction de détection #{i+1}: {detect_func.__name__}")
         result = detect_func(text)
         if result and result.get("exist"):
+            # Injecter la provenance et la confiance dans le résultat avant de le renvoyer
+            result["source"] = detect_func.__name__
+            result["confidence"] = confidence_map.get(detect_func, 0.75)
             print(f"[DEBUG] detect_gps_coordinates: Coordonnées trouvées par {detect_func.__name__}: {result}")
             return result
     
@@ -1236,7 +1249,9 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
         "exist": False,
         "ddm_lat": None,
         "ddm_lon": None,
-        "ddm": None
+        "ddm": None,
+        "source": None,
+        "confidence": 0.0
     }
 
 # ------------------------------------------------------------------------------

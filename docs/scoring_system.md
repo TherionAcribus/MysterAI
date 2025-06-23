@@ -9,7 +9,7 @@ Ce document décrit le système d'évaluation de confiance implémenté pour les
 - [1. Pré-filtrage ultra-léger](#1-pré-filtrage-ultra-léger)
 - [2. Normalisation "géocaching"](#2-normalisation-géocaching)
 - [3. Segmentation de texte](#3-segmentation-de-texte)
-- [4. Bonus "GPS"](#4-bonus-gps)
+- [4. Détection & confiance « GPS »](#4-détection--confiance-gps)
 - [5. Score lexical](#5-score-lexical)
 - [6. Score global](#6-score-global)
 - [7. Architecture pratique](#7-architecture-pratique)
@@ -73,20 +73,25 @@ Lorsque les espaces sont absents, une segmentation est nécessaire pour identifi
 
 > **Astuce** : Utiliser fastText (lid.176.ftz, 917 kB) avant de segmenter pour déterminer la langue probable et charger le dictionnaire approprié.
 
-## 4. Bonus "GPS"
+## 4. Détection & confiance « GPS »
 
-Plusieurs expressions régulières dédiées identifient les formats de coordonnées GPS courants :
+La détection des coordonnées GPS est désormais centrale :
 
-- Format standard : `N 48° 51.234 E 2° 21.567`
-- Format avec points cardinaux en texte : `nord 48° 51.234 est 2° 21.567`
-- Format sans espaces : `N48°51.234E2°21.567`
-- Format décimal : `48.123, 2.456`
+1. Le service `detect_gps_coordinates` renvoie :
+   * `exist` (bool) : coordonnée détectée ou non.  
+   * `confidence` (float ∈ [0-1]) : fiabilité du format reconnu (ex. DDM complet → 0,95 ; pattern flexible → 0,75).  
+   * `source` : nom du détecteur qui a fait mouche.
 
-Toutes ces variantes sont détectées par un ensemble d'expressions régulières spécifiques.
+2. Si `exist==True` → le score final du texte = `confidence`.  
+   **Aucune autre composante n'est prise en compte.**  
+   L'idée : une coordonnée valide vaut à elle seule quasi-certitude.
 
-- Si correspondance trouvée → `coord_bonus = 0,3` (sur une échelle de 0 à 1)
+3. Si aucune coordonnée n'est détectée → on tombe sur la partie lexicale (sections 5-6).
 
-> **⚠️ Attention** : Les faux positifs de type « N E N E » ou « nord est nord est » sont détectés par une liste de motifs et reçoivent un bonus réduit (0.1).
+> Les anciens bonus fixes (0,3) et la pondération 70 / 30 sont obsolètes.
+
+### Anti faux-positifs
+Certaines séquences ambiguës (ex. « N E N E ») abaissent la `confidence` à ≤ 0,2.
 
 ## 5. Score lexical
 
@@ -153,19 +158,20 @@ Mots à exclure avant le scoring pour éviter les faux positifs liés au domaine
 
 ## 6. Score global
 
-Le score final combine le score lexical et le bonus GPS :
-
 ```
-score_global = 0,7 × score_lexical + 0,3 × coord_bonus
+si coordonnées GPS détectées :
+    score_global = confidence_GPS   # 0,0 – 1,0
+sinon :
+    score_global = score_lexical
 ```
 
-### Interprétation des scores
+### Interprétation
 
 | Score | Interprétation | Interface |
 |-------|----------------|-----------|
-| ≥ 0,65 | Décryptage certain | Badge vert |
-| 0,40–0,65 | Décryptage probable | Badge orange |
-| < 0,40 | Peu crédible | Badge gris |
+| ≥ 0,80 | Coordonnée fiable | Badge vert |
+| 0,50–0,79 | Résultat probable | Badge orange |
+| < 0,50 | Indice faible | Badge gris |
 
 ## 7. Architecture pratique
 

@@ -84,24 +84,23 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
   - Utile pour les plugins qui fonctionnent uniquement avec des caractères ASCII standards
   - Devrait être défini à `true` pour les plugins basés sur des transpositions de lettres ou qui doivent préserver l'intégralité du texte
 
-### Configuration du scoring
+### Scoring (v2)
 
-La section `scoring_method` permet de personnaliser la méthode d'évaluation de confiance pour les résultats du plugin :
+Le scoring est désormais pris en charge **de manière centrale** par le `PluginManager`.  
+Chaque résultat contenant un champ `text_output` est automatiquement évalué :
+
+1. Si des coordonnées GPS valides sont détectées → la `confidence` est fixée à la `confidence_GPS` (0-1).  
+2. Sinon, la composante lexicale est utilisée (voir `scoring_system.md`).
+
+Ainsi, la section `scoring_method` du `plugin.json` est maintenue pour rétro-compatibilité mais **ses pondérations personnalisées (`custom_weights`) sont ignorées**. Il suffit d'ajouter :
 
 ```json
-"scoring_method": {
-  "type": "lexical",
-  "custom_weights": {
-    "lexical": 0.8,
-    "gps": 0.2
-  }
-}
+"enable_scoring": true
 ```
 
-- `type`: Type d'évaluation à utiliser (généralement "lexical")
-- `custom_weights`: Pondérations personnalisées pour les différents facteurs du score
+pour que le plugin bénéficie du nouvel algorithme, sans implémentation supplémentaire côté plugin.
 
-Le paramètre global `enable_auto_scoring` (défini dans les paramètres généraux de l'application) n'active pas directement le scoring pour chaque plugin. Il détermine l'état initial de la case à cocher "Activer le scoring automatique" dans l'interface des plugins configurés avec `enable_scoring: true`.
+Le paramètre global `enable_auto_scoring` continue de définir l'état initial de la case à cocher « Activer le scoring automatique » dans l'UI des plugins qui l'exposent.
 
 ### Types d'entrées supportés
 
