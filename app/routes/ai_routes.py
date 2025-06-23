@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template, Response
 from app.services.ai_service import ai_service
 from app.models.app_config import AppConfig
+from app.services.ocr_service import get_ocr_service
 import logging
 import os
 
@@ -651,4 +652,27 @@ def get_provider_api_key(provider):
         return jsonify({
             'success': False,
             'error': str(e)
-        }), 500 
+        }), 500
+
+@ai_bp.route('/ocr/extract', methods=['POST'])
+def ocr_extract():
+    """Extrait le texte d'une image via OCR (EasyOCR puis IA facultative).
+
+    Form-data attendu :
+        - image : fichier image (obligatoire)
+        - use_ai : 'true' ou 'false' (optionnel, défaut : false)
+    """
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'error': 'Aucun fichier image fourni'}), 400
+
+    image_file = request.files['image']
+    use_ai = request.form.get('use_ai', 'false').lower() == 'true'
+
+    ocr_service = get_ocr_service()
+
+    try:
+        result = ocr_service.extract_text(image_file.read(), use_ai_fallback=use_ai)
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        logger.error(f"Erreur OCR : {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500 

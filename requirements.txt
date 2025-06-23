@@ -19,4 +19,10 @@ wordfreq==3.0.3
 pybloom-live==3.1.0
 
 # Tests
-pytest==7.3.1 
+pytest==7.3.1
+
+# Utilitaires OCR
+numpy==1.26.4
+easyocr==1.7.1
+opencv-python-headless==4.10.0.82
+torch==2.2.1 

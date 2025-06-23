@@ -3,7 +3,7 @@ const { Menu } = require('electron');
 function createImageContextMenu(mainWindow) {
     return Menu.buildFromTemplate([
         {
-            label: 'Éditer l\'image',
+            label: 'Éditer l1\'image',
             click: () => {
                 mainWindow.webContents.send('edit-image-requested');
             }

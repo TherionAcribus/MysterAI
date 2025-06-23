@@ -50,6 +50,31 @@ function initContextMenu() {
             header.textContent = `Image : "${imageName}"`;
             menu.appendChild(header);
             
+            // Option OCR rapide
+            const ocrQuickOption = document.createElement('div');
+            ocrQuickOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            ocrQuickOption.innerHTML = '<i class="fas fa-search mr-2"></i>OCR rapide';
+            ocrQuickOption.onclick = () => {
+                runOCR(targetImage, false);
+                menu.remove();
+            };
+            menu.appendChild(ocrQuickOption);
+
+            // Option OCR IA (GPT-4o)
+            const ocrAIOption = document.createElement('div');
+            ocrAIOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            ocrAIOption.innerHTML = '<i class="fas fa-robot mr-2"></i>OCR IA (GPT-4o)';
+            ocrAIOption.onclick = () => {
+                runOCR(targetImage, true);
+                menu.remove();
+            };
+            menu.appendChild(ocrAIOption);
+
+            // Séparateur
+            const separator1 = document.createElement('div');
+            separator1.className = 'border-t border-gray-700 my-1';
+            menu.appendChild(separator1);
+
             // Option d'édition
             const editOption = document.createElement('div');
             editOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
@@ -158,3 +183,52 @@ function initContextMenu() {
 
 // Exporter les fonctions
 window.initContextMenu = initContextMenu;
+
+// Ajouter la fonction OCR en bas du fichier
+function runOCR(imageElement, useAI) {
+    const imgSrc = imageElement.src;
+    fetch(imgSrc)
+        .then(resp => resp.blob())
+        .then(blob => {
+            const formData = new FormData();
+            formData.append('image', blob, 'image.png');
+            formData.append('use_ai', useAI ? 'true' : 'false');
+
+            // Afficher chargement
+            console.log('runOCR: window.OCRModal =', window.OCRModal);
+            if (window.OCRModal) { OCRModal.showLoading(); }
+
+            return fetch('/api/ai/ocr/extract', {
+                method: 'POST',
+                body: formData
+            });
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (window.OCRModal) {
+                if (data.success) {
+                    OCRModal.showResult(data.text || '', data.confidence);
+                } else {
+                    OCRModal.showResult('Erreur OCR: ' + data.error, 0);
+                }
+            } else {
+                // Fallback alert
+                if (data.success) {
+                    const conf = (data.confidence * 100).toFixed(1);
+                    alert(`Texte détecté (confiance ${conf}%):\n\n${data.text}`);
+                } else {
+                    alert('Erreur OCR: ' + data.error);
+                }
+            }
+        })
+        .catch(err => {
+            console.error('OCR error', err);
+            if (window.OCRModal) {
+                OCRModal.showResult('Erreur lors de l\'appel OCR', 0);
+            } else {
+                alert('Erreur lors de l\'appel OCR');
+            }
+        });
+}
+
+window.runOCR = runOCR;

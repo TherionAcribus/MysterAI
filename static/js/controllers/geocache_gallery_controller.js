@@ -54,7 +54,20 @@
                 // Menu contextuel avec options
                 const menuItems = [
                     {
-                        label: 'Éditer l\'image',
+                        label: 'OCR rapide',
+                        icon: 'fas fa-search',
+                        click: () => this.runOCR(targetImage, false)
+                    },
+                    {
+                        label: 'OCR IA (GPT-4o)',
+                        icon: 'fas fa-robot',
+                        click: () => this.runOCR(targetImage, true)
+                    },
+                    {
+                        type: 'separator'
+                    },
+                    {
+                        label: 'Éditer l3\'image',
                         icon: 'fas fa-edit',
                         click: () => {
                             if (window.electron) {
@@ -121,6 +134,37 @@
                 console.error('Erreur:', error);
                 alert('Erreur lors de la suppression de l\'image.');
             });
+        }
+
+        runOCR(imageElement, useAI) {
+            const imgSrc = imageElement.src;
+            // Télécharger l\'image pour l\'obtenir en blob
+            fetch(imgSrc)
+                .then(resp => resp.blob())
+                .then(blob => {
+                    const formData = new FormData();
+                    formData.append('image', blob, 'image.png');
+                    formData.append('use_ai', useAI ? 'true' : 'false');
+
+                    return fetch('/api/ai/ocr/extract', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.success) {
+                        const text = data.text || '';
+                        const conf = (data.confidence * 100).toFixed(1);
+                        alert(`Texte détecté (confiance ${conf}%):\n\n${text}`);
+                    } else {
+                        alert('Erreur OCR: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error('OCR error', err);
+                    alert('Erreur lors de l\'appel OCR');
+                });
         }
     })
 })()
