@@ -1,0 +1,59 @@
+{
+  "name": "caesar_box_cipher",
+  "version": "1.0.0",
+  "description": "Plugin de chiffrement et déchiffrement utilisant le chiffre Carré de César / Caesar Box (transposition en grille)",
+  "author": "MysterAI",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "dependencies": [],
+  "categories": ["Transposition"],
+  "brute_force": true,
+  "enable_scoring": true,
+  "accept_accents": false,
+  "scoring_method": {
+    "type": "lexical",
+    "custom_weights": {
+      "lexical": 0.8,
+      "gps": 0.2
+    }
+  },
+  "input_types": {
+    "text": {
+      "type": "string",
+      "label": "Texte à traiter",
+      "placeholder": "Entrez le texte à chiffrer ou déchiffrer..."
+    },
+    "width": {
+      "type": "number",
+      "label": "Largeur de la grille (colonnes)",
+      "min": 2,
+      "max": 100,
+      "step": 1,
+      "default": 5
+    },
+    "height": {
+      "type": "number",
+      "label": "Hauteur de la grille (lignes) (optionnel)",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "default": 0
+    },
+    "mode": {
+      "type": "select",
+      "label": "Mode",
+      "options": ["encode", "decode"],
+      "default": "decode"
+    }
+  },
+  "output_types": {
+    "text_output": {
+      "type": "string",
+      "label": "Texte transformé"
+    },
+    "bruteforce_solutions": {
+      "type": "array",
+      "label": "Solutions (bruteforce)"
+    }
+  }
+} 

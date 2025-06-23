@@ -338,7 +338,8 @@ class MetaDetectionPlugin:
             "checksum_code",
             "base_converter",
             "rail_fence_cipher",
-            "ubch_cipher"
+            "ubchi_cipher",
+            "caesar_box_cipher"
         ]
         
         # Structure du résultat standardisé
