@@ -43,6 +43,8 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
     "type": "images",           // ou "font"
     "imageFormat": "png",       // Pour type="images"
     "imageDir": "images",       // Dossier des images
+    "lowercaseSuffix": "_min",  // Suffixe optionnel pour les minuscules (par défaut "")
+    "uppercaseSuffix": "_maj",  // Suffixe optionnel pour les majuscules (par défaut "")
     "fontFile": "fonts/xx.ttf", // Pour type="font"
     "hasUpperCase": false,
     "characters": {

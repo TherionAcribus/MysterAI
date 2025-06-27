@@ -1,6 +1,6 @@
 {
-  "name": "Braille 8",
-  "description": "Braille 8",
+  "name": "Kabouter",
+  "description": "Kabouter",
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.0.0",
@@ -8,12 +8,9 @@
     "type": "images",
     "imageFormat": "png",
     "imageDir": "images",
-    "hasUpperCase": true,
-    "lowercaseSuffix": "_min",
-    "uppercaseSuffix": "_maj",
+    "hasUpperCase": false,
     "characters": {
-      "letters": "all",
-      "numbers": "all"
+      "letters": "all"
     },
     "special": {
     }

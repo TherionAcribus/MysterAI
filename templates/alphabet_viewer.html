@@ -267,7 +267,7 @@
                              data-action="click->alphabet-viewer#addSymbol"
                              data-char="{{ char }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}{{ alphabet.alphabetConfig.lowercaseSuffix|default('') }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
@@ -302,7 +302,7 @@
                              data-action="click->alphabet-viewer#addSymbol"
                              data-char="{{ char }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}{{ alphabet.alphabetConfig.uppercaseSuffix|default('') }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
@@ -337,7 +337,7 @@
                              data-action="click->alphabet-viewer#addSymbol"
                              data-char="{{ char }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
@@ -372,7 +372,7 @@
                              data-char="{{ char }}"
                              title="{{ name }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/images/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
