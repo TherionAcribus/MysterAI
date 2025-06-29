@@ -35,11 +35,59 @@ function initializeLayout() {
                 id: item.id,
                 type: item.type,
                 isComponent: item.isComponent,
-                isStack: item.isStack
+                isStack: item.isStack,
+                componentName: item.componentName,
+                config: item.config
             });
+
+            // FORCER l'ID s'il n'est pas défini
+            if (item.isComponent && (!item.id || item.id === 'undefined')) {
+                if (item.config && item.config.id) {
+                    item.id = item.config.id;
+                    console.log('🔧 Layout: ID forcé pour le composant:', item.id);
+                } else if (item.componentName === 'geocache-details' && item.config?.componentState?.geocacheId) {
+                    item.id = `geocache-details-${item.config.componentState.geocacheId}`;
+                    console.log('🔧 Layout: ID généré pour geocache-details:', item.id);
+                } else {
+                    item.id = `${item.componentName || 'component'}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    console.log('🔧 Layout: ID généré par défaut:', item.id);
+                }
+            }
+            
+            if (item.isStack && (!item.id || item.id === 'undefined')) {
+                item.id = `stack-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                console.log('🔧 Layout: ID généré pour stack:', item.id);
+            }
 
             if (item.isStack) {
                 window.layoutStateManager.registerStack(item);
+            } else if (item.isComponent) {
+                // Enregistrer le composant avec ses métadonnées
+                const metadata = {
+                    ...(item.config.componentState || {}),
+                    componentName: item.componentName
+                };
+                
+                console.log('📝 Layout: Enregistrement du composant avec métadonnées:', {
+                    id: item.id,
+                    componentName: item.componentName,
+                    metadata: metadata
+                });
+                
+                window.layoutStateManager.registerComponent(item, metadata);
+                
+                // Si c'est un composant geocache-details, déclencher immédiatement la mise à jour
+                if (item.componentName === 'geocache-details' && metadata.geocacheId && metadata.gcCode) {
+                    console.log('🚀 Layout: Déclenchement immédiat de geocacheSelected pour le nouveau composant');
+                    setTimeout(() => {
+                        document.dispatchEvent(new CustomEvent('geocacheSelected', {
+                            detail: {
+                                geocacheId: metadata.geocacheId,
+                                gcCode: metadata.gcCode
+                            }
+                        }));
+                    }, 100); // Petit délai pour laisser le composant se finaliser
+                }
             }
         });
 
@@ -71,40 +119,106 @@ function initializeLayout() {
 
         // Fonction pour mettre à jour le code GC et les notes
         function updateGeocacheCode(contentItem) {
-            if (contentItem && contentItem.config && contentItem.config.componentState) {
-                const state = contentItem.config.componentState;
-                if (state.gcCode) {
-                    // Mettre à jour le code GC
-                    const geocacheCodeElement = document.querySelector('.geocache-code');
-                    if (geocacheCodeElement) {
-                        geocacheCodeElement.textContent = state.gcCode;
+            console.log('🔄 UpdateGeocacheCode appelé avec:', contentItem?.id, contentItem?.componentName);
+            
+            if (!contentItem) {
+                console.log('⚠️ UpdateGeocacheCode: contentItem est null/undefined');
+                return;
+            }
+            
+            // Essayer plusieurs sources pour obtenir les données
+            let state = null;
+            let geocacheId = null;
+            let gcCode = null;
+            
+            // Source 1: config.componentState
+            if (contentItem.config && contentItem.config.componentState) {
+                state = contentItem.config.componentState;
+                console.log('📋 UpdateGeocacheCode: Données trouvées dans config.componentState:', state);
+            }
+            
+            // Source 2: getState() method
+            if (!state && contentItem.getState) {
+                try {
+                    state = contentItem.getState();
+                    console.log('📋 UpdateGeocacheCode: Données trouvées dans getState():', state);
+                } catch (e) {
+                    console.log('⚠️ UpdateGeocacheCode: Erreur getState():', e);
+                }
+            }
+            
+            // Source 3: metadata depuis LayoutStateManager
+            if (!state && window.layoutStateManager) {
+                const componentInfo = window.layoutStateManager.getActiveComponentInfo();
+                if (componentInfo && componentInfo.metadata) {
+                    state = componentInfo.metadata;
+                    console.log('📋 UpdateGeocacheCode: Données trouvées dans LayoutStateManager:', state);
+                }
+            }
+            
+            // Extraire les données
+            if (state) {
+                geocacheId = state.geocacheId;
+                gcCode = state.gcCode;
+                console.log('✅ UpdateGeocacheCode: Données extraites - ID:', geocacheId, 'Code:', gcCode);
+            }
+            
+            if (gcCode) {
+                // Mettre à jour le code GC
+                const geocacheCodeElement = document.querySelector('.geocache-code');
+                if (geocacheCodeElement) {
+                    geocacheCodeElement.textContent = gcCode;
+                    console.log('✅ UpdateGeocacheCode: Code GC mis à jour:', gcCode);
+                } else {
+                    console.log('⚠️ UpdateGeocacheCode: Élément .geocache-code non trouvé');
+                }
+                
+                // NOTE: Ne pas déclencher geocacheSelected ici pour éviter la boucle infinie
+                // L'événement est déjà déclenché dans itemCreated et LayoutStateManager
+                
+                // Mettre à jour les notes si le panneau est actif
+                const notesPanel = document.getElementById('notes-panel');
+                if (notesPanel && notesPanel.classList.contains('active') && geocacheId) {
+                    const notesContent = document.getElementById('notes-content');
+                    if (notesContent) {
+                        console.log('🗒️ UpdateGeocacheCode: Chargement des notes pour ID:', geocacheId);
+                        htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+                            target: '#notes-content',
+                            swap: 'innerHTML'
+                        });
                     }
-                    
-                    // Mettre à jour les notes si le panneau est actif
-                    const notesPanel = document.getElementById('notes-panel');
-                    if (notesPanel && notesPanel.classList.contains('active') && state.geocacheId) {
-                        const notesContent = document.getElementById('notes-content');
-                        if (notesContent) {
-                            // Charger le template notes_panel.html d'abord
-                            htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${state.geocacheId}`, {
-                                target: '#notes-content',
-                                swap: 'innerHTML'
-                            });
-                        }
+                }
+                
+                // Mettre à jour les logs si le panneau est actif
+                const logsPanel = document.getElementById('logs-panel');
+                if (logsPanel && logsPanel.classList.contains('active') && geocacheId) {
+                    const logsContent = document.getElementById('logs-content');
+                    if (logsContent) {
+                        console.log('📋 UpdateGeocacheCode: Chargement des logs pour ID:', geocacheId);
+                        htmx.ajax('GET', `/api/logs/logs_panel?geocacheId=${geocacheId}`, {
+                            target: '#logs-content',
+                            swap: 'innerHTML'
+                        });
                     }
-                    
-                    // Mettre à jour les logs si le panneau est actif
-                    const logsPanel = document.getElementById('logs-panel');
-                    if (logsPanel && logsPanel.classList.contains('active') && state.geocacheId) {
-                        const logsContent = document.getElementById('logs-content');
-                        if (logsContent) {
-                            // Charger le template logs_panel.html
-                            htmx.ajax('GET', `/api/logs/logs_panel?geocacheId=${state.geocacheId}`, {
-                                target: '#logs-content',
-                                swap: 'innerHTML'
-                            });
-                        }
-                    }
+                }
+                
+                // Mettre à jour la carte si le panneau est actif
+                const mapPanel = document.getElementById('map-panel');
+                if (mapPanel && mapPanel.classList.contains('active') && geocacheId) {
+                    console.log('🗺️ UpdateGeocacheCode: Chargement de la carte pour ID:', geocacheId);
+                    // Utiliser la bonne URL pour charger le panneau de carte
+                    htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                        target: '#map-panel',
+                        swap: 'innerHTML'
+                    });
+                }
+            } else {
+                console.log('⚠️ UpdateGeocacheCode: Aucun gcCode trouvé - pas de mise à jour du panel');
+                
+                // Réinitialiser l'affichage si aucune géocache n'est active
+                const geocacheCodeElement = document.querySelector('.geocache-code');
+                if (geocacheCodeElement) {
+                    geocacheCodeElement.textContent = '';
                 }
             }
         }
@@ -551,16 +665,59 @@ function initializeLayout() {
 
         // Enregistrer le composant geocache-details
         mainLayout.registerComponent('geocache-details', function(container, state) {
+            console.log('🔧 Geocache-details: Initialisation avec:', { container, state });
+            
+            // Validation des paramètres d'entrée
+            if (!container) {
+                console.error('❌ Geocache-details: Container est undefined');
+                return;
+            }
+            
+            if (!state) {
+                console.error('❌ Geocache-details: State est undefined');
+                return;
+            }
+            
             const geocacheId = state.geocacheId;
             const gcCode = state.gcCode;
             const name = state.name;
             
-            // Mettre à jour immédiatement l'état du composant
-            container.setState({
+            console.log('📋 Geocache-details: Données extraites:', { geocacheId, gcCode, name });
+            
+            // S'assurer que config existe
+            if (!container.config) {
+                console.log('⚠️ Geocache-details: container.config n\'existe pas, création');
+                container.config = {};
+            }
+            
+            // S'assurer que l'ID du composant est défini
+            if (!container.config.id) {
+                container.config.id = `geocache-details-${geocacheId}`;
+                console.log('🆔 Geocache-details: ID assigné:', container.config.id);
+            }
+            
+            // Mettre à jour immédiatement l'état du composant ET componentState
+            const componentState = {
                 geocacheId: geocacheId,
                 gcCode: gcCode,
                 name: name
-            });
+            };
+            
+            console.log('💾 Geocache-details: Mise à jour de l\'état avec:', componentState);
+            
+            try {
+                container.setState(componentState);
+                console.log('✅ Geocache-details: setState réussi');
+            } catch (error) {
+                console.error('❌ Geocache-details: Erreur setState:', error);
+            }
+            
+            // IMPORTANT: Aussi mettre à jour componentState dans config pour que updateGeocacheCode fonctionne
+            if (!container.config.componentState) {
+                container.config.componentState = {};
+            }
+            Object.assign(container.config.componentState, componentState);
+            console.log('🔄 Geocache-details: ComponentState mis à jour dans config');
             
             // Mettre à jour le titre
             container.setTitle(`${gcCode} - ${name}`);
@@ -1135,6 +1292,61 @@ function initializeLayout() {
         // Ajuster la taille lors du redimensionnement de la fenêtre
         window.addEventListener('resize', () => {
             mainLayout.updateSize();
+        });
+
+                // Variable pour éviter les déclenchements multiples de geocacheSelected
+        let lastProcessedGeocache = null;
+        let processingGeocacheEvent = false;
+        
+        // Écouter les événements de sélection de géocache pour mettre à jour les panels
+        document.addEventListener('geocacheSelected', function(event) {
+            const { geocacheId, gcCode } = event.detail;
+            
+            // Éviter le traitement multiple de la même géocache
+            if (processingGeocacheEvent || lastProcessedGeocache === geocacheId) {
+                console.log('⏭️ Layout: Événement geocacheSelected ignoré (déjà en cours de traitement):', { geocacheId, gcCode });
+                return;
+            }
+            
+            processingGeocacheEvent = true;
+            lastProcessedGeocache = geocacheId;
+            
+            console.log('📢 Layout: Événement geocacheSelected reçu:', { geocacheId, gcCode });
+            
+            // Forcer la mise à jour de tous les panels actifs
+            const panels = ['map-panel', 'notes-panel', 'logs-panel'];
+            
+            panels.forEach(panelId => {
+                const panel = document.getElementById(panelId);
+                if (panel && panel.classList.contains('active')) {
+                    console.log(`🔄 Layout: Mise à jour du panel ${panelId} pour la géocache ${geocacheId}`);
+                    
+                    let url = '';
+                    switch (panelId) {
+                                            case 'map-panel':
+                        url = `/api/logs/map_panel?geocacheId=${geocacheId}`;
+                        break;
+                        case 'notes-panel':
+                            url = `/api/logs/notes_panel?geocacheId=${geocacheId}`;
+                            break;
+                        case 'logs-panel':
+                            url = `/api/logs/logs_panel?geocacheId=${geocacheId}`;
+                            break;
+                    }
+                    
+                    if (url) {
+                        htmx.ajax('GET', url, {
+                            target: `#${panelId}`,
+                            swap: 'innerHTML'
+                        });
+                    }
+                }
+            });
+            
+            // Libérer le flag après un délai
+            setTimeout(() => {
+                processingGeocacheEvent = false;
+            }, 500);
         });
 
         console.log('=== Layout: Initialisation terminée ===');

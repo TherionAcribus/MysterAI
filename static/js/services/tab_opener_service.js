@@ -1066,11 +1066,14 @@ class TabOpenerService {
             }
         }
         
+        // Générer un ID unique si non fourni
+        const generatedId = uniqueId || `${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        
         const config = {
             type: type,
             title: title,
             componentName: component || this.getDefaultComponentName(type),
-            uniqueId: uniqueId || `${type}-${Date.now()}`,
+            uniqueId: generatedId,
             state: state
         };
         
@@ -1153,11 +1156,21 @@ class TabOpenerService {
             id: config.uniqueId,
             componentState: {
                 ...config.state,
-                uniqueId: config.uniqueId
+                uniqueId: config.uniqueId,
+                // S'assurer que les données essentielles sont présentes
+                ...(config.state.geocacheId && { geocacheId: config.state.geocacheId }),
+                ...(config.state.gcCode && { gcCode: config.state.gcCode }),
+                ...(config.state.name && { name: config.state.name })
             }
         };
         
-        console.log('🔧 TabOpener: Configuration du composant:', componentConfig);
+        // Debug logging
+        console.log('🔧 TabOpener: Configuration finale du composant:', {
+            id: componentConfig.id,
+            componentName: componentConfig.componentName,
+            title: componentConfig.title,
+            componentState: componentConfig.componentState
+                 });
         
         if (openInSameSection) {
             console.log('📌 TabOpener: Mode "même section" activé');
@@ -1177,27 +1190,46 @@ class TabOpenerService {
         // Utiliser le LayoutStateManager pour trouver la stack active
         const activeStack = this.findActiveStack();
         
-        if (activeStack) {
-            console.log('🎯 TabOpener: Ajout à la stack active:', activeStack.id);
-            activeStack.addChild(componentConfig);
-            console.log('✅ TabOpener: Onglet ajouté à la stack active');
+        if (activeStack && activeStack.addChild) {
+            console.log('🎯 TabOpener: Ajout à la stack active:', activeStack.id || 'ID non défini');
+            try {
+                activeStack.addChild(componentConfig);
+                console.log('✅ TabOpener: Onglet ajouté à la stack active');
+                return; // Important: sortir de la fonction après succès
+            } catch (error) {
+                console.error('❌ TabOpener: Erreur lors de l\'ajout à la stack active:', error);
+            }
         } else {
-            // Fallback: chercher une stack existante
-            const fallbackStack = this.findBestStack();
-            if (fallbackStack) {
-                console.log('🔄 TabOpener: Ajout à une stack existante (fallback):', fallbackStack.id);
+            console.log('⚠️ TabOpener: Stack active non valide ou sans méthode addChild');
+        }
+        
+                // Si on arrive ici, on n'a pas réussi à ajouter à la stack active
+        // Fallback: chercher une stack existante
+        const fallbackStack = this.findBestStack();
+        if (fallbackStack && fallbackStack.addChild) {
+            console.log('🔄 TabOpener: Ajout à une stack existante (fallback):', fallbackStack.id || 'ID non défini');
+            try {
                 fallbackStack.addChild(componentConfig);
                 console.log('✅ TabOpener: Onglet ajouté à la stack existante');
-            } else {
-                // Dernier recours: ajouter à la section principale
-                console.log('🏠 TabOpener: Ajout à la section principale (dernier recours)');
-                if (window.mainLayout?.root?.contentItems?.[0]) {
-                    window.mainLayout.root.contentItems[0].addChild(componentConfig);
-                    console.log('✅ TabOpener: Onglet ajouté à la section principale');
-                } else {
-                    console.error('❌ TabOpener: Impossible d\'ajouter à la section principale');
-                }
+                return; // Important: sortir après succès
+            } catch (error) {
+                console.error('❌ TabOpener: Erreur lors de l\'ajout à la stack de fallback:', error);
             }
+        } else {
+            console.log('⚠️ TabOpener: Stack de fallback non valide ou sans méthode addChild');
+        }
+        
+                // Dernier recours: ajouter à la section principale
+        console.log('🏠 TabOpener: Ajout à la section principale (dernier recours)');
+        if (window.mainLayout?.root?.contentItems?.[0]) {
+            try {
+                window.mainLayout.root.contentItems[0].addChild(componentConfig);
+                console.log('✅ TabOpener: Onglet ajouté à la section principale');
+            } catch (error) {
+                console.error('❌ TabOpener: Erreur lors de l\'ajout à la section principale:', error);
+            }
+                } else {
+            console.error('❌ TabOpener: Impossible d\'ajouter à la section principale - mainLayout non disponible');
         }
     }
     
@@ -1262,16 +1294,20 @@ class TabOpenerService {
         
         // Essayer d'abord la stack actuellement active
         const activeStack = window.layoutStateManager.getActiveGoldenLayoutStack();
-        if (activeStack) {
+        if (activeStack && typeof activeStack === 'object' && activeStack.addChild) {
             console.log('🎯 TabOpener: Stack active trouvée:', activeStack.id);
             return activeStack;
+        } else {
+            console.log('⚠️ TabOpener: Stack active non valide:', activeStack);
         }
         
         // Sinon, utiliser la stack la plus récemment active
         const recentStack = window.layoutStateManager.getMostRecentActiveStack();
-        if (recentStack) {
+        if (recentStack && typeof recentStack === 'object' && recentStack.addChild) {
             console.log('🕒 TabOpener: Stack récemment active trouvée:', recentStack.id);
             return recentStack;
+        } else {
+            console.log('⚠️ TabOpener: Stack récemment active non valide:', recentStack);
         }
         
         console.log('❌ TabOpener: Aucune stack active trouvée via LayoutStateManager');

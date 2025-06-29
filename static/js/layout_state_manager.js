@@ -258,6 +258,14 @@ class LayoutStateManager {
             stackId: componentInfo.parent ? componentInfo.parent.id : null
         };
         
+        // Vérifier s'il faut déclencher l'événement geocacheSelected AVANT de changer activeComponent
+        let shouldDispatchEvent = false;
+        if (componentInfo.type === 'geocache-details' && componentInfo.metadata.geocacheId) {
+            const previousComponent = this.activeComponent ? this.components.get(this.activeComponent) : null;
+            shouldDispatchEvent = !previousComponent || 
+                                 previousComponent.metadata.geocacheId !== componentInfo.metadata.geocacheId;
+        }
+
         // Enregistrer/mettre à jour le component dans la Map
         this.components.set(componentData.id, componentData);
         this.activeComponent = componentData.id;
@@ -267,14 +275,17 @@ class LayoutStateManager {
             this.setActiveStack(componentInfo.parent);
         }
 
-        // Dispatch event for geocache selection
-        if (componentInfo.type === 'geocache-details' && componentInfo.metadata.geocacheId) {
+        // Maintenant déclencher l'événement si nécessaire
+        if (shouldDispatchEvent) {
+            console.log('📡 LayoutStateManager: Déclenchement geocacheSelected pour nouvelle géocache:', componentInfo.metadata.geocacheId);
             document.dispatchEvent(new CustomEvent('geocacheSelected', {
                 detail: {
                     geocacheId: componentInfo.metadata.geocacheId,
                     gcCode: componentInfo.metadata.gcCode
                 }
             }));
+        } else if (componentInfo.type === 'geocache-details') {
+            console.log('⏭️ LayoutStateManager: Géocache inchangée, pas de déclenchement d\'événement');
         }
     }
 

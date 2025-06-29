@@ -97,6 +97,10 @@ new ol.style.Style({
 
 ### Routes API
 
+- `GET /api/logs/map_panel?geocacheId=<id>`
+  - Charge le panneau de carte pour une géocache spécifique
+  - Retourne le template HTML avec la carte et les contrôleurs Stimulus
+
 - `GET /api/geocaches/<id>/coordinates`
   - Récupère toutes les coordonnées d'une géocache
   - Retourne les points original, corrigé et waypoints
@@ -140,13 +144,6 @@ new ol.style.Style({
 }
 ```
 
-### Intégration avec le Layout
-
-Le système de carte s'intègre avec :
-- **GoldenLayout** : Gère l'affichage du panneau
-- **Stimulus** : Gère la logique et les interactions
-- **HTMX** : Gère les mises à jour dynamiques du contenu
-
 ## Interactions Utilisateur
 
 - **Survol d'un point** : Le curseur devient un pointeur
@@ -163,3 +160,26 @@ Le système de carte s'intègre avec :
 - **Stimulus** : Gestion des contrôleurs JavaScript
 - **HTMX** : Mises à jour dynamiques du contenu
 - **Tailwind CSS** : Styles et mise en page
+
+## Intégration avec le Layout
+
+Le système de carte s'intègre avec :
+- **GoldenLayout** : Gère l'affichage du panneau
+- **Stimulus** : Gère la logique et les interactions
+- **HTMX** : Gère les mises à jour dynamiques du contenu
+- **Fonction switchTab** : Charge automatiquement la carte lors du changement d'onglet
+
+### Chargement Automatique
+
+Depuis les améliorations récentes, le panneau de carte se charge automatiquement dans deux situations :
+
+1. **Sélection d'une nouvelle géocache** : Le panneau se met à jour via l'événement `geocacheSelected`
+2. **Changement d'onglet** : La fonction `switchTab` charge automatiquement la carte de la géocache active
+
+```javascript
+// Exemple de chargement automatique lors du changement d'onglet
+htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+    target: '#map-panel',
+    swap: 'innerHTML'
+});
+```

@@ -105,6 +105,24 @@ layoutStateManager.on('activeStackChanged', (newStack, oldStack) => {
 });
 ```
 
+### Protection Contre les Boucles Infinies
+
+Le gestionnaire d'état inclut des mécanismes de protection pour éviter les boucles infinies d'événements :
+
+- **Déduplication des événements** : Les événements `geocacheSelected` ne sont déclenchés que si la géocache a réellement changé
+- **Flags de traitement** : Protection contre le traitement simultané des mêmes événements
+- **Optimisation des déclenchements** : Évite les répétitions inutiles
+
+```javascript
+// Exemple de protection implémentée
+if (this.lastProcessedGeocache !== geocacheId) {
+    this.lastProcessedGeocache = geocacheId;
+    document.dispatchEvent(new CustomEvent('geocacheSelected', {
+        detail: { geocacheId, gcCode }
+    }));
+}
+```
+
 ## Logging et Debugging
 
 Le gestionnaire d'état inclut un système de logging détaillé pour faciliter le debugging :

@@ -574,6 +574,60 @@
             const targetPanel = document.getElementById(panelId);
             targetPanel.classList.add('active');
 
+            // Charger le contenu de la géocache active dans le nouvel onglet
+            if (window.layoutStateManager) {
+                const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+                if (activeComponent && activeComponent.metadata && activeComponent.metadata.geocacheId) {
+                    const geocacheId = activeComponent.metadata.geocacheId;
+                    console.log(`🔄 SwitchTab: Chargement du contenu pour la géocache ${geocacheId} dans ${panelId}`);
+
+                    // Charger le contenu approprié selon l'onglet
+                    switch (panelId) {
+                        case 'map-panel':
+                            htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                                target: `#${panelId}`,
+                                swap: 'innerHTML'
+                            });
+                            break;
+                        case 'notes-panel':
+                            htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+                                target: `#${panelId}`,
+                                swap: 'innerHTML'
+                            });
+                            break;
+                        case 'logs-panel':
+                            htmx.ajax('GET', `/api/logs/logs_panel?geocacheId=${geocacheId}`, {
+                                target: `#${panelId}`,
+                                swap: 'innerHTML'
+                            });
+                            break;
+                        case 'informations-panel':
+                            // Le panneau d'informations est géré différemment selon le type de composant
+                            if (activeComponent.metadata.componentName === 'plugin' && activeComponent.metadata.pluginName) {
+                                htmx.ajax('GET', `/api/plugins/${encodeURIComponent(activeComponent.metadata.pluginName)}/info_panel`, {
+                                    target: `#${panelId}`,
+                                    swap: 'innerHTML'
+                                });
+                            } else if (activeComponent.metadata.componentName === 'alphabet-viewer' && activeComponent.metadata.alphabetId) {
+                                htmx.ajax('GET', `/api/alphabets/${encodeURIComponent(activeComponent.metadata.alphabetId)}/info_panel`, {
+                                    target: `#${panelId}`,
+                                    swap: 'innerHTML'
+                                });
+                            } else {
+                                htmx.ajax('GET', '/api/informations_panel', {
+                                    target: `#${panelId}`,
+                                    swap: 'innerHTML'
+                                });
+                            }
+                            break;
+                    }
+                } else {
+                    console.log('🔄 SwitchTab: Aucune géocache active trouvée');
+                }
+            } else {
+                console.log('🔄 SwitchTab: LayoutStateManager non disponible');
+            }
+
             // Déclencher l'événement tab-activated
             window.dispatchEvent(new CustomEvent('tab-activated', {
                 detail: { panelId: panelId }

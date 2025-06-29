@@ -1,5 +1,32 @@
 # Système de Layout MysteryAI
 
+## Corrections et Améliorations Récentes
+
+### Décembre 2024 - Correction du Panneau Inférieur
+
+#### Problèmes Résolus
+
+1. **URL de l'API Carte Incorrecte**
+   - **Problème** : L'URL `/geocaches/${geocacheId}/map_panel` retournait une erreur 404
+   - **Solution** : Correction vers `/api/logs/map_panel?geocacheId=${geocacheId}`
+   - **Impact** : Le panneau de carte se charge maintenant correctement
+
+2. **Fonction switchTab Incomplète**
+   - **Problème** : Changer d'onglet dans le panneau inférieur ne chargeait pas le contenu de la géocache active
+   - **Solution** : Amélioration de la fonction pour charger automatiquement le contenu approprié
+   - **Impact** : Navigation fluide entre les onglets Map, Notes, Logs, Informations
+
+3. **Synchronisation des Événements**
+   - **Problème** : Boucles infinies d'événements `geocacheSelected`
+   - **Solution** : Ajout de protection contre les répétitions et optimisation des déclenchements
+   - **Impact** : Performance améliorée et stabilité accrue
+
+#### Nouvelles Fonctionnalités
+
+- **Chargement Automatique** : Le panneau inférieur se met à jour automatiquement lors du changement d'onglet
+- **Gestion Intelligente des Composants** : Adaptation du contenu selon le type de composant (géocache, plugin, alphabet)
+- **Logging Amélioré** : Messages de debugging plus détaillés pour faciliter le développement
+
 ## Vue d'ensemble
 
 Le système de layout de MysteryAI est construit autour de trois composants principaux :
@@ -214,12 +241,52 @@ function updateGeocacheCode(contentItem) {
 ## Interface Utilisateur
 
 ### 1. Panneau Inférieur
-- Barre d'onglets avec Map, Notes, Informations
+- Barre d'onglets avec Map, Notes, Logs, Informations
 - Affichage du code GC à droite
 - Style monospace pour le code GC
 - Fond sombre et coins arrondis
+- **Chargement automatique du contenu** lors du changement d'onglet
 
-### 2. Styles CSS
+### 2. Fonction switchTab Améliorée
+La fonction `switchTab` a été améliorée pour charger automatiquement le contenu de la géocache active :
+
+```javascript
+function switchTab(button, panelId) {
+    // Mise à jour des classes visuelles
+    // ...
+    
+    // Chargement automatique du contenu de la géocache active
+    if (window.layoutStateManager) {
+        const activeComponent = window.layoutStateManager.getActiveComponentInfo();
+        if (activeComponent && activeComponent.metadata && activeComponent.metadata.geocacheId) {
+            const geocacheId = activeComponent.metadata.geocacheId;
+            
+            switch (panelId) {
+                case 'map-panel':
+                    htmx.ajax('GET', `/api/logs/map_panel?geocacheId=${geocacheId}`, {
+                        target: `#${panelId}`,
+                        swap: 'innerHTML'
+                    });
+                    break;
+                case 'notes-panel':
+                    htmx.ajax('GET', `/api/logs/notes_panel?geocacheId=${geocacheId}`, {
+                        target: `#${panelId}`,
+                        swap: 'innerHTML'
+                    });
+                    break;
+                // ... autres onglets
+            }
+        }
+    }
+}
+```
+
+**Avantages** :
+- Navigation fluide entre les onglets
+- Pas besoin de rouvrir une géocache pour voir son contenu dans un autre onglet
+- Synchronisation automatique avec l'onglet GoldenLayout actif
+
+### 3. Styles CSS
 ```css
 .bottom-panel-header {
     display: flex;
@@ -234,7 +301,7 @@ function updateGeocacheCode(contentItem) {
 }
 ```
 
-### 3. Structure HTML
+### 4. Structure HTML
 ```html
 <div class="bottom-panel-header">
     <div class="bottom-panel-tabs">
@@ -297,3 +364,17 @@ Error: HTTP error! status: 404
 - [ ] Prévisualisation des détails
 - [ ] Historique des modifications
 - [ ] Synchronisation en temps réel
+
+### Routes API
+
+- `GET /api/geocaches/<id>/coordinates`
+  - Récupère toutes les coordonnées d'une géocache
+  - Retourne les points original, corrigé et waypoints
+
+- `GET /api/logs/map_panel?geocacheId=<id>`
+  - Charge le panneau de carte pour une géocache spécifique
+  - Retourne le template HTML avec la carte et les contrôleurs Stimulus
+
+- `POST /api/geocaches/save/<id>/coordinates`
+  - Sauvegarde les coordonnées corrigées
+  - Utilisé pour mettre à jour la position finale
