@@ -56,9 +56,9 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
       // OU
       "numbers": ["1", "2", "3"], // Liste spécifique de chiffres
       
-      "special": {              // Caractères spéciaux (optionnel)
-        ".": "point",
-        ",": "virgule"
+      "special": {              // Caractères spéciaux (optionnel) – la valeur est le nom du fichier image sans extension
+        ".": "point",        // utilisera images/point.png
+        ",": "virgule"       // utilisera images/virgule.png
       }
     }
   }

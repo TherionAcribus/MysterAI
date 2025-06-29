@@ -37,7 +37,7 @@
                     <div class="flex flex-wrap gap-1">
                         {% for char in display_text[:10] %}
                             {% if char|lower in "abcdefghijklmnopqrstuvwxyz0123456789" %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char|lower }}{% if char.isupper() %}{{ alphabet.alphabetConfig.uppercaseSuffix|default('') }}{% else %}{{ alphabet.alphabetConfig.lowercaseSuffix|default('') }}{% endif %}.{{ alphabet.alphabetConfig.imageFormat }}" 
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char|lower }}.{{ alphabet.alphabetConfig.imageFormat }}" 
                                     alt="{{ char }}" 
                                     style="width: {{ font_size|int * 1.5 }}px; height: {{ font_size|int * 1.5 }}px;"
                                     class="object-contain">

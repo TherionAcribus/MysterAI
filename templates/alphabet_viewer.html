@@ -360,11 +360,12 @@
             {% endif %}
 
             <!-- Caractères spéciaux -->
-            {% if alphabet.alphabetConfig.characters.special %}
+            {% set special_map = (alphabet.alphabetConfig.characters.special if alphabet.alphabetConfig.characters is defined and alphabet.alphabetConfig.characters.special is defined else (alphabet.alphabetConfig.special if alphabet.alphabetConfig.special is defined else None)) %}
+            {% if special_map %}
             <div>
                 <h3 class="text-sm font-medium text-gray-400 mb-2">Caractères spéciaux</h3>
                 <div class="flex flex-wrap gap-3">
-                    {% for char, name in alphabet.alphabetConfig.characters.special.items() %}
+                    {% for char, name in special_map.items() %}
                         <div class="relative flex flex-col items-center">
                         <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
                              data-alphabet-viewer-target="availableSymbol"
@@ -372,7 +373,7 @@
                              data-char="{{ char }}"
                              title="{{ name }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ name }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
