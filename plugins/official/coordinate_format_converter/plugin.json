@@ -1,0 +1,54 @@
+{
+  "name": "coordinate_format_converter",
+  "version": "1.0.0",
+  "description": "Plugin pour convertir des coordonnées entre les formats DD, DMS, DMM et UTM",
+  "author": "MysterAI",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "dependencies": [],
+  "categories": ["Conversion", "Coordinates", "GPS"],
+  "brute_force": false,
+  "enable_scoring": false,
+  "accept_accents": true,
+  "input_types": {
+    "coordinates": {
+      "type": "string",
+      "label": "Coordonnées",
+      "placeholder": "Entrez les coordonnées à convertir"
+    },
+    "source_format": {
+      "type": "select",
+      "label": "Format source",
+      "options": [
+        {"value": "auto", "label": "auto (détection)"},
+        {"value": "dd", "label": "dd – 49.60117 5.35098"},
+        {"value": "dmm", "label": "dmm – N 49° 36.070' E 005° 21.059'"},
+        {"value": "dms", "label": "dms – N 49° 36' 04\" E 005° 21' 03\""},
+        {"value": "utm", "label": "utm – 31U 334785 5499708"}
+      ],
+      "default": "auto"
+    },
+    "target_format": {
+      "type": "select",
+      "label": "Format cible",
+      "options": [
+        {"value": "dd", "label": "dd – 49.60117 5.35098"},
+        {"value": "dmm", "label": "dmm – N 49° 36.070' E 005° 21.059'"},
+        {"value": "dms", "label": "dms – N 49° 36' 04\" E 005° 21' 03\""},
+        {"value": "utm", "label": "utm – 31U 334785 5499708"}
+      ],
+      "default": "dmm"
+    },
+    "embedded": {
+      "type": "boolean",
+      "label": "Texte avec autres informations ?",
+      "default": false
+    }
+  },
+  "output_types": {
+    "result": {
+      "type": "string",
+      "label": "Coordonnées converties"
+    }
+  }
+} 

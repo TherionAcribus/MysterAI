@@ -144,10 +144,18 @@
                                     name="{{ input_name }}"
                                     class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 {% for option in input_config.options %}
-                                    <option value="{{ option }}" 
-                                            {% if option == input_config.default %}selected{% endif %}>
-                                        {{ option }}
-                                    </option>
+                                    {% if option is mapping %}
+                                        {# option est un dictionnaire avec keys 'value' et 'label' #}
+                                        <option value="{{ option.value or option['value'] }}" 
+                                                {% if (option.value or option['value']) == input_config.default %}selected{% endif %}>
+                                            {{ option.label or option['label'] or option.value or option['value'] }}
+                                        </option>
+                                    {% else %}
+                                        <option value="{{ option }}" 
+                                                {% if option == input_config.default %}selected{% endif %}>
+                                            {{ option }}
+                                        </option>
+                                    {% endif %}
                                 {% endfor %}
                             </select>
                         {% elif input_config.type == "checkbox" or input_config.type == "boolean" %}

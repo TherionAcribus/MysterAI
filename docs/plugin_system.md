@@ -114,15 +114,39 @@ Le paramètre global `enable_auto_scoring` continue de définir l'état initial 
   }
   ```
 
-- `select`: Liste déroulante
-  ```json
-  {
-    "type": "select",
-    "label": "Label du champ",
-    "options": ["option1", "option2", "option3"],
-    "default": "option1"
-  }
-  ```
+- `select`: Liste déroulante. Deux syntaxes sont désormais acceptées :
+
+  1. **Syntaxe simple (rétro-compatible)**
+     ```json
+     {
+       "type": "select",
+       "label": "Label du champ",
+       "options": ["option1", "option2", "option3"],
+       "default": "option1"
+     }
+     ```
+
+  2. **Syntaxe enrichie avec libellé personnalisé**  
+     Chaque entrée du tableau `options` peut être un objet `{ "value": "…", "label": "…" }`.  
+     Le champ `value` est la valeur réellement envoyée au backend ; `label` est le texte affiché à l'utilisateur (idéal pour montrer un exemple parlant).
+
+     ```json
+     {
+       "type": "select",
+       "label": "Format source",
+       "options": [
+         { "value": "auto", "label": "auto (détection)" },
+         { "value": "dd",   "label": "dd – 49.60117 5.35098" },
+         { "value": "dmm",  "label": "dmm – N 49° 36.070' E 005° 21.059'" },
+         { "value": "dms",  "label": "dms – N 49° 36' 04\" E 005° 21' 03\"" },
+         { "value": "utm",  "label": "utm – 31U 334785 5499708" }
+       ],
+       "default": "auto"
+     }
+     ```
+
+  Si l'objet ne contient pas de clé `label`, la valeur de `value` sera utilisée pour l'affichage.  
+  Les anciens plugins continuent de fonctionner sans modification (rétro-compatibilité assurée).
 
 - `number`: Champ numérique
   ```json
