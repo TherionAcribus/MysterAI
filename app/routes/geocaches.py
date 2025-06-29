@@ -1417,10 +1417,10 @@ def project_waypoint():
         if not all([gc_lat, gc_lon, distance, bearing_deg]):
             return jsonify({'error': 'Paramètres manquants'}), 400
         
-        # Préparer les entrées pour le plugin
-        coord_str = f"{gc_lat} {gc_lon}"
+        # Concaténer la latitude et la longitude pour le plugin
+        origin_coords = f"{gc_lat} {gc_lon}"
         
-        # Récupérer le plugin d'orientation
+        # Récupérer le gestionnaire de plugins et le plugin
         from app import get_plugin_manager
         plugin_manager = get_plugin_manager()
         
@@ -1429,18 +1429,37 @@ def project_waypoint():
         if not orientation_calculation:
             return jsonify({'error': 'Plugin de projection non disponible'}), 500
         
-        # Exécuter le plugin
-        result = orientation_calculation.execute({
-            'text': coord_str,
+        # Préparer les paramètres pour le nouveau mode strict du plugin
+        plugin_inputs = {
+            'origin_coords': origin_coords,
             'bearing_deg': float(bearing_deg),
             'distance': float(distance),
-            'distance_unit': distance_unit
-        })
+            'distance_unit': distance_unit,
+            'strict': 'strict',      # Force le mode strict
+            'mode': 'decode',        # Mode par défaut
+            'enable_gps_detection': False  # Pas nécessaire ici
+        }
         
-        # Extraire les nouvelles coordonnées
-        new_coord_str = result.get('text_output', '')
-        new_gc_lat = result.get('gc_lat', '')
-        new_gc_lon = result.get('gc_lon', '')
+        # Exécuter le plugin
+        result = orientation_calculation.execute(plugin_inputs)
+        
+        # Le plugin renvoie un dictionnaire ayant la structure
+        # {
+        #   "result": {
+        #       "text": {"text_output": "N 49° 12.xxx ..."},
+        #       "gc_lat": "N 49° ...",
+        #       "gc_lon": "E 005° ...",
+        #       ...
+        #   },
+        #   "coordinates": { ... }
+        # }
+        
+        result_block = result.get('result', {})
+        text_block = result_block.get('text', {})
+        
+        new_coord_str = text_block.get('text_output', '')
+        new_gc_lat = result_block.get('gc_lat', '')
+        new_gc_lon = result_block.get('gc_lon', '')
         
         # Vérifier que les coordonnées ont été correctement extraites
         if new_gc_lat and new_gc_lon:
