@@ -110,6 +110,13 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - Synchronisation bidirectionnelle avec la zone des symboles entrés
 - Mise à jour automatique à chaque modification
 
+### 4.1 Système d'épinglage
+
+- **Mise en épingle** des coordonnées détectées
+- **Désépingle** des coordonnées détectées
+- **Affichage dynamique** des coordonnées épinglées
+- **Gestion des états** (épinglé/désépinglé)
+
 ### 5. Détection de Coordonnées GPS
 
 - **Analyse automatique** du texte décodé
