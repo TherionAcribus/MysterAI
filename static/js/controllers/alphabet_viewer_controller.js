@@ -37,7 +37,16 @@
             "associatedGeocacheCode",
             "associatedGeocacheInfo",
             "originalCoordinates",
-            "originalCoordinatesValue"
+            "originalCoordinatesValue",
+            // Nouveaux targets pour l'épinglage
+            "pinnedArea",
+            "pinnedSymbolsSection",
+            "pinnedSymbols",
+            "pinnedTextSection",
+            "pinnedDecodedText",
+            "pinSymbolsBtn",
+            "pinTextBtn",
+            "inputSection"
         ]
         
         static values = {
@@ -72,6 +81,329 @@
             // Ajouter un écouteur pour l'événement beforeunload de la fenêtre
             this.beforeUnloadHandler = this.handleBeforeUnload.bind(this)
             window.addEventListener('beforeunload', this.beforeUnloadHandler)
+            
+            // Initialiser le système d'épinglage
+            this.initializePinning()
+        }
+        
+        // =====================================================
+        // SYSTÈME D'ÉPINGLAGE
+        // =====================================================
+        
+        initializePinning() {
+            // État d'épinglage
+            this.pinnedSymbols = false
+            this.pinnedText = false
+            
+            // Charger les préférences d'épinglage
+            this.loadPinningPreferences()
+            
+            // Variables pour la détection du scroll
+            this.inputSectionRect = null
+            this.isScrollListenerActive = false
+            
+            // Trouver le conteneur de scroll (pour GoldenLayout)
+            this.scrollContainer = this.findScrollContainer()
+            
+            // Debouncer pour le scroll
+            this.handleScrollDebounced = this.debounce(this.checkScrollPosition.bind(this), 16) // 60fps
+        }
+        
+        // Trouver le bon conteneur de scroll pour GoldenLayout
+        findScrollContainer() {
+            let element = this.element
+            
+            // Remonter dans le DOM pour trouver l'élément scrollable
+            let attempts = 0
+            while (element && element !== document.body && attempts < 10) {
+                const style = window.getComputedStyle(element)
+                
+                if ((style.overflow === 'auto' || style.overflow === 'scroll' || 
+                    style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+                    element.scrollHeight > element.clientHeight) {
+                    return element
+                }
+                element = element.parentElement
+                attempts++
+            }
+            
+            // Fallback : utiliser l'élément principal du contrôleur
+            return this.element
+        }
+        
+        loadPinningPreferences() {
+            try {
+                const prefs = localStorage.getItem(`alphabet_${this.alphabetIdValue}_pinning`)
+                if (prefs) {
+                    const preferences = JSON.parse(prefs)
+                    if (preferences.symbols) {
+                        this.pinSymbols()
+                    }
+                    if (preferences.text) {
+                        this.pinText()
+                    }
+                }
+            } catch (e) {
+                console.warn('Erreur lors du chargement des préférences d\'épinglage:', e)
+            }
+        }
+        
+        savePinningPreferences() {
+            try {
+                const preferences = {
+                    symbols: this.pinnedSymbols,
+                    text: this.pinnedText
+                }
+                localStorage.setItem(`alphabet_${this.alphabetIdValue}_pinning`, JSON.stringify(preferences))
+            } catch (e) {
+                console.warn('Erreur lors de la sauvegarde des préférences d\'épinglage:', e)
+            }
+        }
+        
+        // Gestion du scroll
+        handleScroll(event) {
+            if (this.isScrollListenerActive) {
+                this.handleScrollDebounced()
+            }
+        }
+        
+        checkScrollPosition() {
+            if (!this.inputSectionTarget) {
+                return
+            }
+            
+            // Récupérer la position actuelle de la section d'input
+            const inputRect = this.inputSectionTarget.getBoundingClientRect()
+            const containerRect = this.scrollContainer.getBoundingClientRect()
+            const scrollTop = this.scrollContainer.scrollTop || 0
+            
+            // Vérifier si la section d'input est visible dans le conteneur
+            // Elle est considérée comme visible si elle est dans la partie haute du conteneur
+            // ou si elle est complètement visible
+            const isInputSectionVisible = (inputRect.top >= containerRect.top - 50 && 
+                                         inputRect.top <= containerRect.top + (containerRect.height * 0.4)) ||
+                                         (inputRect.bottom >= containerRect.top && 
+                                          inputRect.top <= containerRect.bottom)
+            
+            // Afficher/masquer la zone épinglée selon la visibilité de la section d'input
+            const shouldShowPinned = !isInputSectionVisible && (this.pinnedSymbols || this.pinnedText)
+            const isCurrentlyShown = !this.pinnedAreaTarget.classList.contains('hidden')
+            
+            if (shouldShowPinned) {
+                if (!isCurrentlyShown) {
+                    this.showPinnedArea()
+                } else {
+                    // Mettre à jour la position si elle est déjà affichée
+                    this.pinnedAreaTarget.style.top = scrollTop + 'px'
+                }
+            } else if (isCurrentlyShown) {
+                this.hidePinnedArea()
+            }
+        }
+        
+        showPinnedArea() {
+            this.pinnedAreaTarget.classList.remove('hidden')
+            
+            // Ajuster la position de la zone épinglée par rapport au scroll
+            const scrollTop = this.scrollContainer.scrollTop || 0
+            this.pinnedAreaTarget.style.top = scrollTop + 'px'
+        }
+        
+        hidePinnedArea() {
+            this.pinnedAreaTarget.classList.add('hidden')
+        }
+        
+        // Épinglage des symboles
+        togglePinSymbols(event) {
+            event.preventDefault()
+            if (this.pinnedSymbols) {
+                this.unpinSymbols()
+            } else {
+                this.pinSymbols()
+            }
+        }
+        
+        pinSymbols() {
+            this.pinnedSymbols = true
+            this.pinnedSymbolsSectionTarget.classList.remove('hidden')
+            this.updatePinnedSymbols()
+            this.updatePinButton(this.pinSymbolsBtnTarget, true)
+            this.activateScrollListener()
+            this.savePinningPreferences()
+            
+            // Vérifier immédiatement la position pour tester
+            setTimeout(() => {
+                this.checkScrollPosition()
+            }, 100)
+        }
+        
+        unpinSymbols() {
+            this.pinnedSymbols = false
+            this.pinnedSymbolsSectionTarget.classList.add('hidden')
+            this.updatePinButton(this.pinSymbolsBtnTarget, false)
+            this.checkIfShouldDeactivateScrollListener()
+            this.savePinningPreferences()
+        }
+        
+        // Épinglage du texte
+        togglePinText(event) {
+            event.preventDefault()
+            if (this.pinnedText) {
+                this.unpinText()
+            } else {
+                this.pinText()
+            }
+        }
+        
+        pinText() {
+            this.pinnedText = true
+            this.pinnedTextSectionTarget.classList.remove('hidden')
+            this.updatePinnedText()
+            this.updatePinButton(this.pinTextBtnTarget, true)
+            this.activateScrollListener()
+            this.savePinningPreferences()
+        }
+        
+        unpinText() {
+            this.pinnedText = false
+            this.pinnedTextSectionTarget.classList.add('hidden')
+            this.updatePinButton(this.pinTextBtnTarget, false)
+            this.checkIfShouldDeactivateScrollListener()
+            this.savePinningPreferences()
+        }
+        
+        // Désépingler tout
+        unpinAll(event) {
+            event.preventDefault()
+            this.unpinSymbols()
+            this.unpinText()
+        }
+        
+        // Mise à jour des boutons d'épinglage
+        updatePinButton(button, isPinned) {
+            const icon = button.querySelector('svg')
+            const text = button.querySelector('svg').nextSibling
+            
+            if (isPinned) {
+                button.classList.remove('bg-blue-600', 'hover:bg-blue-500')
+                button.classList.add('bg-green-600', 'hover:bg-green-500')
+                icon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                `
+                text.textContent = ' Épinglé'
+            } else {
+                button.classList.remove('bg-green-600', 'hover:bg-green-500')
+                button.classList.add('bg-blue-600', 'hover:bg-blue-500')
+                icon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                `
+                text.textContent = ' Épingler'
+            }
+        }
+        
+        // Activation/désactivation du listener de scroll
+        activateScrollListener() {
+            if (!this.isScrollListenerActive) {
+                this.isScrollListenerActive = true
+                // Forcer la mise à jour de la position de référence
+                this.inputSectionRect = null
+                
+                // Vérifier immédiatement la position
+                setTimeout(() => {
+                    this.checkScrollPosition()
+                }, 100)
+            }
+        }
+        
+        checkIfShouldDeactivateScrollListener() {
+            if (!this.pinnedSymbols && !this.pinnedText) {
+                this.isScrollListenerActive = false
+                this.hidePinnedArea()
+            }
+        }
+        
+        // Mise à jour des contenus épinglés
+        updatePinnedSymbols() {
+            if (!this.pinnedSymbols) return
+            
+            // Créer une version simplifiée des symboles avec leur représentation visuelle
+            const simplifiedSymbols = this.enteredChars.map((char, index) => {
+                // Vérifier d'abord si c'est un symbole disponible dans la liste
+                const symbol = this.availableSymbolTargets.find(s => s.dataset.char === char)
+                
+                let symbolContent = ''
+                let bgColorClass = 'bg-gray-600'
+                
+                if (symbol) {
+                    // Cas d'un symbole disponible dans l'alphabet
+                    if (symbol.querySelector('span')) {
+                        // Cas d'une police personnalisée - copier le span avec la police
+                        const originalSpan = symbol.querySelector('span')
+                        const computedStyle = window.getComputedStyle(originalSpan)
+                        const fontFamily = computedStyle.fontFamily || originalSpan.style.fontFamily || 'monospace'
+                        symbolContent = `<span style="font-family: ${fontFamily}; font-size: 0.75rem;" class="text-white">${char}</span>`
+                    } else if (symbol.querySelector('img')) {
+                        // Cas d'une image - créer une version miniaturisée
+                        const originalImg = symbol.querySelector('img')
+                        symbolContent = `<img src="${originalImg.src}" alt="${char}" class="w-4 h-4 object-contain">`
+                    } else {
+                        symbolContent = `<span class="text-white text-xs">${char}</span>`
+                    }
+                } else {
+                    // Cas d'un symbole spécial (lettres cardinales, symboles de coordonnées)
+                    if (['N', 'S', 'E', 'W'].includes(char)) {
+                        bgColorClass = 'bg-indigo-700'
+                        symbolContent = `<span class="text-white font-bold text-xs">${char}</span>`
+                    } else if (['°', '.', '′', '″'].includes(char)) {
+                        bgColorClass = 'bg-teal-700'
+                        symbolContent = `<span class="text-white font-bold text-xs">${char}</span>`
+                    } else if (char === ' ') {
+                        bgColorClass = 'bg-gray-500'
+                        symbolContent = `<span class="text-white text-xs">esp</span>`
+                    } else {
+                        symbolContent = `<span class="text-white text-xs">${char}</span>`
+                    }
+                }
+                
+                return `
+                    <div class="mr-1">
+                        <div class="w-6 h-6 ${bgColorClass} rounded flex items-center justify-center cursor-pointer hover:opacity-75 transition-opacity"
+                             data-action="click->alphabet-viewer#removePinnedSymbol"
+                             data-index="${index}"
+                             title="Cliquer pour supprimer ce symbole">
+                            ${symbolContent}
+                        </div>
+                    </div>
+                `
+            }).join('')
+            
+            this.pinnedSymbolsTarget.innerHTML = simplifiedSymbols || '<span class="text-gray-400 text-xs">Aucun symbole</span>'
+        }
+        
+        updatePinnedText() {
+            if (!this.pinnedText) return
+            
+            this.pinnedDecodedTextTarget.value = this.decodedTextTarget.value
+        }
+        
+        // Gestion de la saisie dans le texte épinglé
+        handlePinnedTextInput(event) {
+            if (this.pinnedText) {
+                // Synchroniser avec le texte original
+                this.decodedTextTarget.value = event.target.value
+                // Déclencher la logique de mise à jour
+                this.handleTextInput({ target: this.decodedTextTarget })
+            }
+        }
+        
+        // Supprimer un symbole depuis la zone épinglée
+        removePinnedSymbol(event) {
+            event.preventDefault()
+            const index = parseInt(event.currentTarget.dataset.index)
+            if (index >= 0 && index < this.enteredChars.length) {
+                this.enteredChars.splice(index, 1)
+                this.updateDisplay()
+            }
         }
         
         // Méthode appelée lorsque le contrôleur est déconnecté
@@ -83,6 +415,10 @@
                 sessionStorage.removeItem(`alphabet_${this.alphabetIdValue}_geocache`)
                 this.associatedGeocache = null
             }
+            
+            // Nettoyer les ressources d'épinglage
+            this.isScrollListenerActive = false
+            this.hidePinnedArea()
             
             // Supprimer l'écouteur d'événement beforeunload
             window.removeEventListener('beforeunload', this.beforeUnloadHandler)
@@ -738,6 +1074,14 @@
                     }).join('')
             }
             
+            // Mettre à jour les versions épinglées si nécessaire
+            if (this.pinnedSymbols) {
+                this.updatePinnedSymbols()
+            }
+            if (this.pinnedText && !this.isUpdatingFromTextInput) {
+                this.updatePinnedText()
+            }
+            
             // Détecter les coordonnées si du texte est présent
             if (this.enteredChars.length > 0) {
                 this.detectCoordinatesDebounced(this.decodedTextTarget.value)
@@ -968,6 +1312,11 @@
             
             // Mettre à jour l'affichage (uniquement les symboles, pas le texte)
             this.updateDisplay()
+            
+            // Synchroniser avec le texte épinglé si nécessaire
+            if (this.pinnedText && event.target === this.decodedTextTarget) {
+                this.pinnedDecodedTextTarget.value = newText
+            }
             
             // Détecter les coordonnées
             this.detectCoordinatesDebounced(newText)
