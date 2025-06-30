@@ -515,6 +515,31 @@ def add_geocache():
                 gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
                 geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
 
+        # === Nouveau bloc : gestion des coordonnées corrigées ===
+        if geocache_data.get('is_corrected'):
+            try:
+                orig_lat = geocache_data.get('original_latitude')
+                orig_lon = geocache_data.get('original_longitude')
+                # Si on dispose des anciennes coordonnées on les place comme originales
+                if orig_lat is not None and orig_lon is not None:
+                    # Construire format GC pour les originales
+                    lat_deg = int(abs(orig_lat)); lat_min = (abs(orig_lat) - lat_deg) * 60
+                    lon_deg = int(abs(orig_lon)); lon_min = (abs(orig_lon) - lon_deg) * 60
+                    lat_dir = "N" if orig_lat >= 0 else "S"
+                    lon_dir = "E" if orig_lon >= 0 else "W"
+                    orig_gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                    orig_gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                    geocache.set_location(orig_lat, orig_lon, gc_lat=orig_gc_lat, gc_lon=orig_gc_lon)
+                    geocache.set_location_corrected(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                else:
+                    # Sinon on enregistre simplement les corrigées comme déjà fait
+                    geocache.set_location_corrected(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                geocache.solved = 'solved'
+                geocache.solved_date = datetime.now()
+            except Exception as e:
+                logger.error(f"Erreur lors de l'enregistrement des coordonnées corrigées : {str(e)}")
+        # =========================================================
+
         # Ajouter les waypoints additionnels
         if geocache_data.get('additional_waypoints'):
             for wp_data in geocache_data['additional_waypoints']:

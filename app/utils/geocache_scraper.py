@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 from typing import Optional, Dict, Any, Tuple, List
 from app.utils.logger import setup_logger
 import sys
+import json
+import re
 
 # Configuration de l'encodage pour la sortie console
 if sys.stdout.encoding != 'utf-8':
@@ -187,7 +189,6 @@ def extract_attributes(soup: BeautifulSoup) -> List[Dict]:
     
     # Dump les attributs en JSON pour les logs
     try:
-        import json
         logger.debug(f"Liste des attributs JSON: {json.dumps(attributes)}")
     except:
         logger.debug("Impossible de convertir les attributs en JSON")
@@ -445,19 +446,44 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
         
         # Vérifier si c'est une page Premium
         check_premium_page(soup)
-        
-        # Extraire les informations
-        name = extract_name(soup)
-        owner = extract_owner(soup)
-        cache_type = extract_cache_type(soup)
-        
+
         # Extraire les coordonnées brutes et converties
         coords_elem = soup.find('span', {'id': 'uxLatLon'})
         if not coords_elem:
             raise Exception("Impossible de trouver les coordonnées. Êtes-vous connecté sur geocaching.com ?")
-        
         coords_raw = coords_elem.text.strip()
         lat, lon = parse_coordinates(coords_raw)
+
+        # Déterminer si la coordonnée affichée est corrigée via la class CSS
+        is_corrected_coords = 'myLatLon' in coords_elem.get('class', []) if coords_elem else False
+
+        # ---------------- Détection supplémentaire via userDefinedCoords JS ----------------
+        user_defined_match = re.search(r"var\s+userDefinedCoords\s*=\s*(\{.*?\});", response.text, re.DOTALL)
+        original_lat = None
+        original_lon = None
+        if user_defined_match:
+            try:
+                user_defined_json = user_defined_match.group(1).rstrip(';')  # enlever le point-virgule final
+                user_defined = json.loads(user_defined_json)
+                data_block = user_defined.get('data', {})
+                if data_block.get('isUserDefined'):
+                    is_corrected_coords = True
+                    # Nouvelles coordonnées corrigées (normalement identiques à coords_raw mais on les prend comme référence)
+                    if data_block.get('newLatLng') and len(data_block['newLatLng']) == 2:
+                        lat = data_block['newLatLng'][0]
+                        lon = data_block['newLatLng'][1]
+                    # Anciennes coordonnées originales
+                    if data_block.get('oldLatLng') and len(data_block['oldLatLng']) == 2:
+                        original_lat = data_block['oldLatLng'][0]
+                        original_lon = data_block['oldLatLng'][1]
+            except Exception as e:
+                logger.warning(f"Impossible de parser userDefinedCoords : {str(e)}")
+        # -----------------------------------------------------------------------------------
+
+        # Extraire les informations
+        name = extract_name(soup)
+        owner = extract_owner(soup)
+        cache_type = extract_cache_type(soup)
         
         difficulty, terrain = extract_difficulty_terrain(soup)
         size = extract_size(soup)
@@ -478,7 +504,7 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
             'name': name,
             'owner': owner,
             'cache_type': cache_type,
-            'coordinates_raw': coords_raw,  # Ajout des coordonnées originales
+            'coordinates_raw': coords_raw,
             'latitude': lat,
             'longitude': lon,
             'difficulty': difficulty,
@@ -494,8 +520,13 @@ def scrape_geocache(gc_code: str) -> Optional[Dict[str, Any]]:
             'checkers': checkers,
             'images': [{'url': url} for url in images],
             'found': found,
-            'found_date': found_date
+            'found_date': found_date,
+            'is_corrected': is_corrected_coords,
         }
+        # Ajouter éventuellement les coordonnées originales si elles existent
+        if original_lat is not None and original_lon is not None:
+            cache_data['original_latitude'] = original_lat
+            cache_data['original_longitude'] = original_lon
         
         return cache_data
         
