@@ -46,7 +46,11 @@
             "pinnedDecodedText",
             "pinSymbolsBtn",
             "pinTextBtn",
-            "inputSection"
+            "inputSection",
+            // ==== NOUVEAUX TARGETS POUR LA SECTION COORDONNÉES ====
+            "pinCoordinatesBtn",
+            "pinnedCoordinatesSection",
+            "pinnedCoordinates"
         ]
         
         static values = {
@@ -94,6 +98,7 @@
             // État d'épinglage
             this.pinnedSymbols = false
             this.pinnedText = false
+            this.pinnedCoordinates = false
             
             // Charger les préférences d'épinglage
             this.loadPinningPreferences()
@@ -142,6 +147,9 @@
                     if (preferences.text) {
                         this.pinText()
                     }
+                    if (preferences.coordinates) {
+                        this.pinCoordinates()
+                    }
                 }
             } catch (e) {
                 console.warn('Erreur lors du chargement des préférences d\'épinglage:', e)
@@ -152,7 +160,8 @@
             try {
                 const preferences = {
                     symbols: this.pinnedSymbols,
-                    text: this.pinnedText
+                    text: this.pinnedText,
+                    coordinates: this.pinnedCoordinates
                 }
                 localStorage.setItem(`alphabet_${this.alphabetIdValue}_pinning`, JSON.stringify(preferences))
             } catch (e) {
@@ -186,7 +195,7 @@
                                           inputRect.top <= containerRect.bottom)
             
             // Afficher/masquer la zone épinglée selon la visibilité de la section d'input
-            const shouldShowPinned = !isInputSectionVisible && (this.pinnedSymbols || this.pinnedText)
+            const shouldShowPinned = !isInputSectionVisible && (this.pinnedSymbols || this.pinnedText || this.pinnedCoordinates)
             const isCurrentlyShown = !this.pinnedAreaTarget.classList.contains('hidden')
             
             if (shouldShowPinned) {
@@ -316,7 +325,7 @@
         }
         
         checkIfShouldDeactivateScrollListener() {
-            if (!this.pinnedSymbols && !this.pinnedText) {
+            if (!this.pinnedSymbols && !this.pinnedText && !this.pinnedCoordinates) {
                 this.isScrollListenerActive = false
                 this.hidePinnedArea()
             }
@@ -2934,6 +2943,61 @@
             
             // Stocker la distance calculée pour une utilisation ultérieure (par exemple, dans les waypoints)
             this.lastCalculatedDistance = distanceInfo;
+        }
+
+        // === Épinglage des symboles de coordonnées ===
+        togglePinCoordinates(event) {
+            event.preventDefault()
+            if (this.pinnedCoordinates) {
+                this.unpinCoordinates()
+            } else {
+                this.pinCoordinates()
+            }
+        }
+        
+        pinCoordinates() {
+            this.pinnedCoordinates = true
+            this.pinnedCoordinatesSectionTarget.classList.remove('hidden')
+            this.updatePinnedCoordinates()
+            this.updatePinButton(this.pinCoordinatesBtnTarget, true)
+            this.activateScrollListener()
+            this.savePinningPreferences()
+        }
+        
+        unpinCoordinates() {
+            this.pinnedCoordinates = false
+            this.pinnedCoordinatesSectionTarget.classList.add('hidden')
+            this.updatePinButton(this.pinCoordinatesBtnTarget, false)
+            this.checkIfShouldDeactivateScrollListener()
+            this.savePinningPreferences()
+        }
+
+        // Mise à jour de l'affichage des boutons de coordonnées épinglés
+        updatePinnedCoordinates() {
+            if (!this.pinnedCoordinates) return
+            
+            // Liste des symboles disponibles
+            const coordSymbols = ['N','S','E','W','°','.','′','″',' ']
+            const html = coordSymbols.map(sym => {
+                // Déterminer la couleur de fond
+                let bgCls = 'bg-gray-600'
+                if (['N','S','E','W'].includes(sym)) {
+                    bgCls = 'bg-indigo-700'
+                } else if (['°','.','′','″'].includes(sym)) {
+                    bgCls = 'bg-teal-700'
+                } else if (sym === ' ') {
+                    bgCls = 'bg-gray-500'
+                }
+                const label = sym === ' ' ? 'esp' : sym
+                return `
+                    <div class="mr-1 mb-1">
+                        <button type="button" class="w-8 h-8 ${bgCls} rounded border border-gray-500 flex items-center justify-center text-white text-sm hover:opacity-80 focus:outline-none"
+                                data-action="click->alphabet-viewer#addSpecialSymbol"
+                                data-value="${sym}">${label}</button>
+                    </div>
+                 `
+            }).join('')
+            this.pinnedCoordinatesTarget.innerHTML = html
         }
     })
 })()
