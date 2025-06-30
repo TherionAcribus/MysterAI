@@ -416,18 +416,24 @@ class ScoringService:
         """
         candidates = []
         
+        # Candidat avec ponctuation remplacée par des espaces (important pour les coordonnées)
+        punct_to_spaces = re.sub(r'[.,;:!?(){}[\]"\'-]+', ' ', text)
+        punct_to_spaces = re.sub(r'\s+', ' ', punct_to_spaces).strip()
+        if punct_to_spaces != text:
+            candidates.append(punct_to_spaces)
+        
+        # Candidat sans espaces (prioritaire pour la segmentation wordninja)
+        no_spaces = text.replace(' ', '')
+        if no_spaces != text:
+            candidates.append(no_spaces)
+        
         # Ajouter le texte original
         candidates.append(text)
         
         # Candidat sans doubles espaces
         no_double_spaces = re.sub(r'\s+', ' ', text).strip()
-        if no_double_spaces != text:
+        if no_double_spaces != text and no_double_spaces not in candidates:
             candidates.append(no_double_spaces)
-        
-        # Candidat sans espaces
-        no_spaces = text.replace(' ', '')
-        if no_spaces != text and no_spaces != no_double_spaces:
-            candidates.append(no_spaces)
         
         # Candidat avec compression des espaces entre lettres (H E L L O -> HELLO)
         spaced_letters_pattern = r'(?<!\S)(\S)(?:\s+)(\S)(?:\s+)(\S)(?:\s+)(\S)(?:\s+)(\S)(?!\S)'
