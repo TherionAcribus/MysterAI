@@ -112,6 +112,11 @@
             
             // Debouncer pour le scroll
             this.handleScrollDebounced = this.debounce(this.checkScrollPosition.bind(this), 16) // 60fps
+            
+            // Échelle d'affichage pour chaque section épinglée (1 = taille de base)
+            this.pinnedSymbolsScale = 1
+            this.pinnedTextScale = 1
+            this.pinnedCoordinatesScale = 1
         }
         
         // Trouver le bon conteneur de scroll pour GoldenLayout
@@ -150,6 +155,14 @@
                     if (preferences.coordinates) {
                         this.pinCoordinates()
                     }
+                    if (preferences.symbolsScale) this.pinnedSymbolsScale = preferences.symbolsScale
+                    if (preferences.textScale) this.pinnedTextScale = preferences.textScale
+                    if (preferences.coordinatesScale) this.pinnedCoordinatesScale = preferences.coordinatesScale
++
++                    // Appliquer l'échelle lue
++                    this.updatePinnedSymbols()
++                    this.updatePinnedText()
++                    this.updatePinnedCoordinates()
                 }
             } catch (e) {
                 console.warn('Erreur lors du chargement des préférences d\'épinglage:', e)
@@ -161,7 +174,10 @@
                 const preferences = {
                     symbols: this.pinnedSymbols,
                     text: this.pinnedText,
-                    coordinates: this.pinnedCoordinates
+                    coordinates: this.pinnedCoordinates,
+                    symbolsScale: this.pinnedSymbolsScale,
+                    textScale: this.pinnedTextScale,
+                    coordinatesScale: this.pinnedCoordinatesScale
                 }
                 localStorage.setItem(`alphabet_${this.alphabetIdValue}_pinning`, JSON.stringify(preferences))
             } catch (e) {
@@ -336,6 +352,9 @@
             if (!this.pinnedSymbols) return
             
             // Créer une version simplifiée des symboles avec leur représentation visuelle
+            const baseSize = 24 // px
+            const size = baseSize * this.pinnedSymbolsScale
+            const fontSize = size * 0.75
             const simplifiedSymbols = this.enteredChars.map((char, index) => {
                 // Vérifier d'abord si c'est un symbole disponible dans la liste
                 const symbol = this.availableSymbolTargets.find(s => s.dataset.char === char)
@@ -350,7 +369,7 @@
                         const originalSpan = symbol.querySelector('span')
                         const computedStyle = window.getComputedStyle(originalSpan)
                         const fontFamily = computedStyle.fontFamily || originalSpan.style.fontFamily || 'monospace'
-                        symbolContent = `<span style="font-family: ${fontFamily}; font-size: 0.75rem;" class="text-white">${char}</span>`
+                        symbolContent = `<span style="font-family: ${fontFamily}; font-size: ${fontSize}px;" class="text-white">${char}</span>`
                     } else if (symbol.querySelector('img')) {
                         // Cas d'une image - créer une version miniaturisée
                         const originalImg = symbol.querySelector('img')
@@ -375,11 +394,12 @@
                 }
                 
                 return `
-                    <div class="mr-1">
-                        <div class="w-6 h-6 ${bgColorClass} rounded flex items-center justify-center cursor-pointer hover:opacity-75 transition-opacity"
-                             data-action="click->alphabet-viewer#removePinnedSymbol"
-                             data-index="${index}"
-                             title="Cliquer pour supprimer ce symbole">
+                    <div class="mr-1" style="width:${size}px;height:${size}px;">
+                        <div class="w-full h-full ${bgColorClass} rounded flex items-center justify-center cursor-pointer hover:opacity-75 transition-opacity"
+                              data-action="click->alphabet-viewer#removePinnedSymbol"
+                              data-index="${index}"
+                              title="Cliquer pour supprimer ce symbole"
+                              style="font-size:${fontSize}px">
                             ${symbolContent}
                         </div>
                     </div>
@@ -393,6 +413,9 @@
             if (!this.pinnedText) return
             
             this.pinnedDecodedTextTarget.value = this.decodedTextTarget.value
+            const baseFont = 14 // px
+            const fontSize = baseFont * this.pinnedTextScale
+            this.pinnedDecodedTextTarget.style.fontSize = `${fontSize}px`
         }
         
         // Gestion de la saisie dans le texte épinglé
@@ -2978,6 +3001,9 @@
             
             // Liste des symboles disponibles
             const coordSymbols = ['N','S','E','W','°','.','′','″',' ']
+            const baseSize = 32 // px
+            const size = baseSize * this.pinnedCoordinatesScale
+            const fontSize = size * 0.6
             const html = coordSymbols.map(sym => {
                 // Déterminer la couleur de fond
                 let bgCls = 'bg-gray-600'
@@ -2990,14 +3016,44 @@
                 }
                 const label = sym === ' ' ? 'esp' : sym
                 return `
-                    <div class="mr-1 mb-1">
-                        <button type="button" class="w-8 h-8 ${bgCls} rounded border border-gray-500 flex items-center justify-center text-white text-sm hover:opacity-80 focus:outline-none"
+                    <div class="mr-1 mb-1" style="width:${size}px;height:${size}px;">
+                        <button type="button" class="w-full h-full ${bgCls} rounded border border-gray-500 flex items-center justify-center text-white hover:opacity-80 focus:outline-none"
                                 data-action="click->alphabet-viewer#addSpecialSymbol"
-                                data-value="${sym}">${label}</button>
+                                data-value="${sym}"
+                                style="font-size:${fontSize}px;">${label}</button>
                     </div>
                  `
             }).join('')
             this.pinnedCoordinatesTarget.innerHTML = html
         }
+
+        // ========= GESTION DU ZOOM / TAILLE DES SECTIONS ÉPINGLÉES =========
+        changePinnedSectionScale(section, delta) {
+            const min = 0.5, max = 2, step = 0.25
+            switch(section) {
+                case 'symbols':
+                    this.pinnedSymbolsScale = Math.min(max, Math.max(min, this.pinnedSymbolsScale + delta))
+                    this.updatePinnedSymbols()
+                    break
+                case 'text':
+                    this.pinnedTextScale = Math.min(max, Math.max(min, this.pinnedTextScale + delta))
+                    this.updatePinnedText()
+                    break
+                case 'coordinates':
+                    this.pinnedCoordinatesScale = Math.min(max, Math.max(min, this.pinnedCoordinatesScale + delta))
+                    this.updatePinnedCoordinates()
+                    break
+            }
+            this.savePinningPreferences()
+        }
+
+        increaseSymbolsSize(event){ event.preventDefault(); this.changePinnedSectionScale('symbols', +0.25) }
+        decreaseSymbolsSize(event){ event.preventDefault(); this.changePinnedSectionScale('symbols', -0.25) }
+
+        increaseTextSize(event){ event.preventDefault(); this.changePinnedSectionScale('text', +0.25) }
+        decreaseTextSize(event){ event.preventDefault(); this.changePinnedSectionScale('text', -0.25) }
+
+        increaseCoordinatesSize(event){ event.preventDefault(); this.changePinnedSectionScale('coordinates', +0.25) }
+        decreaseCoordinatesSize(event){ event.preventDefault(); this.changePinnedSectionScale('coordinates', -0.25) }
     })
 })()

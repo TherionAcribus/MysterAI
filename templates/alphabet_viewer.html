@@ -21,11 +21,17 @@
             <div class="mb-3 hidden" data-alphabet-viewer-target="pinnedSymbolsSection">
                 <div class="flex items-center justify-between mb-1">
                     <label class="text-xs font-medium text-gray-400">Symboles entrés</label>
-                    <button type="button"
-                            class="text-xs text-red-400 hover:text-red-300"
-                            data-action="click->alphabet-viewer#unpinSymbols">
-                        Désépingler
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#decreaseSymbolsSize">-</button>
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#increaseSymbolsSize">+</button>
+                        <button type="button"
+                                class="text-xs text-red-400 hover:text-red-300"
+                                data-action="click->alphabet-viewer#unpinSymbols">
+                            Désépingler
+                        </button>
+                    </div>
                 </div>
                 <div class="flex flex-wrap gap-1 min-h-8 p-2 bg-gray-700 rounded text-xs max-h-16 overflow-y-auto"
                      data-alphabet-viewer-target="pinnedSymbols">
@@ -36,11 +42,17 @@
             <div class="hidden" data-alphabet-viewer-target="pinnedTextSection">
                 <div class="flex items-center justify-between mb-1">
                     <label class="text-xs font-medium text-gray-400">Texte décodé</label>
-                    <button type="button"
-                            class="text-xs text-red-400 hover:text-red-300"
-                            data-action="click->alphabet-viewer#unpinText">
-                        Désépingler
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#decreaseTextSize">-</button>
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#increaseTextSize">+</button>
+                        <button type="button"
+                                class="text-xs text-red-400 hover:text-red-300"
+                                data-action="click->alphabet-viewer#unpinText">
+                            Désépingler
+                        </button>
+                    </div>
                 </div>
                 <textarea class="w-full h-12 bg-gray-700 text-white rounded text-xs p-2 resize-none"
                           data-alphabet-viewer-target="pinnedDecodedText"
@@ -51,11 +63,17 @@
             <div class="hidden" data-alphabet-viewer-target="pinnedCoordinatesSection">
                 <div class="flex items-center justify-between mb-1">
                     <label class="text-xs font-medium text-gray-400">Symboles pour coordonnées</label>
-                    <button type="button"
-                            class="text-xs text-red-400 hover:text-red-300"
-                            data-action="click->alphabet-viewer#unpinCoordinates">
-                        Désépingler
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#decreaseCoordinatesSize">-</button>
+                        <button type="button" class="w-4 h-4 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#increaseCoordinatesSize">+</button>
+                        <button type="button"
+                                class="text-xs text-red-400 hover:text-red-300"
+                                data-action="click->alphabet-viewer#unpinCoordinates">
+                            Désépingler
+                        </button>
+                    </div>
                 </div>
                 <div class="flex flex-wrap gap-1 p-2 bg-gray-700 rounded border border-gray-600"
                      data-alphabet-viewer-target="pinnedCoordinates">
