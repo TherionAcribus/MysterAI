@@ -339,7 +339,8 @@ class MetaDetectionPlugin:
             "base_converter",
             "rail_fence_cipher",
             "ubchi_cipher",
-            "caesar_box_cipher"
+            "caesar_box_cipher",
+            "consonants_vowels_rank"
         ]
         
         # Structure du résultat standardisé
