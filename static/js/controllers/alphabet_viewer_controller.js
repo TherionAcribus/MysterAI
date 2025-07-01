@@ -88,6 +88,14 @@
             
             // Initialiser le système d'épinglage
             this.initializePinning()
+            
+            // Initialiser le système de zoom pour les sections principales
+            this.initializeMainSectionsZoom()
+            
+            // Appliquer les échelles après que les éléments DOM soient chargés
+            setTimeout(() => {
+                this.applyAvailableSymbolsScale()
+            }, 100)
         }
         
         // =====================================================
@@ -117,6 +125,25 @@
             this.pinnedSymbolsScale = 1
             this.pinnedTextScale = 1
             this.pinnedCoordinatesScale = 1
+        }
+        
+        // =====================================================
+        // SYSTÈME DE ZOOM POUR LES SECTIONS PRINCIPALES
+        // =====================================================
+        
+        initializeMainSectionsZoom() {
+            // Échelle d'affichage pour les sections principales (1 = taille de base)
+            this.enteredSymbolsScale = 1
+            this.decodedTextScale = 1
+            this.availableSymbolsScale = 1
+            
+            // Charger les préférences de zoom
+            this.loadMainSectionsZoomPreferences()
+            
+            // Appliquer les échelles initiales
+            this.applyEnteredSymbolsScale()
+            this.applyDecodedTextScale()
+            this.applyAvailableSymbolsScale()
         }
         
         // Trouver le bon conteneur de scroll pour GoldenLayout
@@ -183,6 +210,108 @@
             } catch (e) {
                 console.warn('Erreur lors de la sauvegarde des préférences d\'épinglage:', e)
             }
+        }
+        
+        loadMainSectionsZoomPreferences() {
+            try {
+                const prefs = localStorage.getItem(`alphabet_${this.alphabetIdValue}_zoom`)
+                if (prefs) {
+                    const preferences = JSON.parse(prefs)
+                    if (preferences.enteredSymbolsScale) this.enteredSymbolsScale = preferences.enteredSymbolsScale
+                    if (preferences.decodedTextScale) this.decodedTextScale = preferences.decodedTextScale
+                    if (preferences.availableSymbolsScale) this.availableSymbolsScale = preferences.availableSymbolsScale
+                }
+            } catch (e) {
+                console.warn('Erreur lors du chargement des préférences de zoom:', e)
+            }
+        }
+        
+        saveMainSectionsZoomPreferences() {
+            try {
+                const preferences = {
+                    enteredSymbolsScale: this.enteredSymbolsScale,
+                    decodedTextScale: this.decodedTextScale,
+                    availableSymbolsScale: this.availableSymbolsScale
+                }
+                localStorage.setItem(`alphabet_${this.alphabetIdValue}_zoom`, JSON.stringify(preferences))
+            } catch (e) {
+                console.warn('Erreur lors de la sauvegarde des préférences de zoom:', e)
+            }
+        }
+        
+        // Appliquer l'échelle aux symboles entrés
+        applyEnteredSymbolsScale() {
+            if (!this.hasEnteredSymbolsTarget) return
+            
+            // Taille de base : 96px (w-24 h-24)
+            const baseSize = 96
+            const newSize = baseSize * this.enteredSymbolsScale
+            
+            // Appliquer la nouvelle taille aux symboles entrés
+            const symbols = this.enteredSymbolsTarget.querySelectorAll('.w-24.h-24')
+            symbols.forEach(symbol => {
+                symbol.style.width = `${newSize}px`
+                symbol.style.height = `${newSize}px`
+                
+                // Ajuster la taille de la police pour les symboles texte
+                const textSpan = symbol.querySelector('span')
+                if (textSpan) {
+                    const baseFontSize = 40 // 2.5rem = 40px
+                    textSpan.style.fontSize = `${baseFontSize * this.enteredSymbolsScale}px`
+                }
+                
+                // Ajuster la taille des images
+                const img = symbol.querySelector('img')
+                if (img) {
+                    img.style.width = `${newSize}px`
+                    img.style.height = `${newSize}px`
+                }
+            })
+        }
+        
+        // Appliquer l'échelle au texte décodé
+        applyDecodedTextScale() {
+            if (!this.hasDecodedTextTarget) return
+            
+            // Taille de base de la police : 16px (base Tailwind)
+            const baseFontSize = 16
+            const newFontSize = baseFontSize * this.decodedTextScale
+            
+            this.decodedTextTarget.style.fontSize = `${newFontSize}px`
+        }
+        
+        // Appliquer l'échelle aux symboles disponibles
+        applyAvailableSymbolsScale() {
+            if (!this.availableSymbolTargets || this.availableSymbolTargets.length === 0) return
+            
+            // Taille de base : 96px (w-24 h-24)
+            const baseSize = 96
+            const newSize = baseSize * this.availableSymbolsScale
+            
+            // Appliquer la nouvelle taille aux symboles disponibles
+            // Les availableSymbolTargets sont déjà les éléments avec w-24 h-24
+            this.availableSymbolTargets.forEach((symbolElement, index) => {
+                if (symbolElement) {
+                    symbolElement.style.width = `${newSize}px`
+                    symbolElement.style.height = `${newSize}px`
+                    
+                    // Ajuster la taille de la police pour les symboles texte
+                    const textSpan = symbolElement.querySelector('span')
+                    if (textSpan) {
+                        const baseFontSize = 40 // 2.5rem = 40px
+                        textSpan.style.fontSize = `${baseFontSize * this.availableSymbolsScale}px`
+                    }
+                    
+                    // Ajuster la taille des images
+                    const img = symbolElement.querySelector('img')
+                    if (img) {
+                        // Pour les images, ajuster aussi le padding en proportion
+                        const basePadding = 12 // p-3 = 12px
+                        const newPadding = basePadding * this.availableSymbolsScale
+                        img.style.padding = `${newPadding}px`
+                    }
+                }
+            })
         }
         
         // Gestion du scroll
@@ -1105,6 +1234,9 @@
                         return this.createSymbolElement(char, index)
                     }).join('')
             }
+            
+            // Appliquer l'échelle aux symboles entrés après la mise à jour
+            this.applyEnteredSymbolsScale()
             
             // Mettre à jour les versions épinglées si nécessaire
             if (this.pinnedSymbols) {
@@ -3055,5 +3187,34 @@
 
         increaseCoordinatesSize(event){ event.preventDefault(); this.changePinnedSectionScale('coordinates', +0.25) }
         decreaseCoordinatesSize(event){ event.preventDefault(); this.changePinnedSectionScale('coordinates', -0.25) }
+        
+        // ========= GESTION DU ZOOM / TAILLE DES SECTIONS PRINCIPALES =========
+        changeMainSectionScale(section, delta) {
+            const min = 0.5, max = 2, step = 0.25
+            switch(section) {
+                case 'enteredSymbols':
+                    this.enteredSymbolsScale = Math.min(max, Math.max(min, this.enteredSymbolsScale + delta))
+                    this.applyEnteredSymbolsScale()
+                    break
+                case 'decodedText':
+                    this.decodedTextScale = Math.min(max, Math.max(min, this.decodedTextScale + delta))
+                    this.applyDecodedTextScale()
+                    break
+                case 'availableSymbols':
+                    this.availableSymbolsScale = Math.min(max, Math.max(min, this.availableSymbolsScale + delta))
+                    this.applyAvailableSymbolsScale()
+                    break
+            }
+            this.saveMainSectionsZoomPreferences()
+        }
+
+        increaseEnteredSymbolsSize(event){ event.preventDefault(); this.changeMainSectionScale('enteredSymbols', +0.25) }
+        decreaseEnteredSymbolsSize(event){ event.preventDefault(); this.changeMainSectionScale('enteredSymbols', -0.25) }
+
+        increaseDecodedTextSize(event){ event.preventDefault(); this.changeMainSectionScale('decodedText', +0.25) }
+        decreaseDecodedTextSize(event){ event.preventDefault(); this.changeMainSectionScale('decodedText', -0.25) }
+
+        increaseAvailableSymbolsSize(event){ event.preventDefault(); this.changeMainSectionScale('availableSymbols', +0.25) }
+        decreaseAvailableSymbolsSize(event){ event.preventDefault(); this.changeMainSectionScale('availableSymbols', -0.25) }
     })
 })()

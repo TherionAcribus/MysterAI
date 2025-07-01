@@ -178,15 +178,26 @@
         <div class="bg-gray-800 rounded-lg p-4 mb-8" data-alphabet-viewer-target="inputSection">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-white">Symboles entrés</h2>
-                <button type="button"
-                        class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded flex items-center"
-                        data-action="click->alphabet-viewer#togglePinSymbols"
-                        data-alphabet-viewer-target="pinSymbolsBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                    Épingler
-                </button>
+                <div class="flex items-center gap-2">
+                    <!-- Boutons de zoom pour les symboles entrés -->
+                    <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                            data-action="click->alphabet-viewer#decreaseEnteredSymbolsSize"
+                            title="Réduire la taille des symboles">-</button>
+                    <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                            data-action="click->alphabet-viewer#increaseEnteredSymbolsSize"
+                            title="Augmenter la taille des symboles">+</button>
+                    
+                    <!-- Bouton d'épinglage -->
+                    <button type="button"
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded flex items-center"
+                            data-action="click->alphabet-viewer#togglePinSymbols"
+                            data-alphabet-viewer-target="pinSymbolsBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                        Épingler
+                    </button>
+                </div>
             </div>
             <div class="flex flex-wrap gap-4 min-h-24 mb-4 p-4 bg-gray-700 rounded"
                  data-alphabet-viewer-target="enteredSymbols">
@@ -285,6 +296,16 @@
                     <label class="text-sm font-medium text-gray-300">Texte décodé</label>
                     <div class="flex items-center gap-2">
                         <div class="text-xs text-gray-400">Vous pouvez saisir directement du texte ici</div>
+                        
+                        <!-- Boutons de zoom pour le texte décodé -->
+                        <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#decreaseDecodedTextSize"
+                                title="Réduire la taille du texte">-</button>
+                        <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                                data-action="click->alphabet-viewer#increaseDecodedTextSize"
+                                title="Augmenter la taille du texte">+</button>
+                        
+                        <!-- Bouton d'épinglage -->
                         <button type="button"
                                 class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded flex items-center"
                                 data-action="click->alphabet-viewer#togglePinText"
@@ -361,7 +382,18 @@
 
         <!-- Symboles disponibles -->
         <div class="bg-gray-800 rounded-lg p-4">
-            <h2 class="text-lg font-semibold text-white mb-4">Symboles disponibles</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-white">Symboles disponibles</h2>
+                <div class="flex items-center gap-2">
+                    <!-- Boutons de zoom pour les symboles disponibles -->
+                    <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                            data-action="click->alphabet-viewer#decreaseAvailableSymbolsSize"
+                            title="Réduire la taille des symboles">-</button>
+                    <button type="button" class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                            data-action="click->alphabet-viewer#increaseAvailableSymbolsSize"
+                            title="Augmenter la taille des symboles">+</button>
+                </div>
+            </div>
 
             <!-- Lettres minuscules -->
             {% if alphabet.alphabetConfig.characters.letters %}

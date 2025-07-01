@@ -17,6 +17,8 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
    - Fichier : `static/js/controllers/alphabet_viewer_controller.js`
    - Gère toute l'interactivité de l'interface
    - Utilise le framework Stimulus pour une gestion d'état propre
+   - Système de zoom intégré pour toutes les sections principales
+   - Persistance des préférences utilisateur via localStorage
 
 3. **Template HTML**
    - Fichier : `templates/alphabet_viewer.html`
@@ -65,10 +67,16 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 
 - **Présentation**
   - Grille responsive avec espacement uniforme
-  - Taille de symbole : 96x96 pixels (w-24 h-24)
+  - Taille de symbole : 96x96 pixels (w-24 h-24) par défaut, ajustable par zoom
   - Fond gris foncé avec effets de survol
-  - Police de caractères : 2.5rem
+  - Police de caractères : 2.5rem par défaut, ajustable par zoom
   - Affichage de la valeur sous chaque symbole
+
+- **Système de zoom**
+  - Boutons +/- dans l'en-tête de chaque section principale
+  - Plage de zoom : 0.5× à 2× par incréments de 0.25
+  - Persistance des préférences de zoom par alphabet
+  - Application automatique à tous les éléments de la section
 
 ### 2. Interaction avec les Symboles
 
@@ -116,6 +124,29 @@ L'interface des Alphabets est un composant clé de l'application MysteryAI qui p
 - **Désépingle** des coordonnées détectées
 - **Affichage dynamique** des coordonnées épinglées
 - **Gestion des états** (épinglé/désépinglé)
+
+### 4.2 Système de zoom pour les sections principales
+
+- **Sections zoom disponibles**
+  - Symboles entrés : Ajuste la taille des symboles saisis (96px × échelle)
+  - Texte décodé : Ajuste la taille de la police du textarea (16px × échelle)
+  - Symboles disponibles : Ajuste la taille de tous les symboles de l'alphabet
+
+- **Interface utilisateur**
+  - Boutons "-" et "+" dans l'en-tête de chaque section
+  - Tooltips informatifs ("Réduire/Augmenter la taille")
+  - Design cohérent avec les boutons d'épinglage
+
+- **Fonctionnement technique**
+  - Échelle modifiable de 0.5× à 2× par pas de 0.25
+  - Application en temps réel des changements de taille
+  - Ajustement automatique des polices et du padding des images
+  - Sauvegarde automatique des préférences dans localStorage
+
+- **Persistance**
+  - Sauvegarde par alphabet : `alphabet_{id}_zoom`
+  - Rechargement automatique au démarrage du contrôleur
+  - Conservation des préférences entre les sessions
 
 ### 5. Détection de Coordonnées GPS
 
@@ -292,8 +323,35 @@ fetch('/api/detect_coordinates', {
     body: JSON.stringify({ 
         text: text,
         include_numeric_only: true // Pour activer la détection de format numérique pur
-    })
-})
+          })
+  })
+  ```
+
+### 4. Structure HTML pour le Zoom
+```html
+<!-- Exemple d'en-tête de section avec boutons de zoom -->
+<div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold text-white">Symboles entrés</h2>
+    <div class="flex items-center gap-2">
+        <!-- Boutons de zoom -->
+        <button type="button" 
+                class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                data-action="click->alphabet-viewer#decreaseEnteredSymbolsSize"
+                title="Réduire la taille des symboles">-</button>
+        <button type="button" 
+                class="w-6 h-6 bg-gray-600 text-white rounded flex items-center justify-center text-xs hover:bg-gray-500"
+                data-action="click->alphabet-viewer#increaseEnteredSymbolsSize"
+                title="Augmenter la taille des symboles">+</button>
+        
+        <!-- Bouton d'épinglage -->
+        <button type="button"
+                class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded flex items-center"
+                data-action="click->alphabet-viewer#togglePinSymbols"
+                data-alphabet-viewer-target="pinSymbolsBtn">
+            <!-- Icône d'épinglage -->
+        </button>
+    </div>
+</div>
 ```
 
 ## Gestion des Événements
@@ -321,6 +379,82 @@ fetch('/api/detect_coordinates', {
    - Debouncing pour limiter les appels API
 
 ## Exemple de Code
+
+### Initialisation du Système de Zoom
+
+```javascript
+// =====================================================
+// SYSTÈME DE ZOOM POUR LES SECTIONS PRINCIPALES
+// =====================================================
+
+initializeMainSectionsZoom() {
+    // Échelle d'affichage pour les sections principales (1 = taille de base)
+    this.enteredSymbolsScale = 1
+    this.decodedTextScale = 1
+    this.availableSymbolsScale = 1
+    
+    // Charger les préférences de zoom
+    this.loadMainSectionsZoomPreferences()
+    
+    // Appliquer les échelles initiales
+    this.applyEnteredSymbolsScale()
+    this.applyDecodedTextScale()
+    this.applyAvailableSymbolsScale()
+}
+
+// Méthodes pour appliquer l'échelle
+applyEnteredSymbolsScale() {
+    if (!this.hasEnteredSymbolsTarget) return
+    
+    // Taille de base : 96px (w-24 h-24)
+    const baseSize = 96
+    const newSize = baseSize * this.enteredSymbolsScale
+    
+    // Appliquer la nouvelle taille aux symboles entrés
+    const symbols = this.enteredSymbolsTarget.querySelectorAll('.w-24.h-24')
+    symbols.forEach(symbol => {
+        symbol.style.width = `${newSize}px`
+        symbol.style.height = `${newSize}px`
+        
+        // Ajuster la taille de la police pour les symboles texte
+        const textSpan = symbol.querySelector('span')
+        if (textSpan) {
+            const baseFontSize = 40 // 2.5rem = 40px
+            textSpan.style.fontSize = `${baseFontSize * this.enteredSymbolsScale}px`
+        }
+    })
+}
+
+// Gestion des événements de zoom
+changeMainSectionScale(section, delta) {
+    const min = 0.5, max = 2, step = 0.25
+    switch(section) {
+        case 'enteredSymbols':
+            this.enteredSymbolsScale = Math.min(max, Math.max(min, this.enteredSymbolsScale + delta))
+            this.applyEnteredSymbolsScale()
+            break
+        case 'decodedText':
+            this.decodedTextScale = Math.min(max, Math.max(min, this.decodedTextScale + delta))
+            this.applyDecodedTextScale()
+            break
+        case 'availableSymbols':
+            this.availableSymbolsScale = Math.min(max, Math.max(min, this.availableSymbolsScale + delta))
+            this.applyAvailableSymbolsScale()
+            break
+    }
+    this.saveMainSectionsZoomPreferences()
+}
+
+// Méthodes d'interface pour les boutons
+increaseEnteredSymbolsSize(event){ 
+    event.preventDefault(); 
+    this.changeMainSectionScale('enteredSymbols', +0.25) 
+}
+decreaseEnteredSymbolsSize(event){ 
+    event.preventDefault(); 
+    this.changeMainSectionScale('enteredSymbols', -0.25) 
+}
+```
 
 ### Gestion du Glisser-Déposer
 ```javascript
@@ -1106,6 +1240,13 @@ createWaypointWithJSON(gcLat, gcLon, originalCoordinates) {
    - Auto-suppression pour éviter l'encombrement
    - Fallbacks pour les fonctionnalités non disponibles
 
+5. **Système de zoom**
+   - Plage de zoom standardisée (0.5× à 2×) pour une expérience cohérente
+   - Persistance des préférences par alphabet pour un confort d'utilisation optimal
+   - Application en temps réel pour un feedback immédiat
+   - Gestion proportionnelle de tous les éléments (polices, images, padding)
+   - Préférences sauvegardées dans localStorage pour éviter la surcharge serveur
+
 ## Dépendances
 
 - Stimulus.js pour la gestion d'état
@@ -1124,6 +1265,7 @@ L'interface peut être personnalisée via :
 4. Les options du contrôleur Stimulus
 5. Les paramètres de détection des coordonnées
 6. Les préférences d'association de géocaches
+7. Les préférences de zoom et d'épinglage (sauvegardées automatiquement)
 
 ### Architecture du Calcul de Distance
 
