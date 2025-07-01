@@ -341,7 +341,8 @@ class MetaDetectionPlugin:
             "ubchi_cipher",
             "caesar_box_cipher",
             "consonants_vowels_rank",
-            "shadok_numbers"
+            "shadok_numbers",
+            "fox_code"
         ]
         
         # Structure du résultat standardisé

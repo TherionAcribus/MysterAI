@@ -1,0 +1,42 @@
+{
+  "name": "fox_code",
+  "version": "1.1.0",
+  "description": "Encodage et décodage du Fox Code (versions courte et longue)",
+  "author": "MysteryAI Team",
+  "plugin_type": "python",
+  "entry_point": "main.py",
+  "dependencies": [],
+  "categories": ["NumbersDecryption"],
+  "brute_force": true,
+  "enable_scoring": true,
+  "accept_accents": false,
+  "input_types": {
+    "text": {
+      "type": "string",
+      "label": "Texte à traiter",
+      "placeholder": "Entrez le texte ou la séquence de chiffres ici..."
+    },
+    "mode": {
+      "type": "select",
+      "label": "Mode",
+      "options": ["encode", "decode"],
+      "default": "decode"
+    },
+    "variant": {
+      "type": "select",
+      "label": "Variante",
+      "options": [
+        {"value": "auto", "label": "auto (détection)"},
+        {"value": "short", "label": "courte (colonnes seulement)"},
+        {"value": "long", "label": "longue (ligne+colonne)"}
+      ],
+      "default": "auto"
+    }
+  },
+  "output_types": {
+    "result": {
+      "type": "string",
+      "label": "Résultat"
+    }
+  }
+} 
