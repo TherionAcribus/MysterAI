@@ -506,21 +506,21 @@
             <div>
                 <h3 class="text-sm font-medium text-gray-400 mb-2">Caractères spéciaux</h3>
                 <div class="flex flex-wrap gap-3">
-                    {% for char, name in special_map.items() %}
+                    {% for symbol_name, char_value in special_map.items() %}
                         <div class="relative flex flex-col items-center">
                         <div class="w-24 h-24 bg-gray-700 rounded-xl cursor-pointer hover:bg-gray-600 hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center group relative"
                              data-alphabet-viewer-target="availableSymbol"
                              data-action="click->alphabet-viewer#addSymbol"
-                             data-char="{{ char }}"
-                             title="{{ name }}">
+                             data-char="{{ char_value }}"
+                             title="{{ char_value }}">
                             {% if alphabet.alphabetConfig.type == 'images' %}
-                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ name }}.{{ alphabet.alphabetConfig.imageFormat }}"
-                                     alt="{{ char }}"
+                                <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ symbol_name }}.{{ alphabet.alphabetConfig.imageFormat }}"
+                                     alt="{{ char_value }}"
                                      class="w-full h-full object-contain p-3">
                             {% else %}
                                 <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
                                       style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
-                                    {{ char }}
+                                    {{ char_value }}
                                 </span>
                             {% endif %}
                             <div class="absolute -bottom-1 right-1 text-xs text-gray-400 opacity-50 group-hover:opacity-100">
@@ -528,7 +528,7 @@
                                 </div>
                             </div>
                             <div class="text-center mt-1 px-2 py-1 bg-gray-700 rounded-md text-gray-300 font-medium text-sm min-w-10 flex items-center justify-center">
-                                {{ char }}
+                                {{ char_value }}
                             </div>
                         </div>
                     {% endfor %}
