@@ -1,4 +1,12 @@
 <!-- Template pour l'affichage d'un alphabet -->
+<style>
+    /* Fond blanc pour les images d'alphabets transparentes */
+    .alphabet-image-background {
+        background-color: white;
+        border-radius: 0.375rem; /* Rounded corners pour correspondre au style existant */
+    }
+</style>
+
 <div class="h-full bg-gray-900 p-6 overflow-y-auto relative"
      data-controller="alphabet-viewer"
      data-alphabet-viewer-alphabet-id-value="{{ alphabet.id }}"
@@ -410,7 +418,7 @@
                             {% if alphabet.alphabetConfig.type == 'images' %}
                                 <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}{{ alphabet.alphabetConfig.lowercaseSuffix|default('') }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
+                                     class="w-full h-full object-contain p-3 alphabet-image-background">
                             {% else %}
                                 <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
                                       style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
@@ -445,7 +453,7 @@
                             {% if alphabet.alphabetConfig.type == 'images' %}
                                 <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}{{ alphabet.alphabetConfig.uppercaseSuffix|default('') }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
+                                     class="w-full h-full object-contain p-3 alphabet-image-background">
                             {% else %}
                                 <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
                                       style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
@@ -480,7 +488,7 @@
                             {% if alphabet.alphabetConfig.type == 'images' %}
                                 <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ char }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char }}"
-                                     class="w-full h-full object-contain p-3">
+                                     class="w-full h-full object-contain p-3 alphabet-image-background">
                             {% else %}
                                 <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
                                       style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">
@@ -516,7 +524,7 @@
                             {% if alphabet.alphabetConfig.type == 'images' %}
                                 <img src="/api/alphabets/{{ alphabet.id }}/resource/{{ alphabet.alphabetConfig.imageDir }}/{{ symbol_name }}.{{ alphabet.alphabetConfig.imageFormat }}"
                                      alt="{{ char_value }}"
-                                     class="w-full h-full object-contain p-3">
+                                     class="w-full h-full object-contain p-3 alphabet-image-background">
                             {% else %}
                                 <span class="text-white custom-font-{{ alphabet.id }} group-hover:text-gray-200"
                                       style="font-family: '{{ alphabet.name }}', monospace !important; font-size: 2.5rem;">

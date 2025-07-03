@@ -502,7 +502,7 @@
                     } else if (symbol.querySelector('img')) {
                         // Cas d'une image - créer une version miniaturisée
                         const originalImg = symbol.querySelector('img')
-                        symbolContent = `<img src="${originalImg.src}" alt="${char}" class="w-4 h-4 object-contain">`
+                        symbolContent = `<img src="${originalImg.src}" alt="${char}" class="w-4 h-4 object-contain alphabet-image-background">`
                     } else {
                         symbolContent = `<span class="text-white text-xs">${char}</span>`
                     }
@@ -1275,6 +1275,7 @@
                     } else if (symbol.querySelector('img')) {
                         // Cas d'une image
                         symbolContent = symbol.querySelector('img').cloneNode(true)
+                        symbolContent.classList.add('alphabet-image-background')
                     } else {
                     symbolContent = `<span class="text-white text-2xl">${char}</span>`
                 }
