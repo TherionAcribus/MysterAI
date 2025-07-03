@@ -3,12 +3,12 @@
   "description": "Betamaze",
   "type": "alphabet",
   "category": "alphabets",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "alphabetConfig": {
     "type": "font",
     "fontFile": "fonts/betamaze.ttf",
     "hasUpperCase": true,
-    "upperCaseOnly": true,
+    "upperCaseOnly": false,
     "characters": {
       "letters": "all",
       "numbers": "all",
