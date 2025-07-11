@@ -460,7 +460,7 @@ def add_geocache():
             terrain=float(geocache_data.get('terrain', 1.0)),
             size=geocache_data.get('size', ''),
             hints=decoded_hints,
-            favorites_count=int(geocache_data.get('favorites', 0)),
+            favorites_count=int(geocache_data.get('favorites_count', 0)),
             logs_count=int(geocache_data.get('logs_count', 0)),
             hidden_date=hidden_date,
             found=found,

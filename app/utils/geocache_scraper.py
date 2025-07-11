@@ -204,12 +204,62 @@ def extract_cache_type(soup: BeautifulSoup) -> str:
 
 def extract_favorites(soup: BeautifulSoup) -> int:
     """Extrait le nombre de favoris de la géocache"""
+    logger.debug("Début de l'extraction des favoris")
+    
+    # Debug: afficher tout le HTML contenant "favorite"
+    favorite_divs = soup.find_all('div', class_=lambda x: x and 'favorite' in ' '.join(x) if x else False)
+    logger.debug(f"Divs contenant 'favorite': {len(favorite_divs)}")
+    for i, div in enumerate(favorite_divs):
+        logger.debug(f"Div favorite {i}: {div}")
+    
+    # Essayer de trouver l'élément span avec la classe favorite-value
     fav_span = soup.find('span', {'class': 'favorite-value'})
+    logger.debug(f"Span favorite-value trouvé: {fav_span}")
+    
     if not fav_span:
+        # Si pas trouvé, chercher dans le conteneur parent
+        fav_container = soup.find('div', {'class': 'favorite-container'})
+        logger.debug(f"Conteneur favorite-container trouvé: {fav_container}")
+        
+        if fav_container:
+            # Chercher le span à l'intérieur du conteneur
+            fav_span = fav_container.find('span', {'class': 'favorite-value'})
+            logger.debug(f"Span favorite-value dans conteneur: {fav_span}")
+        
+        if not fav_span:
+            # Essayer de trouver dans le div "favorite right"
+            favorite_right = soup.find('div', {'class': 'favorite right'})
+            logger.debug(f"Div favorite right trouvé: {favorite_right}")
+            if favorite_right:
+                fav_span = favorite_right.find('span', {'class': 'favorite-value'})
+                logger.debug(f"Span dans favorite right: {fav_span}")
+        
+        if not fav_span:
+            # Dernier recours: chercher tout span contenant "favorite-value"
+            all_spans = soup.find_all('span')
+            logger.debug(f"Recherche exhaustive dans {len(all_spans)} spans")
+            for span in all_spans:
+                span_classes = span.get('class', [])
+                if 'favorite-value' in span_classes:
+                    fav_span = span
+                    logger.debug(f"Span trouvé via recherche exhaustive: {fav_span}")
+                    break
+    
+    if not fav_span:
+        logger.debug("Aucun span favorite-value trouvé")
         return 0
+    
     try:
-        return int(fav_span.text.strip())
-    except (ValueError, TypeError):
+        # Extraire le texte et nettoyer
+        fav_text = fav_span.text.strip()
+        logger.debug(f"Texte brut des favoris: '{fav_text}'")
+        
+        # Convertir en entier
+        fav_count = int(fav_text)
+        logger.debug(f"Nombre de favoris extrait: {fav_count}")
+        return fav_count
+    except (ValueError, TypeError) as e:
+        logger.error(f"Erreur lors de la conversion des favoris '{fav_span.text}': {str(e)}")
         return 0
 
 def extract_hidden_date(soup: BeautifulSoup) -> str:
