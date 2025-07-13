@@ -570,6 +570,10 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         @apply bg-blue-500 hover:bg-blue-700 text-white action-button;
     }
 
+    .refresh-button {
+        @apply bg-green-500 hover:bg-green-700 text-white action-button;
+    }
+
     .delete-button {
         @apply bg-red-500 hover:bg-red-700 text-white action-button;
     }
@@ -911,6 +915,13 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                 onclick="handleGeocacheDetailsClick(${geocacheId}, '${escapedGcCode}', '${escapedName}', event)"
                             >
                                 Détails
+                            </button>
+                            <button 
+                                class="refresh-button"
+                                onclick="window.refreshGeocache(${geocacheId}, '${escapedGcCode}')"
+                                title="Rafraîchir les données depuis geocaching.com"
+                            >
+                                Rafraîchir
                             </button>
                             <button 
                                 class="delete-button"
@@ -2011,6 +2022,37 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     await reloadTable();
                 } else {
                     messageDiv.textContent = data.error || 'Une erreur est survenue lors de la suppression';
+                    messageDiv.className = 'mt-2 text-red-600';
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                messageDiv.textContent = 'Une erreur est survenue lors de la communication avec le serveur';
+                messageDiv.className = 'mt-2 text-red-600';
+            }
+        };
+
+        // Gestionnaire d'événements pour le rafraîchissement
+        window.refreshGeocache = async function(geocacheId, gcCode) {
+            try {
+                // Afficher l'indicateur de chargement
+                messageDiv.textContent = `Rafraîchissement de ${gcCode} en cours...`;
+                messageDiv.className = 'mt-2 text-blue-600';
+
+                const response = await fetch(`/api/geocaches/${geocacheId}/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.textContent = `${gcCode} rafraîchie avec succès ! Les données ont été mises à jour depuis geocaching.com.`;
+                    messageDiv.className = 'mt-2 text-green-600';
+                    // Recharger le tableau
+                    await reloadTable();
+                } else {
+                    messageDiv.textContent = data.error || 'Une erreur est survenue lors du rafraîchissement';
                     messageDiv.className = 'mt-2 text-red-600';
                 }
             } catch (error) {

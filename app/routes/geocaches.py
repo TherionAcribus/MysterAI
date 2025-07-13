@@ -85,6 +85,7 @@ def get_geocaches(zone_id):
         'logs_count': cache.logs_count,
         'hidden_date': cache.hidden_date.isoformat() if cache.hidden_date else None,
         'created_at': cache.created_at.isoformat() if cache.created_at else None,
+        'last_updated': cache.last_updated.isoformat() if cache.last_updated else None,
         'solved': cache.solved,
         'found': cache.found,
         'found_date': cache.found_date.isoformat() if cache.found_date else None
@@ -149,6 +150,7 @@ def get_geocache(geocache_id):
         'logs_count': geocache.logs_count,
         'hidden_date': geocache.hidden_date.isoformat() if geocache.hidden_date else None,
         'created_at': geocache.created_at.isoformat() if geocache.created_at else None,
+        'last_updated': geocache.last_updated.isoformat() if geocache.last_updated else None,
         'solved': geocache.solved,
         'additional_waypoints': [{
             'id': wp.id,
@@ -3779,3 +3781,262 @@ def get_geocache_by_code(gc_code):
         'found': geocache.found,
         'found_date': geocache.found_date.isoformat() if geocache.found_date else None
     })
+
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/refresh', methods=['POST'])
+def refresh_geocache(geocache_id):
+    """Rafraîchit une géocache existante en refaisant un scrapping tout en préservant les données utilisateur."""
+    try:
+        # Récupérer la géocache existante
+        geocache = Geocache.query.get_or_404(geocache_id)
+        gc_code = geocache.gc_code
+        
+        logger.debug(f"Rafraîchissement de la géocache {gc_code} (ID: {geocache_id})")
+        
+        # Sauvegarder les données utilisateur avant le rafraîchissement
+        user_data = {
+            'solved': geocache.solved,
+            'solved_date': geocache.solved_date,
+            'location_corrected': geocache.location_corrected,
+            'gc_lat_corrected': geocache.gc_lat_corrected,
+            'gc_lon_corrected': geocache.gc_lon_corrected,
+            'description_modified': geocache.description_modified,
+            'gc_personnal_note': geocache.gc_personnal_note,
+            'zones': geocache.zones.copy(),  # Conserver les associations aux zones
+            'notes': geocache.notes.copy()   # Conserver les notes personnelles
+        }
+        
+        logger.debug(f"Données utilisateur sauvegardées pour {gc_code}")
+        
+        # Récupérer les nouvelles données via le scraper
+        logger.debug(f"Récupération des nouvelles données pour {gc_code}")
+        geocache_data = scrape_geocache(gc_code)
+        
+        if not geocache_data:
+            return jsonify({'error': 'Failed to fetch updated geocache data'}), 404
+
+        # Mettre à jour les données liées au scrapping
+        geocache.name = geocache_data.get('name', geocache.name)
+        geocache.cache_type = geocache_data.get('cache_type', geocache.cache_type)
+        geocache.description = geocache_data.get('description', geocache.description)
+        geocache.difficulty = float(geocache_data.get('difficulty', geocache.difficulty))
+        geocache.terrain = float(geocache_data.get('terrain', geocache.terrain))
+        geocache.size = geocache_data.get('size', geocache.size)
+        
+        # Décoder les hints (ROT13)
+        decoded_hints = rot13(geocache_data.get('hints', ''))
+        geocache.hints = decoded_hints
+        
+        geocache.favorites_count = int(geocache_data.get('favorites_count', geocache.favorites_count))
+        geocache.logs_count = int(geocache_data.get('logs_count', geocache.logs_count))
+        
+        # Mettre à jour la date de pose si elle a changé
+        if geocache_data.get('hidden_date'):
+            try:
+                geocache.hidden_date = datetime.strptime(geocache_data['hidden_date'], '%m/%d/%Y')
+            except ValueError as e:
+                logger.warning(f"Impossible de parser la date: {geocache_data['hidden_date']} - {str(e)}")
+        
+        # Mettre à jour le statut "trouvé" si nécessaire
+        found = geocache_data.get('found', False)
+        geocache.found = found
+        if found and geocache_data.get('found_date'):
+            try:
+                geocache.found_date = datetime.strptime(geocache_data['found_date'], '%m/%d/%Y')
+            except ValueError as e:
+                logger.warning(f"Impossible de parser la date de trouvaille: {geocache_data['found_date']} - {str(e)}")
+        
+        # Mettre à jour l'owner si nécessaire
+        owner_name = geocache_data.get('owner', '')
+        if owner_name:
+            with db.session.no_autoflush:
+                owner = Owner.query.filter_by(name=owner_name).first()
+                if not owner:
+                    owner = Owner(name=owner_name)
+                    db.session.add(owner)
+                geocache.owner = owner
+        
+        # Mettre à jour les coordonnées originales (en préservant les coordonnées corrigées)
+        if 'latitude' in geocache_data and 'longitude' in geocache_data:
+            lat = float(geocache_data['latitude'])
+            lon = float(geocache_data['longitude'])
+            
+            # Utiliser les coordonnées brutes si disponibles
+            if 'coordinates_raw' in geocache_data:
+                coords_raw = geocache_data['coordinates_raw']
+                parts = coords_raw.split()
+                if len(parts) >= 6:
+                    gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
+                    gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
+                    geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                else:
+                    # Fallback
+                    lat_deg = int(abs(lat))
+                    lat_min = (abs(lat) - lat_deg) * 60
+                    lon_deg = int(abs(lon))
+                    lon_min = (abs(lon) - lon_deg) * 60
+                    lat_dir = "N" if lat >= 0 else "S"
+                    lon_dir = "E" if lon >= 0 else "W"
+                    gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                    gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                    geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+            else:
+                # Fallback si pas de coordonnées brutes
+                lat_deg = int(abs(lat))
+                lat_min = (abs(lat) - lat_deg) * 60
+                lon_deg = int(abs(lon))
+                lon_min = (abs(lon) - lon_deg) * 60
+                lat_dir = "N" if lat >= 0 else "S"
+                lon_dir = "E" if lon >= 0 else "W"
+                gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+
+        # Supprimer et recréer les waypoints additionnels
+        for waypoint in geocache.additional_waypoints:
+            db.session.delete(waypoint)
+        
+        if geocache_data.get('additional_waypoints'):
+            for wp_data in geocache_data['additional_waypoints']:
+                if isinstance(wp_data, dict):
+                    waypoint = AdditionalWaypoint(
+                        name=wp_data.get('name', ''),
+                        prefix=wp_data.get('prefix', ''),
+                        lookup=wp_data.get('lookup', ''),
+                        note=wp_data.get('note', '')
+                    )
+                    if wp_data.get('latitude') and wp_data.get('longitude'):
+                        lat = float(wp_data['latitude'])
+                        lon = float(wp_data['longitude'])
+                        
+                        gc_coords = wp_data.get('gc_coords', '')
+                        if gc_coords:
+                            parts = gc_coords.split()
+                            if len(parts) >= 6:
+                                gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
+                                gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
+                                waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                            else:
+                                lat_deg = int(abs(lat))
+                                lat_min = (abs(lat) - lat_deg) * 60
+                                lon_deg = int(abs(lon))
+                                lon_min = (abs(lon) - lon_deg) * 60
+                                lat_dir = "N" if lat >= 0 else "S"
+                                lon_dir = "E" if lon >= 0 else "W"
+                                gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                                gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                                waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                        else:
+                            lat_deg = int(abs(lat))
+                            lat_min = (abs(lat) - lat_deg) * 60
+                            lon_deg = int(abs(lon))
+                            lon_min = (abs(lon) - lon_deg) * 60
+                            lat_dir = "N" if lat >= 0 else "S"
+                            lon_dir = "E" if lon >= 0 else "W"
+                            gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                            gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                            waypoint.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                    geocache.additional_waypoints.append(waypoint)
+
+        # Supprimer et recréer les checkers
+        for checker in geocache.checkers:
+            db.session.delete(checker)
+        
+        if geocache_data.get('checkers'):
+            for checker_data in geocache_data['checkers']:
+                if isinstance(checker_data, dict):
+                    checker = Checker(
+                        name=checker_data.get('name', ''),
+                        url=checker_data.get('url', '')
+                    )
+                    geocache.checkers.append(checker)
+
+        # Supprimer et recréer les attributs
+        geocache.attributes.clear()
+        
+        if geocache_data.get('attributes'):
+            for attr_data in geocache_data['attributes']:
+                if isinstance(attr_data, dict):
+                    base_name = attr_data.get('name', '')
+                    is_negative = attr_data.get('is_negative', False)
+                    base_filename = attr_data.get('base_filename', '')
+                    
+                    # Rechercher l'attribut dans la base de données (même logique que l'ajout)
+                    attribute = None
+                    
+                    if base_filename:
+                        main_filename = base_filename
+                        if '-yes' in base_filename:
+                            main_filename = base_filename.replace('-yes', '')
+                            is_negative = False
+                        elif '-no' in base_filename:
+                            main_filename = base_filename.replace('-no', '')
+                            is_negative = True
+                            
+                        attributes = Attribute.query.all()
+                        for attr in attributes:
+                            if attr.icon_url and main_filename in attr.icon_url:
+                                if (is_negative and '-no' in attr.icon_url) or (not is_negative and '-yes' in attr.icon_url):
+                                    attribute = attr
+                                    break
+                    
+                    if not attribute and Attribute.has_new_columns():
+                        potential_names = [
+                            base_name,
+                            base_name.split(' ')[0],
+                            base_name.replace(' allowed', ''),
+                            base_name.replace(' nearby', ''),
+                            base_name.replace('No ', '')
+                        ]
+                        
+                        for potential_name in potential_names:
+                            attribute = Attribute.query.filter(
+                                Attribute.base_name.like(f"%{potential_name}%"),
+                                Attribute.is_negative == is_negative
+                            ).first()
+                            
+                            if attribute:
+                                break
+                    
+                    if not attribute:
+                        attribute = Attribute.query.filter(
+                            Attribute.name.like(f"%{base_name}%")
+                        ).first()
+                    
+                    if attribute:
+                        geocache.attributes.append(attribute)
+
+        # Supprimer et recréer les images (optionnel - les images peuvent être volumineuses)
+        # Pour l'instant, on conserve les images existantes sauf si explicitement demandé
+        
+        # Restaurer les données utilisateur
+        geocache.solved = user_data['solved']
+        geocache.solved_date = user_data['solved_date']
+        geocache.location_corrected = user_data['location_corrected']
+        geocache.gc_lat_corrected = user_data['gc_lat_corrected']
+        geocache.gc_lon_corrected = user_data['gc_lon_corrected']
+        geocache.description_modified = user_data['description_modified']
+        geocache.gc_personnal_note = user_data['gc_personnal_note']
+        
+        # Mettre à jour la date de dernière mise à jour
+        geocache.last_updated = datetime.now()
+        
+        # Les zones et notes sont déjà préservées par la relation
+        
+        # Sauvegarder les changements
+        db.session.commit()
+        
+        logger.debug(f"Géocache {gc_code} rafraîchie avec succès")
+        
+        return jsonify({
+            'message': f'Geocache {gc_code} refreshed successfully',
+            'id': geocache.id,
+            'gc_code': geocache.gc_code,
+            'name': geocache.name
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors du rafraîchissement de la géocache {geocache_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': f'Failed to refresh geocache: {str(e)}'}), 500

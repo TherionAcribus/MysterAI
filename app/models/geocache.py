@@ -326,6 +326,7 @@ class Geocache(db.Model):
     logs_count = db.Column(db.Integer, default=0)
     hidden_date = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     solved = db.Column(db.String(20), default='not_solved')  # "not_solved", "solved", "ongoing"
     solved_date = db.Column(db.DateTime)
     found = db.Column(db.Boolean, default=False)
