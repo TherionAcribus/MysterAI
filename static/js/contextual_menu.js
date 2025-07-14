@@ -70,6 +70,16 @@ function initContextMenu() {
             };
             menu.appendChild(ocrAIOption);
 
+            // Option QR Code
+            const qrOption = document.createElement('div');
+            qrOption.className = 'px-4 py-2 text-white hover:bg-gray-700 cursor-pointer flex items-center';
+            qrOption.innerHTML = '<i class="fas fa-qrcode mr-2"></i>Lire QR Code';
+            qrOption.onclick = () => {
+                runQRCode(targetImage);
+                menu.remove();
+            };
+            menu.appendChild(qrOption);
+
             // Séparateur
             const separator1 = document.createElement('div');
             separator1.className = 'border-t border-gray-700 my-1';
@@ -231,4 +241,74 @@ function runOCR(imageElement, useAI) {
         });
 }
 
+// Fonction QR Code similaire à runOCR
+function runQRCode(imageElement) {
+    const imgSrc = imageElement.src;
+    fetch(imgSrc)
+        .then(resp => resp.blob())
+        .then(blob => {
+            const formData = new FormData();
+            formData.append('image', blob, 'image.png');
+
+            // Afficher chargement (optionnel, peut utiliser la même modale que OCR)
+            if (window.OCRModal) { OCRModal.showLoading(); }
+
+            return fetch('/api/ai/qr/extract', {
+                method: 'POST',
+                body: formData
+            });
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (window.OCRModal) {
+                if (data.success) {
+                    if (data.qr_codes && data.qr_codes.length > 0) {
+                        let resultText = `${data.qr_codes.length} QR Code(s) détecté(s):\n\n`;
+                        data.qr_codes.forEach((qr, index) => {
+                            resultText += `QR Code ${index + 1}: ${qr.data}\n`;
+                        });
+                        OCRModal.showResult(resultText, 1.0); // Confiance maximale pour QR codes
+                    } else {
+                        OCRModal.showResult('Aucun QR Code détecté dans cette image.', 0);
+                    }
+                } else {
+                    OCRModal.showResult('Erreur QR Code: ' + (data.error || 'Erreur inconnue'), 0);
+                }
+            } else {
+                // Fallback alert
+                if (data.success) {
+                    if (data.qr_codes && data.qr_codes.length > 0) {
+                        let message = `${data.qr_codes.length} QR Code(s) détecté(s):\n\n`;
+                        data.qr_codes.forEach((qr, index) => {
+                            message += `QR Code ${index + 1}: ${qr.data}\n`;
+                        });
+                        alert(message);
+                        
+                        // Copier le premier QR code dans le presse-papier si disponible
+                        if (data.qr_codes.length === 1 && navigator.clipboard) {
+                            navigator.clipboard.writeText(data.qr_codes[0].data).then(() => {
+                                console.log('QR code copié dans le presse-papier');
+                            }).catch(err => {
+                                console.error('Erreur lors de la copie:', err);
+                            });
+                        }
+                    } else {
+                        alert('Aucun QR Code détecté dans cette image.');
+                    }
+                } else {
+                    alert('Erreur QR Code: ' + (data.error || 'Erreur inconnue'));
+                }
+            }
+        })
+        .catch(err => {
+            console.error('QR Code error', err);
+            if (window.OCRModal) {
+                OCRModal.showResult('Erreur lors de l\'appel QR Code', 0);
+            } else {
+                alert('Erreur lors de l\'appel QR Code');
+            }
+        });
+}
+
 window.runOCR = runOCR;
+window.runQRCode = runQRCode;

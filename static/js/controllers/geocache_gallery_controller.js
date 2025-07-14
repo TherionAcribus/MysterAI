@@ -64,6 +64,11 @@
                         click: () => this.runOCR(targetImage, true)
                     },
                     {
+                        label: 'Lire QR Code',
+                        icon: 'fas fa-qrcode',
+                        click: () => this.runQRCode(targetImage)
+                    },
+                    {
                         type: 'separator'
                     },
                     {
@@ -164,6 +169,58 @@
                 .catch(err => {
                     console.error('OCR error', err);
                     alert('Erreur lors de l\'appel OCR');
+                });
+        }
+
+        runQRCode(imageElement) {
+            const imgSrc = imageElement.src;
+            // Télécharger l\'image pour l\'obtenir en blob
+            fetch(imgSrc)
+                .then(resp => resp.blob())
+                .then(blob => {
+                    const formData = new FormData();
+                    formData.append('image', blob, 'image.png');
+
+                    return fetch('/api/ai/qr/extract', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.qr_codes && data.qr_codes.length > 0) {
+                            let message = `${data.qr_codes.length} QR Code(s) détecté(s):\n\n`;
+                            data.qr_codes.forEach((qr, index) => {
+                                message += `QR Code ${index + 1}: ${qr.data}\n`;
+                            });
+                            
+                            // Afficher dans une modale plus sophistiquée si disponible
+                            if (window.QRModal) {
+                                QRModal.showResult(data.qr_codes);
+                            } else {
+                                // Fallback vers alert
+                                alert(message);
+                                
+                                // Copier le premier QR code dans le presse-papier si disponible
+                                if (data.qr_codes.length === 1 && navigator.clipboard) {
+                                    navigator.clipboard.writeText(data.qr_codes[0].data).then(() => {
+                                        console.log('QR code copié dans le presse-papier');
+                                    }).catch(err => {
+                                        console.error('Erreur lors de la copie:', err);
+                                    });
+                                }
+                            }
+                        } else {
+                            alert('Aucun QR Code détecté dans cette image.');
+                        }
+                    } else {
+                        alert('Erreur QR Code: ' + (data.error || 'Erreur inconnue'));
+                    }
+                })
+                .catch(err => {
+                    console.error('QR Code error', err);
+                    alert('Erreur lors de l\'appel QR Code');
                 });
         }
     })

@@ -675,4 +675,27 @@ def ocr_extract():
         return jsonify({'success': True, **result})
     except Exception as e:
         logger.error(f"Erreur OCR : {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ai_bp.route('/qr/extract', methods=['POST'])
+def qr_extract():
+    """Détecte et décode les QR codes dans une image.
+
+    Form-data attendu :
+        - image : fichier image (obligatoire)
+    """
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'error': 'Aucun fichier image fourni'}), 400
+
+    image_file = request.files['image']
+
+    from app.services.qr_service import get_qr_service
+    qr_service = get_qr_service()
+
+    try:
+        result = qr_service.detect_qr_codes(image_file.read())
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Erreur QR Code : {e}")
         return jsonify({'success': False, 'error': str(e)}), 500 

@@ -1,0 +1,32 @@
+{
+    "name": "qr_code_detector",
+    "version": "1.0.0",
+    "description": "Plugin pour détecter et décoder les QR codes dans les images d'une géocache",
+    "author": "MysteryAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": ["pyzbar", "opencv-python-headless"],
+    "categories": ["Analysis", "Image"],
+    "brute_force": false,
+
+    "input_types": {
+        "geocache_id": {
+            "type": "string",
+            "label": "ID de la géocache à analyser"
+        }
+    },
+    "output_types": {
+        "findings": {
+            "type": "array",
+            "label": "QR codes détectés dans les images"
+        },
+        "qr_codes": {
+            "type": "array",
+            "label": "Liste des QR codes décodés"
+        },
+        "images_analyzed": {
+            "type": "integer",
+            "label": "Nombre d'images analysées"
+        }
+    }
+} 

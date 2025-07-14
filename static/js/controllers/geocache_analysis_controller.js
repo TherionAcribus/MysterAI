@@ -201,6 +201,42 @@
                     `
                 }
                 
+                // Afficher les QR codes détectés
+                let qrCodes = [];
+                if (combined.qr_code_detector && combined.qr_code_detector.qr_codes && combined.qr_code_detector.qr_codes.length > 0) {
+                    qrCodes = combined.qr_code_detector.qr_codes;
+                }
+                
+                if (qrCodes.length > 0) {
+                    html += `
+                        <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                            <h2 class="text-lg font-semibold text-gray-100 mb-3">QR Codes détectés</h2>
+                            <div class="space-y-2">
+                                ${qrCodes.map(qr => `
+                                    <div class="bg-gray-700 rounded p-3">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <div class="text-gray-200">📱 ${qr.data}</div>
+                                                <div class="text-sm text-gray-400 mt-1">
+                                                    Image: ${qr.image_name} | Qualité: ${qr.quality}
+                                                </div>
+                                            </div>
+                                            <button 
+                                                class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline flex items-center"
+                                                onclick="navigator.clipboard.writeText('${qr.data.replace(/'/g, "\\'")}')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                                Copier
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `
+                }
+                
                 // Regrouper les textes intéressants
                 let interestingTexts = [];
                 
@@ -224,6 +260,15 @@
                 if (combined.image_alt_text_extractor && combined.image_alt_text_extractor.findings && combined.image_alt_text_extractor.findings.length > 0) {
                     combined.image_alt_text_extractor.findings.forEach(text => {
                         interestingTexts.push(`🖼️ ${text}`);
+                    });
+                }
+                
+                // Ajouter les QR codes détectés
+                if (combined.qr_code_detector && combined.qr_code_detector.findings && combined.qr_code_detector.findings.length > 0) {
+                    combined.qr_code_detector.findings.forEach(finding => {
+                        if (finding.isInteresting) {
+                            interestingTexts.push(`📱 QR Code: ${finding.content} (dans ${finding.image_name})`);
+                        }
                     });
                 }
                 
