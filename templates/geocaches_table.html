@@ -244,6 +244,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                 onclick="return handleMultiSolverClick(this, event)">
                             <i class="fas fa-puzzle-piece mr-2"></i> Résoudre les caches filtrées
                         </button>
+                        <button id="refresh-filtered-btn-{{ zone_id }}" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                            <i class="fas fa-sync-alt mr-2"></i> Rafraîchir les caches filtrées
+                        </button>
                         <button id="delete-selected-btn-{{ zone_id }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex items-center">
                             <i class="fas fa-trash mr-2"></i> Supprimer les géocaches filtrées
                         </button>
@@ -423,6 +426,41 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 <button class="confirm-export-gpx bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <span>Exporter</span>
                     <div class="export-loading-indicator hidden ml-2">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de rafraîchissement des géocaches filtrées -->
+    <div id="refreshFilteredModal-{{ zone_id }}" class="refresh-filtered-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-orange-500">Rafraîchir les géocaches filtrées</h3>
+                <button class="close-refresh-filtered-modal text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="text-gray-300 mb-4">Voulez-vous rafraîchir <span class="geocaches-count-to-refresh font-semibold">0</span> géocaches correspondant aux filtres actuels ?</p>
+            
+            <div class="bg-gray-700 p-3 rounded-md mb-4">
+                <h4 class="text-sm font-medium text-gray-200 mb-2">Cette action va :</h4>
+                <ul class="text-sm text-gray-300 space-y-1">
+                    <li>• Mettre à jour les données depuis geocaching.com</li>
+                    <li>• Préserver vos données personnalisées (statut, coordonnées corrigées, notes)</li>
+                    <li>• Actualiser les informations (description, attributs, favoris, logs)</li>
+                    <li>• Peut prendre plusieurs minutes selon le nombre de géocaches</li>
+                </ul>
+            </div>
+            
+            <div class="flex justify-end gap-2">
+                <button class="cancel-refresh-filtered bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Annuler
+                </button>
+                <button class="confirm-refresh-filtered bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <span>Rafraîchir</span>
+                    <div class="refresh-loading-indicator hidden ml-2">
                         <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                     </div>
                 </button>
@@ -655,6 +693,26 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 } else {
                     console.error('Modale de réinitialisation des coordonnées non trouvée');
                 }
+                
+                // Modale de rafraîchissement des géocaches filtrées
+                const refreshFilteredModal = document.getElementById('refreshFilteredModal-{{ zone_id }}');
+                if (refreshFilteredModal) {
+                    console.log('Déplacement de la modale de rafraîchissement vers le conteneur global');
+                    // Vérifier si la modale existe déjà dans le conteneur global
+                    const existingRefreshModal = modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }}');
+                    if (existingRefreshModal) {
+                        existingRefreshModal.remove();
+                    }
+                    
+                    // Cloner et ajouter au conteneur global
+                    const clonedRefreshModal = refreshFilteredModal.cloneNode(true);
+                    modalContainer.appendChild(clonedRefreshModal);
+                    
+                    // Supprimer la modale originale
+                    refreshFilteredModal.remove();
+                } else {
+                    console.error('Modale de rafraîchissement des géocaches filtrées non trouvée');
+                }
             }
         }
         
@@ -779,7 +837,16 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 cancelResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .cancel-reset-coords'),
                 confirmResetCoords: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .confirm-reset-coords'),
                 resetLoadingIndicator: modalContainer.querySelector('#resetCoordsModal-{{ zone_id }} .reset-loading-indicator'),
-                exportGpxBtn: document.getElementById('export-gpx-btn-{{ zone_id }}')
+                exportGpxBtn: document.getElementById('export-gpx-btn-{{ zone_id }}'),
+                
+                // Éléments pour le rafraîchissement des géocaches filtrées
+                refreshFilteredButton: document.getElementById('refresh-filtered-btn-{{ zone_id }}'),
+                refreshFilteredModal: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }}'),
+                geocachesCountToRefresh: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }} .geocaches-count-to-refresh'),
+                closeRefreshFilteredModal: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }} .close-refresh-filtered-modal'),
+                cancelRefreshFiltered: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }} .cancel-refresh-filtered'),
+                confirmRefreshFiltered: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }} .confirm-refresh-filtered'),
+                refreshLoadingIndicator: modalContainer.querySelector('#refreshFilteredModal-{{ zone_id }} .refresh-loading-indicator')
             };
         }
 
@@ -1874,7 +1941,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 importGpxModal, closeImportModal, cancelImport, importGpxForm,
                 copyToZoneModal, targetZoneSelect, cancelCopyToZone, confirmCopyToZone,
                 geocachesCountToCopy, resetCoordsButton, resetCoordsModal,
-                closeResetCoordsModal, cancelResetCoords, confirmResetCoords
+                closeResetCoordsModal, cancelResetCoords, confirmResetCoords,
+                refreshFilteredButton, refreshFilteredModal, closeRefreshFilteredModal,
+                cancelRefreshFiltered, confirmRefreshFiltered
             } = elements;
 
             // Gestionnaire pour le bouton "Réinitialiser les coordonnées"
@@ -1903,6 +1972,36 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 resetCoordsModal.addEventListener('click', function(e) {
                     if (e.target === this) {
                         closeResetCoordsModalFunc();
+                    }
+                });
+            }
+
+            // Gestionnaire pour le bouton "Rafraîchir les caches filtrées"
+            if (refreshFilteredButton) {
+                refreshFilteredButton.addEventListener('click', openRefreshFilteredModal);
+            }
+            
+            // Gestionnaires pour la modale de rafraîchissement des géocaches filtrées
+            if (closeRefreshFilteredModal) {
+                closeRefreshFilteredModal.addEventListener('click', function() {
+                    closeRefreshFilteredModalFunc();
+                });
+            }
+            
+            if (cancelRefreshFiltered) {
+                cancelRefreshFiltered.addEventListener('click', function() {
+                    closeRefreshFilteredModalFunc();
+                });
+            }
+            
+            if (confirmRefreshFiltered) {
+                confirmRefreshFiltered.addEventListener('click', refreshFilteredGeocaches);
+            }
+            
+            if (refreshFilteredModal) {
+                refreshFilteredModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeRefreshFilteredModalFunc();
                     }
                 });
             }
@@ -3044,6 +3143,103 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 
                 // Fermer la modale
                 closeResetCoordsModalFunc();
+            }
+        }
+
+        // Fonction pour ouvrir la modale de rafraîchissement des géocaches filtrées
+        function openRefreshFilteredModal() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { refreshFilteredModal, geocachesCountToRefresh } = elements;
+            
+            // Obtenir les géocaches filtrées
+            const geocacheIds = getFilteredGeocacheIds();
+            
+            // Vérifier s'il y a des géocaches correspondant aux filtres
+            if (!geocacheIds || geocacheIds.length === 0) {
+                alert("Aucune géocache ne correspond aux filtres actuels. Veuillez ajuster vos filtres.");
+                return;
+            }
+            
+            // Mettre à jour le nombre de géocaches qui seront rafraîchies
+            if (geocachesCountToRefresh) {
+                geocachesCountToRefresh.textContent = geocacheIds.length;
+            }
+            
+            // Afficher la modale
+            if (refreshFilteredModal) {
+                refreshFilteredModal.classList.remove('hidden');
+            }
+        }
+        
+        // Fonction pour fermer la modale de rafraîchissement des géocaches filtrées
+        function closeRefreshFilteredModalFunc() {
+            const elements = getModalElements();
+            if (!elements || !elements.refreshFilteredModal) return;
+            
+            elements.refreshFilteredModal.classList.add('hidden');
+        }
+        
+        // Fonction pour rafraîchir les géocaches filtrées
+        async function refreshFilteredGeocaches() {
+            const elements = getModalElements();
+            if (!elements) return;
+            
+            const { refreshLoadingIndicator } = elements;
+            
+            // Afficher l'indicateur de chargement
+            if (refreshLoadingIndicator) {
+                refreshLoadingIndicator.classList.remove('hidden');
+            }
+            
+            try {
+                // Obtenir les IDs des géocaches filtrées
+                const geocacheIds = getFilteredGeocacheIds();
+                
+                if (!geocacheIds || geocacheIds.length === 0) {
+                    showError('Aucune géocache à rafraîchir');
+                    return;
+                }
+                
+                console.log(`Rafraîchissement en lot de ${geocacheIds.length} géocaches...`);
+                
+                const response = await fetch('/api/geocaches/refresh-batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        geocache_ids: geocacheIds
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess(data.message);
+                    
+                    // Afficher des détails si il y a des erreurs
+                    if (data.results && data.results.error_count > 0) {
+                        console.warn('Erreurs lors du rafraîchissement:', data.results.errors);
+                    }
+                } else {
+                    throw new Error(data.error || 'Une erreur est survenue lors du rafraîchissement des géocaches');
+                }
+                
+                // Recharger le tableau
+                await reloadTable();
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError(error.message || 'Une erreur est survenue lors du rafraîchissement des géocaches');
+            } finally {
+                // Cacher l'indicateur de chargement
+                if (refreshLoadingIndicator) {
+                    refreshLoadingIndicator.classList.add('hidden');
+                }
+                
+                // Fermer la modale
+                closeRefreshFilteredModalFunc();
             }
         }
 

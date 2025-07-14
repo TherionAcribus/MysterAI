@@ -4040,3 +4040,166 @@ def refresh_geocache(geocache_id):
         import traceback
         logger.error(traceback.format_exc())
         return jsonify({'error': f'Failed to refresh geocache: {str(e)}'}), 500
+
+@geocaches_bp.route('/api/geocaches/refresh-batch', methods=['POST'])
+def refresh_batch_geocaches():
+    """Rafraîchit plusieurs géocaches en lot tout en préservant les données utilisateur."""
+    try:
+        data = request.get_json()
+        geocache_ids = data.get('geocache_ids', [])
+        
+        if not geocache_ids:
+            return jsonify({'error': 'Aucune géocache spécifiée'}), 400
+        
+        logger.info(f"Rafraîchissement en lot de {len(geocache_ids)} géocaches")
+        
+        results = {
+            'success_count': 0,
+            'error_count': 0,
+            'errors': [],
+            'processed_geocaches': []
+        }
+        
+        for geocache_id in geocache_ids:
+            try:
+                # Récupérer la géocache
+                geocache = Geocache.query.get(geocache_id)
+                if not geocache:
+                    results['error_count'] += 1
+                    results['errors'].append(f"Géocache ID {geocache_id} introuvable")
+                    continue
+                
+                gc_code = geocache.gc_code
+                logger.debug(f"Rafraîchissement de {gc_code}")
+                
+                # Sauvegarder les données utilisateur
+                user_data = {
+                    'solved': geocache.solved,
+                    'solved_date': geocache.solved_date,
+                    'location_corrected': geocache.location_corrected,
+                    'gc_lat_corrected': geocache.gc_lat_corrected,
+                    'gc_lon_corrected': geocache.gc_lon_corrected,
+                    'description_modified': geocache.description_modified,
+                    'gc_personnal_note': geocache.gc_personnal_note,
+                }
+                
+                # Effectuer le scrapping
+                geocache_data = scrape_geocache(gc_code)
+                if not geocache_data:
+                    results['error_count'] += 1
+                    results['errors'].append(f"Impossible de récupérer les données pour {gc_code}")
+                    continue
+                
+                # Mettre à jour les données liées au scrapping
+                geocache.name = geocache_data.get('name', geocache.name)
+                geocache.cache_type = geocache_data.get('cache_type', geocache.cache_type)
+                geocache.description = geocache_data.get('description', geocache.description)
+                geocache.difficulty = float(geocache_data.get('difficulty', geocache.difficulty))
+                geocache.terrain = float(geocache_data.get('terrain', geocache.terrain))
+                geocache.size = geocache_data.get('size', geocache.size)
+                
+                # Décoder les hints (ROT13)
+                decoded_hints = rot13(geocache_data.get('hints', ''))
+                geocache.hints = decoded_hints
+                
+                geocache.favorites_count = int(geocache_data.get('favorites_count', geocache.favorites_count))
+                geocache.logs_count = int(geocache_data.get('logs_count', geocache.logs_count))
+                
+                # Mettre à jour la date de pose si elle a changé
+                if geocache_data.get('hidden_date'):
+                    try:
+                        geocache.hidden_date = datetime.strptime(geocache_data['hidden_date'], '%m/%d/%Y')
+                    except ValueError:
+                        logger.warning(f"Impossible de parser la date pour {gc_code}")
+                
+                # Mettre à jour le statut "trouvé" si nécessaire
+                found = geocache_data.get('found', False)
+                geocache.found = found
+                if found and geocache_data.get('found_date'):
+                    try:
+                        geocache.found_date = datetime.strptime(geocache_data['found_date'], '%m/%d/%Y')
+                    except ValueError:
+                        logger.warning(f"Impossible de parser la date de trouvaille pour {gc_code}")
+                
+                # Mettre à jour l'owner si nécessaire
+                owner_name = geocache_data.get('owner', '')
+                if owner_name:
+                    with db.session.no_autoflush:
+                        owner = Owner.query.filter_by(name=owner_name).first()
+                        if not owner:
+                            owner = Owner(name=owner_name)
+                            db.session.add(owner)
+                        geocache.owner = owner
+                
+                # Mettre à jour les coordonnées originales (en préservant les coordonnées corrigées)
+                if 'latitude' in geocache_data and 'longitude' in geocache_data:
+                    lat = float(geocache_data['latitude'])
+                    lon = float(geocache_data['longitude'])
+                    
+                    # Utiliser les coordonnées brutes si disponibles
+                    if 'coordinates_raw' in geocache_data:
+                        coords_raw = geocache_data['coordinates_raw']
+                        parts = coords_raw.split()
+                        if len(parts) >= 6:
+                            gc_lat = f"{parts[0]} {parts[1]} {parts[2]}"
+                            gc_lon = f"{parts[3]} {parts[4]} {parts[5]}"
+                            geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                        else:
+                            # Fallback
+                            lat_deg = int(abs(lat))
+                            lat_min = (abs(lat) - lat_deg) * 60
+                            lon_deg = int(abs(lon))
+                            lon_min = (abs(lon) - lon_deg) * 60
+                            lat_dir = "N" if lat >= 0 else "S"
+                            lon_dir = "E" if lon >= 0 else "W"
+                            gc_lat = f"{lat_dir} {lat_deg}° {lat_min:.3f}"
+                            gc_lon = f"{lon_dir} {lon_deg}° {lon_min:.3f}"
+                            geocache.set_location(lat, lon, gc_lat=gc_lat, gc_lon=gc_lon)
+                
+                # Restaurer les données utilisateur
+                geocache.solved = user_data['solved']
+                geocache.solved_date = user_data['solved_date']
+                geocache.location_corrected = user_data['location_corrected']
+                geocache.gc_lat_corrected = user_data['gc_lat_corrected']
+                geocache.gc_lon_corrected = user_data['gc_lon_corrected']
+                geocache.description_modified = user_data['description_modified']
+                geocache.gc_personnal_note = user_data['gc_personnal_note']
+                
+                # Mettre à jour la date de dernière mise à jour
+                geocache.last_updated = datetime.now()
+                
+                results['success_count'] += 1
+                results['processed_geocaches'].append({
+                    'id': geocache.id,
+                    'gc_code': gc_code,
+                    'name': geocache.name
+                })
+                
+                logger.debug(f"Géocache {gc_code} rafraîchie avec succès")
+                
+            except Exception as e:
+                results['error_count'] += 1
+                error_msg = f"Erreur lors du rafraîchissement de la géocache ID {geocache_id}: {str(e)}"
+                results['errors'].append(error_msg)
+                logger.error(error_msg)
+                continue
+        
+        # Sauvegarder tous les changements
+        db.session.commit()
+        
+        # Construire le message de retour
+        message = f"Rafraîchissement terminé : {results['success_count']} succès"
+        if results['error_count'] > 0:
+            message += f", {results['error_count']} erreurs"
+        
+        logger.info(f"Rafraîchissement en lot terminé: {results['success_count']} succès, {results['error_count']} erreurs")
+        
+        return jsonify({
+            'message': message,
+            'results': results
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors du rafraîchissement en lot: {str(e)}")
+        return jsonify({'error': f'Erreur lors du rafraîchissement en lot: {str(e)}'}), 500
