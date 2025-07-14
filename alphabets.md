@@ -5,6 +5,37 @@ Le système d'Alphabets permet d'ajouter et de gérer différents types d'alphab
 - Les alphabets basés sur des images (ex: Hexahue)
 - Les alphabets basés sur des polices de caractères (ex: Braille)
 
+## Système de Recherche
+Le système d'alphabets inclut une fonction de recherche avancée qui permet de trouver rapidement des alphabets selon plusieurs critères :
+
+### Types de recherche
+- **Nom & Description** : Recherche dans le nom et la description du JSON (poids élevé)
+- **Tags** : Recherche dans les tags définis (poids élevé)
+- **Description longue (README)** : Recherche dans le fichier README.md s'il existe (poids faible)
+- **Recherche partielle** : Recherche par mots séparés
+
+### Options de recherche
+Vous pouvez choisir où effectuer la recherche grâce aux checkboxes :
+- ✅ **Nom & Description** (activé par défaut) : Recherche dans le nom et la description courte
+- ✅ **Tags** (activé par défaut) : Recherche dans les mots-clés et tags
+- ⬜ **Description longue (README)** (désactivé par défaut) : Recherche dans le contenu du fichier README.md
+
+### Utilisation
+1. Saisissez votre terme de recherche dans le champ "Rechercher"
+2. Sélectionnez les zones de recherche avec les checkboxes
+3. La recherche se fait automatiquement avec un délai de 500ms (debounce)
+4. Les résultats sont triés par pertinence (score de correspondance)
+5. Les correspondances trouvées sont affichées sous chaque alphabet
+6. Appuyez sur Entrée pour une recherche immédiate
+7. Cliquez sur l'icône ❌ pour effacer la recherche
+
+### Exemples de recherche
+- `morse` : Trouve tous les alphabets liés au morse
+- `maritime` : Trouve les alphabets de signalisation maritime  
+- `danse` : Trouve l'alphabet Ballet grâce aux tags
+- `tactile` : Trouve le Braille
+- `circle` : Trouve le Morse Circle
+
 ## Structure du répertoire
 ```
 alphabets/
@@ -30,6 +61,7 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.0.0",
+  "tags": ["tag1", "tag2", "tag3"],                         // Tags pour la recherche
   "sources": [                   // Sources et crédits (optionnel)
     {
       "type": "reference",       // Types: reference, font, credit, author
@@ -61,6 +93,58 @@ Chaque alphabet doit avoir un fichier `alphabet.json` qui définit sa configurat
         ",": "virgule"       // utilisera images/virgule.png
       }
     }
+  }
+}
+```
+
+### Optimisation pour la recherche
+
+#### Tags
+Les tags permettent d'améliorer la découvrabilité des alphabets en incluant des mots-clés pertinents :
+```json
+"tags": ["morse", "télégraphe", "points", "traits", "radio", "sos"]
+```
+
+**Bonnes pratiques pour les tags :**
+- Utilisez des termes descriptifs et variés
+- Incluez des synonymes et variantes
+- Pensez aux contextes d'utilisation (géocaching, thèmes, etc.)
+- Évitez la répétition avec le nom et la description
+- Incluez des termes techniques et populaires
+
+**Types de tags recommandés :**
+- **Thématiques** : maritime, militaire, fantasy, sci-fi
+- **Techniques** : tactile, visuel, auditif
+- **Historiques** : antique, moderne, médiéval
+- **Usage** : géocaching, communication, art
+
+#### Exemples complets
+
+**Alphabet basé sur police (Braille) :**
+```json
+{
+  "name": "Braille",
+  "description": "Alphabet Braille standard",
+  "tags": ["braille", "aveugle", "tactile", "points", "relief", "accessibilité"],
+  "alphabetConfig": {
+    "type": "font",
+    "fontFile": "fonts/braille.ttf",
+    "characters": { "letters": "all", "numbers": "all" }
+  }
+}
+```
+
+**Alphabet basé sur images (Sémaphore) :**
+```json
+{
+  "name": "Sémaphore",
+  "description": "Signalisation maritime par drapeaux",
+  "tags": ["sémaphore", "maritime", "drapeaux", "signalisation", "navire"],
+  "alphabetConfig": {
+    "type": "images",
+    "imageFormat": "png",
+    "imageDir": "images",
+    "characters": { "letters": "all", "numbers": "all" }
   }
 }
 ```

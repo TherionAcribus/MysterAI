@@ -4,6 +4,7 @@
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.0.0",
+  "tags": ["braille", "aveugle", "tactile", "points", "relief", "accessibilité", "malvoyant", "standard"],
   "alphabetConfig": {
     "type": "font",
     "fontFile": "fonts/braille.ttf",

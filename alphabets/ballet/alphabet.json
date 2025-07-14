@@ -1,9 +1,10 @@
 {
   "name": "Ballet",
-  "description": "Ballet",
+  "description": "danseuse, personnage",
   "type": "alphabet",
   "category": "alphabets",
   "version": "1.0.0",
+  "tags": ["ballet", "danse", "danseuse", "personnage", "élégant", "artistique", "thématique", "personnages"],
   "alphabetConfig": {
     "type": "font",
     "fontFile": "fonts/ballet.ttf",

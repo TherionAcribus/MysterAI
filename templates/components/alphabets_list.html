@@ -1,6 +1,75 @@
 <div id="alphabets-panel-content">
     <div class="panel-header border-b border-gray-700 p-2">
         <h2 class="text-lg font-semibold">Alphabets</h2>
+        
+        <!-- Zone de recherche -->
+        <div class="mt-3 mb-2">
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-300">Rechercher:</label>
+                <div class="flex-grow relative">
+                    <input type="text" 
+                        class="bg-gray-800 text-white rounded px-3 py-2 text-sm w-full pr-8"
+                        placeholder="Nom, description, tags..."
+                        name="search"
+                        value="{{ search_query|default('') }}"
+                        data-alphabet-display-target="searchInput"
+                        onkeyup="if(event.keyCode==13) updateAlphabetsList(); else debouncedSearch();">
+                    {% if search_query %}
+                        <button type="button" 
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                            onclick="clearSearch()"
+                            title="Effacer la recherche">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    {% else %}
+                        <i class="fas fa-search absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Options de recherche -->
+            <div class="mt-2 flex flex-wrap gap-4 text-xs">
+                <label class="flex items-center gap-1 text-gray-300">
+                    <input type="checkbox" 
+                        class="form-checkbox text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                        name="search_in_name"
+                        {% if search_in_name %}checked{% endif %}
+                        data-alphabet-display-target="searchInName"
+                        onchange="updateAlphabetsList();">
+                    <span>Nom & Description</span>
+                </label>
+                <label class="flex items-center gap-1 text-gray-300">
+                    <input type="checkbox" 
+                        class="form-checkbox text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                        name="search_in_tags"
+                        {% if search_in_tags %}checked{% endif %}
+                        data-alphabet-display-target="searchInTags"
+                        onchange="updateAlphabetsList();">
+                    <span>Tags</span>
+                </label>
+                <label class="flex items-center gap-1 text-gray-300">
+                    <input type="checkbox" 
+                        class="form-checkbox text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                        name="search_in_readme"
+                        {% if search_in_readme %}checked{% endif %}
+                        data-alphabet-display-target="searchInReadme"
+                        onchange="updateAlphabetsList();">
+                    <span>Description longue (README)</span>
+                </label>
+            </div>
+            
+            {% if search_query %}
+                <div class="mt-1 text-xs text-blue-400">
+                    Recherche pour: "{{ search_query }}" 
+                    {% if alphabets %}
+                        ({{ alphabets|length }} résultat{{ 's' if alphabets|length > 1 else '' }})
+                    {% else %}
+                        (aucun résultat)
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        
         <div class="mt-2 space-y-2" data-controller="alphabet-display">
             <!-- Contrôle d'affichage des exemples -->
             <div class="flex items-center gap-2">
@@ -62,6 +131,9 @@
     </div>
 
     <script>
+    // Variable pour le debounce de recherche
+    let searchTimeout;
+    
     // Fonction pour initialiser les gestionnaires d'événements des alphabets
     function initAlphabetEvents() {
         console.log("Initialisation des gestionnaires d'événements pour les alphabets");
@@ -108,14 +180,46 @@
         }
     }
 
+    // Fonction de recherche avec debounce
+    function debouncedSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            updateAlphabetsList();
+        }, 500); // Attendre 500ms après la dernière frappe
+    }
+
+    // Fonction pour effacer la recherche
+    function clearSearch() {
+        const searchInput = document.querySelector('[name="search"]');
+        if (searchInput) {
+            searchInput.value = '';
+            updateAlphabetsList();
+        }
+    }
+
     function updateAlphabetsList() {
         const showExamples = document.querySelector('[name="show_examples"]').value;
         const exampleText = document.querySelector('[name="example_text"]').value;
         const fontSize = document.querySelector('[name="font_size"]').value;
         const customText = document.querySelector('[name="custom_text"]').value || '';
+        const searchQuery = document.querySelector('[name="search"]').value || '';
+        const searchInName = document.querySelector('[name="search_in_name"]').checked;
+        const searchInTags = document.querySelector('[name="search_in_tags"]').checked;
+        const searchInReadme = document.querySelector('[name="search_in_readme"]').checked;
         
         // Construire l'URL avec les paramètres
-        const url = `/api/alphabets/list?show_examples=${showExamples}&example_text=${exampleText}&font_size=${fontSize}&custom_text=${encodeURIComponent(customText)}`;
+        const params = new URLSearchParams({
+            show_examples: showExamples,
+            example_text: exampleText,
+            font_size: fontSize,
+            custom_text: customText,
+            search: searchQuery,
+            search_in_name: searchInName,
+            search_in_tags: searchInTags,
+            search_in_readme: searchInReadme
+        });
+        
+        const url = `/api/alphabets/list?${params.toString()}`;
         
         // Effectuer la requête HTMX manuellement
         fetch(url)
@@ -128,6 +232,9 @@
                     console.log("Réinitialisation des gestionnaires d'événements après mise à jour des alphabets");
                     initAlphabetEvents();
                 }, 100);
+            })
+            .catch(error => {
+                console.error('Erreur lors de la recherche d\'alphabets:', error);
             });
     }
     

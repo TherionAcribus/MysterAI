@@ -15,6 +15,18 @@
                  hx-trigger="click">
                 <h3 class="font-semibold text-white">{{ alphabet.name }}</h3>
                 <p class="text-sm text-gray-300 mt-1">{{ alphabet.description }}</p>
+                
+                <!-- Afficher les correspondances de recherche -->
+                {% if search_query and alphabet.search_matches %}
+                    <div class="mt-2 text-xs">
+                        <div class="text-blue-400 font-medium">Correspondances trouvées:</div>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            {% for match in alphabet.search_matches %}
+                                <span class="bg-blue-900/50 text-blue-300 px-2 py-1 rounded text-xs">{{ match }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
             </div>
             
             {% if show_examples %}
@@ -56,6 +68,16 @@
     {% endfor %}
 {% else %}
     <div class="text-gray-400 text-center py-4">
-        Aucun alphabet disponible
+        {% if search_query %}
+            Aucun alphabet trouvé pour "<strong>{{ search_query }}</strong>"
+            <div class="text-sm mt-2">
+                Essayez avec d'autres termes ou 
+                <button onclick="clearSearch()" class="text-blue-400 hover:text-blue-300 underline">
+                    effacez la recherche
+                </button>
+            </div>
+        {% else %}
+            Aucun alphabet disponible
+        {% endif %}
     </div>
 {% endif %}

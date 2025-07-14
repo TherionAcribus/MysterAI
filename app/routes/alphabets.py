@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from flask import Blueprint, jsonify, send_file, request, render_template, current_app
 
 alphabets_bp = Blueprint('alphabets', __name__)
@@ -18,12 +19,102 @@ def load_alphabet_config(alphabet_id):
         config['id'] = alphabet_id
         return config
 
-@alphabets_bp.route('/api/alphabets/template', methods=['GET'])
-def get_alphabets_template():
-    """Récupère le template complet avec la liste de tous les alphabets disponibles."""
+def load_alphabet_readme(alphabet_id):
+    """Charge le contenu du README d'un alphabet s'il existe."""
+    alphabet_dir = os.path.join(ALPHABETS_DIR, alphabet_id)
+    possible_names = ["README.md", "Readme.md", "readme.md"]
+    
+    for name in possible_names:
+        readme_path = os.path.join(alphabet_dir, name)
+        if os.path.isfile(readme_path):
+            try:
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except:
+                continue
+    return ""
+
+def search_alphabets(query, alphabets, search_in_name=True, search_in_tags=True, search_in_readme=True):
+    """
+    Recherche dans les alphabets selon une requête et les préférences de recherche.
+    Recherche dans : nom, tags, et contenu README selon les préférences.
+    """
+    if not query or query.strip() == "":
+        return alphabets
+    
+    query = query.lower().strip()
+    results = []
+    
+    for alphabet in alphabets:
+        score = 0
+        matches = []
+        
+        # Recherche dans le nom (si activé)
+        if search_in_name:
+            name = alphabet.get('name', '').lower()
+            if query in name:
+                score += 10
+                matches.append(f"nom: {alphabet.get('name', '')}")
+        
+        # Recherche dans la description (si activé - même checkbox que nom)
+        if search_in_name:
+            description = alphabet.get('description', '').lower()
+            if query in description:
+                score += 5
+                matches.append(f"description: {alphabet.get('description', '')}")
+        
+        # Recherche dans les tags (si activé)
+        if search_in_tags:
+            tags = alphabet.get('tags', [])
+            if isinstance(tags, list):
+                for tag in tags:
+                    if query in tag.lower():
+                        score += 8
+                        matches.append(f"tag: {tag}")
+        
+        # Recherche dans le README (si activé)
+        if search_in_readme:
+            readme_content = load_alphabet_readme(alphabet.get('id', ''))
+            if readme_content and query in readme_content.lower():
+                score += 3
+                matches.append("description longue (README)")
+        
+        # Recherche partielle (mots séparés) - seulement si au moins une option est activée
+        if search_in_name or search_in_tags or search_in_readme:
+            query_words = query.split()
+            for word in query_words:
+                if len(word) >= 3:  # Éviter les mots trop courts
+                    if search_in_name:
+                        # Recherche partielle dans le nom
+                        name = alphabet.get('name', '').lower()
+                        if word in name:
+                            score += 2
+                        # Recherche partielle dans la description
+                        description = alphabet.get('description', '').lower()
+                        if word in description:
+                            score += 1
+                    
+                    if search_in_tags:
+                        # Recherche partielle dans les tags
+                        tags = alphabet.get('tags', [])
+                        if isinstance(tags, list):
+                            for tag in tags:
+                                if word in tag.lower():
+                                    score += 1
+        
+        if score > 0:
+            alphabet['search_score'] = score
+            alphabet['search_matches'] = matches
+            results.append(alphabet)
+    
+    # Trier par score décroissant
+    results.sort(key=lambda x: x.get('search_score', 0), reverse=True)
+    return results
+
+def get_all_alphabets():
+    """Récupère tous les alphabets disponibles."""
     alphabets = []
     
-    # Parcourir le répertoire des alphabets
     if os.path.exists(ALPHABETS_DIR):
         for dirname in os.listdir(ALPHABETS_DIR):
             alphabet_dir = os.path.join(ALPHABETS_DIR, dirname)
@@ -31,6 +122,22 @@ def get_alphabets_template():
                 config = load_alphabet_config(dirname)
                 if config:
                     alphabets.append(config)
+    
+    return alphabets
+
+@alphabets_bp.route('/api/alphabets/template', methods=['GET'])
+def get_alphabets_template():
+    """Récupère le template complet avec la liste de tous les alphabets disponibles."""
+    alphabets = get_all_alphabets()
+    
+    # Gérer la recherche
+    search_query = request.args.get('search', '').strip()
+    search_in_name = request.args.get('search_in_name', 'true').lower() == 'true'
+    search_in_tags = request.args.get('search_in_tags', 'true').lower() == 'true'
+    search_in_readme = request.args.get('search_in_readme', 'false').lower() == 'true'  # Par défaut désactivé
+    
+    if search_query:
+        alphabets = search_alphabets(search_query, alphabets, search_in_name, search_in_tags, search_in_readme)
     
     # Récupérer les paramètres
     show_examples = request.args.get('show_examples', 'false').lower() == 'true'
@@ -48,21 +155,25 @@ def get_alphabets_template():
                            example_text=example_text,
                            custom_text=custom_text,
                            display_text=display_text,
-                           font_size=font_size)
+                           font_size=font_size,
+                           search_query=search_query,
+                           search_in_name=search_in_name,
+                           search_in_tags=search_in_tags,
+                           search_in_readme=search_in_readme)
 
 @alphabets_bp.route('/api/alphabets/list', methods=['GET'])
 def get_alphabets_list():
     """Récupère uniquement la liste des alphabets (contenu) pour les mises à jour HTMX."""
-    alphabets = []
+    alphabets = get_all_alphabets()
     
-    # Parcourir le répertoire des alphabets
-    if os.path.exists(ALPHABETS_DIR):
-        for dirname in os.listdir(ALPHABETS_DIR):
-            alphabet_dir = os.path.join(ALPHABETS_DIR, dirname)
-            if os.path.isdir(alphabet_dir):
-                config = load_alphabet_config(dirname)
-                if config:
-                    alphabets.append(config)
+    # Gérer la recherche
+    search_query = request.args.get('search', '').strip()
+    search_in_name = request.args.get('search_in_name', 'true').lower() == 'true'
+    search_in_tags = request.args.get('search_in_tags', 'true').lower() == 'true'
+    search_in_readme = request.args.get('search_in_readme', 'false').lower() == 'true'  # Par défaut désactivé
+    
+    if search_query:
+        alphabets = search_alphabets(search_query, alphabets, search_in_name, search_in_tags, search_in_readme)
     
     # Récupérer les paramètres
     show_examples = request.args.get('show_examples', 'false').lower() == 'true'
@@ -80,7 +191,11 @@ def get_alphabets_list():
                           example_text=example_text,
                           custom_text=custom_text,
                           display_text=display_text,
-                          font_size=font_size)
+                          font_size=font_size,
+                          search_query=search_query,
+                          search_in_name=search_in_name,
+                          search_in_tags=search_in_tags,
+                          search_in_readme=search_in_readme)
 
 @alphabets_bp.route('/api/alphabets', methods=['GET'])
 def get_alphabets():
