@@ -3428,9 +3428,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         //     handleMapClick(this);
         // });
         
-        document.querySelector('#quickSolve-{{ zone_id }}').addEventListener('click', function() {
+        document.querySelector('#quickSolve-{{ zone_id }}').addEventListener('click', function(event) {
             // Utiliser la même fonction que le bouton "Résoudre les caches filtrées"
-            openMultiSolver();
+            handleMultiSolverClick(this, event);
         });
 
         // Initialiser les tooltips pour les boutons de lancement rapide
@@ -3755,14 +3755,68 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         console.log(`🗺️ Ouverture de la carte avec ${geocacheIds.length} géocaches`);
         
-        // Appeler directement showGeocachesMapPanel
+        // Utiliser directement TabOpenerService au lieu de showGeocachesMapPanel
         const title = `Carte (${geocacheIds.length} géocaches)`;
         const zoneId = parseInt('{{ zone_id }}');
-        showGeocachesMapPanel(geocacheIds, zoneId, title);
+        
+        if (window.TabOpenerService) {
+            // Utiliser TabOpenerService directement
+            const config = {
+                type: 'component',
+                componentName: 'geocaches-map',
+                title: title,
+                uniqueId: `geocaches-map-filtered-${zoneId}-${Date.now()}`,
+                state: {
+                    geocacheIds: geocacheIds,
+                    zoneId: zoneId
+                }
+            };
+            
+            console.log('🗺️ Configuration carte:', config);
+            
+            window.TabOpenerService.openTab(config, false).then(() => {
+                console.log('✅ Carte ouverte avec succès');
+            }).catch(error => {
+                console.error('❌ Erreur ouverture carte:', error);
+                // Fallback vers l'ancienne méthode
+                fallbackMapOpen(geocacheIds, zoneId, title);
+            });
+        } else {
+            console.warn('⚠️ TabOpenerService non disponible, utilisation du fallback');
+            fallbackMapOpen(geocacheIds, zoneId, title);
+        }
         
         // IMPORTANT: Retourner false pour empêcher TabOpenerService
         console.log('🛑 handleMapClick: Retour false pour empêcher TabOpenerService');
         return false;
+    }
+    
+    // Fonction fallback pour ouvrir la carte
+    function fallbackMapOpen(geocacheIds, zoneId, title) {
+        console.log('🔄 Fallback: ouverture de la carte via GoldenLayout');
+        
+        if (window.parent && window.parent.mainLayout) {
+            try {
+                const config = {
+                    type: 'component',
+                    componentName: 'geocaches-map',
+                    title: title,
+                    componentState: {
+                        geocacheIds: geocacheIds,
+                        zoneId: zoneId
+                    }
+                };
+                
+                window.parent.mainLayout.root.contentItems[0].addChild(config);
+                console.log('✅ Carte ouverte via GoldenLayout');
+            } catch (error) {
+                console.error('❌ Erreur GoldenLayout:', error);
+                alert('Erreur lors de l\'ouverture de la carte');
+            }
+        } else {
+            console.error('❌ GoldenLayout non disponible');
+            alert('Impossible d\'ouvrir la carte');
+        }
     }
 
     function handleMultiSolverClick(button, event) {
@@ -3786,14 +3840,72 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         console.log(`🧩 Ouverture du Multi-Solver avec ${geocacheIds.length} géocaches`);
         
-        // Appeler directement showMultiSolverPanel
+        // Récupérer les données complètes des géocaches pour le Multi-Solver
+        const tableId = `geocaches-table-{{ zone_id }}`;
+        const allData = window[`allGeocachesData_${tableId}`] || [];
+        const filteredGeocaches = allData.filter(g => geocacheIds.includes(g.id));
+        
+        // Préparer les données des géocaches pour le multi-solver
+        const geocachesData = filteredGeocaches.map(g => ({
+            id: g.id,
+            gc_code: g.gc_code,
+            name: g.name
+        }));
+        
+        console.log('🧩 Données des géocaches pour le multi-solver:', geocachesData);
+        
+        // Utiliser directement TabOpenerService
         const title = `Multi-Solver (${geocacheIds.length} géocaches)`;
-        const zoneId = parseInt('{{ zone_id }}');
-        showMultiSolverPanel(geocacheIds, zoneId, title);
+        
+        if (window.TabOpenerService) {
+            const config = {
+                type: 'component',
+                componentName: 'multi-solver',
+                title: title,
+                uniqueId: `multi-solver-filtered-{{ zone_id }}-${Date.now()}`,
+                state: {
+                    geocaches: geocachesData,
+                    zoneId: parseInt('{{ zone_id }}')
+                }
+            };
+            
+            console.log('🧩 Configuration Multi-Solver:', config);
+            
+            window.TabOpenerService.openTab(config, false).then(() => {
+                console.log('✅ Multi-Solver ouvert avec succès');
+            }).catch(error => {
+                console.error('❌ Erreur ouverture Multi-Solver:', error);
+                // Fallback vers l'ancienne méthode
+                fallbackMultiSolverOpen(geocachesData, title);
+            });
+        } else {
+            console.warn('⚠️ TabOpenerService non disponible, utilisation du fallback');
+            fallbackMultiSolverOpen(geocachesData, title);
+        }
         
         // IMPORTANT: Retourner false pour empêcher TabOpenerService
         console.log('🛑 handleMultiSolverClick: Retour false pour empêcher TabOpenerService');
         return false;
+    }
+    
+    // Fonction fallback pour ouvrir le Multi-Solver
+    function fallbackMultiSolverOpen(geocachesData, title) {
+        console.log('🔄 Fallback: ouverture du Multi-Solver via postMessage');
+        
+        // Utiliser postMessage comme fallback
+        window.parent.postMessage({
+            type: 'openMultiSolver',
+            geocaches: geocachesData,
+            component: {
+                type: 'component',
+                componentName: 'multi-solver',
+                title: title,
+                componentState: {
+                    url: `/multi-solver`,
+                    geocaches: geocachesData
+                }
+            }
+        }, '*');
     }
 
     // Fonction intelligente pour les liens des codes GC et boutons Détails
