@@ -459,6 +459,9 @@ class TabOpenerService {
             case 'geocache-details':
                 this.addGeocacheDetailsCustomItems(menu, buttonConfig);
                 break;
+            case 'geocache-analysis':
+                this.addGeocacheAnalysisCustomItems(menu, buttonConfig);
+                break;
             case 'geocaches-table':
                 this.addGeocachesTableCustomItems(menu, buttonConfig);
                 break;
@@ -537,6 +540,42 @@ class TabOpenerService {
                 }
             );
             menu.appendChild(solverItem);
+        }
+    }
+
+    /**
+     * Ajoute des options personnalisées pour l'analyse de géocache
+     */
+    addGeocacheAnalysisCustomItems(menu, buttonConfig) {
+        if (buttonConfig.state && buttonConfig.state.geocacheId) {
+            // Séparateur
+            const separator = document.createElement('div');
+            separator.style.cssText = `height: 1px; background: #eee; margin: 4px 0;`;
+            menu.appendChild(separator);
+            
+            // Option: Détails de la géocache
+            const detailsItem = this.createMenuItem(
+                '🗺️ Détails de la géocache',
+                'Ouvrir les détails de cette géocache',
+                () => {
+                    console.log('🗺️ Menu: Ouverture des détails de la géocache');
+                    this.hideContextMenu();
+                    this.openGeocacheDetails(buttonConfig.state.geocacheId);
+                }
+            );
+            menu.appendChild(detailsItem);
+            
+            // Option: Formula Solver
+            const formulaSolverItem = this.createMenuItem(
+                '🧮 Formula Solver',
+                'Ouvrir le Formula Solver pour cette géocache',
+                () => {
+                    console.log('🧮 Menu: Ouverture du Formula Solver');
+                    this.hideContextMenu();
+                    this.openFormulaSolver(buttonConfig.state.geocacheId, buttonConfig.state.gcCode);
+                }
+            );
+            menu.appendChild(formulaSolverItem);
         }
     }
     
@@ -1376,6 +1415,7 @@ class TabOpenerService {
             'geocaches-map': 'geocaches-map',
             'geocaches-table': 'geocaches-table',
             'multi-solver': 'multi-solver',
+            'geocache-analysis': 'GeocacheAnalysis',
             'web-search': 'WebSearch',
             'external-url': 'external-url'
         };
