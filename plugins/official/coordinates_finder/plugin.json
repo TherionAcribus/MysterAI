@@ -1,0 +1,32 @@
+{
+    "name": "coordinates_finder",
+    "version": "1.0.0",
+    "description": "Plugin pour détecter les coordonnées GPS dans le texte d'une géocache sous tous les formats possibles",
+    "author": "MysteryAI",
+    "plugin_type": "python",
+    "entry_point": "main.py",
+    "dependencies": [],
+    "categories": ["Analysis", "Coordinates"],
+    "brute_force": false,
+
+    "input_types": {
+        "text": {
+            "type": "string",
+            "label": "Texte à analyser pour détecter des coordonnées"
+        },
+        "geocache_id": {
+            "type": "string",
+            "label": "ID de la géocache (optionnel)"
+        }
+    },
+    "output_types": {
+        "coordinates": {
+            "type": "object",
+            "label": "Coordonnées détectées au format DDM"
+        },
+        "findings": {
+            "type": "array",
+            "label": "Liste des coordonnées trouvées dans le texte"
+        }
+    }
+} 

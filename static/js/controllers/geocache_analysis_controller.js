@@ -110,6 +110,18 @@
                 // Vérifier s'il y a des coordonnées détectées
                 let coordinates = [];
                 
+                // Vérifier les coordonnées du coordinates_finder (détection générale)
+                if (combined.coordinates_finder && combined.coordinates_finder.coordinates && combined.coordinates_finder.coordinates.exist) {
+                    console.log("Coordonnées trouvées dans coordinates_finder:", combined.coordinates_finder.coordinates);
+                    coordinates.push({
+                        original_text: combined.coordinates_finder.coordinates.ddm || "Coordonnées détectées dans le texte",
+                        lat: combined.coordinates_finder.coordinates.ddm_lat,
+                        lng: combined.coordinates_finder.coordinates.ddm_lon,
+                        source: combined.coordinates_finder.coordinates.source || "coordinates_finder",
+                        confidence: combined.coordinates_finder.coordinates.confidence || 0.75
+                    });
+                }
+                
                 // Vérifier les coordonnées du parser de formules
                 if (combined.formula_parser && combined.formula_parser.coordinates && combined.formula_parser.coordinates.length > 0) {
                     console.log("Coordonnées trouvées dans formula_parser:", combined.formula_parser.coordinates);
@@ -117,7 +129,9 @@
                         coordinates.push({
                             original_text: `${coord.north} ${coord.east}`,
                             lat: coord.north,
-                            lng: coord.east
+                            lng: coord.east,
+                            source: "formula_parser",
+                            confidence: 0.90
                         });
                     });
                 }
@@ -128,7 +142,21 @@
                     coordinates.push({
                         original_text: combined.color_text_detector.coordinates.ddm || "Coordonnées détectées dans un texte coloré",
                         lat: combined.color_text_detector.coordinates.ddm_lat,
-                        lng: combined.color_text_detector.coordinates.ddm_lon
+                        lng: combined.color_text_detector.coordinates.ddm_lon,
+                        source: "color_text_detector",
+                        confidence: combined.color_text_detector.coordinates.confidence || 0.85
+                    });
+                }
+                
+                // Vérifier les coordonnées dans les textes d'images
+                if (combined.image_alt_text_extractor && combined.image_alt_text_extractor.coordinates && combined.image_alt_text_extractor.coordinates.exist) {
+                    console.log("Coordonnées trouvées dans image_alt_text_extractor:", combined.image_alt_text_extractor.coordinates);
+                    coordinates.push({
+                        original_text: combined.image_alt_text_extractor.coordinates.ddm || "Coordonnées détectées dans une image",
+                        lat: combined.image_alt_text_extractor.coordinates.ddm_lat,
+                        lng: combined.image_alt_text_extractor.coordinates.ddm_lon,
+                        source: "image_alt_text_extractor",
+                        confidence: combined.image_alt_text_extractor.coordinates.confidence || 0.80
                     });
                 }
                 
@@ -182,6 +210,9 @@
                                                 <div class="text-sm text-gray-400 mt-1">
                                                     ${coord.lat}, ${coord.lng}
                                                 </div>
+                                                ${coord.source ? `<div class="text-xs text-gray-500 mt-1">
+                                                    Source: ${coord.source} ${coord.confidence ? `(${Math.round(coord.confidence * 100)}%)` : ''}
+                                                </div>` : ''}
                                             </div>
                                             <button 
                                                 class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded focus:outline-none focus:shadow-outline flex items-center"
@@ -239,6 +270,15 @@
                 
                 // Regrouper les textes intéressants
                 let interestingTexts = [];
+                
+                // Ajouter les coordonnées détectées comme textes intéressants
+                if (combined.coordinates_finder && combined.coordinates_finder.findings && combined.coordinates_finder.findings.length > 0) {
+                    combined.coordinates_finder.findings.forEach(finding => {
+                        if (finding.isInteresting) {
+                            interestingTexts.push(`📍 ${finding.content} (${finding.description})`);
+                        }
+                    });
+                }
                 
                 // Ajouter les textes du détecteur de couleur
                 if (combined.color_text_detector && combined.color_text_detector.findings && combined.color_text_detector.findings.length > 0) {

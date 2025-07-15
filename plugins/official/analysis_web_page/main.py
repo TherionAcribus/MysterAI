@@ -50,10 +50,14 @@ class AnalysisWebPagePlugin:
         # On itère sur les sous-plugins
         for step in pipeline:
             plugin_name = step["plugin_name"]
-            # On construit les inputs pour ce sous-plugin
+            # On construit les inputs pour ce sous-plugin (même paramètres que Multi Solver)
             plugin_inputs = {
                 "text": page_content,
-                "geocache_id": geocache_id
+                "geocache_id": geocache_id,
+                "enable_gps_detection": True,  # Paramètre clé pour la détection de coordonnées
+                "mode": "decode",
+                "strict": "smooth", 
+                "embedded": True
                 # ... on peut ajouter d'autres infos,
                 # ou lire step["params"] si besoin
             }
@@ -63,40 +67,101 @@ class AnalysisWebPagePlugin:
             # On stocke le résultat dans combined_results
             combined_results[plugin_name] = result
 
-        # Cas spécifique: si une coordonnée est détectée à la fois par color_text_detector et formula_parser,
-        # ne garder que celle de color_text_detector
-        if 'color_text_detector' in combined_results and 'formula_parser' in combined_results:
-            color_detector_result = combined_results['color_text_detector']
-            formula_parser_result = combined_results['formula_parser']
-            
-            # Vérifier si color_text_detector a trouvé des coordonnées
-            if (color_detector_result and 
-                isinstance(color_detector_result, dict) and 
-                'coordinates' in color_detector_result and 
-                color_detector_result['coordinates'].get('exist', False)):
+        # **NOUVEAU** : Analyser le contenu des QR codes détectés pour les coordonnées
+        if 'qr_code_detector' in combined_results:
+            qr_results = combined_results['qr_code_detector']
+            if qr_results and 'qr_codes' in qr_results:
+                from app.routes.coordinates import detect_gps_coordinates
                 
-                # Extraire les coordonnées du color_text_detector
-                color_coords = color_detector_result['coordinates'].get('ddm', '').strip()
-                
-                # Si formula_parser a également trouvé des coordonnées similaires, les supprimer
-                if (formula_parser_result and 
-                    isinstance(formula_parser_result, dict) and 
-                    'coordinates' in formula_parser_result and 
-                    formula_parser_result['coordinates']):
-                    
-                    # Filtrer les coordonnées qui correspondent à celles de color_text_detector
-                    new_coords = []
-                    for coord in formula_parser_result['coordinates']:
-                        formula_coord = f"{coord.get('north', '')} {coord.get('east', '')}".strip()
-                        # Normaliser les coordonnées pour la comparaison
-                        normalized_color_coords = color_coords.replace("'", "").replace("°", "°")
-                        normalized_formula_coord = formula_coord.replace("'", "").replace("°", "°")
+                for qr_code in qr_results['qr_codes']:
+                    qr_content = qr_code.get('data', '')
+                    if qr_content:
+                        print(f"[DEBUG] Analyse des coordonnées dans QR code: '{qr_content}'")
                         
-                        if normalized_formula_coord not in normalized_color_coords:
-                            new_coords.append(coord)
+                        # Détecter les coordonnées dans le contenu du QR code
+                        coords_result = detect_gps_coordinates(qr_content)
+                        
+                        if coords_result.get('exist', False):
+                            print(f"[DEBUG] Coordonnées détectées dans QR code: {coords_result}")
+                            
+                            # Si coordinates_finder n'a pas trouvé de coordonnées, utiliser celles du QR code
+                            if ('coordinates_finder' not in combined_results or 
+                                not combined_results['coordinates_finder'].get('coordinates', {}).get('exist', False)):
+                                
+                                # Créer ou mettre à jour le résultat de coordinates_finder
+                                if 'coordinates_finder' not in combined_results:
+                                    combined_results['coordinates_finder'] = {'findings': [], 'coordinates': {}}
+                                
+                                combined_results['coordinates_finder']['coordinates'] = coords_result
+                                combined_results['coordinates_finder']['coordinates']['source'] = 'qr_code_content'
+                                
+                                print(f"[DEBUG] Coordonnées du QR code ajoutées à coordinates_finder: {coords_result}")
+                            
+                            # Arrêter après le premier QR code avec des coordonnées valides
+                            break
+
+        # Déduplication intelligente des coordonnées
+        # Priorité: coordinates_finder > color_text_detector > image_alt_text_extractor > formula_parser
+        priority_plugins = ['coordinates_finder', 'color_text_detector', 'image_alt_text_extractor', 'formula_parser']
+        detected_coordinates = []
+        
+        # Collecter toutes les coordonnées détectées avec leur source
+        for plugin_name in priority_plugins:
+            if plugin_name in combined_results:
+                result = combined_results[plugin_name]
+                if (result and isinstance(result, dict) and 'coordinates' in result):
+                    coord_data = result['coordinates']
                     
-                    # Mettre à jour les coordonnées dans formula_parser
-                    combined_results['formula_parser']['coordinates'] = new_coords
+                    # Vérifier que coord_data est un dictionnaire avant d'utiliser .get()
+                    if isinstance(coord_data, dict) and coord_data.get('exist', False):
+                        detected_coordinates.append({
+                            'plugin': plugin_name,
+                            'ddm': coord_data.get('ddm', '').strip(),
+                            'confidence': coord_data.get('confidence', 0.75),
+                            'data': coord_data
+                        })
+        
+        # Si plusieurs plugins ont détecté des coordonnées, appliquer la déduplication
+        if len(detected_coordinates) > 1:
+            print(f"Déduplication des coordonnées : {len(detected_coordinates)} sources détectées")
+            
+            # Garder la source avec la plus haute priorité (premier dans la liste)
+            primary_coord = detected_coordinates[0]
+            primary_ddm = primary_coord['ddm']
+            
+            print(f"Coordonnée principale : {primary_ddm} (source: {primary_coord['plugin']})")
+            
+            # Supprimer les coordonnées similaires des autres plugins
+            for coord in detected_coordinates[1:]:
+                plugin_name = coord['plugin']
+                coord_ddm = coord['ddm']
+                
+                # Normaliser pour comparaison
+                normalized_primary = primary_ddm.replace("'", "").replace("°", "°").replace(" ", "")
+                normalized_current = coord_ddm.replace("'", "").replace("°", "°").replace(" ", "")
+                
+                # Si les coordonnées sont similaires, supprimer de ce plugin
+                if normalized_primary == normalized_current or normalized_current in normalized_primary:
+                    print(f"Suppression de coordonnées dupliquées dans {plugin_name}")
+                    
+                    if plugin_name == 'formula_parser':
+                        # Pour formula_parser, filtrer les coordonnées individuelles
+                        if 'coordinates' in combined_results[plugin_name] and isinstance(combined_results[plugin_name]['coordinates'], list):
+                            new_coords = []
+                            for formula_coord in combined_results[plugin_name]['coordinates']:
+                                # Vérifier que formula_coord est un dictionnaire avant d'utiliser .get()
+                                if isinstance(formula_coord, dict):
+                                    formula_ddm = f"{formula_coord.get('north', '')} {formula_coord.get('east', '')}".strip()
+                                    norm_formula = formula_ddm.replace("'", "").replace("°", "°").replace(" ", "")
+                                    if norm_formula not in normalized_primary:
+                                        new_coords.append(formula_coord)
+                                else:
+                                    # Si ce n'est pas un dictionnaire, le garder tel quel
+                                    new_coords.append(formula_coord)
+                            combined_results[plugin_name]['coordinates'] = new_coords
+                    else:
+                        # Pour les autres plugins, supprimer complètement les coordonnées
+                        combined_results[plugin_name]['coordinates'] = {"exist": False}
         
         # Ajouter les coordonnées décimales pour tous les résultats
         from app.routes.coordinates import convert_ddm_to_decimal

@@ -1206,6 +1206,7 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
     # ------------------------------------------------------------------
     confidence_map = {
         _detect_word_coordinates:            1.00,
+        _detect_geocaching_standard_format:  0.96,  # Nouvelle fonction avec haute priorité
         _detect_compact_coordinates:         0.95,
         _detect_dmm_coordinates:             0.95,
         _detect_dms_coordinates:             0.92,
@@ -1503,4 +1504,52 @@ def _detect_dmm_no_symbol_no_dot(text: str) -> Optional[Dict[str, Optional[str]]
         }
 
     print("[DEBUG] _detect_dmm_no_symbol_no_dot: Aucun match trouvé")
+    return None
+
+# ------------------------------------------------------------------------------
+# Détection du format géocaching standard (ex: "N29 02.879 W98 01.304")
+# ------------------------------------------------------------------------------
+
+def _detect_geocaching_standard_format(text: str) -> Optional[Dict[str, Optional[str]]]:
+    """
+    Détecte les coordonnées au format géocaching standard, par exemple :
+      - "N29 02.879 W98 01.304"
+      - "N48 33.787 E006 38.803"
+    Format : Direction + Degrés + Espace + Minutes.Décimales + Espace + Direction + Degrés + Espace + Minutes.Décimales
+    """
+    print(f"[DEBUG] _detect_geocaching_standard_format: Analyse du texte: '{text[:100]}...' (tronqué)")
+    
+    # Regex spécialement conçue pour le format géocaching standard
+    # Accepte : N/S + 1-2 chiffres + espace + minutes.décimales + espace + E/W + 1-3 chiffres + espace + minutes.décimales
+    geocaching_regex = r'([NS])(\d{1,2})\s+(\d{1,2}\.\d{1,3})\s+([EW])(\d{1,3})\s+(\d{1,2}\.\d{1,3})'
+    
+    print(f"[DEBUG] _detect_geocaching_standard_format: Regex utilisée: {geocaching_regex}")
+    match = re.search(geocaching_regex, text)
+    if match:
+        print(f"[DEBUG] _detect_geocaching_standard_format: Match trouvé! Groupes: {match.groups()}")
+        lat_dir, lat_deg, lat_min, lon_dir, lon_deg, lon_min = match.groups()
+        
+        # Formatage des coordonnées (s'assurer que les minutes ont 3 décimales)
+        def format_minutes(min_str):
+            if '.' in min_str:
+                whole, dec = min_str.split('.')
+                return f"{whole.zfill(2)}.{dec.ljust(3, '0')[:3]}"
+            return f"{min_str.zfill(2)}.000"
+        
+        lat_min_fmt = format_minutes(lat_min)
+        lon_min_fmt = format_minutes(lon_min)
+        
+        ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}'"
+        ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}'"
+        
+        print(f"[DEBUG] _detect_geocaching_standard_format: Coordonnées formatées: {ddm_lat} {ddm_lon}")
+        
+        return {
+            "exist": True,
+            "ddm_lat": ddm_lat,
+            "ddm_lon": ddm_lon,
+            "ddm": f"{ddm_lat} {ddm_lon}"
+        }
+    
+    print("[DEBUG] _detect_geocaching_standard_format: Aucun match trouvé")
     return None

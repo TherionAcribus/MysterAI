@@ -686,8 +686,12 @@ def add_geocache():
                     
                     # Si l'attribut existe, l'associer à la géocache
                     if attribute:
-                        logger.debug(f"Association de l'attribut '{attribute.name}' à la géocache {code}")
-                        geocache.attributes.append(attribute)
+                        # Vérifier si l'attribut n'est pas déjà associé à cette géocache
+                        if attribute not in geocache.attributes:
+                            logger.debug(f"Association de l'attribut '{attribute.name}' à la géocache {code}")
+                            geocache.attributes.append(attribute)
+                        else:
+                            logger.debug(f"Attribut '{attribute.name}' déjà associé à la géocache {code}, ignoré")
                     else:
                         logger.warning(f"Attribut '{base_name}' (négatif: {is_negative}, fichier: {base_filename}) non trouvé dans la base de données")
                 elif isinstance(attr_data, str):
@@ -695,14 +699,22 @@ def add_geocache():
                     logger.debug(f"Attribut sous forme de chaîne: '{attr_data}'")
                     attribute = Attribute.query.filter_by(name=attr_data).first()
                     if attribute:
-                        logger.debug(f"Attribut trouvé par nom exact: {attribute.name} (ID: {attribute.id})")
-                        geocache.attributes.append(attribute)
+                        # Vérifier si l'attribut n'est pas déjà associé à cette géocache
+                        if attribute not in geocache.attributes:
+                            logger.debug(f"Attribut trouvé par nom exact: {attribute.name} (ID: {attribute.id})")
+                            geocache.attributes.append(attribute)
+                        else:
+                            logger.debug(f"Attribut '{attribute.name}' déjà associé à la géocache {code}, ignoré")
                     else:
                         # Essayons de le trouver par nom partiel
                         attribute = Attribute.query.filter(Attribute.name.like(f"%{attr_data}%")).first()
                         if attribute:
-                            logger.debug(f"Attribut trouvé par nom partiel: {attribute.name} (ID: {attribute.id})")
-                            geocache.attributes.append(attribute)
+                            # Vérifier si l'attribut n'est pas déjà associé à cette géocache
+                            if attribute not in geocache.attributes:
+                                logger.debug(f"Attribut trouvé par nom partiel: {attribute.name} (ID: {attribute.id})")
+                                geocache.attributes.append(attribute)
+                            else:
+                                logger.debug(f"Attribut '{attribute.name}' déjà associé à la géocache {code}, ignoré")
                         else:
                             logger.warning(f"Attribut '{attr_data}' non trouvé dans la base de données")
                 else:
@@ -2011,8 +2023,12 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                                     
                                     # Si l'attribut existe, l'associer à la géocache
                                     if attribute:
-                                        current_app.logger.debug(f"Ajout de l'attribut à la géocache existante: {attribute.name}")
-                                        existing_geocache.attributes.append(attribute)
+                                        # Vérifier si l'attribut n'est pas déjà associé à cette géocache
+                                        if attribute not in existing_geocache.attributes:
+                                            current_app.logger.debug(f"Ajout de l'attribut à la géocache existante: {attribute.name}")
+                                            existing_geocache.attributes.append(attribute)
+                                        else:
+                                            current_app.logger.debug(f"Attribut '{attribute.name}' déjà associé à la géocache existante, ignoré")
                                     else:
                                         current_app.logger.warning(f"Attribut non trouvé dans la base: {attr_text}")
                                         
@@ -2221,8 +2237,12 @@ def process_gpx_file(gpx_file_path, zone_id, update_existing):
                             
                             # Si l'attribut existe, l'associer à la géocache
                             if attribute:
-                                current_app.logger.debug(f"Attribut trouvé dans la base: {attribute.name}")
-                                geocache.attributes.append(attribute)
+                                # Vérifier si l'attribut n'est pas déjà associé à cette géocache
+                                if attribute not in geocache.attributes:
+                                    current_app.logger.debug(f"Attribut trouvé dans la base: {attribute.name}")
+                                    geocache.attributes.append(attribute)
+                                else:
+                                    current_app.logger.debug(f"Attribut '{attribute.name}' déjà associé à la géocache, ignoré")
                             else:
                                 current_app.logger.warning(f"Attribut non trouvé dans la base: {attr_text}")
                                 
@@ -4003,7 +4023,9 @@ def refresh_geocache(geocache_id):
                         ).first()
                     
                     if attribute:
-                        geocache.attributes.append(attribute)
+                        # Vérifier si l'attribut n'est pas déjà associé à cette géocache (sécurité supplémentaire)
+                        if attribute not in geocache.attributes:
+                            geocache.attributes.append(attribute)
 
         # Supprimer et recréer les images (optionnel - les images peuvent être volumineuses)
         # Pour l'instant, on conserve les images existantes sauf si explicitement demandé
