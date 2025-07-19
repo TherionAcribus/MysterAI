@@ -100,11 +100,29 @@ class DictionaryService:
                 self.scoring_service = ScoringService()
                 self.scoring_service_available = True
                 print("DictionaryService: Service de scoring initialisé avec succès")
+                
+                # NOUVEAU : Obtenir un accès direct aux Bloom filters pour des performances optimales
+                if hasattr(self.scoring_service, '_bloom_filters'):
+                    self._bloom_filters = self.scoring_service._bloom_filters
+                    print(f"DictionaryService: Accès direct aux Bloom filters - Langues disponibles: {list(self._bloom_filters.keys())}")
+                    
+                    # Afficher les statistiques des dictionnaires
+                    for lang, bloom_filter in self._bloom_filters.items():
+                        if hasattr(bloom_filter, '__len__'):
+                            print(f"  - {lang}: {len(bloom_filter):,} mots")
+                        else:
+                            print(f"  - {lang}: filtre disponible")
+                else:
+                    self._bloom_filters = {}
+                    print("DictionaryService: Pas d'accès direct aux Bloom filters")
+                    
             except Exception as e:
                 print(f"DictionaryService: Erreur lors de l'initialisation du scoring: {str(e)}")
                 self.scoring_service_available = False
+                self._bloom_filters = {}
         else:
             print("DictionaryService: Service de scoring non disponible")
+            self._bloom_filters = {}
     
     def is_valid_word(self, word: str, language: str = None, strict: bool = False) -> bool:
         """
@@ -121,41 +139,76 @@ class DictionaryService:
         if not word or len(word) < 2:
             return False
         
-        word = word.strip().upper()
+        word_normalized = word.strip().lower()  # Normaliser en minuscules pour les Bloom filters
+        word_upper = word.strip().upper()
         
         # Vérifier dans le cache
-        cache_key = f"{word}_{language}_{strict}"
+        cache_key = f"{word_upper}_{language}_{strict}"
         if cache_key in self._word_cache:
             return self._word_cache[cache_key]
         
         # Vérifier dans les termes de géocaching
-        if self._is_geocaching_term(word, language):
+        if self._is_geocaching_term(word_upper, language):
             self._word_cache[cache_key] = True
             return True
         
-        # Utiliser le service de scoring si disponible
+        # NOUVEAU : Accès direct aux Bloom filters pour une performance optimale
+        if hasattr(self, '_bloom_filters') and self._bloom_filters:
+            # Déterminer la langue à utiliser
+            target_language = language or self.default_language
+            
+            # Vérifier dans le Bloom filter de la langue cible
+            if target_language in self._bloom_filters:
+                bloom_filter = self._bloom_filters[target_language]
+                if word_normalized in bloom_filter:
+                    # Si strict est demandé, vérifier aussi le score Zipf
+                    if strict and wordfreq_available:
+                        freq = zipf_frequency(word_normalized, target_language)
+                        is_valid = freq >= 2.0  # Seuil strict
+                    else:
+                        is_valid = True
+                    
+                    self._word_cache[cache_key] = is_valid
+                    return is_valid
+            
+            # Si pas trouvé dans la langue cible, essayer l'anglais comme fallback
+            if target_language != 'en' and 'en' in self._bloom_filters:
+                bloom_filter = self._bloom_filters['en']
+                if word_normalized in bloom_filter:
+                    # Mot trouvé en anglais, score réduit si strict
+                    if strict and wordfreq_available:
+                        freq = zipf_frequency(word_normalized, 'en')
+                        is_valid = freq >= 2.5  # Seuil plus strict pour langue non-native
+                    else:
+                        is_valid = True
+                    
+                    self._word_cache[cache_key] = is_valid
+                    return is_valid
+        
+        # Fallback vers l'ancien système si pas de Bloom filters
         if self.scoring_service_available and self.scoring_service:
             try:
-                result = self.scoring_service.score_text(word.lower())
+                result = self.scoring_service.score_text(word_normalized)
                 if result and 'score' in result:
                     threshold = 0.6 if strict else 0.3
                     is_valid = result['score'] >= threshold
                     self._word_cache[cache_key] = is_valid
                     return is_valid
             except Exception as e:
-                print(f"DictionaryService: Erreur lors de la validation de '{word}': {str(e)}")
+                # Ignorer les erreurs d'application context et continuer
+                pass
         
         # Fallback: vérification basique avec wordfreq si disponible
         if wordfreq_available:
             lang = language or self.default_language
-            freq = zipf_frequency(word.lower(), lang)
+            freq = zipf_frequency(word_normalized, lang)
             threshold = 2.0 if strict else 1.0
             is_valid = freq >= threshold
             self._word_cache[cache_key] = is_valid
             return is_valid
         
         # Dernier fallback: mot reconnu s'il fait partie des termes de géocaching
-        is_valid = self._is_geocaching_term(word)
+        is_valid = self._is_geocaching_term(word_upper)
         self._word_cache[cache_key] = is_valid
         return is_valid
     
@@ -274,39 +327,82 @@ class DictionaryService:
         self._anagram_cache[cache_key] = result
         return result[:max_results]
     
-    def find_valid_anagrams(self, letters: str, min_length: int = 3,
-                           max_length: int = None, max_results: int = 20,
-                           language: str = None) -> List[Dict[str, Any]]:
+    def find_valid_anagrams(self, letters: str, min_length: int = 3, 
+                           max_results: int = 50, language: str = None) -> List[Dict[str, Any]]:
         """
-        Trouve toutes les anagrammes valides d'un ensemble de lettres.
+        Trouve des anagrammes valides à partir d'un ensemble de lettres.
+        NOUVEAU : Utilise l'accès direct aux Bloom filters pour une performance optimale.
         
         Args:
-            letters: Lettres à réorganiser
-            min_length: Longueur minimale des anagrammes
-            max_length: Longueur maximale
+            letters: Lettres disponibles pour former des anagrammes
+            min_length: Longueur minimale des mots
             max_results: Nombre maximum de résultats
-            language: Langue à utiliser
+            language: Langue à utiliser (par défaut: français)
             
         Returns:
-            Liste des anagrammes valides avec leurs scores
+            Liste d'anagrammes valides avec leurs scores
         """
-        anagrams = self.generate_anagrams(letters, min_length, max_length, max_results * 5)
+        if not letters or len(letters) < min_length:
+            return []
+        
+        target_language = language or self.default_language
+        letters_normalized = letters.lower()
         valid_anagrams = []
         
-        for anagram in anagrams:
-            if self.is_valid_word(anagram, language):
-                score = self.get_word_score(anagram, language)
-                valid_anagrams.append({
-                    'word': anagram,
-                    'score': score,
-                    'length': len(anagram),
-                    'language': language or self.default_language,
-                    'letters_used': len(anagram),
-                    'letters_total': len(letters.replace(' ', ''))
-                })
+        # Compter les lettres disponibles
+        letter_count = {}
+        for letter in letters_normalized:
+            letter_count[letter] = letter_count.get(letter, 0) + 1
         
-        # Trier par score décroissant puis par longueur décroissante
-        valid_anagrams.sort(key=lambda x: (x['score'], x['length']), reverse=True)
+        # Fonction pour vérifier si un mot peut être formé avec les lettres disponibles
+        def can_form_word(word):
+            word_letters = {}
+            for letter in word:
+                word_letters[letter] = word_letters.get(letter, 0) + 1
+            
+            for letter, count in word_letters.items():
+                if letter_count.get(letter, 0) < count:
+                    return False
+            return True
+        
+        # Si on a accès aux Bloom filters, on peut générer des permutations et les tester
+        if hasattr(self, '_bloom_filters') and self._bloom_filters and target_language in self._bloom_filters:
+            bloom_filter = self._bloom_filters[target_language]
+            
+            # Générer des permutations de différentes longueurs
+            from itertools import permutations
+            
+            tested_words = set()
+            
+            for length in range(min_length, min(len(letters_normalized) + 1, 12)):  # Limite à 12 lettres max
+                for perm in permutations(letters_normalized, length):
+                    word = ''.join(perm)
+                    
+                    if word in tested_words:
+                        continue
+                    tested_words.add(word)
+                    
+                    # Vérifier si le mot peut être formé et s'il existe dans le dictionnaire
+                    if can_form_word(word) and word in bloom_filter:
+                        # Calculer le score
+                        score = self.get_word_score(word.upper(), target_language)
+                        
+                        valid_anagrams.append({
+                            'word': word.upper(),
+                            'length': len(word),
+                            'score': score,
+                            'language': target_language
+                        })
+                        
+                        if len(valid_anagrams) >= max_results:
+                            break
+                
+                if len(valid_anagrams) >= max_results:
+                    break
+        
+        # Trier par score décroissant
+        valid_anagrams.sort(key=lambda x: x['score'], reverse=True)
+        
         return valid_anagrams[:max_results]
     
     def suggest_best_segmentation(self, text: str, possible_segmentations: List[List[str]],
@@ -395,6 +491,91 @@ class DictionaryService:
             'word_cache_size': len(self._word_cache),
             'anagram_cache_size': len(self._anagram_cache)
         }
+
+    def get_available_languages(self) -> List[str]:
+        """
+        Retourne la liste des langues disponibles avec des dictionnaires complets.
+        
+        Returns:
+            Liste des codes de langues disponibles
+        """
+        if hasattr(self, '_bloom_filters') and self._bloom_filters:
+            return list(self._bloom_filters.keys())
+        else:
+            return self.supported_languages
+
+    def get_dictionary_stats(self) -> Dict[str, Any]:
+        """
+        Retourne des statistiques sur les dictionnaires disponibles.
+        
+        Returns:
+            Dictionnaire avec les statistiques par langue
+        """
+        stats = {
+            'bloom_filters_available': hasattr(self, '_bloom_filters') and bool(self._bloom_filters),
+            'languages': {}
+        }
+        
+        if hasattr(self, '_bloom_filters') and self._bloom_filters:
+            for lang, bloom_filter in self._bloom_filters.items():
+                try:
+                    size = len(bloom_filter) if hasattr(bloom_filter, '__len__') else "Inconnu"
+                    stats['languages'][lang] = {
+                        'estimated_words': size,
+                        'type': 'bloom_filter',
+                        'source': 'wordfreq + geocaching terms'
+                    }
+                except:
+                    stats['languages'][lang] = {
+                        'estimated_words': "Inconnu",
+                        'type': 'bloom_filter',
+                        'source': 'wordfreq + geocaching terms'
+                    }
+        else:
+            # Fallback aux termes de géocaching seulement
+            for lang in self.supported_languages:
+                geocaching_count = len(self.geocaching_terms.get(lang, set()))
+                stats['languages'][lang] = {
+                    'estimated_words': geocaching_count,
+                    'type': 'geocaching_terms_only',
+                    'source': 'termes géocaching hardcodés'
+                }
+        
+        return stats
+
+    def is_word_in_language(self, word: str, language: str) -> bool:
+        """
+        Vérifie si un mot existe dans une langue spécifique (accès direct aux Bloom filters).
+        Plus rapide que is_valid_word() car pas de fallbacks.
+        
+        Args:
+            word: Mot à vérifier
+            language: Code de la langue spécifique
+            
+        Returns:
+            True si le mot existe dans cette langue, False sinon
+        """
+        if not word or not language or len(word) < 2:
+            return False
+        
+        word_normalized = word.strip().lower()
+        
+        # Vérifier d'abord dans les termes de géocaching
+        word_upper = word.strip().upper()
+        if self._is_geocaching_term(word_upper, language):
+            return True
+        
+        # Accès direct au Bloom filter de cette langue
+        if hasattr(self, '_bloom_filters') and self._bloom_filters and language in self._bloom_filters:
+            bloom_filter = self._bloom_filters[language]
+            return word_normalized in bloom_filter
+        
+        # Fallback si pas de Bloom filter pour cette langue
+        if wordfreq_available:
+            freq = zipf_frequency(word_normalized, language)
+            return freq >= 1.0  # Seuil bas pour existence simple
+        
+        return False
 
 
 # Instance globale du service (pattern Singleton léger)
