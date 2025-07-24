@@ -45,7 +45,13 @@
                     // Charger la clé API pour le fournisseur sélectionné
                     if (this.hasProviderTarget && this.hasApiKeyTarget) {
                         const provider = this.providerTarget.value;
+                        console.log(`=== DEBUG: Chargement initial de la clé API pour ${provider} ===`);
+                        
+                        // Charger la clé API immédiatement au démarrage
                         this.loadAPIKeyForProvider(provider);
+                        
+                        // Mettre à jour le libellé du fournisseur
+                        this.updateProviderNameInLabel(provider);
                     }
                 }
             }
@@ -133,9 +139,48 @@
         
         toggleApiKeyVisibility() {
             const input = this.apiKeyTarget;
+            const rawKey = input.getAttribute('data-raw-key');
+            
+            console.log('=== DEBUG: toggleApiKeyVisibility ===');
+            console.log('Type actuel:', input.type);
+            console.log('Valeur actuelle:', input.value);
+            console.log('Raw key:', rawKey);
+            console.log('Raw key existe:', !!rawKey);
+            
             if (input.type === 'password') {
+                // Afficher la clé réelle si disponible, sinon la valeur actuelle
+                if (rawKey && rawKey !== '') {
+                    console.log('Affichage de la clé réelle');
+                    input.value = rawKey;
+                } else {
+                    console.log('Pas de clé réelle disponible, affichage de la valeur actuelle');
+                    // Si pas de clé réelle, essayer de recharger la clé API
+                    const provider = this.providerTarget.value;
+                    console.log('Tentative de rechargement de la clé API pour:', provider);
+                    this.loadAPIKeyForProvider(provider);
+                    
+                    // Attendre un peu puis réessayer
+                    setTimeout(() => {
+                        const newRawKey = input.getAttribute('data-raw-key');
+                        if (newRawKey && newRawKey !== '') {
+                            console.log('Clé API rechargée, affichage de la clé réelle');
+                            input.value = newRawKey;
+                        }
+                    }, 500);
+                }
                 input.type = 'text';
             } else {
+                // Remasquer la clé
+                if (rawKey && rawKey !== '') {
+                    console.log('Remasquage de la clé');
+                    if (rawKey.length > 4) {
+                        input.value = '*'.repeat(rawKey.length - 4) + rawKey.slice(-4);
+                    } else {
+                        input.value = '*'.repeat(rawKey.length);
+                    }
+                } else {
+                    console.log('Pas de clé réelle disponible pour le remasquage');
+                }
                 input.type = 'password';
             }
         }
@@ -367,23 +412,36 @@
         
         // Charge la clé API pour le fournisseur sélectionné
         loadAPIKeyForProvider(provider) {
+            console.log(`=== DEBUG: Chargement de la clé API pour ${provider} ===`);
+            
             fetch(`/api/ai/provider_api_key/${provider}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('=== DEBUG: Réponse API ===', data);
+                    
                     if (data.success && data.api_key) {
-                        // Masquer la clé pour l'affichage
-                        const maskedKey = data.api_key;
-                        this.apiKeyTarget.value = maskedKey;
+                        // Afficher la clé masquée
+                        this.apiKeyTarget.value = data.api_key;
+                        // Stocker la clé non masquée pour l'affichage
+                        if (data.raw_api_key) {
+                            this.apiKeyTarget.setAttribute('data-raw-key', data.raw_api_key);
+                            console.log(`=== DEBUG: Clé non masquée stockée (longueur: ${data.raw_api_key.length}) ===`);
+                        } else {
+                            this.apiKeyTarget.removeAttribute('data-raw-key');
+                            console.log('=== DEBUG: Pas de clé non masquée disponible ===');
+                        }
                         console.log(`=== DEBUG: Clé API chargée pour ${provider} ===`);
                     } else {
                         // Effacer le champ si aucune clé n'est configurée
                         this.apiKeyTarget.value = '';
+                        this.apiKeyTarget.removeAttribute('data-raw-key');
                         console.log(`=== DEBUG: Aucune clé API configurée pour ${provider} ===`);
                     }
                 })
                 .catch(error => {
                     console.error(`Erreur lors du chargement de la clé API pour ${provider}:`, error);
                     this.apiKeyTarget.value = '';
+                    this.apiKeyTarget.removeAttribute('data-raw-key');
                 });
         }
         

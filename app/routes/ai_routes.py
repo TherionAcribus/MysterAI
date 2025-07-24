@@ -127,11 +127,30 @@ def settings_panel():
         settings = ai_service.get_settings()
         logger.info(f"=== DEBUG: Paramètres récupérés: {settings} ===")
         
-        # Masquer la clé API
-        if settings.get('api_key'):
-            masked_key = settings['api_key']
-            if masked_key and len(masked_key) > 4:
-                settings['api_key'] = '*' * (len(masked_key) - 4) + masked_key[-4:]
+        # Récupérer le fournisseur actuel
+        current_provider = settings.get('ai_provider', 'openai')
+        
+        # Récupérer la clé API spécifique au fournisseur actuel
+        provider_key_name = f"{current_provider}_api_key"
+        provider_api_key = AppConfig.get_value(provider_key_name, '')
+        
+        # Si pas de clé spécifique, utiliser la clé générique
+        if not provider_api_key:
+            provider_api_key = AppConfig.get_value('api_key', '')
+        
+        # Masquer la clé API pour l'affichage
+        masked_api_key = ''
+        if provider_api_key:
+            if len(provider_api_key) > 4:
+                masked_api_key = '*' * (len(provider_api_key) - 4) + provider_api_key[-4:]
+            else:
+                masked_api_key = '*' * len(provider_api_key)
+        
+        # Mettre à jour les paramètres avec la clé masquée
+        settings['api_key'] = masked_api_key
+        # Ne pas inclure la clé non masquée dans les paramètres pour éviter qu'elle soit visible dans le HTML
+        
+        logger.info(f"=== DEBUG: Fournisseur actuel: {current_provider}, Clé masquée: {masked_api_key[:10]}... ===")
         
         # Générer le HTML directement
         html = f"""
@@ -203,7 +222,7 @@ def settings_panel():
                     <div class="flex">
                         <input type="password" class="form-input flex-grow" 
                                data-ai-settings-target="apiKey" 
-                               value="{settings.get('api_key', '')}"
+                               value="{masked_api_key}"
                                placeholder="Entrez votre clé API">
                         <button type="button" class="ml-2 p-2 bg-gray-700 hover:bg-gray-600 rounded" 
                                 data-action="click->ai-settings#toggleApiKeyVisibility">
@@ -629,10 +648,14 @@ def get_provider_api_key(provider):
         # Récupérer la clé API
         api_key = AppConfig.get_value(key_name, '')
         
+        # Si pas de clé spécifique, utiliser la clé générique
+        if not api_key:
+            api_key = AppConfig.get_value('api_key', '')
+        
         # Masquer la clé pour la réponse si elle existe
         masked_key = ''
         if api_key:
-            if len(api_key) > 8:
+            if len(api_key) > 4:
                 # Masquer la clé en ne montrant que les 4 derniers caractères
                 masked_key = '*' * (len(api_key) - 4) + api_key[-4:]
             else:
@@ -644,6 +667,7 @@ def get_provider_api_key(provider):
             'success': True,
             'provider': provider,
             'api_key': masked_key,
+            'raw_api_key': api_key,  # Clé non masquée pour le JavaScript
             'has_key': bool(api_key)
         })
         
