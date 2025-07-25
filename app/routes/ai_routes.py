@@ -218,11 +218,13 @@ def settings_panel():
                 
                 <!-- Clé API -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1">Clé API pour <span class="font-bold" id="provider-name">OpenAI</span></label>
+                    <label class="block text-sm font-medium mb-1">Clé API pour <span class="font-bold" id="provider-name">{'OpenAI' if current_provider == 'openai' else 'Anthropic (Claude)' if current_provider == 'anthropic' else 'Google (Gemini)' if current_provider == 'google' else current_provider.title()}</span></label>
                     <div class="flex">
                         <input type="password" class="form-input flex-grow" 
                                data-ai-settings-target="apiKey" 
+                               data-action="input->ai-settings#onApiKeyInput"
                                value="{masked_api_key}"
+                               data-raw-key="{provider_api_key}"
                                placeholder="Entrez votre clé API">
                         <button type="button" class="ml-2 p-2 bg-gray-700 hover:bg-gray-600 rounded" 
                                 data-action="click->ai-settings#toggleApiKeyVisibility">

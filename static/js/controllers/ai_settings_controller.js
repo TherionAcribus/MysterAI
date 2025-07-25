@@ -42,13 +42,25 @@
                 if (this.hasProviderTarget && this.hasOnlineModelTarget) {
                     this.updateProviderVisibility();
                     
-                    // Charger la clé API pour le fournisseur sélectionné
+                    // Mettre à jour le libellé du fournisseur au démarrage
                     if (this.hasProviderTarget && this.hasApiKeyTarget) {
                         const provider = this.providerTarget.value;
-                        console.log(`=== DEBUG: Chargement initial de la clé API pour ${provider} ===`);
+                        console.log(`=== DEBUG: Initialisation pour le fournisseur ${provider} ===`);
                         
-                        // Charger la clé API immédiatement au démarrage
-                        this.loadAPIKeyForProvider(provider);
+                        // Vérifier si une clé API est déjà présente dans le template
+                        const currentApiKey = this.apiKeyTarget.value.trim();
+                        const hasRawKey = this.apiKeyTarget.hasAttribute('data-raw-key') && 
+                                         this.apiKeyTarget.getAttribute('data-raw-key').trim() !== '';
+                        
+                        console.log(`=== DEBUG: Clé API présente: ${!!currentApiKey}, Raw key présente: ${hasRawKey} ===`);
+                        
+                        // Si pas de clé API présente, la charger depuis le serveur
+                        if (!currentApiKey || !hasRawKey) {
+                            console.log(`=== DEBUG: Chargement de la clé API depuis le serveur ===`);
+                            this.loadAPIKeyForProvider(provider);
+                        } else {
+                            console.log(`=== DEBUG: Clé API déjà présente dans le template ===`);
+                        }
                         
                         // Mettre à jour le libellé du fournisseur
                         this.updateProviderNameInLabel(provider);
@@ -189,6 +201,19 @@
             this.temperatureValueTarget.textContent = this.temperatureTarget.value;
         }
         
+        onApiKeyInput() {
+            // Quand l'utilisateur tape dans le champ API key, mettre à jour l'attribut data-raw-key
+            const input = this.apiKeyTarget;
+            const currentValue = input.value;
+            
+            // Si l'utilisateur est en train de taper (pas juste des étoiles), 
+            // mettre à jour la clé raw
+            if (!currentValue.includes('*') || input.type === 'text') {
+                input.setAttribute('data-raw-key', currentValue);
+                console.log(`=== DEBUG: Mise à jour data-raw-key: ${currentValue.length} caractères ===`);
+            }
+        }
+        
         testOllamaConnection() {
             const url = this.ollamaUrlTarget.value;
             this.connectionStatusTarget.textContent = 'Test en cours...';
@@ -238,9 +263,32 @@
                 settings.ai_provider = provider;
                 settings.ai_model = this.onlineModelTarget.value;
                 
-                // Ajouter la clé API si elle n'est pas vide
-                const apiKey = this.apiKeyTarget.value.trim();
-                if (apiKey) {
+                // Récupérer la clé API réelle (depuis data-raw-key si le champ est masqué)
+                let apiKey = this.apiKeyTarget.value.trim();
+                const rawKey = this.apiKeyTarget.getAttribute('data-raw-key');
+                
+                console.log(`=== DEBUG SAVE: Valeur du champ: "${apiKey}" (longueur: ${apiKey.length}) ===`);
+                console.log(`=== DEBUG SAVE: Type du champ: ${this.apiKeyTarget.type} ===`);
+                console.log(`=== DEBUG SAVE: Contient des étoiles: ${apiKey.includes('*')} ===`);
+                console.log(`=== DEBUG SAVE: Raw key disponible: ${!!rawKey} ===`);
+                if (rawKey) {
+                    console.log(`=== DEBUG SAVE: Raw key: "${rawKey.substring(0, 10)}..." (longueur: ${rawKey.length}) ===`);
+                }
+                
+                // Si le champ est en mode password et contient des étoiles, utiliser la vraie clé
+                if (this.apiKeyTarget.type === 'password' && apiKey.includes('*')) {
+                    if (rawKey && rawKey.trim() !== '') {
+                        apiKey = rawKey.trim();
+                        console.log(`=== DEBUG SAVE: Utilisation de la clé raw-key au lieu de la valeur masquée ===`);
+                        console.log(`=== DEBUG SAVE: Nouvelle clé API: "${apiKey.substring(0, 10)}..." (longueur: ${apiKey.length}) ===`);
+                    } else {
+                        console.error(`=== DEBUG SAVE: ERREUR - Raw key vide ou indisponible! ===`);
+                    }
+                } else {
+                    console.log(`=== DEBUG SAVE: Utilisation directe de la valeur du champ ===`);
+                }
+                
+                if (apiKey && !apiKey.includes('*')) {
                     // Enregistrer la clé API à la fois dans la clé générique et dans la clé spécifique au fournisseur
                     settings.api_key = apiKey;
                     
