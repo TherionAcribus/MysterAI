@@ -14,7 +14,7 @@
             "ollamaUrl", "localModel", "connectionStatus", 
             "temperature", "temperatureValue", "maxContext",
             "onlineSettings", "localSettings", "localModelEnabled",
-            "frameworkRadio"
+            "frameworkRadio", "apiTestStatus"
         ];
         
         connect() {
@@ -242,6 +242,62 @@
             });
         }
         
+        testAPIConnection() {
+            // Récupérer la clé API réelle
+            let apiKey = this.apiKeyTarget.value.trim();
+            const rawKey = this.apiKeyTarget.getAttribute('data-raw-key');
+            
+            // Si le champ est masqué et contient des étoiles, utiliser la vraie clé
+            if (this.apiKeyTarget.type === 'password' && apiKey.includes('*')) {
+                if (rawKey && rawKey.trim() !== '') {
+                    apiKey = rawKey.trim();
+                } else {
+                    this.apiTestStatusTarget.textContent = 'Erreur: Aucune clé API disponible';
+                    this.apiTestStatusTarget.className = 'ml-2 text-sm text-red-400';
+                    return;
+                }
+            }
+            
+            if (!apiKey || apiKey.includes('*')) {
+                this.apiTestStatusTarget.textContent = 'Erreur: Veuillez saisir une clé API';
+                this.apiTestStatusTarget.className = 'ml-2 text-sm text-red-400';
+                return;
+            }
+            
+            const provider = this.providerTarget.value;
+            
+            this.apiTestStatusTarget.textContent = 'Test en cours...';
+            this.apiTestStatusTarget.className = 'ml-2 text-sm text-yellow-400';
+            
+            fetch('/api/ai/test_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    provider: provider,
+                    api_key: apiKey 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const modelsText = data.models && data.models.length > 0 
+                        ? ` Modèles disponibles: ${data.models.slice(0, 3).join(', ')}${data.models.length > 3 ? '...' : ''}`
+                        : '';
+                    this.apiTestStatusTarget.textContent = `✓ Clé API valide!${modelsText}`;
+                    this.apiTestStatusTarget.className = 'ml-2 text-sm text-green-400';
+                } else {
+                    this.apiTestStatusTarget.textContent = `✗ Erreur: ${data.error}`;
+                    this.apiTestStatusTarget.className = 'ml-2 text-sm text-red-400';
+                }
+            })
+            .catch(error => {
+                this.apiTestStatusTarget.textContent = `✗ Erreur: ${error.message}`;
+                this.apiTestStatusTarget.className = 'ml-2 text-sm text-red-400';
+            });
+        }
+        
         saveSettings() {
             // Récupérer les valeurs des paramètres
             const mode = this.modeRadioTargets.find(radio => radio.checked).value;
@@ -345,13 +401,6 @@
             .then(data => {
                 if (data.success) {
                     this.showNotification('Paramètres enregistrés avec succès!');
-                    
-                    // Si on a configuré une clé API, proposer de tester la connexion
-                    if (mode === 'online' && settings.api_key) {
-                        if (confirm('Voulez-vous tester votre clé API pour vérifier qu\'elle fonctionne?')) {
-                            this.testAPIKey(settings.ai_provider, settings.api_key);
-                        }
-                    }
                 } else {
                     this.showNotification('Erreur: ' + data.error, true);
                 }
@@ -361,35 +410,7 @@
             });
         }
         
-        /**
-         * Teste la validité d'une clé API
-         * @param {string} provider - Le fournisseur d'API (openai, anthropic, etc.)
-         * @param {string} apiKey - La clé API à tester
-         */
-        testAPIKey(provider, apiKey) {
-            this.showNotification('Test de la clé API en cours...', false, false);
-            
-            // Appeler l'API appropriée pour tester la clé
-            fetch('/api/ai/test_api_key', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ provider, api_key: apiKey })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.showNotification('Clé API valide! Modèles disponibles: ' + 
-                                         (data.models ? data.models.join(', ') : 'inconnu'));
-                } else {
-                    this.showNotification('Erreur avec la clé API: ' + data.error, true);
-                }
-            })
-            .catch(error => {
-                this.showNotification('Erreur lors du test: ' + error.message, true);
-            });
-        }
+
         
         /**
          * Affiche une notification temporaire

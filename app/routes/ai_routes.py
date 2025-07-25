@@ -231,6 +231,16 @@ def settings_panel():
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
+                    
+                    <!-- Bouton pour tester la clé API -->
+                    <div class="mt-2">
+                        <button type="button" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm"
+                                data-action="click->ai-settings#testAPIConnection">
+                            <i class="fas fa-key mr-1"></i>Tester la clé API
+                        </button>
+                        <span class="ml-2 text-sm" data-ai-settings-target="apiTestStatus"></span>
+                    </div>
+                    
                     <p class="text-xs text-gray-500 mt-1">Chaque fournisseur utilise sa propre clé API. En changeant de fournisseur, la clé API correspondante sera chargée automatiquement.</p>
                 </div>
                 
