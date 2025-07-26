@@ -355,7 +355,12 @@ def delete_geocache(geocache_id):
 
 @geocaches_bp.route('/api/geocaches/add', methods=['POST'])
 def add_geocache():
-    """Ajoute une nouvelle geocache."""
+    """Ajoute une nouvelle geocache avec suivi en temps réel via WebSocket."""
+    # Initialiser le service WebSocket et créer une session
+    from app.services.websocket_service import get_websocket_service
+    ws_service = get_websocket_service()
+    session_id = None
+    
     try:
         # Log des headers de la requête
         logger.debug(f"Headers de la requête : {dict(request.headers)}")
@@ -375,19 +380,27 @@ def add_geocache():
 
         if not code or not zone_id:
             return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Créer une session WebSocket pour suivre le processus
+        session_id = ws_service.create_session('add_geocache', int(zone_id))
+        ws_service.emit_progress(session_id, 'started', f'Début de l\'ajout de la géocache {code}', 0)
 
         # Récupérer la zone
+        ws_service.emit_progress(session_id, 'validate_zone', 'Vérification de la zone...', 10)
         zone = Zone.query.get(zone_id)
         if not zone:
+            ws_service.emit_error(session_id, f'Zone avec l\'ID {zone_id} introuvable')
             return jsonify({'error': f'Zone with ID {zone_id} not found'}), 404
 
         # Vérifier si la géocache existe déjà
+        ws_service.emit_progress(session_id, 'check_existing', 'Vérification si la géocache existe déjà...', 20)
         existing_geocache = Geocache.query.filter_by(gc_code=code).first()
         
         if existing_geocache:
             # Vérifier si la zone est déjà associée à la géocache
             if zone in existing_geocache.zones:
                 logger.debug(f"La géocache {code} est déjà associée à la zone {zone_id}")
+                ws_service.emit_error(session_id, f'La géocache {code} existe déjà dans cette zone')
                 return jsonify({
                     'error': 'Geocache already exists in this zone',
                     'id': existing_geocache.id,
@@ -397,25 +410,35 @@ def add_geocache():
                 }), 409
             
             # Ajouter la zone à la géocache existante
+            ws_service.emit_progress(session_id, 'add_zone', 'Ajout de la zone à la géocache existante...', 90)
             existing_geocache.zones.append(zone)
             db.session.commit()
             
             logger.debug(f"Zone {zone_id} ajoutée à la géocache {code} existante")
+            ws_service.emit_success(session_id, f'Zone ajoutée à la géocache {code} existante', {
+                'id': existing_geocache.id,
+                'gc_code': existing_geocache.gc_code,
+                'name': existing_geocache.name
+            })
             return jsonify({
                 'message': 'Zone added to existing geocache',
                 'id': existing_geocache.id,
                 'gc_code': existing_geocache.gc_code,
-                'name': existing_geocache.name
+                'name': existing_geocache.name,
+                'session_id': session_id
             }), 200
         
         # Si la géocache n'existe pas, récupérer les informations via le scraper
+        ws_service.emit_progress(session_id, 'scraping', f'Récupération des données depuis geocaching.com...', 30)
         logger.debug(f"Récupération des données pour la géocache {code}")
         geocache_data = scrape_geocache(code)
         
         if not geocache_data:
+            ws_service.emit_error(session_id, 'Impossible de récupérer les données de la géocache depuis geocaching.com')
             return jsonify({'error': 'Failed to fetch geocache data'}), 404
 
         # Convertir la date si elle existe
+        ws_service.emit_progress(session_id, 'parse_data', 'Traitement des données récupérées...', 40)
         hidden_date = None
         if geocache_data.get('hidden_date'):
             try:
@@ -424,6 +447,7 @@ def add_geocache():
                 logger.warning(f"Impossible de parser la date: {geocache_data['hidden_date']} - {str(e)}")
 
         # Gérer l'owner
+        ws_service.emit_progress(session_id, 'process_owner', 'Traitement des informations du propriétaire...', 50)
         owner_name = geocache_data.get('owner', '')
         owner = None
         if owner_name:
@@ -452,6 +476,7 @@ def add_geocache():
                 logger.warning(f"Impossible de parser la date de trouvaille: {geocache_data['found_date']} - {str(e)}")
                 
         # Creer la nouvelle geocache
+        ws_service.emit_progress(session_id, 'create_geocache', 'Création de l\'entrée géocache...', 60)
         geocache = Geocache(
             gc_code=code,
             name=geocache_data.get('name', ''),
@@ -543,6 +568,7 @@ def add_geocache():
         # =========================================================
 
         # Ajouter les waypoints additionnels
+        ws_service.emit_progress(session_id, 'process_waypoints', 'Traitement des waypoints additionnels...', 70)
         if geocache_data.get('additional_waypoints'):
             for wp_data in geocache_data['additional_waypoints']:
                 if isinstance(wp_data, dict):
@@ -596,6 +622,7 @@ def add_geocache():
                     geocache.additional_waypoints.append(waypoint)
 
         # Ajouter les checkers
+        ws_service.emit_progress(session_id, 'process_checkers', 'Traitement des checkers...', 75)
         if geocache_data.get('checkers'):
             for checker_data in geocache_data['checkers']:
                 if isinstance(checker_data, dict):
@@ -610,6 +637,7 @@ def add_geocache():
         Attribute.debug_all_attributes()
 
         # Ajouter les attributes
+        ws_service.emit_progress(session_id, 'process_attributes', 'Traitement des attributs...', 80)
         if geocache_data.get('attributes'):
             logger.debug(f"Données d'attributs reçues: {geocache_data.get('attributes')}")
             logger.debug(f"Nombre d'attributs trouvés dans les données: {len(geocache_data.get('attributes', []))}")
@@ -759,6 +787,7 @@ def add_geocache():
                             logger.error(f"Erreur lors du téléchargement de l'image {img_url}: {str(e)}")
 
         logger.debug(f"Ajout de la géocache {code} à la base de données")
+        ws_service.emit_progress(session_id, 'save_database', 'Sauvegarde en base de données...', 90)
         
         # S'assurer qu'aucune transaction n'est active
         if db.session.is_active:
@@ -794,11 +823,17 @@ def add_geocache():
             db.session.commit()
             
             logger.debug(f"Géocache {code} ajoutée avec succès, ID: {geocache.id}")
+            ws_service.emit_success(session_id, f'Géocache {code} ajoutée avec succès !', {
+                'id': geocache.id,
+                'gc_code': geocache.gc_code,
+                'name': geocache.name
+            })
             return jsonify({
                 'message': 'Geocache added successfully',
                 'id': geocache.id,
                 'gc_code': geocache.gc_code,
-                'name': geocache.name
+                'name': geocache.name,
+                'session_id': session_id
             }), 201
         except Exception as e:
             db.session.rollback()
@@ -806,6 +841,8 @@ def add_geocache():
             
     except Exception as e:
         logger.error(f"Error adding geocache: {str(e)}")
+        if session_id:
+            ws_service.emit_error(session_id, f'Erreur lors de l\'ajout de la géocache : {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 

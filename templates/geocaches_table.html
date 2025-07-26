@@ -622,6 +622,11 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 <script src="/js/layout_tab_opener_integration.js"></script>
 <script src="/js/debug_tab_opener.js"></script>
 
+<!-- Scripts WebSocket et notifications -->
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="/js/services/websocket_service.js"></script>
+<script src="/js/components/progress_notification.js"></script>
+
 <!-- Script de test pour les liens intelligents des géocaches (développement) -->
 <!-- <script src="/js/test_geocache_links.js"></script> -->
 
@@ -2161,7 +2166,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         };
 
-        // Gestionnaire d'événements pour l'ajout de géocaches
+        // Gestionnaire d'événements pour l'ajout de géocaches avec WebSocket
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
 
@@ -2169,12 +2174,114 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 // Afficher l'indicateur de chargement
                 loadingIndicator.classList.remove('hidden');
                 spinner.style.display = 'block';
-                messageDiv.textContent = '';
-                messageDiv.className = 'mt-2';
+                messageDiv.textContent = 'Connexion en cours...';
+                messageDiv.className = 'mt-2 text-blue-600';
                 submitButton.disabled = true;
+                
+                // S'assurer que le WebSocket est connecté
+                if (!window.wsService.isConnected) {
+                    messageDiv.textContent = 'Connexion au serveur WebSocket...';
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('Timeout de connexion WebSocket'));
+                        }, 5000);
+                        
+                        const checkConnection = () => {
+                            if (window.wsService.isConnected) {
+                                clearTimeout(timeout);
+                                resolve();
+                            } else {
+                                setTimeout(checkConnection, 100);
+                            }
+                        };
+                        checkConnection();
+                    });
+                }
+                
+                // Rejoindre la zone pour recevoir les updates
+                const zoneId = form.querySelector('input[name="zone_id"]').value;
+                window.wsService.joinZone(parseInt(zoneId));
                 
                 // Préparer les données du formulaire
                 const formData = new FormData(form);
+                
+                // Configuration des gestionnaires WebSocket pour cette opération
+                let sessionId = null;
+                let operationCompleted = false;
+                
+                const progressHandler = (data) => {
+                    if (data.operation_type === 'add_geocache' && data.zone_id == zoneId) {
+                        sessionId = data.session_id;
+                        messageDiv.textContent = data.message;
+                        messageDiv.className = 'mt-2 text-blue-600';
+                        
+                        // Rejoindre la session pour recevoir les updates spécifiques
+                        window.wsService.joinSession(sessionId);
+                    }
+                };
+                
+                const completeHandler = (data) => {
+                    if (data.operation_type === 'add_geocache' && data.zone_id == zoneId && !operationCompleted) {
+                        operationCompleted = true;
+                        
+                        if (data.status === 'success') {
+                            // Succès
+                            messageDiv.textContent = data.message;
+                            messageDiv.className = 'mt-2 text-green-600';
+                            
+                            // Réinitialiser le formulaire
+                            form.reset();
+
+                            // Recharger le tableau
+                            reloadTable().then(() => {
+                                // Ouvrir la page de détails de la nouvelle géocache
+                                if (data.result && data.result.id) {
+                                    handleGeocacheDetailsClick(
+                                        data.result.id, 
+                                        data.result.gc_code, 
+                                        data.result.name, 
+                                        null
+                                    );
+                                }
+                            });
+                        } else {
+                            // Erreur
+                            messageDiv.textContent = data.message || 'Une erreur est survenue';
+                            messageDiv.className = 'mt-2 text-red-600';
+                        }
+                        
+                        // Nettoyer les gestionnaires d'événements
+                        window.wsService.off('progress_add_geocache', progressHandler);
+                        window.wsService.off('complete_add_geocache', completeHandler);
+                        
+                        // Réactiver le formulaire
+                        setTimeout(() => {
+                            loadingIndicator.classList.add('hidden');
+                            spinner.style.display = 'none';
+                            submitButton.disabled = false;
+                        }, 1000);
+                    }
+                };
+                
+                // Ajouter les gestionnaires d'événements WebSocket
+                window.wsService.on('progress_add_geocache', progressHandler);
+                window.wsService.on('complete_add_geocache', completeHandler);
+                
+                // Timeout de sécurité pour éviter d'attendre indéfiniment
+                const timeoutHandler = setTimeout(() => {
+                    if (!operationCompleted) {
+                        messageDiv.textContent = 'Timeout de l\'opération. Veuillez réessayer.';
+                        messageDiv.className = 'mt-2 text-orange-600';
+                        
+                        // Nettoyer
+                        window.wsService.off('progress_add_geocache', progressHandler);
+                        window.wsService.off('complete_add_geocache', completeHandler);
+                        
+                        loadingIndicator.classList.add('hidden');
+                        spinner.style.display = 'none';
+                        submitButton.disabled = false;
+                    }
+                }, 60000); // 60 secondes
                 
                 // Envoyer la requête
                 const response = await fetch('/api/geocaches/add', {
@@ -2184,30 +2291,46 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 
                 const data = await response.json();
                 
-                if (response.ok) {
-                    // Afficher le message de succès
-                    messageDiv.textContent = 'Géocache ajoutée avec succès !';
+                // Si la requête HTTP échoue immédiatement (avant WebSocket)
+                if (!response.ok && !sessionId) {
+                    clearTimeout(timeoutHandler);
+                    throw new Error(data.error || 'Erreur de requête');
+                }
+                
+                // Si la réponse est immédiate (géocache déjà existante par exemple)
+                if (response.ok && !data.session_id) {
+                    clearTimeout(timeoutHandler);
+                    operationCompleted = true;
+                    
+                    // Nettoyer les gestionnaires
+                    window.wsService.off('progress_add_geocache', progressHandler);
+                    window.wsService.off('complete_add_geocache', completeHandler);
+                    
+                    // Traiter la réponse immédiate
+                    messageDiv.textContent = data.message || 'Opération terminée';
                     messageDiv.className = 'mt-2 text-green-600';
                     
-                    // Réinitialiser le formulaire
-                    form.reset();
-
-                    // Recharger le tableau
-                    await reloadTable();
-
-                    // Ouvrir la page de détails de la nouvelle géocache avec la fonction intelligente
-                    handleGeocacheDetailsClick(data.id, data.gc_code, data.name, null);
-                } else {
-                    // Afficher le message d'erreur
-                    messageDiv.textContent = data.error || 'Une erreur est survenue';
-                    messageDiv.className = 'mt-2 text-red-600';
+                    if (data.id) {
+                        // Réinitialiser le formulaire et recharger le tableau
+                        form.reset();
+                        await reloadTable();
+                        handleGeocacheDetailsClick(data.id, data.gc_code, data.name, null);
+                    }
+                    
+                    // Réactiver le formulaire
+                    loadingIndicator.classList.add('hidden');
+                    spinner.style.display = 'none';
+                    submitButton.disabled = false;
                 }
+                
+                // Sinon, les gestionnaires WebSocket prennent le relais
+                
             } catch (error) {
                 console.error('Erreur:', error);
-                messageDiv.textContent = 'Une erreur est survenue lors de la communication avec le serveur';
+                messageDiv.textContent = error.message || 'Une erreur est survenue lors de la communication avec le serveur';
                 messageDiv.className = 'mt-2 text-red-600';
-            } finally {
-                // Cacher l'indicateur de chargement
+                
+                // Réactiver le formulaire en cas d'erreur
                 loadingIndicator.classList.add('hidden');
                 spinner.style.display = 'none';
                 submitButton.disabled = false;

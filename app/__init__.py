@@ -11,6 +11,7 @@ from app.plugin_manager import PluginManager
 from app.utils.logger import setup_logger
 import base64
 from sqlalchemy import inspect
+from flask_socketio import SocketIO
 
 logger = setup_logger()
 
@@ -56,6 +57,53 @@ def create_app():
 
     # Initialisation de Flask-Migrate
     migrate = Migrate(app, db)
+
+    # Initialiser SocketIO avec CORS
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+    
+    # Initialiser le service WebSocket
+    from app.services.websocket_service import init_websocket_service
+    websocket_service = init_websocket_service(socketio)
+    
+    # Enregistrer les gestionnaires d'événements WebSocket
+    @socketio.on('connect')
+    def handle_connect():
+        logger.info(f"Client connecté: {request.sid}")
+    
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        logger.info(f"Client déconnecté: {request.sid}")
+    
+    @socketio.on('join_session')
+    def handle_join_session(data):
+        session_id = data.get('session_id')
+        if session_id:
+            websocket_service.join_session(session_id)
+            logger.info(f"Client {request.sid} a rejoint la session {session_id}")
+    
+    @socketio.on('join_zone')
+    def handle_join_zone(data):
+        zone_id = data.get('zone_id')
+        if zone_id:
+            websocket_service.join_zone(int(zone_id))
+            logger.info(f"Client {request.sid} a rejoint la zone {zone_id}")
+    
+    @socketio.on('leave_session')
+    def handle_leave_session(data):
+        session_id = data.get('session_id')
+        if session_id:
+            websocket_service.leave_session(session_id)
+            logger.info(f"Client {request.sid} a quitté la session {session_id}")
+    
+    @socketio.on('leave_zone')
+    def handle_leave_zone(data):
+        zone_id = data.get('zone_id')
+        if zone_id:
+            websocket_service.leave_zone(int(zone_id))
+            logger.info(f"Client {request.sid} a quitté la zone {zone_id}")
+    
+    # Rendre socketio accessible globalement
+    app.socketio = socketio
 
     # Route pour servir les images des géocaches
     @app.route('/geocaches_images/<gc_code>/<filename>')
