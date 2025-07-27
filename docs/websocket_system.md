@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Ce document décrit le système WebSocket intégré à MysteryAI pour fournir des mises à jour en temps réel lors d'opérations longues. Le système est conçu pour être robuste, extensible et facile à utiliser.
+Ce document décrit le système WebSocket intégré à MysteryAI pour fournir des mises à jour en temps réel lors d'opérations longues. Le système est conçu pour être robuste, extensible et facile à utiliser avec une **progression intégrée directement dans la page**.
 
 ## Architecture
 
@@ -70,14 +70,46 @@ window.wsService.on('complete_add_geocache', (data) => {
 });
 ```
 
-#### Composant de Notification (`static/js/components/progress_notification.js`)
+#### Interface de Progression Intégrée
 
-Interface utilisateur élégante pour afficher les notifications :
+L'affichage de progression se fait directement dans la page via des éléments HTML dédiés :
 
-- **Notifications toast** : Affichage en coin d'écran
-- **Barre de progression** : Suivi visuel du pourcentage
-- **Animation fluide** : Entrée/sortie avec transitions CSS
-- **Gestion automatique** : Auto-suppression et limitation du nombre
+- **Barre de progression** : Barre animée avec dégradé de couleurs
+- **Messages d'étapes** : Affichage de l'étape actuelle en cours
+- **Pourcentage** : Affichage du pourcentage de completion
+- **Animation de brillance** : Effet visuel pour montrer l'activité
+- **Transitions fluides** : Changement de couleurs selon l'état (progression/succès/erreur)
+
+```html
+<!-- Zone de progression intégrée -->
+<div id="progress-container" class="mt-4 hidden">
+    <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
+        <div class="flex items-center justify-between mb-2">
+            <span id="progress-title" class="text-sm font-medium text-blue-400">
+                <i class="fas fa-plus-circle mr-2"></i>
+                Ajout de géocache
+            </span>
+            <span id="progress-percentage" class="text-sm text-gray-400">0%</span>
+        </div>
+        
+        <div id="progress-step" class="text-xs text-gray-500 mb-2 uppercase tracking-wide">
+            Préparation...
+        </div>
+        
+        <div id="progress-message" class="text-sm text-gray-300 mb-3">
+            Initialisation...
+        </div>
+        
+        <!-- Barre de progression -->
+        <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
+            <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300 ease-out relative overflow-hidden" style="width: 0%">
+                <!-- Effet de brillance animé -->
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 animate-shimmer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+```
 
 ## Formats de Messages
 
@@ -182,36 +214,62 @@ def add_geocache():
         ws_service.emit_error(session_id, f'Erreur : {str(e)}')
 ```
 
-#### Frontend (Formulaire)
+#### Frontend (Formulaire avec Progression Intégrée)
 
 ```javascript
+// Fonctions de gestion de la progression intégrée
+function showProgress() {
+    progressContainer.classList.remove('hidden');
+    progressContainer.classList.add('show');
+}
+
+function updateProgress(step, message, percentage, sessionId = null) {
+    if (step) progressStep.textContent = step.toUpperCase();
+    if (message) progressMessage.textContent = message;
+    if (percentage !== null) {
+        progressPercentage.textContent = `${percentage}%`;
+        progressBar.style.width = `${percentage}%`;
+    }
+}
+
+function showProgressSuccess(message) {
+    progressBar.className = 'bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-300 ease-out relative overflow-hidden';
+    progressStep.textContent = 'TERMINÉ';
+    progressMessage.textContent = message;
+    progressPercentage.textContent = '✅';
+}
+
+// Gestionnaire d'événements du formulaire
 form.addEventListener('submit', async function(event) {
     event.preventDefault();
     
-    // Rejoindre la zone pour recevoir les updates
-    const zoneId = form.querySelector('input[name="zone_id"]').value;
-    window.wsService.joinZone(parseInt(zoneId));
+    // Afficher la progression intégrée
+    showProgress();
+    updateProgress('connexion', 'Connexion au serveur WebSocket...', 0);
     
-    // Configuration des gestionnaires
+    // Configuration des gestionnaires WebSocket
     const progressHandler = (data) => {
         if (data.operation_type === 'add_geocache' && data.zone_id == zoneId) {
-            messageDiv.textContent = data.message;
-            // Rejoindre la session spécifique
+            updateProgress(data.step, data.message, data.progress, data.session_id);
             window.wsService.joinSession(data.session_id);
         }
     };
     
     const completeHandler = (data) => {
         if (data.status === 'success') {
-            // Succès - recharger le tableau
-            reloadTable();
+            showProgressSuccess(data.message);
+            // Recharger le tableau et ouvrir les détails
+            reloadTable().then(() => {
+                if (data.result && data.result.id) {
+                    handleGeocacheDetailsClick(data.result.id, data.result.gc_code, data.result.name, null);
+                }
+            });
         } else {
-            // Erreur - afficher le message
-            showError(data.message);
+            showProgressError(data.message);
         }
     };
     
-    // Écouter les événements
+    // Écouter les événements WebSocket
     window.wsService.on('progress_add_geocache', progressHandler);
     window.wsService.on('complete_add_geocache', completeHandler);
     
@@ -219,6 +277,22 @@ form.addEventListener('submit', async function(event) {
     await fetch('/api/geocaches/add', { method: 'POST', body: formData });
 });
 ```
+
+## Interface Utilisateur
+
+### Couleurs et États
+
+- **Progression normale** : Dégradé bleu vers vert (`from-blue-500 to-green-500`)
+- **Fin de progression** : Dégradé vert (`from-green-500 to-blue-500` puis `from-green-500 to-green-400`)
+- **Erreur** : Dégradé rouge (`from-red-500 to-red-400`)
+- **Animation de brillance** : Effet shimmer continu pour montrer l'activité
+
+### Animations et Transitions
+
+- **Apparition** : Transition de opacité et translation Y
+- **Barre de progression** : Transition fluide de la largeur (300ms)
+- **Changement de couleurs** : Transitions automatiques selon l'état
+- **Masquage automatique** : Disparition après 3 secondes en cas de succès
 
 ## Extensibilité
 
@@ -232,59 +306,84 @@ ws_service.emit_progress(session_id, 'step1', 'Étape 1...', 25)
 ws_service.emit_success(session_id, 'Terminé !', result)
 ```
 
-2. **Frontend** : Écouter les événements spécifiques
+2. **Frontend** : Écouter les événements spécifiques et mettre à jour la progression
 ```javascript
-window.wsService.on('progress_mon_operation', handleProgress);
-window.wsService.on('complete_mon_operation', handleComplete);
-```
+window.wsService.on('progress_mon_operation', (data) => {
+    updateProgress(data.step, data.message, data.progress);
+});
 
-3. **Notifications** : Le composant de notification s'adapte automatiquement
-
-### Configuration des Notifications
-
-```javascript
-// Personnaliser les notifications
-window.progressNotification = new ProgressNotification({
-    position: 'top-right',        // Position des notifications
-    maxNotifications: 5,          // Nombre maximum affiché
-    autoRemove: true,            // Suppression automatique
-    autoRemoveDelay: 5000,       // Délai de suppression (ms)
-    showProgress: true,          // Afficher la barre de progression
-    theme: 'dark'                // Thème (dark/light)
+window.wsService.on('complete_mon_operation', (data) => {
+    if (data.status === 'success') {
+        showProgressSuccess(data.message);
+    } else {
+        showProgressError(data.message);
+    }
 });
 ```
 
-## Gestion des Erreurs
+3. **Interface** : Adapter les titres et icônes selon l'opération
+```javascript
+// Personnaliser le titre selon l'opération
+if (data.operation_type === 'import_gpx') {
+    progressTitle.innerHTML = '<i class="fas fa-file-import mr-2"></i>Import GPX';
+} else if (data.operation_type === 'refresh_batch') {
+    progressTitle.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Rafraîchissement';
+}
+```
 
-### Côté Backend
+## Avantages de cette Approche
 
-- **Timeout de session** : Sessions nettoyées automatiquement
-- **Exceptions capturées** : Émission automatique d'erreurs WebSocket
-- **Validation des données** : Vérification avant émission
+### Intégration Native
+- **Pas de pop-ups** : Progression directement dans le flux de la page
+- **Contextuel** : L'utilisateur reste dans le contexte de son action
+- **Responsive** : S'adapte à la largeur de la page
 
-### Côté Frontend
+### Expérience Utilisateur
+- **Feedback immédiat** : L'utilisateur voit instantanément que quelque chose se passe
+- **Information détaillée** : Étape actuelle + message descriptif + pourcentage
+- **État final clair** : Couleurs et icônes différentes pour succès/erreur
 
-- **Reconnexion automatique** : Jusqu'à 5 tentatives
-- **Timeout d'opération** : 60 secondes par défaut
-- **Fallback gracieux** : Retour au mode HTTP classique si WebSocket indisponible
+### Performance
+- **Léger** : Pas de composant de notification supplémentaire
+- **Efficace** : Mise à jour directe des éléments DOM existants
+- **Fluide** : Transitions CSS optimisées
 
 ## Bonnes Pratiques
 
 ### Backend
 
 1. **Toujours créer une session** avant de commencer une opération longue
-2. **Émettre régulièrement** des mises à jour de progression
-3. **Nettoyer les sessions** en cas d'erreur
-4. **Utiliser des messages descriptifs** pour l'utilisateur
+2. **Émettre régulièrement** des mises à jour de progression (tous les 10% environ)
+3. **Messages descriptifs** : Indiquer clairement ce qui se passe
+4. **Gestion d'erreurs robuste** : Toujours émettre un message d'erreur explicite
 
 ### Frontend
 
-1. **Rejoindre la zone** concernée avant de démarrer l'opération
-2. **Gérer les timeouts** pour éviter les attentes infinies
-3. **Nettoyer les gestionnaires** après utilisation
-4. **Prévoir un fallback** si WebSocket n'est pas disponible
+1. **Afficher la progression dès le début** : Même pour la connexion WebSocket
+2. **Gérer les timeouts** : Ne pas laisser l'utilisateur attendre indéfiniment
+3. **Feedback visuel** : Couleurs différentes selon l'état
+4. **Nettoyage automatique** : Masquer la progression après succès
 
 ## Débogage
+
+### Mode Debug
+
+Pour activer le mode debug et voir des informations techniques supplémentaires, ajouter `#debug` à l'URL :
+```
+http://localhost:3000/geocaches/table/1#debug
+```
+
+Cela affichera l'ID de session et d'autres détails techniques.
+
+### Logs Frontend
+
+```javascript
+// Activer les logs de débogage WebSocket
+window.wsService.debug = true;
+
+// Vérifier l'état de la connexion
+console.log(window.wsService.getConnectionStatus());
+```
 
 ### Logs Backend
 
@@ -294,36 +393,6 @@ window.progressNotification = new ProgressNotification({
 logger.setLevel(logging.DEBUG)
 ```
 
-### Logs Frontend
-
-```javascript
-// Activer les logs de débogage
-window.wsService.debug = true;
-
-// Vérifier l'état de la connexion
-console.log(window.wsService.getConnectionStatus());
-```
-
-### Outils de Développement
-
-1. **Console du navigateur** : Voir les événements WebSocket en temps réel
-2. **Onglet Network** : Vérifier les connexions WebSocket
-3. **Logs serveur** : Suivre les sessions et messages côté backend
-
-## Performances
-
-- **Sessions légères** : UUID uniquement, pas de stockage lourd
-- **Nettoyage automatique** : Sessions supprimées après utilisation
-- **Limitation des notifications** : Maximum 5 notifications simultanées
-- **Compression** : Messages JSON minifiés automatiquement
-
-## Sécurité
-
-- **CORS configuré** : Origines autorisées définies
-- **Validation des sessions** : Vérification de l'existence avant émission
-- **Nettoyage préventif** : Timeout pour éviter les fuites mémoire
-- **Isolation des zones** : Chaque zone reçoit uniquement ses messages
-
 ---
 
-Ce système WebSocket fournit une base solide pour l'amélioration de l'expérience utilisateur dans MysteryAI, avec la possibilité d'extension facile vers d'autres fonctionnalités nécessitant du temps réel. 
+Ce système WebSocket avec progression intégrée offre une expérience utilisateur fluide et informative, directement intégrée dans le flux naturel de l'interface, sans interruption par des pop-ups. 

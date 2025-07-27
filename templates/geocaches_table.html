@@ -63,7 +63,43 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 </button>
             </div>
         </div>
-        <div id="spinner" class="spinner"></div>
+        <!-- Zone de progression intégrée -->
+        <div id="progress-container" class="mt-4 hidden">
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-600">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="progress-title" class="text-sm font-medium text-blue-400">
+                        <i class="fas fa-plus-circle mr-2"></i>
+                        Ajout de géocache
+                    </span>
+                    <span id="progress-percentage" class="text-sm text-gray-400">0%</span>
+                </div>
+                
+                <div id="progress-step" class="text-xs text-gray-500 mb-2 uppercase tracking-wide">
+                    Préparation...
+                </div>
+                
+                <div id="progress-message" class="text-sm text-gray-300 mb-3">
+                    Initialisation...
+                </div>
+                
+                <!-- Barre de progression -->
+                <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300 ease-out relative overflow-hidden" style="width: 0%">
+                        <!-- Effet de brillance animé -->
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 animate-shimmer"></div>
+                    </div>
+                </div>
+                
+                <!-- Détails techniques (optionnel, masqué par défaut) -->
+                <div id="progress-details" class="mt-2 hidden">
+                    <div class="text-xs text-gray-500">
+                        Session: <span id="progress-session-id" class="font-mono">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Zone de messages de résultat -->
         <div id="message" class="mt-2"></div>
     </div>
 
@@ -479,20 +515,29 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 </div>
 
 <style>
-    .spinner {
-        display: none;
-        width: 40px;
-        height: 40px;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #3498db;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 10px auto;
+    /* Animation de brillance pour la barre de progression */
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
     }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+    
+    .animate-shimmer {
+        animation: shimmer 2s infinite;
+    }
+    
+    /* Styles pour la zone de progression */
+    #progress-container {
+        transition: all 0.3s ease-in-out;
+    }
+    
+    #progress-container.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    #progress-container.hide {
+        opacity: 0;
+        transform: translateY(-10px);
     }
 
     /* Styles pour Tabulator */
@@ -622,10 +667,9 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
 <script src="/js/layout_tab_opener_integration.js"></script>
 <script src="/js/debug_tab_opener.js"></script>
 
-<!-- Scripts WebSocket et notifications -->
+<!-- Scripts WebSocket -->
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 <script src="/js/services/websocket_service.js"></script>
-<script src="/js/components/progress_notification.js"></script>
 
 <!-- Script de test pour les liens intelligents des géocaches (développement) -->
 <!-- <script src="/js/test_geocache_links.js"></script> -->
@@ -726,9 +770,18 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         const form = document.getElementById('addGeocacheForm');
         const loadingIndicator = form.querySelector('.loading-indicator');
-        const spinner = document.getElementById('spinner');
         const messageDiv = document.getElementById('message');
         const submitButton = form.querySelector('button[type="submit"]');
+        
+        // Éléments de progression intégrée
+        const progressContainer = document.getElementById('progress-container');
+        const progressTitle = document.getElementById('progress-title');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressStep = document.getElementById('progress-step');
+        const progressMessage = document.getElementById('progress-message');
+        const progressBar = document.getElementById('progress-bar');
+        const progressDetails = document.getElementById('progress-details');
+        const progressSessionId = document.getElementById('progress-session-id');
         
         // Éléments de filtrage du tableau
         const tableFilter = document.getElementById('tableFilter');
@@ -752,6 +805,80 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
         
         // Variable pour stocker les filtres actifs
         let activeFiltersList = [];
+        
+        // === FONCTIONS DE GESTION DE LA PROGRESSION INTÉGRÉE ===
+        
+        function showProgress() {
+            progressContainer.classList.remove('hidden');
+            progressContainer.classList.add('show');
+            messageDiv.textContent = '';
+            messageDiv.className = 'mt-2';
+        }
+        
+        function hideProgress() {
+            progressContainer.classList.add('hide');
+            setTimeout(() => {
+                progressContainer.classList.add('hidden');
+                progressContainer.classList.remove('show', 'hide');
+            }, 300);
+        }
+        
+        function updateProgress(step, message, percentage, sessionId = null) {
+            if (step) {
+                progressStep.textContent = step.toUpperCase();
+            }
+            if (message) {
+                progressMessage.textContent = message;
+            }
+            if (percentage !== null && percentage !== undefined) {
+                progressPercentage.textContent = `${percentage}%`;
+                progressBar.style.width = `${percentage}%`;
+                
+                // Changer la couleur selon le pourcentage
+                if (percentage >= 100) {
+                    progressBar.className = progressBar.className.replace(
+                        'from-blue-500 to-green-500', 
+                        'from-green-500 to-green-400'
+                    );
+                } else if (percentage >= 75) {
+                    progressBar.className = progressBar.className.replace(
+                        'from-blue-500 to-green-500', 
+                        'from-green-500 to-blue-500'
+                    );
+                }
+            }
+            if (sessionId) {
+                progressSessionId.textContent = sessionId;
+                if (window.location.hash.includes('debug')) {
+                    progressDetails.classList.remove('hidden');
+                }
+            }
+        }
+        
+        function showProgressError(message) {
+            progressBar.className = progressBar.className.replace(
+                'from-blue-500 to-green-500', 
+                'from-red-500 to-red-400'
+            );
+            progressStep.textContent = 'ERREUR';
+            progressMessage.textContent = message;
+            progressPercentage.textContent = '❌';
+        }
+        
+        function showProgressSuccess(message) {
+            progressBar.className = progressBar.className.replace(
+                'from-blue-500 to-green-500', 
+                'from-green-500 to-green-400'
+            );
+            progressStep.textContent = 'TERMINÉ';
+            progressMessage.textContent = message;
+            progressPercentage.textContent = '✅';
+            
+            // Masquer après 3 secondes
+            setTimeout(() => {
+                hideProgress();
+            }, 3000);
+        }
         
         // Définitions des opérateurs par type de champ
         const operatorsByFieldType = {
@@ -2166,21 +2293,20 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             }
         };
 
-        // Gestionnaire d'événements pour l'ajout de géocaches avec WebSocket
+        // Gestionnaire d'événements pour l'ajout de géocaches avec progression intégrée
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
 
             try {
-                // Afficher l'indicateur de chargement
+                // Afficher la progression intégrée et désactiver le formulaire
+                showProgress();
+                updateProgress('connexion', 'Connexion au serveur WebSocket...', 0);
                 loadingIndicator.classList.remove('hidden');
-                spinner.style.display = 'block';
-                messageDiv.textContent = 'Connexion en cours...';
-                messageDiv.className = 'mt-2 text-blue-600';
                 submitButton.disabled = true;
                 
                 // S'assurer que le WebSocket est connecté
                 if (!window.wsService.isConnected) {
-                    messageDiv.textContent = 'Connexion au serveur WebSocket...';
+                    updateProgress('connexion', 'Connexion au serveur WebSocket...', 5);
                     await new Promise((resolve, reject) => {
                         const timeout = setTimeout(() => {
                             reject(new Error('Timeout de connexion WebSocket'));
@@ -2204,6 +2330,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 
                 // Préparer les données du formulaire
                 const formData = new FormData(form);
+                const gcCode = formData.get('code');
                 
                 // Configuration des gestionnaires WebSocket pour cette opération
                 let sessionId = null;
@@ -2212,8 +2339,14 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 const progressHandler = (data) => {
                     if (data.operation_type === 'add_geocache' && data.zone_id == zoneId) {
                         sessionId = data.session_id;
-                        messageDiv.textContent = data.message;
-                        messageDiv.className = 'mt-2 text-blue-600';
+                        
+                        // Mettre à jour la progression avec les données WebSocket
+                        updateProgress(
+                            data.step, 
+                            data.message, 
+                            data.progress, 
+                            sessionId
+                        );
                         
                         // Rejoindre la session pour recevoir les updates spécifiques
                         window.wsService.joinSession(sessionId);
@@ -2226,7 +2359,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         
                         if (data.status === 'success') {
                             // Succès
-                            messageDiv.textContent = data.message;
+                            showProgressSuccess(data.message);
+                            messageDiv.textContent = `✅ ${data.message}`;
                             messageDiv.className = 'mt-2 text-green-600';
                             
                             // Réinitialiser le formulaire
@@ -2246,7 +2380,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                             });
                         } else {
                             // Erreur
-                            messageDiv.textContent = data.message || 'Une erreur est survenue';
+                            showProgressError(data.message || 'Une erreur est survenue');
+                            messageDiv.textContent = `❌ ${data.message || 'Une erreur est survenue'}`;
                             messageDiv.className = 'mt-2 text-red-600';
                         }
                         
@@ -2257,7 +2392,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         // Réactiver le formulaire
                         setTimeout(() => {
                             loadingIndicator.classList.add('hidden');
-                            spinner.style.display = 'none';
                             submitButton.disabled = false;
                         }, 1000);
                     }
@@ -2270,7 +2404,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 // Timeout de sécurité pour éviter d'attendre indéfiniment
                 const timeoutHandler = setTimeout(() => {
                     if (!operationCompleted) {
-                        messageDiv.textContent = 'Timeout de l\'opération. Veuillez réessayer.';
+                        showProgressError('Timeout de l\'opération. Veuillez réessayer.');
+                        messageDiv.textContent = '⏰ Timeout de l\'opération. Veuillez réessayer.';
                         messageDiv.className = 'mt-2 text-orange-600';
                         
                         // Nettoyer
@@ -2278,12 +2413,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                         window.wsService.off('complete_add_geocache', completeHandler);
                         
                         loadingIndicator.classList.add('hidden');
-                        spinner.style.display = 'none';
                         submitButton.disabled = false;
                     }
                 }, 60000); // 60 secondes
                 
                 // Envoyer la requête
+                updateProgress('envoi', 'Envoi de la requête...', 10);
                 const response = await fetch('/api/geocaches/add', {
                     method: 'POST',
                     body: formData
@@ -2307,7 +2442,8 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     window.wsService.off('complete_add_geocache', completeHandler);
                     
                     // Traiter la réponse immédiate
-                    messageDiv.textContent = data.message || 'Opération terminée';
+                    showProgressSuccess(data.message || 'Opération terminée');
+                    messageDiv.textContent = `✅ ${data.message || 'Opération terminée'}`;
                     messageDiv.className = 'mt-2 text-green-600';
                     
                     if (data.id) {
@@ -2319,7 +2455,6 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     
                     // Réactiver le formulaire
                     loadingIndicator.classList.add('hidden');
-                    spinner.style.display = 'none';
                     submitButton.disabled = false;
                 }
                 
@@ -2327,12 +2462,12 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 
             } catch (error) {
                 console.error('Erreur:', error);
-                messageDiv.textContent = error.message || 'Une erreur est survenue lors de la communication avec le serveur';
+                showProgressError(error.message || 'Erreur de communication avec le serveur');
+                messageDiv.textContent = `❌ ${error.message || 'Une erreur est survenue lors de la communication avec le serveur'}`;
                 messageDiv.className = 'mt-2 text-red-600';
                 
                 // Réactiver le formulaire en cas d'erreur
                 loadingIndicator.classList.add('hidden');
-                spinner.style.display = 'none';
                 submitButton.disabled = false;
             }
         });
