@@ -1735,6 +1735,83 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             `<div class="mt-2 text-xs text-gray-400">
                                 Fragments: ${resultEntry.metadata.fragments.join(', ')}
                              </div>` : ''}
+                        ${(() => {
+                            // Bloc coordonnées par résultat (si disponible)
+                            const coords = resultEntry.coordinates || (result.combined_results && result.combined_results[parameterPlugin] ? result.combined_results[parameterPlugin].coordinates : null);
+                            if (!coords || !coords.exist) {
+                                return '';
+                            }
+                            // Récupérer lat/lon décimaux depuis diverses structures possibles
+                            let lat = null; let lon = null;
+                            if (coords.decimal) {
+                                if (Array.isArray(coords.decimal)) {
+                                    lat = coords.decimal[0];
+                                    lon = coords.decimal[1];
+                                } else if (typeof coords.decimal === 'object') {
+                                    lat = coords.decimal.latitude ?? coords.decimal.lat ?? null;
+                                    lon = coords.decimal.longitude ?? coords.decimal.lon ?? null;
+                                }
+                            }
+                            // Fallback si decimal absent mais primary_coordinates au format objet
+                            if ((lat === null || lon === null) && result.primary_coordinates) {
+                                lat = result.primary_coordinates.latitude ?? null;
+                                lon = result.primary_coordinates.longitude ?? null;
+                            }
+                            // Construire DDM
+                            let ddmLat = coords.ddm_lat || '';
+                            let ddmLon = coords.ddm_lon || '';
+                            let ddmFull = coords.ddm || '';
+                            const toDdm = (value, isLat) => {
+                                if (typeof value !== 'number' || isNaN(value)) return '';
+                                const dir = isLat ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'W');
+                                const abs = Math.abs(value);
+                                const deg = Math.floor(abs);
+                                const min = (abs - deg) * 60;
+                                return `${dir} ${deg}° ${min.toFixed(3)}'`;
+                            };
+                            if ((!ddmLat || !ddmLon) && (typeof lat === 'number') && (typeof lon === 'number')) {
+                                ddmLat = toDdm(lat, true);
+                                ddmLon = toDdm(lon, false);
+                            }
+                            if (!ddmFull && ddmLat && ddmLon) {
+                                ddmFull = `${ddmLat} ${ddmLon}`;
+                            }
+                            const gmapsLat = (typeof lat === 'number') ? lat : '';
+                            const gmapsLon = (typeof lon === 'number') ? lon : '';
+                            const ddmAttr = (ddmFull || '').replace(/"/g, '&quot;');
+                            const ddmLatAttr = (ddmLat || '').replace(/"/g, '&quot;');
+                            const ddmLonAttr = (ddmLon || '').replace(/"/g, '&quot;');
+                            return `
+                                <div class="bg-gray-700 rounded-lg p-3 mt-3">
+                                    <h4 class="text-sm font-medium text-green-400 mb-2">Coordonnées détectées</h4>
+                                    <div class="bg-gray-800 p-3 rounded grid grid-cols-1 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-400 mb-1">Coordonnées:</label>
+                                            <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmFull}" readonly>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-400 mb-1">Latitude:</label>
+                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLat || (typeof lat === 'number' ? lat : '')}" readonly>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-400 mb-1">Longitude:</label>
+                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLon || (typeof lon === 'number' ? lon : '')}" readonly>
+                                            </div>
+                                        </div>
+                                        <div class="mt-1">
+                                            ${ (gmapsLat !== '' && gmapsLon !== '') ? `<a href="https://www.google.com/maps?q=${gmapsLat},${gmapsLon}" target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs inline-flex items-center mr-2"><i class="fas fa-map-marker-alt mr-1"></i> Google Maps</a>` : ''}
+                                            <button class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md mr-2" onclick="navigator.clipboard.writeText('${ddmAttr}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
+                                                <i class="fas fa-copy mr-1"></i> Copier
+                                            </button>
+                                            <button class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-md" data-action="click->geocache-solver#useCoordinates" data-ddm="${ddmAttr}" data-ddm-lat="${ddmLatAttr}" data-ddm-lon="${ddmLonAttr}" data-lat="${gmapsLat}" data-lon="${gmapsLon}">
+                                                Utiliser ces coordonnées
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        })()}
                     </div>`;
             });
             
@@ -1901,6 +1978,36 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     // Méthode pour utiliser les coordonnées détectées
     useCoordinates(event) {
         event.preventDefault();
+        
+        // Si des coordonnées sont passées via data-*, les utiliser en priorité
+        const button = event.currentTarget;
+        const dataLat = button?.dataset?.lat;
+        const dataLon = button?.dataset?.lon;
+        const dataDdm = button?.dataset?.ddm;
+        const dataDdmLat = button?.dataset?.ddmLat;
+        const dataDdmLon = button?.dataset?.ddmLon;
+        if (dataLat || dataLon || dataDdm || dataDdmLat || dataDdmLon) {
+            let ddmLat = dataDdmLat || '';
+            let ddmLon = dataDdmLon || '';
+            let ddmFull = dataDdm || '';
+            const toDdm = (value, isLat) => {
+                const num = parseFloat(value);
+                if (isNaN(num)) return '';
+                const dir = isLat ? (num >= 0 ? 'N' : 'S') : (num >= 0 ? 'E' : 'W');
+                const abs = Math.abs(num);
+                const deg = Math.floor(abs);
+                const min = (abs - deg) * 60;
+                return `${dir} ${deg}° ${min.toFixed(3)}'`;
+            };
+            if (!ddmLat && dataLat) ddmLat = toDdm(dataLat, true);
+            if (!ddmLon && dataLon) ddmLon = toDdm(dataLon, false);
+            if (!ddmFull && ddmLat && ddmLon) ddmFull = `${ddmLat} ${ddmLon}`;
+            this.lastDetectedCoordinatesValue = {
+                ddm: ddmFull,
+                ddm_lat: ddmLat,
+                ddm_lon: ddmLon
+            };
+        }
         
         if (!this.lastDetectedCoordinatesValue) {
             alert("Aucune coordonnée GPS détectée.");
