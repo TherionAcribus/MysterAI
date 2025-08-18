@@ -585,6 +585,13 @@ def execute_metadetection():
     Ce plugin est un méta-plugin qui peut analyser et décoder du texte en utilisant d'autres plugins.
     """
     try:
+        # Initialiser le service WebSocket et la session (si fournie par le client, la réutiliser)
+        try:
+            from app.services.websocket_service import get_websocket_service
+            ws_service = get_websocket_service()
+        except Exception:
+            ws_service = None
+
         # Récupérer les inputs du formulaire
         text = request.form.get('text', '')
         mode = request.form.get('mode', 'detect')  # 'detect' ou 'decode'
@@ -592,6 +599,8 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         key = request.form.get('key', None)
+        # Session WebSocket optionnelle transmise par le frontend
+        ws_session_id = request.form.get('ws_session_id') or request.form.get('session_id')
         
         # Normaliser le texte
         text = normalize_text(text)
@@ -609,6 +618,24 @@ def execute_metadetection():
         if not text:
             return jsonify({'error': 'Aucun texte fourni'}), 400
             
+        # Créer une session si non fournie
+        if ws_service and not ws_session_id:
+            try:
+                ws_session_id = ws_service.create_session('metadetection')
+            except Exception:
+                ws_session_id = None
+
+        # Émettre un début de progression
+        if ws_service and ws_session_id:
+            try:
+                ws_service.emit_progress(ws_session_id, 'started', "Démarrage du MetaSolver...", 0, {
+                    'mode': mode,
+                    'embedded': embedded,
+                    'strict': strict
+                })
+            except Exception:
+                pass
+
         # Vérifier que le plugin metadetection existe
         plugin = Plugin.query.filter_by(name='metadetection').first()
         if not plugin:
@@ -618,7 +645,8 @@ def execute_metadetection():
         inputs = {
             'text': text,
             'mode': mode,
-            'strict': strict  # Transmettre le paramètre strict tel quel ('strict' ou 'smooth')
+            'strict': strict,  # Transmettre le paramètre strict tel quel ('strict' ou 'smooth')
+            'ws_session_id': ws_session_id
         }
         
         # Ajouter les caractères autorisés si fournis
@@ -639,15 +667,38 @@ def execute_metadetection():
         
         # Exécuter le plugin
         result = plugin_manager.execute_plugin('metadetection', inputs)
+
+        # Émettre le succès et le résultat via WebSocket
+        if ws_service and ws_session_id:
+            try:
+                ws_service.emit_success(ws_session_id, 'MetaSolver terminé', result)
+            except Exception:
+                pass
         
         # Retourner le résultat en JSON
-        return jsonify(result)
+        # Inclure l'id de session pour le frontend si utile
+        response_payload = result if isinstance(result, dict) else {'result': result}
+        if ws_session_id:
+            response_payload['ws_session_id'] = ws_session_id
+        return jsonify(response_payload)
         
     except Exception as e:
         import traceback
         print(f"Error executing metadetection plugin: {str(e)}")
         print("Traceback:")
         print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@plugins_bp.route('/api/plugins/metadetection/session', methods=['POST'])
+def create_metasolver_session():
+    """Crée une session WebSocket pour suivre l'exécution du MetaSolver."""
+    try:
+        from app.services.websocket_service import get_websocket_service
+        ws_service = get_websocket_service()
+        session_id = ws_service.create_session('metadetection')
+        return jsonify({'session_id': session_id, 'operation_type': 'metadetection'})
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # Fonction utilitaire pour normaliser le texte

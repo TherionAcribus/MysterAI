@@ -1,4 +1,4 @@
-from loguru import logger
+from loguru import logger  # noqa: F401
 
 class MetaDetectionPlugin:
     """
@@ -37,6 +37,22 @@ class MetaDetectionPlugin:
         text = inputs.get("text", "")
         plugin_name = inputs.get("plugin_name")
         key = inputs.get("key")
+        ws_session_id = inputs.get("ws_session_id")
+
+        # Prépare l'accès au service WebSocket si disponible
+        ws_service = None
+        try:
+            from app.services.websocket_service import get_websocket_service
+            ws_service = get_websocket_service()
+        except Exception:
+            ws_service = None
+
+        def emit_progress(step: str, message: str, progress: int | None = None, data: dict | None = None):
+            if ws_service and ws_session_id:
+                try:
+                    ws_service.emit_progress(ws_session_id, step, message, progress, data or {})
+                except Exception:
+                    pass
         
         # Récupération du mode strict/smooth
         strict = inputs.get("strict", True) == "strict"
@@ -51,7 +67,7 @@ class MetaDetectionPlugin:
         embedded = inputs.get("embedded", False)
         
         # Récupération du paramètre de détection GPS
-        enable_gps_detection = inputs.get("enable_gps_detection", True)
+        enable_gps_detection = inputs.get("enable_gps_detection", True)  # noqa: F841
         
         # Récupération du paramètre de force brute
         enable_bruteforce = inputs.get("enable_bruteforce", True)
@@ -75,6 +91,9 @@ class MetaDetectionPlugin:
         start_time = time.time()
             
         if mode == "detect":
+            emit_progress('prepare', 'Préparation de la détection...', 5, {
+                'phase': 'detect',
+            })
             # Ancien format pour rétrocompatibilité avec l'UI
             old_result = self.detect_codes(text, strict, allowed_chars, embedded)
             
@@ -107,6 +126,18 @@ class MetaDetectionPlugin:
                         "fragments": fragment_values,
                         "can_decode": code.get("can_decode", False)
                     }
+                })
+
+                # Émettre une progression pour chaque plugin détecté
+                try:
+                    progress_pct = 10 + int((idx + 1) / max(1, len(possible_codes)) * 60)
+                except Exception:
+                    progress_pct = None
+                emit_progress('detect_found', f"Détection: {plugin_name} (score {score})", progress_pct, {
+                    'plugin': plugin_name,
+                    'fragments': fragment_values,
+                    'score': score,
+                    'can_decode': code.get('can_decode', False)
                 })
                 
                 # Ajouter au dictionnaire combined_results pour la rétrocompatibilité
@@ -144,13 +175,18 @@ class MetaDetectionPlugin:
             
         elif mode == "decode":
             # Récupérer les résultats de décodage (format standardisé uniquement)
-            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key, enable_bruteforce)
+            emit_progress('decode_start', 'Début du décodage...', 10, {
+                'phase': 'decode',
+                'plugin': plugin_name or 'auto'
+            })
+            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key, enable_bruteforce, ws_session_id=ws_session_id, ws_service=ws_service)
             
             # Mesure du temps d'exécution
             execution_time = int((time.time() - start_time) * 1000)
             
             # En cas d'absence de résultat, retourner une erreur formatée
             if not decode_results["results"]:
+                emit_progress('decode_done', "Décodage terminé: aucun résultat", 100)
                 return {
                     "status": "error",
                     "plugin_info": {
@@ -166,6 +202,9 @@ class MetaDetectionPlugin:
                 }
             
             # Sinon, retourner les résultats formatés
+            emit_progress('decode_done', "Décodage terminé", 95, {
+                'results': len(decode_results["results"]) if isinstance(decode_results, dict) else 0
+            })
             return {
                 "status": "success",
                 "plugin_info": {
@@ -291,7 +330,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -354,6 +393,13 @@ class MetaDetectionPlugin:
             "failed_plugins": []  # Suivi des échecs
         }
         
+        def emit_progress(step: str, message: str, progress: int | None = None, data: dict | None = None):
+            if ws_service and ws_session_id:
+                try:
+                    ws_service.emit_progress(ws_session_id, step, message, progress, data or {})
+                except Exception:
+                    pass
+
         if plugin_name:
             # Si un plugin spécifique est demandé
             if plugin_name in excluded_plugins:
@@ -375,6 +421,7 @@ class MetaDetectionPlugin:
             
             # Utiliser la méthode execute du plugin
             try:
+                emit_progress('decode_try_plugin', f"Décodage avec {plugin_name}...", 30, {'plugin': plugin_name})
                 inputs = {
                     "text": text,
                     "strict": strict,
@@ -408,6 +455,8 @@ class MetaDetectionPlugin:
             primary_coordinates = None
             
             # Parcourir tous les plugins chargés
+            total_plugins = sum(1 for name in plugin_manager.loaded_plugins.keys() if name not in excluded_plugins and (not included_plugins or name in included_plugins))
+            processed_count = 0
             for plugin_name, plugin_wrapper in plugin_manager.loaded_plugins.items():
                 # Ignorer les plugins exclus
                 if plugin_name in excluded_plugins:
@@ -429,6 +478,12 @@ class MetaDetectionPlugin:
                 # Essayer de décoder avec ce plugin
                 print(f"Décodage avec {plugin_name}")
                 try:
+                    processed_count += 1
+                    try:
+                        progress_pct = 20 + int(processed_count / max(1, total_plugins) * 70)
+                    except Exception:
+                        progress_pct = None
+                    emit_progress('decode_try_plugin', f"Décodage avec {plugin_name}...", progress_pct, {'plugin': plugin_name})
                     inputs = {
                         "text": text,
                         "strict": strict,
@@ -452,6 +507,14 @@ class MetaDetectionPlugin:
                     # Traiter uniquement les formats standardisés
                     if self._is_standardized_format(plugin_result):
                         plugin_processed = self._process_plugin_result(plugin_result, plugin_name)
+                        # Émettre un résultat partiel si disponible
+                        if plugin_processed["results"]:
+                            first = plugin_processed["results"][0]
+                            emit_progress('partial_result', f"Résultat {plugin_name}", None, {
+                                'plugin': plugin_name,
+                                'text_output': first.get('text_output', '')[:500],
+                                'confidence': first.get('confidence', 0)
+                            })
                         
                         # Ajouter les résultats à notre collection
                         all_results.extend(plugin_processed["results"])

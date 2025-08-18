@@ -1117,6 +1117,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
     
     async executeMetaSolver(event) {
         console.log("executeMetaSolver appelé");
+        // S'assurer que les gestionnaires WebSocket sont branchés
+        try { this.connectWebSocketProgressForMetaSolver(); } catch (e) { /* ignore */ }
         
         // Récupérer le mode depuis le bouton ou le select
         const mode = event.currentTarget.dataset.mode || document.getElementById('metasolver-mode').value;
@@ -1179,6 +1181,25 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             if (allowedCharsType !== 'all') {
                 formData.append('allowed_chars', JSON.stringify(allowedChars));
             }
+
+            // Créer/obtenir une session WebSocket pour suivre la progression
+            let sessionId = null;
+            try {
+                const sessionResp = await fetch('/api/plugins/metadetection/session', { method: 'POST' });
+                if (sessionResp.ok) {
+                    const sessionData = await sessionResp.json();
+                    sessionId = sessionData.session_id;
+                }
+            } catch (e) {
+                console.warn('Impossible de créer la session WebSocket MetaSolver', e);
+            }
+            if (sessionId) {
+                // Rejoindre la session pour recevoir les updates
+                if (window.wsService) {
+                    window.wsService.joinSession(sessionId);
+                }
+                formData.append('ws_session_id', sessionId);
+            }
             
             console.log("Paramètres envoyés à l'API:", {
                 text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
@@ -1201,6 +1222,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
             
             const result = await response.json();
+            // Si le backend nous renvoie un session_id, s'y abonner si pas déjà fait
+            if (!sessionId && result && result.ws_session_id && window.wsService) {
+                window.wsService.joinSession(result.ws_session_id);
+            }
             console.log("Réponse brute de l'API MetaSolver:", result);
             console.log("Structure complète des résultats:", JSON.stringify(result, null, 2));
             console.log("Présence de 'results':", !!result.results);
@@ -1232,6 +1257,150 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 </div>
             `;
         }
+    }
+
+    connectWebSocketProgressForMetaSolver() {
+        // Branche les handlers globaux une seule fois
+        if (!window.wsService || this._metaWsHandlersInitialized) return;
+        this._metaWsHandlersInitialized = true;
+
+        const resultElement = document.getElementById('metasolver-result');
+        const resultContentElement = document.getElementById('metasolver-result-content');
+        const liveStatusEl = document.getElementById('metasolver-live-status');
+        const liveSpinnerEl = document.getElementById('metasolver-live-spinner');
+        const liveTextEl = document.getElementById('metasolver-live-text');
+        const liveProgressEl = document.getElementById('metasolver-live-progress');
+
+        // Afficher une ligne d'état nette
+        const ensureVisible = () => {
+            if (resultElement.classList.contains('hidden')) {
+                resultElement.classList.remove('hidden');
+            }
+            if (liveStatusEl && liveStatusEl.classList.contains('hidden')) {
+                liveStatusEl.classList.remove('hidden');
+            }
+            if (liveSpinnerEl) {
+                liveSpinnerEl.classList.remove('hidden');
+            }
+            if (liveProgressEl) {
+                liveProgressEl.style.width = '0%';
+            }
+        };
+
+        // Progression générique
+        window.wsService.on('progress_metadetection', (data) => {
+            if (!data) return;
+            ensureVisible();
+            const { step, message, progress, data: extra } = data;
+            const pct = (typeof progress === 'number' && progress >= 0 && progress <= 100) ? `${progress}%` : '';
+            if (liveStatusEl) {
+                const STEP_LABELS = {
+                    started: 'Démarrage',
+                    prepare: 'Préparation',
+                    scraping: 'Récupération',
+                    detect_found: 'Détection',
+                    decode_start: 'Décodage',
+                    decode_try_plugin: 'Décodage',
+                    partial_result: 'Résultat partiel',
+                    decode_done: 'Décodage terminé',
+                    completed: 'Terminé',
+                    progress: 'Progression'
+                };
+                const stepKey = (step || '').toString().toLowerCase();
+                const friendly = STEP_LABELS[stepKey] || (step ? step.replace(/_/g, ' ') : 'Progression');
+                const friendlyCaps = friendly.toUpperCase();
+                if (liveTextEl) {
+                    liveTextEl.innerHTML = `<span class="text-blue-400">${friendlyCaps}${pct ? ' · ' + pct : ''}</span> ${message || ''}`;
+                } else {
+                    liveStatusEl.innerHTML = `<span class="text-blue-400">${friendlyCaps}${pct ? ' · ' + pct : ''}</span> ${message || ''}`;
+                }
+            }
+            if (liveProgressEl && typeof progress === 'number' && progress >= 0 && progress <= 100) {
+                liveProgressEl.style.width = `${progress}%`;
+            }
+
+            // Affichage incrémental de l'étape en cours
+            const line = document.createElement('div');
+            line.className = 'text-sm text-gray-300';
+            const STEP_LABELS2 = {
+                started: 'Démarrage',
+                prepare: 'Préparation',
+                scraping: 'Récupération',
+                detect_found: 'Détection',
+                decode_start: 'Décodage',
+                decode_try_plugin: 'Décodage',
+                partial_result: 'Résultat partiel',
+                decode_done: 'Décodage terminé',
+                completed: 'Terminé',
+                progress: 'Progression'
+            };
+            const stepKey2 = (step || '').toString().toLowerCase();
+            const friendly2 = STEP_LABELS2[stepKey2] || (step ? step.replace(/_/g, ' ') : 'progress');
+            line.innerHTML = `<span class="text-blue-400">[${friendly2}${pct ? ' ' + pct : ''}]</span> ${message || ''}`;
+            resultContentElement.appendChild(line);
+
+            // Si un résultat partiel est disponible, l'afficher
+            if (extra && (extra.text_output || extra.fragments)) {
+                const partial = document.createElement('div');
+                partial.className = 'mt-1 p-2 bg-gray-700 rounded';
+                const header = extra.plugin ? `<div class="text-xs text-gray-400">Plugin: ${extra.plugin}</div>` : '';
+                const body = extra.text_output ? `<pre class="whitespace-pre-wrap text-gray-200 text-xs">${extra.text_output}</pre>` : '';
+                const fr = Array.isArray(extra.fragments) && extra.fragments.length ? `<div class="text-xs text-gray-400">Fragments: ${extra.fragments.join(', ')}</div>` : '';
+                partial.innerHTML = `${header}${fr}${body}`;
+                resultContentElement.appendChild(partial);
+            }
+
+            // Garder le scroll en bas
+            resultContentElement.scrollTop = resultContentElement.scrollHeight;
+        });
+
+        // Terminaison
+        window.wsService.on('complete_metadetection', (data) => {
+            if (!data) return;
+            ensureVisible();
+            const status = data.status;
+            const line = document.createElement('div');
+            line.className = status === 'success' ? 'text-sm text-green-400' : 'text-sm text-red-400';
+            line.textContent = status === 'success' ? (data.message || 'Terminé') : (data.message || 'Erreur');
+            resultContentElement.appendChild(line);
+            if (liveStatusEl) {
+                if (status === 'success') {
+                    liveStatusEl.className = 'mb-3 p-2 bg-green-900/30 border border-green-600 rounded text-sm text-green-300';
+                    if (liveSpinnerEl) liveSpinnerEl.classList.add('hidden');
+                    if (liveTextEl) { liveTextEl.textContent = data.message || 'Terminé'; } else { liveStatusEl.textContent = data.message || 'Terminé'; }
+                } else {
+                    liveStatusEl.className = 'mb-3 p-2 bg-red-900/30 border border-red-600 rounded text-sm text-red-300';
+                    if (liveSpinnerEl) liveSpinnerEl.classList.add('hidden');
+                    if (liveTextEl) { liveTextEl.textContent = data.message || 'Erreur'; } else { liveStatusEl.textContent = data.message || 'Erreur'; }
+                }
+                if (liveProgressEl) liveProgressEl.style.width = '100%';
+                setTimeout(() => {
+                    if (liveStatusEl) {
+                        liveStatusEl.classList.add('hidden');
+                        liveStatusEl.className = 'mb-3 p-2 bg-gray-800 border border-gray-600 rounded text-sm text-blue-300';
+                        if (liveSpinnerEl) liveSpinnerEl.classList.add('hidden');
+                        if (liveTextEl) liveTextEl.textContent = '';
+                        if (liveProgressEl) liveProgressEl.style.width = '0%';
+                    }
+                }, 3000);
+            }
+
+            // En cas de succès, si un résultat complet est inclus, re-render
+            if (status === 'success' && data.result) {
+                // Séparateur
+                const sep = document.createElement('hr');
+                sep.className = 'my-2 border-gray-600';
+                resultContentElement.appendChild(sep);
+                // Rendu final
+                (async () => {
+                    const html = await this.formatMetaDetectionResults(data.result);
+                    const container = document.createElement('div');
+                    container.innerHTML = html;
+                    resultContentElement.appendChild(container);
+                    resultContentElement.scrollTop = resultContentElement.scrollHeight;
+                })();
+            }
+        });
     }
     
     async decodeWithPlugin(event) {

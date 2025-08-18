@@ -148,6 +148,19 @@
                         
                         <div id="metasolver-result" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
                             <h3 class="text-md font-medium text-gray-200 mb-2">Résultats</h3>
+                            <!-- Statut en direct (se met à jour en remplaçant l'info précédente) -->
+                            <div id="metasolver-live-status" class="hidden mb-3 p-2 bg-gray-800 border border-gray-600 rounded text-sm text-blue-300">
+                                <span id="metasolver-live-spinner" class="inline-flex items-center justify-center mr-2 align-middle">
+                                    <svg class="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                </span>
+                                <span id="metasolver-live-text"></span>
+                                <div class="mt-2 bg-gray-700 rounded-full h-1 overflow-hidden">
+                                    <div id="metasolver-live-progress" class="bg-gradient-to-r from-blue-500 to-green-500 h-1 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                                </div>
+                            </div>
                             <div id="metasolver-result-content" class="text-sm text-gray-300 whitespace-pre-wrap"></div>
                         </div>
                     </div>
