@@ -191,16 +191,20 @@ Ce contexte sera utilisé pour aider à résoudre des questions liées à cette 
         
         result = {letter: "" for letter in letters}
         
-        # Modèles regex pour trouver les questions
+        # Autoriser plusieurs séparateurs après la lettre: ., :, ), -, –, —, /
+        separators_class = r'[\.\:\)\-\–\—\/]'
+        letters_pattern = ''.join(letters)
+        
+        # Modèles regex pour trouver les questions (multi-lignes)
         patterns = [
-            # Format: A. Question?
-            r'(?:^|\n)\s*([' + ''.join(letters) + r'])\s*[\.\:\)]\s*(.*?)(?=\n\s*[A-Z]\s*[\.\:\)]|\n\s*\d+\s*[\.\:\)]|$)',
+            # Format: A. / A: / A) / A- / A – / A —  suivi du texte jusqu'au prochain en-tête ou fin
+            rf'(?:^|\n)\s*([{letters_pattern}])\s*{separators_class}\s*(.*?)(?=\n\s*[A-Z]\s*{separators_class}|\n\s*\d+\s*{separators_class}|$)',
             
-            # Format: Question A:
-            r'(?:^|\n)\s*(.*?)\s+([' + ''.join(letters) + r'])\s*[\.\:\)](?:.*?)(?=\n|$)',
+            # Format: Question A:  (la lettre et le séparateur peuvent utiliser les mêmes séparateurs)
+            rf'(?:^|\n)\s*(.*?)\s+([{letters_pattern}])\s*{separators_class}(?:.*?)(?=\n|$)',
             
             # Format: 1. (A) Question?
-            r'(?:^|\n)\s*\d+\s*[\.\:\)]\s*\(([' + ''.join(letters) + r'])\)\s*(.*?)(?=\n\s*\d+\s*[\.\:\)]|\n\s*[A-Z]\s*[\.\:\)]|$)',
+            rf'(?:^|\n)\s*\d+\s*{separators_class}\s*\(([{letters_pattern}])\)\s*(.*?)(?=\n\s*\d+\s*{separators_class}|\n\s*[A-Z]\s*{separators_class}|$)',
         ]
         
         for pattern in patterns:
