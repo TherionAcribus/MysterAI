@@ -184,34 +184,76 @@ class WordCoordsConverter:
             if dir_letter:
                 # Direction trouvée
                 i += 1
-                # -------------------- Degrés --------------------
+                # -------------------- Degrés/Minutes (avec ou sans mot 'degrees') --------------------
+                has_degree_keyword = False
                 deg_words = []
+
+                # Tentative standard: s'arrêter sur le mot-clé 'degrees'
                 while i < n and tokens[i] not in self.DEG_KEYWORDS.get(lang, set()):
                     deg_words.append(tokens[i])
                     i += 1
-                if i >= n:
-                    break  # pas de mot "degrés"
-                i += 1  # saute "degrees"
-                # -------------------- Minutes --------------------
-                min_words = []
-                while i < n and tokens[i] not in (self.POINT_KEYWORDS.get(lang, set()) | set(dir_words_map) | self.SEP_KEYWORDS):
-                    min_words.append(tokens[i])
-                    i += 1
-                # Décimales éventuelles
-                decimals_part = "000"
-                if i < n and tokens[i] in self.POINT_KEYWORDS.get(lang, set()):
-                    i += 1
-                    dec_words = []
-                    while i < n and tokens[i] not in (set(dir_words_map) | self.SEP_KEYWORDS):
-                        dec_words.append(tokens[i])
+                if i < n and tokens[i] in self.DEG_KEYWORDS.get(lang, set()):
+                    has_degree_keyword = True
+
+                if has_degree_keyword:
+                    # On a trouvé explicitement 'degree(s)'
+                    i += 1  # saute le mot 'degrees'
+                    # -------------------- Minutes --------------------
+                    min_words = []
+                    while i < n and tokens[i] not in (self.POINT_KEYWORDS.get(lang, set()) | set(dir_words_map) | self.SEP_KEYWORDS):
+                        min_words.append(tokens[i])
                         i += 1
-                    decimals_part = self._parse_decimals(dec_words, lang)
-                deg_val = self._words_to_number(deg_words, lang)
-                min_val = self._words_to_number(min_words, lang)
-                if deg_val is not None and min_val is not None:
-                    coord_str = f"{dir_letter} {deg_val:02d}° {min_val:02d}.{decimals_part}"
-                    return coord_str, i
-                # Sinon on continue la recherche après la direction
+                    # Décimales éventuelles
+                    decimals_part = "000"
+                    if i < n and tokens[i] in self.POINT_KEYWORDS.get(lang, set()):
+                        i += 1
+                        dec_words = []
+                        while i < n and tokens[i] not in (set(dir_words_map) | self.SEP_KEYWORDS):
+                            dec_words.append(tokens[i])
+                            i += 1
+                        decimals_part = self._parse_decimals(dec_words, lang)
+
+                    deg_val = self._words_to_number(deg_words, lang)
+                    min_val = self._words_to_number(min_words, lang)
+                    if deg_val is not None and min_val is not None:
+                        coord_str = f"{dir_letter} {deg_val:02d}° {min_val:02d}.{decimals_part}"
+                        return coord_str, i
+                    # Sinon on continue la recherche après la direction
+                else:
+                    # Fallback sans mot 'degrees' (ex: "north forty two fifty two point six eight one")
+                    # Construire un segment jusqu'au prochain mot direction/séparateur ou fin
+                    segment_start = i - len(deg_words)
+                    j = segment_start
+                    point_idx = None
+                    stop_words = set(dir_words_map) | self.SEP_KEYWORDS
+                    while j < n and tokens[j] not in stop_words:
+                        if tokens[j] in self.POINT_KEYWORDS.get(lang, set()) and point_idx is None:
+                            point_idx = j
+                        j += 1
+                    segment_end = j
+
+                    # déterminer borne minutes avant 'point' (ou fin)
+                    window_end = point_idx if point_idx is not None else segment_end
+                    seg = tokens[segment_start:window_end]
+
+                    # Essayer 1 à 3 mots pour les degrés
+                    deg_max = 90 if dir_letter in ("N", "S") else 180
+                    for k in range(1, min(4, len(seg))):
+                        deg_words_try = seg[:k]
+                        min_words_try = seg[k:]
+                        if not min_words_try:
+                            continue
+                        deg_val = self._words_to_number(deg_words_try, lang)
+                        min_val = self._words_to_number(min_words_try, lang)
+                        if deg_val is None or min_val is None:
+                            continue
+                        if 0 <= deg_val <= deg_max and 0 <= min_val <= 59:
+                            decimals_part = "000"
+                            if point_idx is not None:
+                                dec_words = tokens[point_idx+1:segment_end]
+                                decimals_part = self._parse_decimals(dec_words, lang)
+                            coord_str = f"{dir_letter} {deg_val:02d}° {min_val:02d}.{decimals_part}"
+                            return coord_str, segment_end
             i += 1
         return None, start_idx
 
