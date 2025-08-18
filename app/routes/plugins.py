@@ -599,6 +599,14 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         key = request.form.get('key', None)
+        # Optionnel: coordonnées d'origine au format JSON { ddm_lat, ddm_lon }
+        origin_coords_json = request.form.get('origin_coords')
+        origin_coords = None
+        if origin_coords_json:
+            try:
+                origin_coords = json.loads(origin_coords_json)
+            except Exception:
+                origin_coords = None
         # Session WebSocket optionnelle transmise par le frontend
         ws_session_id = request.form.get('ws_session_id') or request.form.get('session_id')
         
@@ -660,6 +668,13 @@ def execute_metadetection():
         # Ajouter la clé si fournie
         if key:
             inputs['key'] = key
+        # Ajouter les coordonnées d'origine si fournies
+        if origin_coords and isinstance(origin_coords, dict):
+            # Normaliser les clés attendues
+            ddm_lat = origin_coords.get('ddm_lat') or origin_coords.get('lat')
+            ddm_lon = origin_coords.get('ddm_lon') or origin_coords.get('lon')
+            if ddm_lat and ddm_lon:
+                inputs['origin_coords'] = { 'ddm_lat': ddm_lat, 'ddm_lon': ddm_lon }
             
         # Obtenir le plugin manager
         from app import get_plugin_manager

@@ -38,6 +38,8 @@ class MetaDetectionPlugin:
         plugin_name = inputs.get("plugin_name")
         key = inputs.get("key")
         ws_session_id = inputs.get("ws_session_id")
+        # Coordonnées d'origine éventuelles (DDM)
+        origin_coords = inputs.get("origin_coords")
 
         # Prépare l'accès au service WebSocket si disponible
         ws_service = None
@@ -183,7 +185,18 @@ class MetaDetectionPlugin:
                 'phase': 'decode',
                 'plugin': plugin_name or 'auto'
             })
-            decode_results = self.decode_code(plugin_name, text, strict_param, allowed_chars, embedded, key, enable_bruteforce, ws_session_id=ws_session_id, ws_service=ws_service)
+            decode_results = self.decode_code(
+                plugin_name,
+                text,
+                strict_param,
+                allowed_chars,
+                embedded,
+                key,
+                enable_bruteforce,
+                ws_session_id=ws_session_id,
+                ws_service=ws_service,
+                origin_coords=origin_coords
+            )
             
             # Mesure du temps d'exécution
             execution_time = int((time.time() - start_time) * 1000)
@@ -334,7 +347,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None, origin_coords: dict | None = None) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -486,7 +499,7 @@ class MetaDetectionPlugin:
                 plugin_result = p_instance.execute(inputs)
                 
                 # Traiter uniquement les résultats au format standardisé
-                return self._process_standardized_result(plugin_result, plugin_name, scoring_cache=scoring_cache)
+                return self._process_standardized_result(plugin_result, plugin_name, scoring_cache=scoring_cache, origin_coords=origin_coords)
                 
             except Exception as e:
                 print(f"Erreur lors du décodage avec {plugin_name}: {str(e)}")
@@ -557,7 +570,7 @@ class MetaDetectionPlugin:
                     
                     # Traiter uniquement les formats standardisés
                     if self._is_standardized_format(plugin_result):
-                        plugin_processed = self._process_plugin_result(plugin_result, plugin_name, scoring_cache=scoring_cache)
+                        plugin_processed = self._process_plugin_result(plugin_result, plugin_name, scoring_cache=scoring_cache, origin_coords=origin_coords)
                         # Émettre un résultat partiel si disponible
                         if plugin_processed["results"]:
                             first = plugin_processed["results"][0]
@@ -611,7 +624,7 @@ class MetaDetectionPlugin:
         
         return "status" in result and "results" in result
     
-    def _process_plugin_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None):
+    def _process_plugin_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None, origin_coords: dict | None = None):
         """
         Traite le résultat d'un plugin au format standardisé
         """
@@ -710,10 +723,46 @@ class MetaDetectionPlugin:
                 # Définir comme coordonnées primaires si présentes et valides
                 if "decimal" in result["coordinates"]:
                     processed["primary_coordinates"] = result["coordinates"]["decimal"]
+
+                # Si des coordonnées d'origine sont fournies, calculer la distance et l'attacher au résultat
+                try:
+                    if origin_coords and origin_coords.get('ddm_lat') and origin_coords.get('ddm_lon'):
+                        from app.routes.coordinates import calculate_distance_between_coords
+                        # Construire les DDM de destination à partir des champs ddm_lat/ddm_lon si présents
+                        dest_ddm_lat = result["coordinates"].get("ddm_lat")
+                        dest_ddm_lon = result["coordinates"].get("ddm_lon")
+                        # Si DDM non fournis mais décimal présent, générer une approximation DDM simple
+                        if (not dest_ddm_lat or not dest_ddm_lon) and "decimal" in result["coordinates"]:
+                            lat = result["coordinates"]["decimal"].get("latitude") or result["coordinates"]["decimal"].get("lat")
+                            lon = result["coordinates"]["decimal"].get("longitude") or result["coordinates"]["decimal"].get("lon")
+                            def to_ddm(value: float, is_lat: bool) -> str:
+                                if value is None:
+                                    return None
+                                direction = ('N' if value >= 0 else 'S') if is_lat else ('E' if value >= 0 else 'W')
+                                abs_val = abs(float(value))
+                                deg = int(abs_val)
+                                minutes = (abs_val - deg) * 60
+                                return f"{direction} {deg}° {minutes:.3f}'"
+                            if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+                                dest_ddm_lat = to_ddm(lat, True)
+                                dest_ddm_lon = to_ddm(lon, False)
+                        if dest_ddm_lat and dest_ddm_lon:
+                            distance_info = calculate_distance_between_coords(
+                                origin_lat=origin_coords['ddm_lat'],
+                                origin_lon=origin_coords['ddm_lon'],
+                                dest_lat=dest_ddm_lat,
+                                dest_lon=dest_ddm_lon
+                            )
+                            # Attacher au résultat et au combined_results
+                            result["distance_from_origin"] = distance_info
+                            processed["combined_results"][plugin_name]["distance_from_origin"] = distance_info
+                except Exception:
+                    # Ne pas bloquer en cas d'erreur
+                    pass
         
         return processed
     
-    def _process_standardized_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None):
+    def _process_standardized_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None, origin_coords: dict | None = None):
         """
         Traite le résultat d'un plugin spécifique au format standardisé
         """
@@ -787,6 +836,38 @@ class MetaDetectionPlugin:
                 # Définir comme coordonnées primaires
                 if "decimal" in result["coordinates"]:
                     processed["primary_coordinates"] = result["coordinates"]["decimal"]
+
+                # Calculer la distance si origin_coords fournie
+                try:
+                    if origin_coords and origin_coords.get('ddm_lat') and origin_coords.get('ddm_lon'):
+                        from app.routes.coordinates import calculate_distance_between_coords
+                        dest_ddm_lat = result["coordinates"].get("ddm_lat")
+                        dest_ddm_lon = result["coordinates"].get("ddm_lon")
+                        if (not dest_ddm_lat or not dest_ddm_lon) and "decimal" in result["coordinates"]:
+                            lat = result["coordinates"]["decimal"].get("latitude") or result["coordinates"]["decimal"].get("lat")
+                            lon = result["coordinates"]["decimal"].get("longitude") or result["coordinates"]["decimal"].get("lon")
+                            def to_ddm(value: float, is_lat: bool) -> str:
+                                if value is None:
+                                    return None
+                                direction = ('N' if value >= 0 else 'S') if is_lat else ('E' if value >= 0 else 'W')
+                                abs_val = abs(float(value))
+                                deg = int(abs_val)
+                                minutes = (abs_val - deg) * 60
+                                return f"{direction} {deg}° {minutes:.3f}'"
+                            if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+                                dest_ddm_lat = to_ddm(lat, True)
+                                dest_ddm_lon = to_ddm(lon, False)
+                        if dest_ddm_lat and dest_ddm_lon:
+                            distance_info = calculate_distance_between_coords(
+                                origin_lat=origin_coords['ddm_lat'],
+                                origin_lon=origin_coords['ddm_lon'],
+                                dest_lat=dest_ddm_lat,
+                                dest_lon=dest_ddm_lon
+                            )
+                            result["distance_from_origin"] = distance_info
+                            processed["combined_results"][plugin_name]["distance_from_origin"] = distance_info
+                except Exception:
+                    pass
         
         # Définir le meilleur résultat
         if processed["results"]:

@@ -1205,6 +1205,23 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
             formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
+            // Tenter d'ajouter les coordonnées d'origine de la géocache si disponibles
+            try {
+                const gcCode = this.gcCodeValue;
+                if (gcCode && typeof gcCode === 'string' && gcCode.trim() !== '') {
+                    const gcResp = await fetch(`/api/geocaches/by-code/${gcCode}`);
+                    if (gcResp.ok) {
+                        const gcData = await gcResp.json();
+                        if (gcData && gcData.gc_lat && gcData.gc_lon) {
+                            const originCoords = { ddm_lat: gcData.gc_lat, ddm_lon: gcData.gc_lon };
+                            formData.append('origin_coords', JSON.stringify(originCoords));
+                            console.log('Coordonnées d\'origine ajoutées:', originCoords);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Impossible de récupérer les coordonnées d\'origine:', e);
+            }
             // Ajouter la clé si fournie
             if (keyValue) {
                 formData.append('key', keyValue);
@@ -1489,6 +1506,23 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('embedded', embedded ? 'true' : 'false');
             formData.append('plugin_name', pluginName);
             formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
+            // Tenter d'ajouter les coordonnées d'origine de la géocache si disponibles
+            try {
+                const gcCode = this.gcCodeValue;
+                if (gcCode && typeof gcCode === 'string' && gcCode.trim() !== '') {
+                    const gcResp = await fetch(`/api/geocaches/by-code/${gcCode}`);
+                    if (gcResp.ok) {
+                        const gcData = await gcResp.json();
+                        if (gcData && gcData.gc_lat && gcData.gc_lon) {
+                            const originCoords = { ddm_lat: gcData.gc_lat, ddm_lon: gcData.gc_lon };
+                            formData.append('origin_coords', JSON.stringify(originCoords));
+                            console.log('Coordonnées d\'origine ajoutées:', originCoords);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Impossible de récupérer les coordonnées d\'origine:', e);
+            }
             // Ajouter la clé si fournie
             if (keyValueDecode) {
                 formData.append('key', keyValueDecode);
@@ -1781,6 +1815,22 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             const ddmAttr = (ddmFull || '').replace(/"/g, '&quot;');
                             const ddmLatAttr = (ddmLat || '').replace(/"/g, '&quot;');
                             const ddmLonAttr = (ddmLon || '').replace(/"/g, '&quot;');
+                            // Distance depuis l'origine si fournie par le backend
+                            let distanceInfo = resultEntry.distance_from_origin;
+                            if (!distanceInfo && result.combined_results && result.combined_results[parameterPlugin]) {
+                                distanceInfo = result.combined_results[parameterPlugin].distance_from_origin;
+                            }
+                            const renderDistance = () => {
+                                if (!distanceInfo) return '';
+                                const meters = typeof distanceInfo.meters === 'number' ? distanceInfo.meters.toFixed(0) : distanceInfo.meters;
+                                const miles = typeof distanceInfo.miles === 'number' ? distanceInfo.miles.toFixed(2) : distanceInfo.miles;
+                                let cls = 'text-gray-300';
+                                if (distanceInfo.status === 'ok') cls = 'text-green-400';
+                                else if (distanceInfo.status === 'warning') cls = 'text-amber-300';
+                                else if (distanceInfo.status === 'far') cls = 'text-red-400';
+                                const label = distanceInfo.status === 'ok' ? 'Conforme (< 2 miles)' : (distanceInfo.status === 'warning' ? 'Proche limite (~2–2.5 miles)' : 'Hors limite (> 2.5 miles)');
+                                return `<div class="mt-2 text-xs ${cls}">Distance: ${meters} m (${miles} miles) · ${label}</div>`;
+                            };
                             return `
                                 <div class="bg-gray-700 rounded-lg p-3 mt-3">
                                     <h4 class="text-sm font-medium text-green-400 mb-2">Coordonnées détectées</h4>
@@ -1808,6 +1858,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                                 Utiliser ces coordonnées
                                             </button>
                                         </div>
+                                        ${renderDistance()}
                                     </div>
                                 </div>
                             `;
