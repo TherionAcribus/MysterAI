@@ -237,7 +237,7 @@ def calculate_coordinates():
         
         # Si nous avons des coordonnées d'origine et que les coordonnées calculées sont complètes, 
         # calculer la distance entre les deux
-        print(f"[DEBUG] Vérification des conditions pour le calcul de distance:")
+        print("[DEBUG] Vérification des conditions pour le calcul de distance:")
         print(f"[DEBUG] - origin_lat: {origin_lat} ({type(origin_lat).__name__ if origin_lat else 'None'})")
         print(f"[DEBUG] - origin_lon: {origin_lon} ({type(origin_lon).__name__ if origin_lon else 'None'})")
         print(f"[DEBUG] - global_status: {global_status}")
@@ -246,7 +246,7 @@ def calculate_coordinates():
         
         if origin_lat and origin_lon and global_status == "complete" and isinstance(lat_decimal, (int, float)) and isinstance(lon_decimal, (int, float)):
             try:
-                print(f"[DEBUG] Conditions remplies pour calculer la distance entre les coordonnées")
+                print("[DEBUG] Conditions remplies pour calculer la distance entre les coordonnées")
                 print(f"[DEBUG] Origin lat: {origin_lat}, Origin lon: {origin_lon}")
                 print(f"[DEBUG] Destination lat: {lat_formatted}, Destination lon: {lon_formatted}")
                 distance_info = calculate_distance_between_coords(
@@ -286,7 +286,7 @@ def calculate_distance_between_coords(origin_lat, origin_lon, dest_lat, dest_lon
     Returns:
         dict: Dictionnaire contenant la distance en mètres, en miles et un statut
     """
-    print(f"[DEBUG] *** DÉBUT CALCUL DISTANCE ***")
+    print("[DEBUG] *** DÉBUT CALCUL DISTANCE ***")
     print(f"[DEBUG] Origine: {origin_lat} {origin_lon}")
     print(f"[DEBUG] Destination: {dest_lat} {dest_lon}")
     
@@ -298,7 +298,7 @@ def calculate_distance_between_coords(origin_lat, origin_lon, dest_lat, dest_lon
     print(f"[DEBUG] Destination (décimal): lat={dest_coords['latitude']}, lon={dest_coords['longitude']}")
     
     if not origin_coords['latitude'] or not origin_coords['longitude'] or not dest_coords['latitude'] or not dest_coords['longitude']:
-        print(f"[ERROR] Conversion des coordonnées en décimal impossible")
+        print("[ERROR] Conversion des coordonnées en décimal impossible")
         raise ValueError("Impossible de convertir les coordonnées en format décimal")
     
     # Calculer la distance avec Geod
@@ -320,14 +320,14 @@ def calculate_distance_between_coords(origin_lat, origin_lon, dest_lat, dest_lon
     status = "ok"
     if distance_miles > 2.5:
         status = "far"
-        print(f"[DEBUG] Statut: FAR - Distance > 2.5 miles")
+        print("[DEBUG] Statut: FAR - Distance > 2.5 miles")
     elif distance_miles > 2.0:
         status = "warning"
-        print(f"[DEBUG] Statut: WARNING - Distance entre 2.0 et 2.5 miles")
+        print("[DEBUG] Statut: WARNING - Distance entre 2.0 et 2.5 miles")
     else:
-        print(f"[DEBUG] Statut: OK - Distance < 2.0 miles")
+        print("[DEBUG] Statut: OK - Distance < 2.0 miles")
     
-    print(f"[DEBUG] *** FIN CALCUL DISTANCE ***")
+    print("[DEBUG] *** FIN CALCUL DISTANCE ***")
     
     return {
         "meters": round(distance_m, 2),
@@ -537,6 +537,30 @@ DIRECTION_MAP = {
 }
 
 # ------------------------------------------------------------------------------
+# Utilitaires de validation des composantes DDM
+# ------------------------------------------------------------------------------
+
+def _is_valid_degrees_minutes(lat_deg: int, lat_min: float, lon_deg: int, lon_min: float) -> bool:
+    """
+    Valide les bornes des degrés et minutes pour une coordonnée DDM.
+    - Latitude degrés: 0 à 90
+    - Longitude degrés: 0 à 180
+    - Minutes: 0 à < 60
+    """
+    try:
+        if lat_deg < 0 or lat_deg > 90:
+            return False
+        if lon_deg < 0 or lon_deg > 180:
+            return False
+        if lat_min < 0 or lat_min >= 60:
+            return False
+        if lon_min < 0 or lon_min >= 60:
+            return False
+        return True
+    except Exception:
+        return False
+
+# ------------------------------------------------------------------------------
 # Fonction utilitaire pour formater une chaîne de chiffres en DDM
 # ------------------------------------------------------------------------------
 
@@ -592,6 +616,15 @@ def _detect_dmm_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]:
     if match:
         print(f"[DEBUG] _detect_dmm_coordinates: Match trouvé! Groupes: {match.groups()}")
         lat_dir, lat_deg, lat_min, lon_dir, lon_deg, lon_min = match.groups()
+        # Normaliser minutes en float pour validation bornes
+        try:
+            lat_min_f = float(lat_min)
+            lon_min_f = float(lon_min)
+            if not _is_valid_degrees_minutes(int(lat_deg), lat_min_f, int(lon_deg), lon_min_f):
+                print("[DEBUG] _detect_dmm_coordinates: Bornes invalides, rejet")
+                return None
+        except Exception:
+            return None
         ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}'"
         ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}'"
         print(f"[DEBUG] _detect_dmm_coordinates: Coordonnées formatées: {ddm_lat} {ddm_lon}")
@@ -632,6 +665,15 @@ def _detect_tabspace_coordinates(text: str) -> Optional[Dict[str, Optional[str]]
         lat_dir, lat_deg, lat_min, lat_sec, lon_dir, lon_deg, lon_min, lon_sec = match.groups()
         
         # Formatage des coordonnées
+        try:
+            lat_min_f = float(f"{lat_min}.{lat_sec}")
+            lon_min_f = float(f"{lon_min}.{lon_sec}")
+            if not _is_valid_degrees_minutes(int(lat_deg), lat_min_f, int(lon_deg), lon_min_f):
+                print("[DEBUG] _detect_tabspace_coordinates: Bornes invalides, rejet")
+                return None
+        except Exception:
+            return None
+
         ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}.{lat_sec}'"
         ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}.{lon_sec}'"
         
@@ -1091,6 +1133,15 @@ def _detect_numeric_only_coordinates(text: str, origin_coords: Optional[Dict[str
         lon_digits = match.group(2)
         
         print(f"[DEBUG] _detect_numeric_only_coordinates: Latitude digits: {lat_digits}, Longitude digits: {lon_digits}")
+        # Anti-faux-positifs: rejeter les groupes purement binaires (0/1)
+        try:
+            has_lat_nonbinary = any(ch in '23456789' for ch in lat_digits)
+            has_lon_nonbinary = any(ch in '23456789' for ch in lon_digits)
+            if not has_lat_nonbinary or not has_lon_nonbinary:
+                print("[DEBUG] _detect_numeric_only_coordinates: Groupes composés uniquement de 0/1 détectés, rejet")
+                return None
+        except Exception:
+            return None
         
         try:
             # Pour la latitude
@@ -1133,6 +1184,14 @@ def _detect_numeric_only_coordinates(text: str, origin_coords: Optional[Dict[str
                     print(f"[WARNING] Erreur lors de l'extraction des directions depuis les coordonnées d'origine: {e}")
                     # En cas d'erreur, on garde les directions par défaut
             
+            # Validation bornes
+            try:
+                if not _is_valid_degrees_minutes(int(lat_deg), float(f"{lat_min}.{lat_dec}"), int(lon_deg), float(f"{lon_min}.{lon_dec}")):
+                    print("[DEBUG] _detect_numeric_only_coordinates: Bornes invalides, rejet")
+                    return None
+            except Exception:
+                return None
+
             # Formatage des coordonnées
             ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}.{lat_dec}'"
             ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}.{lon_dec}'"
@@ -1181,6 +1240,15 @@ def _detect_compact_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]
         lat_dir, lat_digits, lon_dir, lon_digits = match.groups()
         
         print(f"[DEBUG] _detect_compact_coordinates: Latitude: {lat_dir}{lat_digits}, Longitude: {lon_dir}{lon_digits}")
+        # Anti-faux-positifs: rejeter les groupes purement binaires (0/1)
+        try:
+            has_lat_nonbinary = any(ch in '23456789' for ch in lat_digits)
+            has_lon_nonbinary = any(ch in '23456789' for ch in lon_digits)
+            if not has_lat_nonbinary or not has_lon_nonbinary:
+                print("[DEBUG] _detect_compact_coordinates: Groupes composés uniquement de 0/1 détectés, rejet")
+                return None
+        except Exception:
+            return None
         
         try:
             # Pour la latitude
@@ -1194,6 +1262,14 @@ def _detect_compact_coordinates(text: str) -> Optional[Dict[str, Optional[str]]]
             lon_min = padded_lon_digits[3:5]
             lon_dec = padded_lon_digits[5:8]
             
+            # Validation bornes
+            try:
+                if not _is_valid_degrees_minutes(int(lat_deg), float(f"{lat_min}.{lat_dec}"), int(lon_deg), float(f"{lon_min}.{lon_dec}")):
+                    print("[DEBUG] _detect_compact_coordinates: Bornes invalides, rejet")
+                    return None
+            except Exception:
+                return None
+
             # Formatage des coordonnées
             ddm_lat = f"{lat_dir} {lat_deg}° {lat_min}.{lat_dec}'"
             ddm_lon = f"{lon_dir} {lon_deg}° {lon_min}.{lon_dec}'"
@@ -1263,7 +1339,7 @@ def detect_gps_coordinates(text: str, include_numeric_only: bool = False, origin
     detection_functions = list(confidence_map.keys())
     
     if include_numeric_only:
-        print(f"[DEBUG] detect_gps_coordinates: Détection de coordonnées numériques pures activée")
+        print("[DEBUG] detect_gps_coordinates: Détection de coordonnées numériques pures activée")
         # Pour la détection numérique, on passe les coordonnées d'origine
         result = _detect_numeric_only_coordinates(text, origin_coords)
         if result and result.get("exist"):
@@ -1485,6 +1561,16 @@ def _detect_dmm_no_degree_symbol(text: str) -> Optional[Dict[str, Optional[str]]
         lat_min_fmt = _format_minutes(lat_min)
         lon_min_fmt = _format_minutes(lon_min)
 
+        # Validation des bornes
+        try:
+            lat_min_f = float(lat_min_fmt)
+            lon_min_f = float(lon_min_fmt)
+            if not _is_valid_degrees_minutes(int(lat_deg), lat_min_f, int(lon_deg), lon_min_f):
+                print("[DEBUG] _detect_dmm_no_degree_symbol: Bornes invalides, rejet")
+                return None
+        except Exception:
+            return None
+
         ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}'"
         ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}'"
 
@@ -1529,6 +1615,16 @@ def _detect_dmm_no_symbol_no_dot(text: str) -> Optional[Dict[str, Optional[str]]
         lon_min_fmt = lon_min.zfill(2)
         lat_dec_fmt = lat_dec.ljust(3, '0')[:3]
         lon_dec_fmt = lon_dec.ljust(3, '0')[:3]
+
+        # Validation des bornes
+        try:
+            lat_min_f = float(f"{lat_min_fmt}.{lat_dec_fmt}")
+            lon_min_f = float(f"{lon_min_fmt}.{lon_dec_fmt}")
+            if not _is_valid_degrees_minutes(int(lat_deg), lat_min_f, int(lon_deg), lon_min_f):
+                print("[DEBUG] _detect_dmm_no_symbol_no_dot: Bornes invalides, rejet")
+                return None
+        except Exception:
+            return None
 
         ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}.{lat_dec_fmt}'"
         ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}.{lon_dec_fmt}'"
@@ -1576,6 +1672,16 @@ def _detect_geocaching_standard_format(text: str) -> Optional[Dict[str, Optional
         
         lat_min_fmt = format_minutes(lat_min)
         lon_min_fmt = format_minutes(lon_min)
+
+        # Validation des bornes
+        try:
+            lat_min_f = float(lat_min_fmt)
+            lon_min_f = float(lon_min_fmt)
+            if not _is_valid_degrees_minutes(int(lat_deg), lat_min_f, int(lon_deg), lon_min_f):
+                print("[DEBUG] _detect_geocaching_standard_format: Bornes invalides, rejet")
+                return None
+        except Exception:
+            return None
         
         ddm_lat = f"{lat_dir} {lat_deg.zfill(2)}° {lat_min_fmt}'"
         ddm_lon = f"{lon_dir} {lon_deg.zfill(3)}° {lon_min_fmt}'"

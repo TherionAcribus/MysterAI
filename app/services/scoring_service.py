@@ -763,6 +763,10 @@ class ScoringService:
                 coordinates.update(result)
 
                 confidence = float(result.get("confidence", 0.9))
+                # Abaisser légèrement la confiance si la source est numérique pure (plus sujette aux faux positifs)
+                source = result.get("source")
+                if source == "_detect_numeric_only_coordinates":
+                    confidence = min(confidence, 0.85)
 
                 # Vérifier rapidement quelques faux positifs connus (N E N E)
                 if re.search(r"\bN\s*E\s*N\s*E\b", text, re.IGNORECASE):
