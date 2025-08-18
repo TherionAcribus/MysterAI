@@ -445,10 +445,20 @@ class PluginManager:
                         try:
                             scr = scoring_service.score_text(text_to_score, context)
                             node["scoring"] = scr
-                            # Mise à jour de la confiance si elle est inférieure au scoring
-                            if scr and scr.get("score") is not None:
-                                if "confidence" not in node or scr["score"] > node.get("confidence", 0):
-                                    node["confidence"] = scr["score"]
+                            # Toujours utiliser le score centralisé comme source de vérité
+                            # Conserver la confiance d'origine du plugin à des fins d'audit/affichage secondaire
+                            original_confidence = node.get("confidence")
+                            if original_confidence is not None and "plugin_confidence" not in node:
+                                node["plugin_confidence"] = original_confidence
+
+                            central_score = 0.0
+                            if isinstance(scr, dict):
+                                central_score = float(scr.get("score") or 0.0)
+                                # Cas rejetés: forcer à 0
+                                status = scr.get("status")
+                                if status == "rejected" and central_score != 0.0:
+                                    central_score = 0.0
+                            node["confidence"] = central_score
                         except Exception as e:
                             logger.warning(f"Scoring failed on text segment: {e}")
 
@@ -466,6 +476,28 @@ class PluginManager:
                 if isinstance(result.get("results"), list):
                     best = max(result["results"], key=lambda x: x.get("confidence", 0))
                     result.setdefault("summary", {})["best_result_id"] = best.get("id")
+                    # Propager la confiance centralisée vers combined_results (pour l'UI)
+                    if isinstance(result.get("combined_results"), dict):
+                        # Construire un mapping plugin -> meilleure confiance centrale
+                        plugin_conf_map: Dict[str, float] = {}
+                        for entry in result["results"]:
+                            params = entry.get("parameters") if isinstance(entry.get("parameters"), dict) else {}
+                            plugin_name_for_entry = params.get("plugin")
+                            if not plugin_name_for_entry:
+                                continue
+                            central_conf = float(entry.get("confidence", 0.0) or 0.0)
+                            if plugin_name_for_entry not in plugin_conf_map:
+                                plugin_conf_map[plugin_name_for_entry] = central_conf
+                            else:
+                                plugin_conf_map[plugin_name_for_entry] = max(plugin_conf_map[plugin_name_for_entry], central_conf)
+
+                        # Mettre à jour combined_results
+                        for plugin_name_cr, cr in result["combined_results"].items():
+                            if isinstance(cr, dict):
+                                # Conserver l'ancienne confiance en tant que plugin_confidence
+                                if "confidence" in cr and "plugin_confidence" not in cr:
+                                    cr["plugin_confidence"] = cr["confidence"]
+                                cr["confidence"] = float(plugin_conf_map.get(plugin_name_cr, 0.0))
             except Exception as e:
                 logger.debug(f"Unable to recompute best_result_id: {e}")
 

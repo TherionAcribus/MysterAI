@@ -39,8 +39,9 @@ Ce filtrage initial, extrêmement rapide (≤ 0,1 ms), rejette d'emblée les tex
 | Test | Rejette | Méthode |
 |------|---------|---------|
 | Longueur < 20 caractères | Texte trop court pour être fiable | Sauf si regex coordonnées (voir section 4) |
-| Ratio voyelles/consonnes aberrant | Chaînes générées aléatoirement | Table fixe par alphabet |
+| Ratio voyelles/consonnes aberrant | Chaînes générées aléatoirement | Implémenté (seuils heuristiques) |
 | Explosion de caractères non alphabétiques | Dumps hexadécimaux, Base64, etc. | Seuil ~ 40% non-alpha |
+| Séquences binaires/hex sans mots | Bruit technique sans intérêt | Regex binaire/hex + absence de mots et pas de GPS |
 
 > **Astuce d'implémentation** : Réaliser cette étape dans le plugin JS/Electron pour éviter d'appeler l'API Python lorsque l'échec est prévisible.
 
@@ -192,6 +193,12 @@ UI GoldenLayout
    └─ affiche top N + badges
 ```
 
+### Politique d'agrégation et d'affichage (UI)
+
+- La confiance affichée dans l'UI provient toujours du score centralisé (service de scoring).
+- La confiance fournie par les plugins est conservée dans `plugin_confidence` à titre informatif, mais n'influence pas le tri.
+- En mode "détection" (détecter quels plugins pourraient s'appliquer), la confiance est neutralisée côté résultats standardisés (`confidence=0.0`) pour éviter de polluer le tri global.
+
 ### Architecture optimisée (appel direct)
 ```
 Plugin Python
@@ -223,6 +230,10 @@ UI GoldenLayout
 | Priorité aux 4 langues régionales | Gain de 50% sur le premier appel (ex: fr/en/de/nl pour l'Europe centrale) |
 | Limite de 10 000 candidats par énigme | Au-delà, suggérer un algorithme différent plutôt que d'évaluer tous les candidats |
 | Journalisation systématique | Ré-entraînement des pondérations sur données réelles (cipher, plain, lang, score, verdict) |
+| Pré-filtrage binaire/hex | Évite de scorer du bruit (0/1, hex), si aucun mot ni GPS |
+| Ratio voyelles/consonnes | Rejet des chaînes pseudo-aléatoires à faible diversité |
+| Confiance centralisée en UI | Empêche des plugins d'imposer des confiances aberrantes |
+| Plafond sans mots (base_converter) | Évite des scores élevés basés uniquement sur des caractères imprimables |
 
 ## 9. Cas particuliers et retours terrain
 
@@ -263,6 +274,16 @@ UI GoldenLayout
 - **✅ Pondération équilibrée** entre couverture lexicale et pertinence des mots
 
 ### Termes de géocaching enrichis
+
+### Agrégation et garde-fous UI
+- ✅ Confiance affichée toujours issue du score central (propagation automatique vers `combined_results`).
+- ✅ Conservation de la confiance plugin sous `plugin_confidence` à des fins d’audit.
+- ✅ Neutralisation des confiances en mode détection (évite de perturber le tri global).
+- ✅ Plafond des résultats sans mots (ex. conversions ASCII imprimables) dans `base_converter`.
+
+### Pré-filtrage renforcé
+- ✅ Rejet des séquences binaires/hexadécimales sans mots ni motif GPS.
+- ✅ Rejet sur ratio voyelles/consonnes aberrant pour longs textes non-GPS.
 - **✅ Dictionnaire spécialisé** avec plus de 100 termes pour le français et près de 200 pour l'anglais
 - **✅ Reconnaissance insensible à la casse** permettant de détecter les termes quelle que soit leur capitalisation
 - **✅ Support explicite pour des termes spécifiques** comme "moldus", "geocaching" adaptés au contexte
@@ -362,7 +383,7 @@ Ces améliorations seront déployées progressivement pour enrichir l'expérienc
 4. **Segmenter** si nécessaire, après détection de langue
 5. **Chercher** motifs GPS → bonus dédié
 6. **Calculer** score lexical (coverage Bloom + Zipf)
-7. **Combiner** : 70% lexical + 30% GPS
+7. **Combiner** : si GPS détecté → score = confiance GPS, sinon → score lexical
 8. **Ignorer** directions & jargon pour le scoring
 9. **Sélectionner** les meilleurs résultats
 10. **Journaliser** et apprendre des faux positifs

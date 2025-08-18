@@ -116,7 +116,9 @@ class MetaDetectionPlugin:
                 standardized_results.append({
                     "id": result_id,
                     "text_output": f"Plugin: {plugin_name}\nFragments détectés: {', '.join(fragment_values)}",
-                    "confidence": score,
+                    # Neutraliser la confiance en mode détection pour ne pas polluer le tri central
+                    "confidence": 0.0,
+                    "plugin_confidence": score,
                     "parameters": {
                         "plugin": plugin_name,
                         "mode": "detect",
@@ -143,7 +145,9 @@ class MetaDetectionPlugin:
                 # Ajouter au dictionnaire combined_results pour la rétrocompatibilité
                 combined_results[plugin_name] = {
                     "fragments": fragment_values,
-                    "confidence": score,
+                    # Conserver la confiance brute détectée, mais l'UI sera écrasée par la propagation centrale
+                    "confidence": 0.0,
+                    "plugin_confidence": score,
                     "can_decode": code.get("can_decode", False)
                 }
             
@@ -664,11 +668,17 @@ class MetaDetectionPlugin:
                     result["scoring"] = {
                         "score": score_res.get("score"),
                         "confidence_level": score_res.get("confidence_level"),
-                        "coordinates": score_res.get("coordinates")
+                        "coordinates": score_res.get("coordinates"),
+                        "status": score_res.get("status")
                     }
-                    # Mettre à jour la confiance si le score est supérieur
+                    # Toujours utiliser le score centralisé comme confiance affichée
                     if isinstance(score_res.get("score"), (int, float)):
-                        result["confidence"] = max(result.get("confidence", 0.0), float(score_res.get("score")))
+                        if "plugin_confidence" not in result and "confidence" in result:
+                            result["plugin_confidence"] = result.get("confidence")
+                        central_score = float(score_res.get("score") or 0.0)
+                        if score_res.get("status") == "rejected":
+                            central_score = 0.0
+                        result["confidence"] = central_score
                     # Propager des coordonnées détectées si absentes ou non-existantes
                     coords = score_res.get("coordinates", {})
                     if coords and coords.get("exist"):
@@ -686,7 +696,7 @@ class MetaDetectionPlugin:
             
             # Extraire le texte de sortie et la confiance pour combined_results
             text_output = result.get("text_output", "")
-            confidence = result.get("confidence", 0.5)
+            confidence = result.get("confidence", 0.0)
             
             processed["combined_results"][plugin_name] = {
                 "decoded_text": text_output,
@@ -742,10 +752,17 @@ class MetaDetectionPlugin:
                     result["scoring"] = {
                         "score": score_res.get("score"),
                         "confidence_level": score_res.get("confidence_level"),
-                        "coordinates": score_res.get("coordinates")
+                        "coordinates": score_res.get("coordinates"),
+                        "status": score_res.get("status")
                     }
+                    # Toujours utiliser le score centralisé comme confiance affichée
                     if isinstance(score_res.get("score"), (int, float)):
-                        result["confidence"] = max(result.get("confidence", 0.0), float(score_res.get("score")))
+                        if "plugin_confidence" not in result and "confidence" in result:
+                            result["plugin_confidence"] = result.get("confidence")
+                        central_score = float(score_res.get("score") or 0.0)
+                        if score_res.get("status") == "rejected":
+                            central_score = 0.0
+                        result["confidence"] = central_score
                     coords = score_res.get("coordinates", {})
                     if coords and coords.get("exist"):
                         if ("coordinates" not in result) or (not result["coordinates"].get("exist")):
@@ -760,7 +777,7 @@ class MetaDetectionPlugin:
             # Extraire pour combined_results
             processed["combined_results"][plugin_name] = {
                 "decoded_text": result.get("text_output", ""),
-                "confidence": result.get("confidence", 0.5)
+                "confidence": result.get("confidence", 0.0)
             }
             
             # Traiter les coordonnées si présentes

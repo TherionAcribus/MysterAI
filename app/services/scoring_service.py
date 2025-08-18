@@ -398,9 +398,50 @@ class ScoringService:
                         "passed": False,
                         "reason": f"Trop de caractères non-alphabétiques ({non_alpha_ratio:.2f} > {self.NON_ALPHA_THRESHOLD}) et pas de coordonnées GPS détectées"
                     }
+
+        # 2.b Détecter des patterns binaires/hex répétitifs typiques du bruit
+        #     et rejeter s'il n'y a ni mots ni coordonnées
+        try:
+            # motifs: longues séquences de 0/1 avec espaces, ou hex serré
+            bin_like = re.fullmatch(r"\s*(?:[01]{4,}(?:\s+[01]{4,})*)\s*", text)
+            hex_like = re.fullmatch(r"\s*(?:[0-9A-Fa-f]{2,}(?:\s+[0-9A-Fa-f]{2,})*)\s*", text)
+            if (bin_like or hex_like) and not re.search(self.GPS_REGEX, text):
+                # Vérifier s'il existe au moins 1 séquence alphabétique de 3+ lettres
+                if not re.search(r"[A-Za-z]{3,}", text):
+                    return {
+                        "passed": False,
+                        "reason": "Séquence binaire/hexadécimale sans mots ni coordonnées détectées"
+                    }
+        except Exception:
+            pass
         
-        # 3. Vérifier le ratio voyelles/consonnes (à implémenter)
-        # TODO: Implémentation à compléter
+        # 3. Vérifier le ratio voyelles/consonnes
+        #    Rejeter si le ratio est aberrant sur des textes non-coordonnées
+        letters = [c.lower() for c in text if c.isalpha()]
+        if len(letters) >= 20:
+            vowels = sum(1 for c in letters if c in 'aeiouy')
+            consonants = sum(1 for c in letters if c not in 'aeiouy')
+            # éviter division par zéro
+            if consonants == 0:
+                consonants = 1
+            vowel_consonant_ratio = vowels / consonants
+            # Plage heuristique acceptable ~ (0.3, 3.0)
+            if vowel_consonant_ratio < 0.3 or vowel_consonant_ratio > 3.0:
+                # Double-check: si motif GPS détecté, on laisse passer
+                if not re.search(self.GPS_REGEX, text):
+                    try:
+                        from app.routes.coordinates import detect_gps_coordinates
+                        result = detect_gps_coordinates(text, include_numeric_only=True)
+                        if not result.get("exist", False):
+                            return {
+                                "passed": False,
+                                "reason": f"Ratio voyelles/consonnes aberrant ({vowel_consonant_ratio:.2f})"
+                            }
+                    except Exception:
+                        return {
+                            "passed": False,
+                            "reason": f"Ratio voyelles/consonnes aberrant ({vowel_consonant_ratio:.2f})"
+                        }
         
         return {"passed": True}
     

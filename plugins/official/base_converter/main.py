@@ -381,6 +381,10 @@ class BaseConverterPlugin:
         
         # Bonus pour les mots détectés
         score += min(0.4, word_like_patterns * 0.05)
+
+        # Plafond si aucun mot détecté (évite 0.8+ sur du bruit imprimable)
+        if word_like_patterns == 0:
+            score = min(score, 0.2)
         
         return min(1.0, score)
         

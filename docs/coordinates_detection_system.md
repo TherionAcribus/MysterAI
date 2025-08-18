@@ -120,6 +120,11 @@ priority_plugins = ['coordinates_finder', 'color_text_detector', 'image_alt_text
 - **Historique** : Toutes les sources conservées en logs
 - **Validation** : Format DDM standardisé
 
+### 4. Politique d'affichage de la confiance
+
+- L’interface affiche la confiance centralisée issue du service de scoring comme valeur de référence.
+- La confiance d’origine fournie par les plugins peut être conservée pour information mais n’influence pas l’ordre d’affichage.
+
 ---
 
 ## Configuration et Réglages
