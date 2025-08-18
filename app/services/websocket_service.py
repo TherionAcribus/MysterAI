@@ -19,6 +19,8 @@ class WebSocketService:
     def __init__(self, socketio):
         self.socketio = socketio
         self.active_sessions = {}  # Stockage des sessions actives
+        # Contrôles par session: pause / annulation
+        # Stockés aussi dans active_sessions[session_id]['control'] pour accès unifié
         
     def create_session(self, operation_type: str, zone_id: Optional[int] = None) -> str:
         """
@@ -37,7 +39,11 @@ class WebSocketService:
             'zone_id': zone_id,
             'started_at': None,
             'completed_at': None,
-            'status': 'created'
+            'status': 'created',
+            'control': {
+                'paused': False,
+                'canceled': False
+            }
         }
         return session_id
     
@@ -158,6 +164,27 @@ class WebSocketService:
             self.socketio.emit('operation_complete', payload, room=zone_room)
             
         logger.error(f"[WebSocket] {session_id}: Operation failed - {error_message}")
+
+    def set_control(self, session_id: str, paused: Optional[bool] = None, canceled: Optional[bool] = None):
+        """
+        Met à jour les drapeaux de contrôle (pause/annulation) pour une session.
+        """
+        if session_id not in self.active_sessions:
+            logger.warning(f"Tentative de contrôle sur une session inexistante: {session_id}")
+            return
+        control = self.active_sessions[session_id].setdefault('control', {'paused': False, 'canceled': False})
+        if paused is not None:
+            control['paused'] = bool(paused)
+        if canceled is not None:
+            control['canceled'] = bool(canceled)
+
+    def get_control(self, session_id: str) -> Optional[Dict[str, bool]]:
+        """
+        Retourne les drapeaux de contrôle pour une session.
+        """
+        if session_id not in self.active_sessions:
+            return None
+        return self.active_sessions[session_id].get('control', {'paused': False, 'canceled': False})
     
     def join_session(self, session_id: str):
         """

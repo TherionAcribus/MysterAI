@@ -27,6 +27,38 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         lastDetectedCoordinates: Object
     }
 
+    async pauseMetaSolver() {
+        if (!this._metaWsSessionId) return;
+        try {
+            await fetch('/api/plugins/metadetection/pause', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ session_id: this._metaWsSessionId })
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    async resumeMetaSolver() {
+        if (!this._metaWsSessionId) return;
+        try {
+            await fetch('/api/plugins/metadetection/resume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ session_id: this._metaWsSessionId })
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    async cancelMetaSolver() {
+        if (!this._metaWsSessionId) return;
+        try {
+            await fetch('/api/plugins/metadetection/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ session_id: this._metaWsSessionId })
+            });
+        } catch (e) { /* ignore */ }
+    }
     connect() {
         console.log("Solver controller connected", {
             geocacheId: this.geocacheIdValue,
@@ -1198,6 +1230,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 if (window.wsService) {
                     window.wsService.joinSession(sessionId);
                 }
+                // Mémoriser pour Pause/Reprendre/Arrêter
+                this._metaWsSessionId = sessionId;
                 formData.append('ws_session_id', sessionId);
             }
             
@@ -1224,6 +1258,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             const result = await response.json();
             // Si le backend nous renvoie un session_id, s'y abonner si pas déjà fait
             if (!sessionId && result && result.ws_session_id && window.wsService) {
+                this._metaWsSessionId = result.ws_session_id;
                 window.wsService.joinSession(result.ws_session_id);
             }
             console.log("Réponse brute de l'API MetaSolver:", result);

@@ -10,14 +10,14 @@ Ce document décrit le fonctionnement du MetaSolver: un orchestrateur qui parcou
 - **UI (template)**: `templates/geocache_solver.html`
   - Panneau MetaSolver (paramètres, boutons Analyser/Décrypter, zone de résultats, statut live).
 - **Frontend (JS/Stimulus)**: `static/js/controllers/geocache_solver_controller.js`
-  - Méthodes clés: `toggleMetaSolverPanel`, `executeMetaSolver`, `decodeWithPlugin`, `connectWebSocketProgressForMetaSolver`, `formatMetaDetectionResults`.
+  - Méthodes clés: `toggleMetaSolverPanel`, `executeMetaSolver`, `decodeWithPlugin`, `connectWebSocketProgressForMetaSolver`, `formatMetaDetectionResults`, et actions: `pauseMetaSolver`, `resumeMetaSolver`, `cancelMetaSolver`.
 - **Backend (API Flask)**: `app/routes/plugins.py`
-  - Endpoints: `/api/plugins/metadetection/session`, `/api/plugins/metadetection/execute`.
+  - Endpoints: `/api/plugins/metadetection/session`, `/api/plugins/metadetection/execute`, `/api/plugins/metadetection/pause`, `/api/plugins/metadetection/resume`, `/api/plugins/metadetection/cancel`.
   - Normalisation du texte: `normalize_text`.
 - **Plugin MetaSolver**: `plugins/official/metadetection/main.py`
   - Entrée principale: `execute(inputs)` avec `mode` = `detect` | `decode`.
   - Sous-routines: `detect_codes`, `decode_code`, helpers de formatage `_is_standardized_format`, `_process_*`.
-- **WebSockets**: service émet des événements `progress_metadetection` et `complete_metadetection` pour le statut live.
+- **WebSockets**: service émet des événements `progress_metadetection` et `complete_metadetection` pour le statut live (steps: `started`, `prepare`, `detect_found`, `decode_start`, `decode_try_plugin`, `partial_result`, `finalizing`, `completed`, et états `paused`, `resumed`, `canceled`).
 
 ### Flux d’exécution
 1) L’utilisateur saisit le texte dans le Solver et ouvre le panneau MetaSolver.

@@ -16,6 +16,7 @@ Le service WebSocket centralisé gère toutes les communications temps réel :
 - **Salles (Rooms)** : Organisation des clients par session et zone
 - **Messages standardisés** : Format uniforme pour tous les types de messages
 - **Gestion d'erreurs** : Robustesse avec timeout et reconnexion
+ - **Contrôles d'orchestration** : Drapeaux par session (pause/reprise/annulation) via `set_control/get_control`
 
 ```python
 # Exemple d'utilisation côté backend
@@ -54,6 +55,7 @@ Service JavaScript pour la communication côté client :
 - **Reconnexion automatique** : Gestion des déconnexions
 - **Gestion des salles** : Jonction automatique aux zones et sessions
 - **Événements typés** : Émission d'événements spécifiques par opération
+ - **Rooms persistantes** : Rejoint automatiquement les sessions actives après reconnexion
 
 ```javascript
 // Utilisation côté frontend

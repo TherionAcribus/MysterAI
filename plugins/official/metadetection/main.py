@@ -186,7 +186,7 @@ class MetaDetectionPlugin:
             
             # En cas d'absence de résultat, retourner une erreur formatée
             if not decode_results["results"]:
-                emit_progress('decode_done', "Décodage terminé: aucun résultat", 100)
+                emit_progress('finalizing', "Finalisation: aucun résultat", 100)
                 return {
                     "status": "error",
                     "plugin_info": {
@@ -201,8 +201,8 @@ class MetaDetectionPlugin:
                     }
                 }
             
-            # Sinon, retourner les résultats formatés
-            emit_progress('decode_done', "Décodage terminé", 95, {
+            # Sinon, retourner les résultats formatés (pas de recalcul lourd ici)
+            emit_progress('finalizing', "Finalisation des résultats...", 95, {
                 'results': len(decode_results["results"]) if isinstance(decode_results, dict) else 0
             })
             return {
@@ -400,6 +400,39 @@ class MetaDetectionPlugin:
                 except Exception:
                     pass
 
+        def _check_controls() -> str | None:
+            """Retourne 'canceled' si annulé, 'paused' si en pause, sinon None."""
+            if not (ws_service and ws_session_id):
+                return None
+            try:
+                control = ws_service.get_control(ws_session_id)
+            except Exception:
+                control = None
+            if not control:
+                return None
+            if control.get('canceled'):
+                return 'canceled'
+            if control.get('paused'):
+                return 'paused'
+            return None
+
+        def _handle_pause_loop():
+            """Boucle d'attente pendant la pause, jusqu'à reprise/annulation."""
+            import time
+            while True:
+                state = _check_controls()
+                if state == 'paused':
+                    try:
+                        ws_service.emit_progress(ws_session_id, 'paused', 'En pause', None, {})
+                    except Exception:
+                        pass
+                    time.sleep(0.3)
+                    continue
+                break
+
+        # Cache local de scoring pour éviter de rescorrer plusieurs fois le même texte
+        scoring_cache: dict[str, dict] = {}
+
         if plugin_name:
             # Si un plugin spécifique est demandé
             if plugin_name in excluded_plugins:
@@ -421,6 +454,13 @@ class MetaDetectionPlugin:
             
             # Utiliser la méthode execute du plugin
             try:
+                # Contrôles utilisateur avant d'exécuter
+                state = _check_controls()
+                if state == 'canceled':
+                    emit_progress('completed', 'Annulé par utilisateur', 100)
+                    return result_structure
+                if state == 'paused':
+                    _handle_pause_loop()
                 emit_progress('decode_try_plugin', f"Décodage avec {plugin_name}...", 30, {'plugin': plugin_name})
                 inputs = {
                     "text": text,
@@ -442,7 +482,7 @@ class MetaDetectionPlugin:
                 plugin_result = p_instance.execute(inputs)
                 
                 # Traiter uniquement les résultats au format standardisé
-                return self._process_standardized_result(plugin_result, plugin_name)
+                return self._process_standardized_result(plugin_result, plugin_name, scoring_cache=scoring_cache)
                 
             except Exception as e:
                 print(f"Erreur lors du décodage avec {plugin_name}: {str(e)}")
@@ -478,6 +518,13 @@ class MetaDetectionPlugin:
                 # Essayer de décoder avec ce plugin
                 print(f"Décodage avec {plugin_name}")
                 try:
+                    # Contrôles utilisateur au fil de l'eau
+                    state = _check_controls()
+                    if state == 'canceled':
+                        emit_progress('completed', 'Annulé par utilisateur', 100)
+                        return result_structure
+                    if state == 'paused':
+                        _handle_pause_loop()
                     processed_count += 1
                     try:
                         progress_pct = 20 + int(processed_count / max(1, total_plugins) * 70)
@@ -506,7 +553,7 @@ class MetaDetectionPlugin:
                     
                     # Traiter uniquement les formats standardisés
                     if self._is_standardized_format(plugin_result):
-                        plugin_processed = self._process_plugin_result(plugin_result, plugin_name)
+                        plugin_processed = self._process_plugin_result(plugin_result, plugin_name, scoring_cache=scoring_cache)
                         # Émettre un résultat partiel si disponible
                         if plugin_processed["results"]:
                             first = plugin_processed["results"][0]
@@ -560,7 +607,7 @@ class MetaDetectionPlugin:
         
         return "status" in result and "results" in result
     
-    def _process_plugin_result(self, plugin_result, plugin_name):
+    def _process_plugin_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None):
         """
         Traite le résultat d'un plugin au format standardisé
         """
@@ -600,6 +647,40 @@ class MetaDetectionPlugin:
             elif "plugin" not in result["parameters"]:
                 result["parameters"]["plugin"] = plugin_name
             
+            # Appliquer le scoring et l'enrichissement coordonnées
+            try:
+                from app.services.scoring_service import get_scoring_service
+                scoring_service = get_scoring_service()
+                text_out = result.get("text_output", "")
+                if isinstance(text_out, str) and text_out.strip():
+                    # Cache local pour éviter recalculs
+                    if scoring_cache is not None and text_out in scoring_cache:
+                        score_res = scoring_cache[text_out]
+                    else:
+                        score_res = scoring_service.score_text(text_out)
+                        if scoring_cache is not None:
+                            scoring_cache[text_out] = score_res
+                    # Attacher les infos de scoring
+                    result["scoring"] = {
+                        "score": score_res.get("score"),
+                        "confidence_level": score_res.get("confidence_level"),
+                        "coordinates": score_res.get("coordinates")
+                    }
+                    # Mettre à jour la confiance si le score est supérieur
+                    if isinstance(score_res.get("score"), (int, float)):
+                        result["confidence"] = max(result.get("confidence", 0.0), float(score_res.get("score")))
+                    # Propager des coordonnées détectées si absentes ou non-existantes
+                    coords = score_res.get("coordinates", {})
+                    if coords and coords.get("exist"):
+                        if ("coordinates" not in result) or (not result["coordinates"].get("exist")):
+                            result["coordinates"] = coords
+                        # Mettre à jour primary_coordinates si pertinent
+                        if (processed["primary_coordinates"] is None) and ("decimal" in coords):
+                            processed["primary_coordinates"] = coords["decimal"]
+            except Exception:
+                # En cas d'erreur de scoring, continuer sans bloquer
+                pass
+
             # Ajouter à la liste des résultats
             processed["results"].append(result)
             
@@ -622,7 +703,7 @@ class MetaDetectionPlugin:
         
         return processed
     
-    def _process_standardized_result(self, plugin_result, plugin_name):
+    def _process_standardized_result(self, plugin_result, plugin_name, scoring_cache: dict | None = None):
         """
         Traite le résultat d'un plugin spécifique au format standardisé
         """
@@ -646,6 +727,34 @@ class MetaDetectionPlugin:
             elif "plugin" not in result["parameters"]:
                 result["parameters"]["plugin"] = plugin_name
             
+            # Appliquer le scoring et l'enrichissement coordonnées
+            try:
+                from app.services.scoring_service import get_scoring_service
+                scoring_service = get_scoring_service()
+                text_out = result.get("text_output", "")
+                if isinstance(text_out, str) and text_out.strip():
+                    if scoring_cache is not None and text_out in scoring_cache:
+                        score_res = scoring_cache[text_out]
+                    else:
+                        score_res = scoring_service.score_text(text_out)
+                        if scoring_cache is not None:
+                            scoring_cache[text_out] = score_res
+                    result["scoring"] = {
+                        "score": score_res.get("score"),
+                        "confidence_level": score_res.get("confidence_level"),
+                        "coordinates": score_res.get("coordinates")
+                    }
+                    if isinstance(score_res.get("score"), (int, float)):
+                        result["confidence"] = max(result.get("confidence", 0.0), float(score_res.get("score")))
+                    coords = score_res.get("coordinates", {})
+                    if coords and coords.get("exist"):
+                        if ("coordinates" not in result) or (not result["coordinates"].get("exist")):
+                            result["coordinates"] = coords
+                        if (processed["primary_coordinates"] is None) and ("decimal" in coords):
+                            processed["primary_coordinates"] = coords["decimal"]
+            except Exception:
+                pass
+
             processed["results"].append(result)
             
             # Extraire pour combined_results

@@ -144,6 +144,21 @@
                                 </svg>
                                 Décrypter
                             </button>
+                            <button 
+                                data-action="click->geocache-solver#pauseMetaSolver"
+                                class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors">
+                                Pause
+                            </button>
+                            <button 
+                                data-action="click->geocache-solver#resumeMetaSolver"
+                                class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors">
+                                Reprendre
+                            </button>
+                            <button 
+                                data-action="click->geocache-solver#cancelMetaSolver"
+                                class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors">
+                                Arrêter
+                            </button>
                         </div>
                         
                         <div id="metasolver-result" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">

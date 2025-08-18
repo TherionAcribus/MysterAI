@@ -110,15 +110,17 @@ Selon le format du résultat :
 
 Le système permet d'enchaîner les plugins, où le résultat d'un plugin devient l'entrée du suivant.
 
-### 6.2 Détection de coordonnées GPS
+### 6.2 Détection de coordonnées GPS (au fil de l'eau)
 
-Le système intègre une détection automatique des coordonnées GPS dans le texte décodé, avec :
+Le système intègre une détection automatique des coordonnées GPS dans le texte décodé, déclenchée
+pour chaque résultat de plugin par le MetaSolver (sans passe finale lourde), avec :
 - Support de multiples formats (DDM, DMS, formats textuels, etc.)
 - Conversion vers différents formats pour l'affichage et l'exploitation
 
-### 6.3 Scoring et évaluation de confiance
+### 6.3 Scoring et évaluation de confiance (au fil de l'eau)
 
-Un système de scoring évalue la qualité et la confiance des résultats en analysant :
+Un système de scoring évalue la qualité et la confiance des résultats pour chaque `text_output`
+retourné par les plugins (avec cache local au sein d'une exécution MetaSolver), en analysant :
 - La cohérence lexicale du texte décodé
 - La présence de termes spécifiques au géocaching
 - La présence de coordonnées GPS valides

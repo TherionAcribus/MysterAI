@@ -701,6 +701,51 @@ def create_metasolver_session():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@plugins_bp.route('/api/plugins/metadetection/pause', methods=['POST'])
+def pause_metasolver():
+    """Met une session MetaSolver en pause."""
+    try:
+        session_id = request.form.get('session_id') or (request.get_json() or {}).get('session_id')
+        if not session_id:
+            return jsonify({'error': 'session_id requis'}), 400
+        from app.services.websocket_service import get_websocket_service
+        ws_service = get_websocket_service()
+        ws_service.set_control(session_id, paused=True)
+        ws_service.emit_progress(session_id, 'paused', 'MetaSolver en pause', None, {})
+        return jsonify({'ok': True, 'session_id': session_id, 'paused': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/api/plugins/metadetection/resume', methods=['POST'])
+def resume_metasolver():
+    """Relance une session MetaSolver en pause."""
+    try:
+        session_id = request.form.get('session_id') or (request.get_json() or {}).get('session_id')
+        if not session_id:
+            return jsonify({'error': 'session_id requis'}), 400
+        from app.services.websocket_service import get_websocket_service
+        ws_service = get_websocket_service()
+        ws_service.set_control(session_id, paused=False)
+        ws_service.emit_progress(session_id, 'resumed', 'MetaSolver repris', None, {})
+        return jsonify({'ok': True, 'session_id': session_id, 'paused': False})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@plugins_bp.route('/api/plugins/metadetection/cancel', methods=['POST'])
+def cancel_metasolver():
+    """Annule une session MetaSolver en cours."""
+    try:
+        session_id = request.form.get('session_id') or (request.get_json() or {}).get('session_id')
+        if not session_id:
+            return jsonify({'error': 'session_id requis'}), 400
+        from app.services.websocket_service import get_websocket_service
+        ws_service = get_websocket_service()
+        ws_service.set_control(session_id, canceled=True)
+        ws_service.emit_progress(session_id, 'canceled', "MetaSolver annulé par l'utilisateur", None, {})
+        return jsonify({'ok': True, 'session_id': session_id, 'canceled': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Fonction utilitaire pour normaliser le texte
 def normalize_text(text: str) -> str:
     """
