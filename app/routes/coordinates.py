@@ -418,6 +418,45 @@ def _process_formula_part(formula_part, variables):
         # Sinon, retourner tel quel
         return formula_part
     
+    # Si la partie commence et se termine par des parenthèses, vérifier si c'est une concaténation de sous-expressions
+    # Exemple: (A+B)(C-D)(E/2)
+    if re.fullmatch(r'(\([^()]+\))+', formula_part):
+        sub_expressions = re.findall(r'\(([^()]+)\)', formula_part)
+        evaluated_parts = []
+        has_error = False
+        rebuilt_on_error = []
+        for sub in sub_expressions:
+            sub_expr = sub.replace('x', '*')
+            # Remplacer les variables
+            for var, value in variables.items():
+                if var in sub_expr:
+                    sub_expr = sub_expr.replace(var, str(value))
+            # Si des lettres restent, on ne peut pas évaluer cette sous-expression
+            if re.search(r'[A-DF-Z]', sub_expr):
+                has_error = True
+                rebuilt_on_error.append(f'({sub_expr})')
+                continue
+            # Évaluer la sous-expression
+            sub_result = _evaluate_math_expression(sub_expr)
+            if isinstance(sub_result, str) and sub_result.startswith('ERR:'):
+                has_error = True
+                # Conserver la sous-expression fautive telle quelle avec parenthèses
+                rebuilt_on_error.append(f'({sub_expr})')
+            else:
+                evaluated_parts.append(str(sub_result))
+                rebuilt_on_error.append(str(sub_result))
+        # Si une erreur ou une lettre non résolue existe, retourner l'expression reconstruite entre parenthèses
+        if has_error:
+            return '(' + ''.join(rebuilt_on_error) + ')'
+        # Sinon, concaténer les résultats numériques et retourner un entier pour permettre le formatage (zfill)
+        concatenated = ''.join(evaluated_parts) if evaluated_parts else ''
+        try:
+            return int(concatenated) if concatenated != '' else 0
+        except ValueError:
+            # Fallback prudente
+            return '(' + ''.join(rebuilt_on_error) + ')'
+
+    # Cas standard: une seule parenthèse englobante, traiter comme expression unique
     # Extraire l'expression entre parenthèses
     expression = formula_part[1:-1] if formula_part.endswith(')') else formula_part[1:]
     
@@ -425,7 +464,6 @@ def _process_formula_part(formula_part, variables):
     expression = expression.replace('x', '*')
     
     # Remplacer les variables par leurs valeurs
-    original_expression = expression
     for var, value in variables.items():
         if var in expression:
             expression = expression.replace(var, str(value))
