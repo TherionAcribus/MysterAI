@@ -1596,6 +1596,24 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         }
         
+        // Préparer une collection de points pour l'affichage automatique sur la carte
+        const mapPoints = [];
+        const pushPointIfValid = (lat, lon, label, index = null) => {
+            const latNum = typeof lat === 'number' ? lat : parseFloat(lat);
+            const lonNum = typeof lon === 'number' ? lon : parseFloat(lon);
+            if (!isNaN(latNum) && !isNaN(lonNum)) {
+                mapPoints.push({
+                    latitude: latNum,
+                    longitude: lonNum,
+                    label: label || 'Coordonnée détectée',
+                    fillColor: 'rgba(0, 90, 220, 0.7)',
+                    strokeColor: '#00AAFF',
+                    strokeWidth: 3,
+                    index: index || (mapPoints.length + 1)
+                });
+            }
+        };
+
         // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
         let gpsCoordinatesHtml = '';
         // Préparer éventuellement un encart pour les plugins en échec
@@ -1607,6 +1625,9 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             console.log("formatMetaDetectionResults - Coordonnées primaires détectées:", result.primary_coordinates);
             // Stocker les coordonnées détectées pour une utilisation ultérieure
             this.lastDetectedCoordinatesValue = result.primary_coordinates;
+            
+            // Préparer un point primaire (il sera dispatché plus bas selon les autres résultats)
+            pushPointIfValid(result.primary_coordinates.latitude, result.primary_coordinates.longitude, 'Coordonnée principale', 1);
             
             // Récupérer les coordonnées en format DDM si disponibles
             let ddmLat = "";
@@ -1868,6 +1889,56 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format standardisé (longueur):", html.length);
+            // Ajouter affichage automatique sur la carte pour les résultats
+            try {
+                // Ajouter également les coordonnées par-résultat en tant que points si disponibles
+                const augmentedPoints = [];
+                const strokeColors = ['#FF0000','#00AAFF','#00CC00','#FF9500','#9900FF','#FF00FF','#00FFFF','#FFDD00','#CC3300','#AAAAAA'];
+                if (result.results && Array.isArray(result.results)) {
+                    result.results.forEach((resultEntry, idx) => {
+                        const coords = resultEntry.coordinates || (result.combined_results && result.combined_results[resultEntry.parameters?.plugin]?.coordinates);
+                        if (!coords || !coords.exist) return;
+                        let lat = null, lon = null;
+                        if (coords.decimal) {
+                            if (Array.isArray(coords.decimal)) {
+                                lat = coords.decimal[0];
+                                lon = coords.decimal[1];
+                            } else if (typeof coords.decimal === 'object') {
+                                lat = coords.decimal.latitude ?? coords.decimal.lat ?? null;
+                                lon = coords.decimal.longitude ?? coords.decimal.lon ?? null;
+                            }
+                        }
+                        if (lat === null || lon === null) return;
+                        const label = `Résultat ${idx + 1}`;
+                        const colorIdx = idx % strokeColors.length;
+                        augmentedPoints.push({
+                            latitude: typeof lat === 'number' ? lat : parseFloat(lat),
+                            longitude: typeof lon === 'number' ? lon : parseFloat(lon),
+                            label,
+                            fillColor: 'rgba(0, 90, 220, 0.7)',
+                            strokeColor: strokeColors[colorIdx],
+                            strokeWidth: 3,
+                            index: idx + 1
+                        });
+                    });
+                }
+
+                // Fusionner avec le(s) point(s) primaires collectés
+                const allPoints = (augmentedPoints.length > 0) ? augmentedPoints : mapPoints;
+                if (allPoints.length > 1) {
+                    document.dispatchEvent(new CustomEvent('addMultipleCalculatedPointsToMap', {
+                        detail: { points: allPoints, batchId: Date.now() }
+                    }));
+                } else if (allPoints.length === 1) {
+                    const p = allPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (results):', e);
+            }
+
             return html + gpsCoordinatesHtml + failedHtml;
         }
         // Afficher les résultats des plugins combinés (nouveau format)
@@ -1910,6 +1981,54 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format combined_results (longueur):", html.length);
+            // Déterminer les points à afficher sur la carte à partir des résultats combinés
+            try {
+                const points = [];
+                const strokeColors = ['#FF0000','#00AAFF','#00CC00','#FF9500','#9900FF','#FF00FF','#00FFFF','#FFDD00','#CC3300','#AAAAAA'];
+                let idx = 0;
+                Object.values(result.combined_results).forEach((pluginResult) => {
+                    const coords = pluginResult?.coordinates;
+                    if (!coords || !coords.exist) return;
+                    let lat = null, lon = null;
+                    if (coords.decimal) {
+                        if (Array.isArray(coords.decimal)) {
+                            lat = coords.decimal[0];
+                            lon = coords.decimal[1];
+                        } else if (typeof coords.decimal === 'object') {
+                            lat = coords.decimal.latitude ?? coords.decimal.lat ?? null;
+                            lon = coords.decimal.longitude ?? coords.decimal.lon ?? null;
+                        }
+                    }
+                    if (lat === null || lon === null) return;
+                    const colorIdx = idx % strokeColors.length;
+                    points.push({
+                        latitude: typeof lat === 'number' ? lat : parseFloat(lat),
+                        longitude: typeof lon === 'number' ? lon : parseFloat(lon),
+                        label: `Résultat ${idx + 1}`,
+                        fillColor: 'rgba(0, 90, 220, 0.7)',
+                        strokeColor: strokeColors[colorIdx],
+                        strokeWidth: 3,
+                        index: idx + 1
+                    });
+                    idx += 1;
+                });
+
+                // Si aucun point combiné, fallback vers le primaire si présent
+                const allPoints = points.length > 0 ? points : mapPoints;
+                if (allPoints.length > 1) {
+                    document.dispatchEvent(new CustomEvent('addMultipleCalculatedPointsToMap', {
+                        detail: { points: allPoints, batchId: Date.now() }
+                    }));
+                } else if (allPoints.length === 1) {
+                    const p = allPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (combined_results):', e);
+            }
+
             return html + gpsCoordinatesHtml + failedHtml;
         }
         // Gérer l'ancien format (mode détection)
@@ -1955,6 +2074,17 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format possible_codes (longueur):", html.length);
+            // Afficher un éventuel point primaire si présent
+            try {
+                if (mapPoints.length === 1) {
+                    const p = mapPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (possible_codes):', e);
+            }
             return html + gpsCoordinatesHtml + failedHtml;
         }
         // Gérer l'ancien format (décodage spécifique)
@@ -1989,11 +2119,33 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format decoded_results (longueur):", html.length);
+            // Afficher un éventuel point primaire si présent
+            try {
+                if (mapPoints.length === 1) {
+                    const p = mapPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (decoded_results):', e);
+            }
             return html + gpsCoordinatesHtml + failedHtml;
         } 
         // Gérer l'ancien format (décodage simple)
         else if (result.result && result.result.decoded_text) {
             console.log("formatMetaDetectionResults - Utilisation du format decoded_text ancien", result.result.decoded_text);
+            // Afficher un éventuel point primaire si présent
+            try {
+                if (mapPoints.length === 1) {
+                    const p = mapPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (decoded_text):', e);
+            }
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <h3 class="text-lg font-semibold text-blue-400 mb-3">Résultat du décodage</h3>
@@ -2003,6 +2155,17 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             `;
         } else {
             console.log("formatMetaDetectionResults - Aucun format reconnu, affichage du message par défaut", result);
+            // Afficher un éventuel point primaire si présent
+            try {
+                if (mapPoints.length === 1) {
+                    const p = mapPoints[0];
+                    document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                        detail: { latitude: p.latitude, longitude: p.longitude, label: p.label, color: 'rgba(0, 90, 220, 0.8)' }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Affichage carte automatique (default):', e);
+            }
             return `
                 <div class="bg-gray-700 p-4 rounded-lg">
                     <div class="text-gray-400">Aucun code détecté dans le texte.</div>
