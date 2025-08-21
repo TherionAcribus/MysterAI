@@ -1652,44 +1652,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 ddmFull = `${lat > 0 ? 'N' : 'S'} ${Math.abs(lat).toFixed(6)}°, ${lon > 0 ? 'E' : 'W'} ${Math.abs(lon).toFixed(6)}°`;
             }
             
-            gpsCoordinatesHtml = `
-                <div class="bg-gray-700 rounded-lg p-4 mt-4">
-                    <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
-                    
-                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Coordonnées:</label>
-                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                   value="${ddmFull}" readonly>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${ddmLat || result.primary_coordinates.latitude}" readonly>
-                            </div>
-                            <div>
-                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${ddmLon || result.primary_coordinates.longitude}" readonly>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-2">
-                            <a href="https://www.google.com/maps?q=${result.primary_coordinates.latitude},${result.primary_coordinates.longitude}" 
-                               target="_blank" 
-                               class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm inline-flex items-center mr-2">
-                               <i class="fas fa-map-marker-alt mr-1"></i> Google Maps
-                            </a>
-                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
-                                    onclick="navigator.clipboard.writeText('${ddmFull}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
-                                <i class="fas fa-copy mr-1"></i> Copier
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            gpsCoordinatesHtml = ``; // Suppression du bloc global éditable: l'édition se fait par résultat uniquement
         } else if (result.coordinates && result.coordinates.exist) {
             console.log("formatMetaDetectionResults - Coordonnées anciennes détectées (format rétrocompatible)");
             // Ancien format pour rétrocompatibilité
@@ -1699,35 +1662,37 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 <div class="bg-gray-700 rounded-lg p-4 mt-4">
                     <h3 class="text-lg font-medium text-green-400 mb-2">Coordonnées GPS détectées</h3>
                     
-                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4">
+                    <div class="bg-gray-800 p-4 rounded grid grid-cols-1 gap-4" data-coords-container="true">
                         <div>
-                            <label for="coords_ddm" class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
-                            <input type="text" id="coords_ddm" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                   value="${result.coordinates.ddm || ''}" readonly>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Format DDM:</label>
+                            <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                   data-coords-input="ddm" value="${result.coordinates.ddm || ''}" readonly>
                         </div>
                         
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label for="coords_lat" class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
-                                <input type="text" id="coords_lat" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${result.coordinates.ddm_lat || ''}" readonly>
+                                <label class="block text-sm font-medium text-gray-400 mb-1">Latitude:</label>
+                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       data-coords-input="lat" value="${result.coordinates.ddm_lat || ''}" readonly>
                             </div>
                             <div>
-                                <label for="coords_lon" class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
-                                <input type="text" id="coords_lon" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
-                                       value="${result.coordinates.ddm_lon || ''}" readonly>
+                                <label class="block text-sm font-medium text-gray-400 mb-1">Longitude:</label>
+                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono"
+                                       data-coords-input="lon" value="${result.coordinates.ddm_lon || ''}" readonly>
                             </div>
                         </div>
                         
                         <div class="flex justify-between mt-2">
-                            <button class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                                    data-action="click->geocache-solver#useCoordinates">
-                                Utiliser ces coordonnées
-                            </button>
-                            <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
-                                    onclick="navigator.clipboard.writeText('${result.coordinates.ddm}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
-                                Copier
-                            </button>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-1 text-sm bg-amber-600 hover:bg-amber-700 text-white rounded-md"
+                                        data-action="click->geocache-solver#toggleEditCoordinates">
+                                    Modifier
+                                </button>
+                                <button class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md"
+                                        onclick="navigator.clipboard.writeText('${result.coordinates.ddm}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
+                                    Copier
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1855,19 +1820,19 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             return `
                                 <div class="bg-gray-700 rounded-lg p-3 mt-3">
                                     <h4 class="text-sm font-medium text-green-400 mb-2">Coordonnées détectées</h4>
-                                    <div class="bg-gray-800 p-3 rounded grid grid-cols-1 gap-3">
+                                    <div class="bg-gray-800 p-3 rounded grid grid-cols-1 gap-3" data-coords-container="true">
                                         <div>
-                                            <label class="block text-xs font-medium text-gray-400 mb-1">Coordonnées:</label>
-                                            <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmFull}" readonly>
+                                            <label class="block text-xs font-medium text-gray-400 mb-1">Coordonnées — éditable:</label>
+                                            <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmFull}" data-coords-input="ddm" readonly>
                                         </div>
                                         <div class="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-400 mb-1">Latitude:</label>
-                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLat || (typeof lat === 'number' ? lat : '')}" readonly>
+                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLat || (typeof lat === 'number' ? lat : '')}" data-coords-input="lat" readonly>
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-400 mb-1">Longitude:</label>
-                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLon || (typeof lon === 'number' ? lon : '')}" readonly>
+                                                <input type="text" class="w-full bg-gray-800 text-green-300 border border-gray-700 focus:border-green-500 p-2 rounded font-mono" value="${ddmLon || (typeof lon === 'number' ? lon : '')}" data-coords-input="lon" readonly>
                                             </div>
                                         </div>
                                         <div class="mt-1">
@@ -1875,8 +1840,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                             <button class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md mr-2" onclick="navigator.clipboard.writeText('${ddmAttr}').then(() => alert('Coordonnées copiées dans le presse-papier'))">
                                                 <i class="fas fa-copy mr-1"></i> Copier
                                             </button>
-                                            <button class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-md" data-action="click->geocache-solver#useCoordinates" data-ddm="${ddmAttr}" data-ddm-lat="${ddmLatAttr}" data-ddm-lon="${ddmLonAttr}" data-lat="${gmapsLat}" data-lon="${gmapsLon}">
-                                                Utiliser ces coordonnées
+                                            <button class="px-3 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-md" data-action="click->geocache-solver#toggleEditCoordinates">
+                                                Modifier
                                             </button>
                                         </div>
                                         ${renderDistance()}
@@ -2189,6 +2154,157 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         return 'text-red-400';
     }
 
+    // Bascule l'édition des inputs dans le bloc et valide si demandé
+    toggleEditCoordinates(event) {
+        event.preventDefault();
+        const container = event.currentTarget.closest('[data-coords-container]');
+        if (!container) return;
+        const ddmInput = container.querySelector('[data-coords-input="ddm"]');
+        const latInput = container.querySelector('[data-coords-input="lat"]');
+        const lonInput = container.querySelector('[data-coords-input="lon"]');
+        const isReadonly = ddmInput ? ddmInput.hasAttribute('readonly') : true;
+        if (isReadonly) {
+            // Activer l'édition uniquement si tous les champs existent (coordonnées complètes)
+            if (!ddmInput || !latInput || !lonInput || !ddmInput.value || !latInput.value || !lonInput.value) {
+                alert('Coordonnées incomplètes: impossible d\'activer la modification.');
+                return;
+            }
+            // Ne déverrouiller QUE le champ Coordonnées (DDM)
+            ddmInput.removeAttribute('readonly');
+            // S'assurer que Lat/Lon restent en lecture seule
+            latInput.setAttribute('readonly', '');
+            lonInput.setAttribute('readonly', '');
+            // Attacher la validation live une seule fois
+            if (!container.dataset.validationAttached) {
+                this.attachLiveValidation(container);
+                container.dataset.validationAttached = '1';
+            } else {
+                // Forcer une première validation visuelle à l'ouverture
+                this.runInitialValidation(container);
+            }
+            event.currentTarget.textContent = 'Valider';
+            event.currentTarget.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+            event.currentTarget.classList.add('bg-green-600', 'hover:bg-green-700');
+        } else {
+            // Valider et appliquer
+            this.applyManualCoordinates(event);
+            // Repasser en lecture seule
+            if (ddmInput) {
+                ddmInput.setAttribute('readonly', '');
+                this.setInputValidity(ddmInput, true);
+            }
+            if (latInput) this.setInputValidity(latInput, true);
+            if (lonInput) this.setInputValidity(lonInput, true);
+            event.currentTarget.textContent = 'Modifier';
+            event.currentTarget.classList.remove('bg-green-600', 'hover:bg-green-700');
+            event.currentTarget.classList.add('bg-amber-600', 'hover:bg-amber-700');
+        }
+    }
+
+    // Ajoute la validation live sur les inputs d'un conteneur
+    attachLiveValidation(container) {
+        const ddmInput = container.querySelector('[data-coords-input="ddm"]');
+        const latInput = container.querySelector('[data-coords-input="lat"]');
+        const lonInput = container.querySelector('[data-coords-input="lon"]');
+
+        const bind = (el, validator) => {
+            if (!el) return;
+            const handler = () => {
+                const valid = validator(el.value.trim());
+                this.setInputValidity(el, valid);
+            };
+            el.addEventListener('input', handler);
+            el.addEventListener('keyup', handler);
+            el.addEventListener('keydown', handler);
+            el.addEventListener('compositionupdate', handler);
+        };
+        bind(ddmInput, this.validateDdmFull.bind(this));
+        bind(latInput, this.validateLat.bind(this));
+        bind(lonInput, this.validateLon.bind(this));
+
+        // Lancer une première validation visuelle immédiate
+        this.runInitialValidation(container);
+    }
+
+    runInitialValidation(container) {
+        const ddmInput = container.querySelector('[data-coords-input="ddm"]');
+        const latInput = container.querySelector('[data-coords-input="lat"]');
+        const lonInput = container.querySelector('[data-coords-input="lon"]');
+        if (ddmInput) this.setInputValidity(ddmInput, this.validateDdmFull(ddmInput.value.trim()));
+        if (latInput) this.setInputValidity(latInput, this.validateLat(latInput.value.trim()));
+        if (lonInput) this.setInputValidity(lonInput, this.validateLon(lonInput.value.trim()));
+    }
+
+    // Applique des classes visuelles selon la validité
+    setInputValidity(inputEl, isValid) {
+        if (!inputEl) return;
+        // Toujours garder la classe 'border' présente d'origine
+        // Utiliser des styles inline pour éviter les soucis de purge Tailwind
+        if (isValid) {
+            inputEl.style.setProperty('border-color', null, 'important');
+            inputEl.style.setProperty('box-shadow', null, 'important');
+            inputEl.style.setProperty('outline', null, 'important');
+            inputEl.style.setProperty('outline-offset', null, 'important');
+            inputEl.classList.remove('text-red-400');
+            // Restaurer les classes focus par défaut
+            inputEl.classList.remove('focus:border-red-500', 'focus:ring-red-500');
+            if (!inputEl.classList.contains('focus:ring-blue-500')) inputEl.classList.add('focus:ring-blue-500');
+            if (!inputEl.classList.contains('focus:border-green-500')) inputEl.classList.add('focus:border-green-500');
+        } else {
+            inputEl.style.setProperty('border-color', '#ef4444', 'important'); // red-500
+            // Inset + outer pour forcer l'affichage même en focus
+            inputEl.style.setProperty('box-shadow', 'inset 0 0 0 2px #ef4444, 0 0 0 2px #ef4444', 'important');
+            inputEl.style.setProperty('outline', '2px solid #ef4444', 'important');
+            inputEl.style.setProperty('outline-offset', '0px', 'important');
+            inputEl.classList.add('text-red-400');
+            // Forcer la couleur de focus en rouge
+            inputEl.classList.remove('focus:ring-blue-500', 'focus:border-green-500');
+            inputEl.classList.add('focus:ring-red-500', 'focus:border-red-500');
+        }
+    }
+
+    // Validation DDM complet
+    validateDdmFull(str) {
+        if (!str) return false;
+        const m = str.match(/([NS])\s*(\d{1,2})[°\s]*(\d{1,2}\.\d+)["']?\s*([EW])\s*(\d{1,3})[°\s]*(\d{1,2}\.\d+)["']?/i);
+        if (!m) return false;
+        const degLat = parseInt(m[2], 10);
+        const minLat = parseFloat(m[3]);
+        const degLon = parseInt(m[5], 10);
+        const minLon = parseFloat(m[6]);
+        if (degLat < 0 || degLat > 90) return false;
+        if (degLon < 0 || degLon > 180) return false;
+        if (minLat < 0 || minLat >= 60) return false;
+        if (minLon < 0 || minLon >= 60) return false;
+        return true;
+    }
+
+    // Validation latitude (DDM ou décimal)
+    validateLat(str) {
+        if (!str) return false;
+        const m = str.match(/([NS])\s*(\d{1,2})[°\s]*(\d{1,2}\.\d+)["']?/i);
+        if (m) {
+            const deg = parseInt(m[2], 10);
+            const min = parseFloat(m[3]);
+            return deg >= 0 && deg <= 90 && min >= 0 && min < 60;
+        }
+        const num = parseFloat(str.replace(',', '.'));
+        return !isNaN(num) && num >= -90 && num <= 90;
+    }
+
+    // Validation longitude (DDM ou décimal)
+    validateLon(str) {
+        if (!str) return false;
+        const m = str.match(/([EW])\s*(\d{1,3})[°\s]*(\d{1,2}\.\d+)["']?/i);
+        if (m) {
+            const deg = parseInt(m[2], 10);
+            const min = parseFloat(m[3]);
+            return deg >= 0 && deg <= 180 && min >= 0 && min < 60;
+        }
+        const num = parseFloat(str.replace(',', '.'));
+        return !isNaN(num) && num >= -180 && num <= 180;
+    }
+
     // Méthode pour utiliser les coordonnées détectées
     useCoordinates(event) {
         event.preventDefault();
@@ -2262,6 +2378,159 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 default:
                     alert("Action annulée ou non reconnue.");
             }
+        }
+    }
+
+    // Appliquer des coordonnées saisies manuellement et les afficher sur la carte
+    applyManualCoordinates(event) {
+        event.preventDefault();
+        try {
+            // Récupérer le conteneur le plus proche du bouton cliqué
+            const container = event.currentTarget.closest('[data-coords-container]') || document.getElementById('metasolver-result-content');
+            if (!container) {
+                alert("Impossible de trouver la zone de coordonnées à appliquer.");
+                return;
+            }
+            // Récupérer les champs dans ce conteneur
+            const ddmFullInput = container.querySelector('[data-coords-input="ddm"]');
+            const latInput = container.querySelector('[data-coords-input="lat"]');
+            const lonInput = container.querySelector('[data-coords-input="lon"]');
+            const ddmFull = ddmFullInput ? ddmFullInput.value.trim() : '';
+            const latStr = latInput ? latInput.value.trim() : '';
+            const lonStr = lonInput ? lonInput.value.trim() : '';
+
+            // Helpers de parsing DDM → décimal
+            const parseDDM = (str, isLat) => {
+                if (!str) return null;
+                // Exemples acceptés: N 48° 41.823' | N48°41.823' | N48°41.823 | 48.69705
+                const ddmMatch = str.match(/([NSWE])?\s*0*([0-9]{1,3})[°º]?\s*([0-9]{1,2})[\.\,]?(\d{1,6})?\'?/i);
+                if (ddmMatch) {
+                    const dir = (ddmMatch[1] || '').toUpperCase();
+                    const deg = parseInt(ddmMatch[2], 10);
+                    const min = parseInt(ddmMatch[3], 10);
+                    const dec = ddmMatch[4] || '0';
+                    const minutes = parseFloat(`${min}.${dec}`);
+                    let value = deg + (minutes / 60);
+                    if (dir === 'S' || dir === 'W') value = -value;
+                    return value;
+                }
+                // Tentative décimale directe
+                const num = parseFloat(str.replace(',', '.'));
+                return isNaN(num) ? null : num;
+            };
+
+            // Regex de validation DDM (mêmes principes que dans multi_solver)
+            const ddmFullRegex = /([NS])\s*(\d{1,2})[°\s]*(\d{1,2}\.\d+)["']?\s*([EW])\s*(\d{1,3})[°\s]*(\d{1,2}\.\d+)["']?/i;
+            const ddmLatRegex = /([NS])\s*(\d{1,2})[°\s]*(\d{1,2}\.\d+)["']?/i;
+            const ddmLonRegex = /([EW])\s*(\d{1,3})[°\s]*(\d{1,2}\.\d+)["']?/i;
+
+            // Utilitaires de formatage décimal → DDM normalisé
+            const toDdmPart = (value, isLat) => {
+                const dir = isLat ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'W');
+                const abs = Math.abs(value);
+                const deg = Math.floor(abs);
+                const min = (abs - deg) * 60;
+                return `${dir} ${deg}° ${min.toFixed(3)}`;
+            };
+
+            let lat = null, lon = null;
+
+            if (ddmFull) {
+                // Essayer de valider et extraire depuis DDM complet
+                const m = ddmFull.match(ddmFullRegex);
+                if (m) {
+                    const dirLat = m[1].toUpperCase();
+                    const degLat = parseInt(m[2], 10);
+                    const minLat = parseFloat(m[3]);
+                    const dirLon = m[4].toUpperCase();
+                    const degLon = parseInt(m[5], 10);
+                    const minLon = parseFloat(m[6]);
+                    lat = degLat + (minLat / 60);
+                    lon = degLon + (minLon / 60);
+                    if (dirLat === 'S') lat = -lat;
+                    if (dirLon === 'W') lon = -lon;
+                } else {
+                    // Fallback: utiliser lat/lon champs si fournis
+                    const latOk = ddmLatRegex.test(latStr) || !isNaN(parseFloat(latStr.replace(',', '.')));
+                    const lonOk = ddmLonRegex.test(lonStr) || !isNaN(parseFloat(lonStr.replace(',', '.')));
+                    if (!latOk || !lonOk) {
+                        alert("Format de coordonnées invalide. Utilisez DDM (ex: N 48° 32.296' E 6° 40.636') ou décimal (ex: 48.538267, 6.677267).");
+                        return;
+                    }
+                }
+            }
+
+            if (lat === null || lon === null) {
+                // Tenter à partir de lat/lon séparés
+                if (ddmLatRegex.test(latStr) && ddmLonRegex.test(lonStr)) {
+                    // DDM séparés
+                    const lm = latStr.match(ddmLatRegex);
+                    const lom = lonStr.match(ddmLonRegex);
+                    const dirLat = lm[1].toUpperCase();
+                    const degLat = parseInt(lm[2], 10);
+                    const minLat = parseFloat(lm[3]);
+                    const dirLon = lom[1].toUpperCase();
+                    const degLon = parseInt(lom[2], 10);
+                    const minLon = parseFloat(lom[3]);
+                    lat = degLat + (minLat / 60);
+                    lon = degLon + (minLon / 60);
+                    if (dirLat === 'S') lat = -lat;
+                    if (dirLon === 'W') lon = -lon;
+                } else {
+                    // Essayer décimal
+                    const latNum = parseFloat(latStr.replace(',', '.'));
+                    const lonNum = parseFloat(lonStr.replace(',', '.'));
+                    if (!isNaN(latNum) && !isNaN(lonNum)) {
+                        lat = latNum; lon = lonNum;
+                    } else {
+                        alert("Format de coordonnées invalide. Utilisez DDM (ex: N 48° 32.296' / E 6° 40.636') ou décimal (ex: 48.538267 / 6.677267).");
+                        return;
+                    }
+                }
+            }
+
+            if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
+                alert("Coordonnées invalides. Veuillez saisir un format DDM (ex: N 48° 32.296') ou décimal (ex: 48.538267).");
+                return;
+            }
+
+            // Mettre à jour le stockage interne (format générique)
+            this.lastDetectedCoordinatesValue = {
+                latitude: lat,
+                longitude: lon,
+                decimal: { latitude: lat, longitude: lon }
+            };
+
+            // Mettre à jour les champs DDM normalisés pour lat/lon et le champ DDM combiné
+            const ddmLatNorm = toDdmPart(lat, true);
+            const ddmLonNorm = toDdmPart(lon, false);
+            if (latInput) latInput.value = ddmLatNorm;
+            if (lonInput) lonInput.value = ddmLonNorm;
+            if (ddmFullInput) ddmFullInput.value = `${ddmLatNorm} ${ddmLonNorm}`;
+
+            // Dispatche vers la carte (point unique)
+            document.dispatchEvent(new CustomEvent('addCalculatedPointToMap', {
+                detail: {
+                    latitude: lat,
+                    longitude: lon,
+                    label: 'Coordonnée corrigée',
+                    color: 'rgba(255, 0, 0, 0.8)'
+                }
+            }));
+
+            // Feedback utilisateur
+            const resultElement = container;
+            if (resultElement) {
+                const notificationDiv = document.createElement('div');
+                notificationDiv.className = 'mt-2 text-sm text-green-500 map-point-notification';
+                notificationDiv.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Point affiché sur la carte (coordonnées corrigées)';
+                // Nettoyer anciennes notifications
+                resultElement.querySelectorAll('.map-point-notification').forEach(el => el.remove());
+                resultElement.appendChild(notificationDiv);
+            }
+        } catch (e) {
+            console.error('applyManualCoordinates error:', e);
+            alert('Erreur lors de l\'application des coordonnées corrigées.');
         }
     }
     
