@@ -1044,7 +1044,29 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                                  >${gcCode}</a>`;
                       }
                     },
-                    { title: "Nom", field: "name", headerSort: true },
+                    { title: "Nom", field: "name", headerSort: true,
+                      formatter: function(cell) {
+                          const row = cell.getRow();
+                          const data = row.getData();
+                          const geocacheId = data.id;
+                          const gcCode = data.gc_code || '';
+                          const name = data.name || '';
+
+                          // Vérifier que l'ID est valide
+                          if (!geocacheId) {
+                              return `<span class="text-red-500">${name || 'Nom indisponible'} (ID manquant)</span>`;
+                          }
+
+                          // Échapper les caractères spéciaux pour JavaScript
+                          const escapedGcCode = gcCode.replace(/['\\]/g, '\\$&');
+                          const escapedName = name.replace(/['\\]/g, '\\$&');
+
+                          return `<a href="javascript:void(0)"
+                                    class="text-blue-500 hover:text-blue-300 hover:underline"
+                                    onclick="handleGeocacheDetailsClick(${geocacheId}, '${escapedGcCode}', '${escapedName}', event)"
+                                  >${name}</a>`;
+                      }
+                    },
                     { title: "Type", field: "cache_type", headerSort: true },
                     { title: "Difficulté", field: "difficulty", headerSort: true },
                     { title: "Terrain", field: "terrain", headerSort: true },
