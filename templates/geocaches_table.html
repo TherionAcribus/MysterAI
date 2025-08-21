@@ -489,13 +489,21 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                     <li>• Peut prendre plusieurs minutes selon le nombre de géocaches</li>
                 </ul>
             </div>
+            <!-- Progression en direct via WebSocket -->
+            <div id="refreshProgress" class="mt-4 hidden">
+                <div class="text-sm text-gray-300 mb-1">Progression: <span id="refreshProgressText">0%</span></div>
+                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                    <div id="refreshProgressBar" class="bg-orange-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="refreshMessage" class="mt-2 text-xs text-gray-400">Initialisation…</div>
+            </div>
             
             <div class="flex justify-end gap-2">
                 <button class="cancel-refresh-filtered bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Annuler
                 </button>
-                <button class="confirm-refresh-filtered bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
-                    <span>Rafraîchir</span>
+                <button class="confirm-refresh-filtered bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded inline-flex items-center" data-state="idle">
+                    <span class="confirm-refresh-text">Rafraîchir</span>
                     <div class="refresh-loading-indicator hidden ml-2">
                         <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
                     </div>
@@ -3446,6 +3454,32 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
             if (geocachesCountToRefresh) {
                 geocachesCountToRefresh.textContent = geocacheIds.length;
             }
+
+            // Réinitialiser l'état de la modale (progression + bouton) avant ouverture
+            (function resetRefreshModalState() {
+                const modalContainer = window.parent.document.getElementById('modals-container');
+                const modal = modalContainer ? modalContainer.querySelector(`#refreshFilteredModal-{{ zone_id }}`) : document.getElementById(`refreshFilteredModal-{{ zone_id }}`);
+                if (!modal) return;
+                const progressWrap = modal.querySelector('#refreshProgress');
+                const progressBar = modal.querySelector('#refreshProgressBar');
+                const progressText = modal.querySelector('#refreshProgressText');
+                const progressMsg = modal.querySelector('#refreshMessage');
+                const confirmBtn = modal.querySelector('.confirm-refresh-filtered');
+                const confirmText = modal.querySelector('.confirm-refresh-text') || (confirmBtn ? confirmBtn.querySelector('span') : null);
+                // Reset progression UI
+                if (progressWrap) progressWrap.classList.add('hidden');
+                if (progressBar) progressBar.style.width = '0%';
+                if (progressText) progressText.textContent = '0%';
+                if (progressMsg) progressMsg.textContent = 'Initialisation…';
+                // Reset bouton
+                if (confirmBtn) {
+                    confirmBtn.dataset.state = 'idle';
+                    if (confirmText) confirmText.textContent = 'Rafraîchir';
+                    const freshBtn = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(freshBtn, confirmBtn);
+                    freshBtn.addEventListener('click', refreshFilteredGeocaches);
+                }
+            })();
             
             // Afficher la modale
             if (refreshFilteredModal) {
@@ -3483,32 +3517,92 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 }
                 
                 console.log(`Rafraîchissement en lot de ${geocacheIds.length} géocaches...`);
-                
-                const response = await fetch('/api/geocaches/refresh-batch', {
+
+                // UI progression dans la modale
+                const modalContainer = window.parent.document.getElementById('modals-container');
+                const modal = modalContainer ? modalContainer.querySelector(`#refreshFilteredModal-{{ zone_id }}`) : document.getElementById(`refreshFilteredModal-{{ zone_id }}`);
+                const progressWrap = modal?.querySelector('#refreshProgress');
+                const progressBar = modal?.querySelector('#refreshProgressBar');
+                const progressText = modal?.querySelector('#refreshProgressText');
+                const progressMsg = modal?.querySelector('#refreshMessage');
+                const confirmBtn = modal?.querySelector('.confirm-refresh-filtered');
+                const confirmBtnText = modal?.querySelector('.confirm-refresh-text');
+
+                if (progressWrap) progressWrap.classList.remove('hidden');
+                if (confirmBtn && confirmBtnText) { confirmBtn.dataset.state = 'running'; confirmBtnText.textContent = 'Arrêter'; }
+
+                // Lancer l'opération serveur (retourne session_id)
+                const launchResponse = await fetch('/api/geocaches/refresh-batch', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        geocache_ids: geocacheIds
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ geocache_ids: geocacheIds, zone_id: parseInt('{{ zone_id }}') })
                 });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showSuccess(data.message);
-                    
-                    // Afficher des détails si il y a des erreurs
-                    if (data.results && data.results.error_count > 0) {
-                        console.warn('Erreurs lors du rafraîchissement:', data.results.errors);
-                    }
-                } else {
-                    throw new Error(data.error || 'Une erreur est survenue lors du rafraîchissement des géocaches');
+                const launchData = await launchResponse.json();
+                if (!launchResponse.ok) {
+                    throw new Error(launchData.error || 'Impossible de lancer le rafraîchissement');
                 }
-                
-                // Recharger le tableau
-                await reloadTable();
+
+                const sessionId = launchData.session_id;
+                if (!sessionId) throw new Error('Session WebSocket non fournie');
+
+                try { window.wsService.joinZone(parseInt('{{ zone_id }}')); } catch (e) {}
+                try { window.wsService.joinSession(sessionId); } catch (e) {}
+
+                const onProgress = (data) => {
+                    if (data.session_id !== sessionId) return;
+                    const pct = typeof data.progress === 'number' ? Math.max(0, Math.min(100, data.progress)) : null;
+                    if (pct !== null) {
+                        if (progressBar) progressBar.style.width = `${pct}%`;
+                        if (progressText) progressText.textContent = `${pct}%`;
+                    }
+                    if (progressMsg && data.message) {
+                        const prefix = data.data?.gc_code ? `[${data.data.gc_code}] ` : '';
+                        progressMsg.textContent = `${prefix}${data.message}`;
+                    }
+                };
+
+                const onComplete = async (data) => {
+                    if (data.session_id !== sessionId) return;
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressText) progressText.textContent = '100%';
+                    if (progressMsg) progressMsg.textContent = data.message || 'Terminé';
+                    if (confirmBtn && confirmBtnText) { confirmBtn.dataset.state = 'idle'; confirmBtnText.textContent = 'Rafraîchir'; }
+                    await reloadTable();
+                    closeRefreshFilteredModalFunc();
+                    window.wsService.off(`session_${sessionId}_progress`, onProgress);
+                    window.wsService.off(`session_${sessionId}_complete`, onComplete);
+
+                    // Réinitialiser le bouton (retour au comportement par défaut)
+                    if (modal) {
+                        const currentBtn = modal.querySelector('.confirm-refresh-filtered');
+                        if (currentBtn) {
+                            const freshBtn = currentBtn.cloneNode(true);
+                            currentBtn.parentNode.replaceChild(freshBtn, currentBtn);
+                            freshBtn.addEventListener('click', refreshFilteredGeocaches);
+                        }
+                    }
+                };
+
+                window.wsService.on(`session_${sessionId}_progress`, onProgress);
+                window.wsService.on(`session_${sessionId}_complete`, onComplete);
+
+                if (confirmBtn) {
+                    const cancelHandler = async () => {
+                        if (confirmBtn.dataset.state === 'running') {
+                            try {
+                                await fetch('/api/geocaches/refresh-batch/cancel', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ session_id: sessionId })
+                                });
+                                if (progressMsg) progressMsg.textContent = 'Annulation demandée…';
+                            } catch (e) { console.error(e); }
+                        }
+                    };
+                    const confirmClone = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(confirmClone, confirmBtn);
+                    confirmClone.addEventListener('click', cancelHandler);
+                }
             } catch (error) {
                 console.error('Erreur:', error);
                 showError(error.message || 'Une erreur est survenue lors du rafraîchissement des géocaches');
@@ -3517,9 +3611,7 @@ Ce système permet de filtrer les géocaches affichées dans le tableau selon di
                 if (refreshLoadingIndicator) {
                     refreshLoadingIndicator.classList.add('hidden');
                 }
-                
-                // Fermer la modale
-                closeRefreshFilteredModalFunc();
+                // Ne pas fermer la modale ici: elle se ferme à la fin via WebSocket (onComplete)
             }
         }
 
