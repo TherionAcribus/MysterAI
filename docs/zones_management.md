@@ -18,12 +18,12 @@ Les zones sont un concept central dans MysteryAI, permettant d'organiser les gé
 
 Le panneau de gestion des zones présente une interface moderne et réactive pour gérer toutes vos zones :
 
-- **Liste des zones** : Affiche toutes les zones existantes avec leur nom et description
+- **Liste des zones** : Affiche toutes les zones existantes avec leur nom et description (le nom est cliquable et ouvre la liste des géocaches)
 - **Bouton d'ajout** : Permet de créer une nouvelle zone directement dans le panneau
 - **Actions par zone** :
-  - Modifier : Permet de mettre à jour le nom et la description d'une zone
-  - Supprimer : Permet de supprimer une zone (avec confirmation)
-  - Voir les géocaches : Ouvre un nouvel onglet dans GoldenLayout avec toutes les géocaches associées à cette zone
+  - **Voir** (icône œil) : Ouvre la liste des géocaches de la zone dans un nouvel onglet
+  - **Modifier** : Permet de mettre à jour le nom et la description d'une zone
+  - **Supprimer** : Permet de supprimer une zone (avec confirmation)
 
 ### Formulaire d'Ajout/Modification
 
@@ -109,7 +109,7 @@ L'interface de gestion des zones utilise HTMX pour offrir une expérience utilis
 
 ## Intégration avec GoldenLayout
 
-Lorsque l'utilisateur clique sur "Voir les géocaches" d'une zone :
+Lorsque l'utilisateur clique sur l'icône « voir » ou sur le nom de la zone :
 
 1. Un nouvel onglet est créé dans GoldenLayout
 2. Le tableau des géocaches de la zone est chargé dans cet onglet

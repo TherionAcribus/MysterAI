@@ -40,8 +40,30 @@ Le panneau utilise un design moderne avec :
             {% for zone in zones %}
                 <div class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors">
                     <div class="flex justify-between items-start mb-2">
-                        <h3 class="text-lg font-semibold text-blue-400">{{ zone.name }}</h3>
+                        <button
+                            class="text-lg font-semibold text-blue-400 hover:text-blue-300"
+                            data-tab-opener="geocaches-table"
+                            data-tab-title="Géocaches - {{ zone.name | escape }}"
+                            data-tab-component="geocaches-table"
+                            data-tab-unique-id="geocaches-table-{{ zone.id }}"
+                            data-tab-config-zoneId="{{ zone.id }}"
+                            data-tab-config-zoneName="{{ zone.name | escape }}"
+                        >
+                            {{ zone.name }}
+                        </button>
                         <div class="flex space-x-2">
+                            <button
+                                class="text-blue-500 hover:text-blue-400 transition-colors"
+                                title="Voir"
+                                data-tab-opener="geocaches-table"
+                                data-tab-title="Géocaches - {{ zone.name | escape }}"
+                                data-tab-component="geocaches-table"
+                                data-tab-unique-id="geocaches-table-{{ zone.id }}"
+                                data-tab-config-zoneId="{{ zone.id }}"
+                                data-tab-config-zoneName="{{ zone.name | escape }}"
+                            >
+                                <i class="fas fa-eye"></i>
+                            </button>
                             <button hx-get="/zones/{{ zone.id }}/edit"
                                     hx-target="#geocaches-panel-content"
                                     class="text-yellow-500 hover:text-yellow-400 transition-colors" 
@@ -60,12 +82,6 @@ Le panneau utilise un design moderne avec :
                     {% if zone.description %}
                         <p class="text-gray-300 mb-4">{{ zone.description }}</p>
                     {% endif %}
-                    
-                    <button onclick="openGeocachesTab('{{ zone.id }}', '{{ zone.name | escape }}')"
-                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors inline-flex items-center">
-                        <i class="fas fa-table mr-2"></i>
-                        Voir les géocaches
-                    </button>
                 </div>
             {% endfor %}
         </div>
@@ -115,8 +131,8 @@ Le panneau permet de :
 
 ### Interaction avec les géocaches
 
-Quand l'utilisateur clique sur "Voir les géocaches" :
-1. La fonction `openGeocachesTab` est appelée
+Quand l'utilisateur clique sur l'icône "voir" ou sur le nom de la zone :
+1. Le mécanisme `data-tab-opener` déclenche l'ouverture d'un onglet
 2. Un nouvel onglet est créé dans GoldenLayout
 3. Le tableau des géocaches de la zone est chargé dans cet onglet
 
@@ -138,35 +154,17 @@ Exemple d'attributs HTMX :
 
 ## Intégration avec GoldenLayout
 
-La fonction `openGeocachesTab` gère l'ouverture d'un nouvel onglet dans GoldenLayout :
+L'ouverture d'un onglet est désormais gérée par le service d'onglets via les attributs `data-tab-*` (aucun gros bouton n'est requis) :
 
-```javascript
-function openGeocachesTab(zoneId, zoneName) {
-    // Vérifier si nous sommes dans un iframe (dans GoldenLayout)
-    if (window.parent && window.parent.mainLayout) {
-        // Utiliser GoldenLayout pour ouvrir un nouvel onglet
-        try {
-            window.parent.mainLayout.root.contentItems[0].addChild({
-                type: 'component',
-                componentName: 'geocaches-table',
-                title: 'Géocaches: ' + zoneName,
-                componentState: {
-                    zoneId: zoneId,
-                    zoneName: zoneName
-                }
-            });
-        } catch (error) {
-            // Fallback: rediriger vers la page du tableau
-            window.location.href = '/geocaches/table/' + zoneId;
-        }
-    } else if (window.mainLayout) {
-        // Si nous sommes dans la fenêtre principale
-        // ...code similaire...
-    } else {
-        // Fallback: rediriger vers la page du tableau
-        window.location.href = '/geocaches/table/' + zoneId;
-    }
-}
+```html
+<button
+  data-tab-opener="geocaches-table"
+  data-tab-title="Géocaches - {{ zone.name | escape }}"
+  data-tab-unique-id="geocaches-table-{{ zone.id }}"
+  data-tab-config-zoneId="{{ zone.id }}"
+  data-tab-config-zoneName="{{ zone.name | escape }}">
+  <i class="fas fa-eye"></i>
+</button>
 ```
 
 ## Gestion des événements
