@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, render_template, redirect, url_fo
 from app.models.geocache import Zone, Geocache
 from app.database import db
 from flask import current_app
+from app.models.app_config import AppConfig
 
 zones_bp = Blueprint('zones', __name__)
 
@@ -14,11 +15,41 @@ def get_zones():
         print("=== Paramètres de requête ===")
         print(request.args)
         
-        zones = Zone.query.all()
+        # Récupérer le tri: paramètre explicite ou valeur persistée
+        sort = request.args.get('sort') or AppConfig.get_value('zones_sort_order', 'recent')
+        # Sauvegarder le tri choisi si fourni explicitement
+        if 'sort' in request.args:
+            try:
+                AppConfig.set_value('zones_sort_order', sort, category='general', description="Ordre d'affichage des zones")
+            except Exception as _e:
+                current_app.logger.warning(f"Impossible d'enregistrer zones_sort_order: {str(_e)}")
+        query = Zone.query
+        if sort == 'recent':
+            query = query.order_by(Zone.created_at.desc())
+        elif sort == 'oldest':
+            query = query.order_by(Zone.created_at.asc())
+        elif sort == 'name':
+            from sqlalchemy import func
+            query = query.order_by(func.lower(Zone.name).asc())
+        elif sort == 'name_desc':
+            from sqlalchemy import func
+            query = query.order_by(func.lower(Zone.name).desc())
+        elif sort == 'caches_desc':
+            # Tri par nombre de géocaches décroissant
+            from sqlalchemy import func
+            query = query.outerjoin(Zone.geocaches).group_by(Zone.id).order_by(func.count().desc())
+        elif sort == 'caches_asc':
+            # Tri par nombre de géocaches croissant
+            from sqlalchemy import func
+            query = query.outerjoin(Zone.geocaches).group_by(Zone.id).order_by(func.count().asc())
+        else:
+            query = query.order_by(Zone.created_at.desc())
+
+        zones = query.all()
         
         if request.headers.get('HX-Request'):
             print("\n=> Renvoi du template HTML")
-            return render_template('zones_list.html', zones=zones)
+            return render_template('zones_list.html', zones=zones, sort=sort)
             
         print("\n=> Renvoi du JSON")
         return jsonify([zone.to_dict() for zone in zones])
@@ -39,8 +70,35 @@ def get_zone(zone_id):
 
 @zones_bp.route('/zones', methods=['GET'])
 def zones_page():
-    zones = Zone.query.order_by(Zone.created_at.desc()).all()
-    return render_template('zones.html', zones=zones)
+    # Récupérer le tri: paramètre explicite ou valeur persistée
+    sort = request.args.get('sort') or AppConfig.get_value('zones_sort_order', 'recent')
+    if 'sort' in request.args:
+        try:
+            AppConfig.set_value('zones_sort_order', sort, category='general', description="Ordre d'affichage des zones")
+        except Exception as _e:
+            current_app.logger.warning(f"Impossible d'enregistrer zones_sort_order: {str(_e)}")
+    query = Zone.query
+    if sort == 'recent':
+        query = query.order_by(Zone.created_at.desc())
+    elif sort == 'oldest':
+        query = query.order_by(Zone.created_at.asc())
+    elif sort == 'name':
+        from sqlalchemy import func
+        query = query.order_by(func.lower(Zone.name).asc())
+    elif sort == 'name_desc':
+        from sqlalchemy import func
+        query = query.order_by(func.lower(Zone.name).desc())
+    elif sort in ('caches_desc', 'caches_asc'):
+        from sqlalchemy import func
+        if sort == 'caches_desc':
+            query = query.outerjoin(Zone.geocaches).group_by(Zone.id).order_by(func.count().desc())
+        else:
+            query = query.outerjoin(Zone.geocaches).group_by(Zone.id).order_by(func.count().asc())
+    else:
+        query = query.order_by(Zone.created_at.desc())
+
+    zones = query.all()
+    return render_template('zones.html', zones=zones, sort=sort)
 
 @zones_bp.route('/zones/add', methods=['POST'])
 def add_zone():
@@ -54,8 +112,9 @@ def add_zone():
         
         # Si la requête est HTMX, renvoyer directement la liste des zones
         if request.headers.get('HX-Request'):
-            zones = Zone.query.all()
-            return render_template('zones_list.html', zones=zones)
+            # Préserver l'ordre courant (sinon défaut sauvegardé)
+            sort = request.args.get('sort') or AppConfig.get_value('zones_sort_order', 'recent')
+            return redirect(url_for('zones.get_zones', sort=sort, **{'_hx': '1'}))
             
         return redirect(url_for('zones.zones_page'))
     except Exception as e:
@@ -92,8 +151,8 @@ def delete_zone(zone_id):
         
         # Si la requête est HTMX, renvoyer la liste des zones
         if request.headers.get('HX-Request'):
-            zones = Zone.query.all()
-            return render_template('zones_list.html', zones=zones)
+            sort = request.args.get('sort') or AppConfig.get_value('zones_sort_order', 'recent')
+            return redirect(url_for('zones.get_zones', sort=sort, **{'_hx': '1'}))
             
         # Rediriger vers la page d'accueil au lieu de l'API des zones
         return redirect(url_for('main.index'))
@@ -158,8 +217,8 @@ def update_zone(zone_id):
         
         # Si la requête est HTMX, renvoyer directement la liste des zones
         if request.headers.get('HX-Request'):
-            zones = Zone.query.all()
-            return render_template('zones_list.html', zones=zones)
+            sort = request.args.get('sort') or AppConfig.get_value('zones_sort_order', 'recent')
+            return redirect(url_for('zones.get_zones', sort=sort, **{'_hx': '1'}))
             
         return redirect(url_for('zones.zones_page'))
     except Exception as e:

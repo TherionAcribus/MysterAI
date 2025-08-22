@@ -47,7 +47,8 @@ def get_general_settings():
             'auto_mark_solved': AppConfig.get_value('auto_mark_solved', True),
             'auto_correct_coordinates': AppConfig.get_value('auto_correct_coordinates', True),
             'enable_auto_scoring': AppConfig.get_value('enable_auto_scoring', True),
-            'open_tab_in_same_section': AppConfig.get_value('open_tab_in_same_section', True)
+            'open_tab_in_same_section': AppConfig.get_value('open_tab_in_same_section', True),
+            'zones_sort_order': AppConfig.get_value('zones_sort_order', 'recent')
         }
         
         # Générer une version de cache basée sur le timestamp
@@ -136,6 +137,15 @@ def save_general_settings():
             category='general',
             description='Ouvrir les nouveaux onglets dans la même section GoldenLayout par défaut'
         )
+
+        # Sauvegarder l'ordre d'affichage des zones si fourni
+        if 'zones_sort_order' in data:
+            AppConfig.set_value(
+                'zones_sort_order',
+                data.get('zones_sort_order', 'recent'),
+                category='general',
+                description="Ordre d'affichage des zones (recent, oldest, name, name_desc, caches_desc, caches_asc)"
+            )
         
         # Générer une version de cache basée sur le timestamp
         from datetime import datetime

@@ -117,10 +117,11 @@ Les classes principales utilisées :
 
 1. Les zones sont chargées depuis le backend via l'endpoint `/api/zones`
 2. Chaque zone affiche :
-   - Son nom
+   - Son nom (cliquable pour ouvrir les géocaches)
    - Sa description (si disponible)
-   - Des boutons d'action (modifier, supprimer)
-   - Un bouton pour voir les géocaches
+   - Des icônes d'action (voir, modifier, supprimer)
+3. Un sélecteur « Trier par » permet: Plus récent, Plus ancien, Alphabétique (A→Z), Alphabétique (Z→A), Caches (décroissant), Caches (croissant)
+4. Le tri choisi est persisté via `zones_sort_order` et restauré au redémarrage
 
 ### Gestion des zones
 
@@ -174,6 +175,10 @@ Le panneau utilise plusieurs gestionnaires d'événements :
 1. **Initialisation** : La fonction `initZoneEvents` configure tous les gestionnaires d'événements
 2. **Suppression** : La fonction `confirmDeleteZone` gère la confirmation et l'exécution de la suppression
 3. **Réinitialisation** : Les événements HTMX (`htmx:afterSwap`) déclenchent la réinitialisation des gestionnaires
+
+### Tri alphabétique insensible à la casse
+
+Le tri alphabétique ignore les majuscules/minuscules pour un ordre cohérent (ex: `default`, `Formula`, `Meta`, ...).
 
 ## Backend API
 

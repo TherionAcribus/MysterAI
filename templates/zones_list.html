@@ -2,11 +2,30 @@
 <div class="p-4">
     <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-semibold text-blue-400">Zones</h2>
-        <button hx-get="/zones/new" 
+        <div class="flex items-center space-x-2">
+            <label class="text-sm text-gray-300">Trier par:</label>
+            <select
+                class="bg-gray-700 text-gray-100 text-sm px-2 py-1 rounded"
+                hx-get="/api/zones"
                 hx-target="#geocaches-panel-content"
-                class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 transition-colors flex items-center">
-            <i class="fas fa-plus mr-1"></i>Ajouter
-        </button>
+                hx-swap="innerHTML"
+                name="sort"
+                hx-vals='{"sort": this.value}'
+                onchange="htmx.ajax('GET', '/api/zones?sort=' + this.value, {target: '#geocaches-panel-content', swap: 'innerHTML'})"
+            >
+                <option value="recent" {% if sort == 'recent' or not sort %}selected{% endif %}>Plus récent</option>
+                <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Plus ancien</option>
+                <option value="name" {% if sort == 'name' %}selected{% endif %}>Alphabétique (A→Z)</option>
+                <option value="name_desc" {% if sort == 'name_desc' %}selected{% endif %}>Alphabétique (Z→A)</option>
+                <option value="caches_desc" {% if sort == 'caches_desc' %}selected{% endif %}>Caches (décroissant)</option>
+                <option value="caches_asc" {% if sort == 'caches_asc' %}selected{% endif %}>Caches (croissant)</option>
+            </select>
+            <button hx-get="/zones/new" 
+                    hx-target="#geocaches-panel-content"
+                    class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 transition-colors flex items-center">
+                <i class="fas fa-plus mr-1"></i>Ajouter
+            </button>
+        </div>
     </div>
 
     {% if zones %}

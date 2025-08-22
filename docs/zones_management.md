@@ -20,10 +20,11 @@ Le panneau de gestion des zones présente une interface moderne et réactive pou
 
 - **Liste des zones** : Affiche toutes les zones existantes avec leur nom et description (le nom est cliquable et ouvre la liste des géocaches)
 - **Bouton d'ajout** : Permet de créer une nouvelle zone directement dans le panneau
+- **Tri** : Sélecteur « Trier par » avec options `recent`, `oldest`, `name`, `name_desc`, `caches_desc`, `caches_asc` (persisté via `zones_sort_order`)
 - **Actions par zone** :
   - **Voir** (icône œil) : Ouvre la liste des géocaches de la zone dans un nouvel onglet
-  - **Modifier** : Permet de mettre à jour le nom et la description d'une zone
-  - **Supprimer** : Permet de supprimer une zone (avec confirmation)
+  - **Modifier** : Met à jour le nom et la description d'une zone
+  - **Supprimer** : Supprime une zone (avec confirmation)
 
 ### Formulaire d'Ajout/Modification
 
@@ -114,6 +115,10 @@ Lorsque l'utilisateur clique sur l'icône « voir » ou sur le nom de la zone :
 1. Un nouvel onglet est créé dans GoldenLayout
 2. Le tableau des géocaches de la zone est chargé dans cet onglet
 3. L'utilisateur peut interagir avec les géocaches sans quitter l'interface principale
+
+## Tri alphabétique insensible à la casse
+
+Le tri alphabétique ignore la casse (majuscule/minuscule) pour garantir un ordre cohérent.
 
 ## Bonnes Pratiques
 

@@ -6,8 +6,11 @@
 // Fonction pour recharger la liste des zones après une modification
 function reloadZonesList() {
     console.log('Rechargement de la liste des zones');
-    // Utiliser HTMX pour recharger la liste des zones
-    htmx.ajax('GET', '/api/zones', {
+    // Préserver le critère de tri courant si présent sur la page
+    const select = document.querySelector('#geocaches-panel-content select[name="sort"]');
+    const sort = select ? select.value : (window.zonesDefaultSort || 'recent');
+    // Utiliser HTMX pour recharger la liste des zones avec le tri
+    htmx.ajax('GET', `/api/zones?sort=${encodeURIComponent(sort)}`, {
         target: '#geocaches-panel-content',
         swap: 'innerHTML'
     });

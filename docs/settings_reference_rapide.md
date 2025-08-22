@@ -35,6 +35,7 @@ const settings = await SettingsService.getGeneralSettings();
 | `auto_correct_coordinates` | Boolean | `true` | Corriger automatiquement les coordonnées |
 | `enable_auto_scoring` | Boolean | `true` | Activer le scoring automatique |
 | `open_tab_in_same_section` | Boolean | `true` | Ouvrir les nouveaux onglets dans la même section GoldenLayout |
+| `zones_sort_order` | String | `'recent'` | Ordre d'affichage des zones (`recent`, `oldest`, `name`, `name_desc`, `caches_desc`, `caches_asc`) |
 | `formula_extraction_method` | String | `'regex'` | Méthode d'extraction (`'regex'` ou `'ia'`) |
 | `question_extraction_method` | String | `'regex'` | Méthode d'extraction (`'regex'` ou `'ia'`) |
 
