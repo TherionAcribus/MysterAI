@@ -98,6 +98,106 @@
         {% block page_scripts %}{% endblock %}
     {% endblock %}
 
+    <!-- Overlay global des notifications -->
+    <div id="notifications-root" aria-live="polite" aria-atomic="true" style="position:fixed; top:16px; right:16px; z-index:9999; display:flex; flex-direction:column; gap:8px;"></div>
+    <style>
+        .toast { min-width: 260px; max-width: 420px; padding: 10px 12px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,.3); display:flex; align-items:flex-start; gap:8px; border:1px solid rgba(255,255,255,.08); background: #1f2937; color:#e5e7eb; }
+        .toast .bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 9999px; overflow: hidden; margin-top: 6px; }
+        .toast .bar > div { height: 100%; width: 0%; transition: width .2s ease; border-radius: 9999px; }
+        .toast.info { border-color: rgba(59,130,246,.4); background: rgba(59,130,246,.15); }
+        .toast.success { border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.15); }
+        .toast.warning { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.15); }
+        .toast.error { border-color: rgba(239,68,68,.4); background: rgba(239,68,68,.15); }
+        .toast .title { font-weight: 600; margin-bottom: 2px; }
+        .toast .close { margin-left:auto; opacity:.7; cursor:pointer; }
+    </style>
+    <script>
+    window.AppNotify = (() => {
+      const root = document.getElementById('notifications-root');
+      const items = new Map();
+
+      function ensureElement(notification) {
+        let el = document.getElementById(`ntf-${notification.id}`);
+        if (!el) {
+          el = document.createElement('div');
+          el.id = `ntf-${notification.id}`;
+          el.className = `toast ${notification.level||'info'}`;
+          root.appendChild(el);
+        } else {
+          el.className = `toast ${notification.level||'info'}`;
+        }
+
+        const titleHtml = notification.title ? `<div class="title">${notification.title}</div>` : '';
+        const msgHtml = notification.html || `<div>${notification.message||''}</div>`;
+        const progressHtml = notification.progress ? `<div class="bar"><div style="width:${Math.max(0, Math.min(1, notification.progress.pct||0))*100}%; background:${levelColor(notification.level)}"></div></div>` : '';
+        const actionsHtml = (notification.actions||[]).map(a => `<button data-act-id="${a.id}" class="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">${a.label}</button>`).join('');
+
+        el.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:2px; width:100%">
+            ${titleHtml}
+            ${msgHtml}
+            ${progressHtml}
+            ${actionsHtml ? `<div style="margin-top:4px; display:flex; gap:6px">${actionsHtml}</div>` : ''}
+          </div>
+          <span class="close" aria-label="Fermer" onclick="AppNotify.remove('${notification.id}')">✕</span>
+        `;
+
+        if (notification.actions) {
+          notification.actions.forEach(a => {
+            const btn = el.querySelector(`[data-act-id="${a.id}"]`);
+            if (btn && typeof a.onClick === 'function') {
+              btn.onclick = () => a.onClick(notification.id);
+            }
+          });
+        }
+        return el;
+      }
+
+      function levelColor(level) {
+        switch(level) {
+          case 'success': return 'rgb(16 185 129)';
+          case 'warning': return 'rgb(245 158 11)';
+          case 'error': return 'rgb(239 68 68)';
+          default: return 'rgb(59 130 246)';
+        }
+      }
+
+      function push(payload) {
+        const n = { id: payload.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())), type:'toast', level:'info', ttl: 5000, ...payload };
+        items.set(n.id, n);
+        ensureElement(n);
+        if (n.ttl && !n.progress) {
+          setTimeout(() => remove(n.id), n.ttl);
+        }
+        return n.id;
+      }
+
+      function update(id, patch) {
+        const prev = items.get(id) || { id };
+        const n = { ...prev, ...patch };
+        items.set(id, n);
+        ensureElement(n);
+      }
+
+      function remove(id) {
+        items.delete(id);
+        const el = document.getElementById(`ntf-${id}`);
+        if (el) el.remove();
+      }
+
+      // Intégration HTMX si besoin via CustomEvent
+      document.addEventListener('app:notify', (e) => push(e.detail), true);
+
+      // Intégration WebSocket (le projet peut brancher window.handleWsMessage)
+      window.handleWsMessage = (msg) => {
+        if (msg && msg.kind === 'notification') {
+          if (msg.id && items.has(msg.id)) update(msg.id, msg); else push(msg);
+        }
+      };
+
+      return { push, update, remove };
+    })();
+    </script>
     <!-- Script d'initialisation de GoldenLayout -->
     <script>
         // Initialiser l'intégration des plugins avec GoldenLayout

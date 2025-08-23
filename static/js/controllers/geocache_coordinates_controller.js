@@ -108,11 +108,19 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             console.log("Bouton réactivé et texte réinitialisé", button.innerHTML)
             
             if (data.success) {
-                // Afficher un message de succès
-                alert(`Les coordonnées ont été envoyées avec succès vers Geocaching.com pour ${gcCode}!`)
+                // Notification de succès
+                window.AppNotify && window.AppNotify.push({
+                    level: 'success',
+                    message: `Coordonnées envoyées avec succès vers Geocaching.com pour ${gcCode}`,
+                    ttl: 5000
+                });
             } else {
-                // Afficher un message d'erreur
-                alert(`Erreur lors de l'envoi des coordonnées: ${data.error}`)
+                // Notification d'erreur
+                window.AppNotify && window.AppNotify.push({
+                    level: 'error',
+                    message: `Échec d'envoi vers Geocaching.com: ${data.error || 'Erreur inconnue'}`,
+                    ttl: 7000
+                });
             }
         })
         .catch(error => {
@@ -124,8 +132,12 @@ window.GeocacheCoordinatesController = class extends Stimulus.Controller {
             
             console.log("Bouton réactivé et texte réinitialisé après erreur", button.innerHTML)
             
-            // Afficher un message d'erreur
-            alert(`Erreur lors de l'envoi des coordonnées: ${error.message}`)
+            // Notification d'erreur
+            window.AppNotify && window.AppNotify.push({
+                level: 'error',
+                message: `Erreur lors de l'envoi des coordonnées: ${error.message}`,
+                ttl: 7000
+            });
         })
         .finally(() => {
             // S'assurer que le bouton est bien réactivé et réinitialisé
