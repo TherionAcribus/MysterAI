@@ -69,6 +69,24 @@ class ModelRegistry:
 
         # Découverte locale (Ollama)
         installed_local = set(self._discover_ollama())
+
+        # Ajouter automatiquement les modèles locaux découverts qui ne sont pas définis dans defaults/user
+        for local_name in installed_local:
+            composite_id = f"ollama:{local_name}"
+            if composite_id not in by_id:
+                # Créer une entrée minimale pour ce modèle découvert
+                base_name = (local_name.split(':')[0] if ':' in local_name else local_name)
+                human_name = base_name.replace('-', ' ').title()
+                by_id[composite_id] = {
+                    'id': composite_id,
+                    'provider': 'ollama',
+                    'type': 'local',
+                    'model_id': local_name,
+                    'name': human_name,
+                    'capabilities': ['chat'],
+                    'requires_api_key': False,
+                    'defaults': {'temperature': 0.7, 'num_predict': 1000}
+                }
         now_iso = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
         # Marquage des états

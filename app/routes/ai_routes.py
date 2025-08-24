@@ -197,6 +197,8 @@ def settings_panel():
         local_options_html = ''
         current_local_model = settings.get('local_model', '')
         for m in registry_local:
+            if not m.get('installed', False):
+                continue
             full = m.get('model_id') or ''
             name = m.get('name', full)
             selected = 'selected' if current_local_model == full else ''
@@ -206,9 +208,11 @@ def settings_panel():
         local_checkboxes_html = ''
         local_models_state = settings.get('local_models', {})
         for m in registry_local:
+            if not m.get('installed', False):
+                continue
             full = m.get('model_id') or ''
             short_id = full.split(':')[0] if ':' in full else full
-            enabled = local_models_state.get(short_id, {}).get('enabled', False)
+            enabled = local_models_state.get(short_id, {}).get('enabled', True)
             checked = 'checked' if enabled else ''
             label = m.get('name', short_id)
             local_checkboxes_html += (
@@ -450,9 +454,11 @@ def get_ai_models():
                 'is_usable': is_usable
             })
 
-        # Local: utiliser l'identifiant complet (ex: 'llama3:latest') pour cohérence avec Ollama
+        # Local: n'afficher QUE les modèles installés; id complet (ex: 'llama3:latest')
         for m in registry_local:
             full = m.get('model_id') or ''
+            if not m.get('installed', False):
+                continue
             short_id = full.split(':')[0] if ':' in full else full
             is_active = settings.get('mode') == 'local' and (
                 settings.get('local_model') == full or settings.get('local_model') == short_id
@@ -462,7 +468,7 @@ def get_ai_models():
                 'name': m.get('name', short_id),
                 'type': 'local',
                 'is_active': is_active,
-                'is_usable': bool(m.get('installed', False))
+                'is_usable': True
             })
 
         # Fallback si vide

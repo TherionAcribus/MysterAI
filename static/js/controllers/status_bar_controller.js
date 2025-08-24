@@ -18,6 +18,11 @@
             
             // Écouter les événements de changement d'IA depuis d'autres parties de l'application
             window.addEventListener('aiModelChanged', this.updateSelectedModel.bind(this));
+            // Écouter l'événement de rafraîchissement des modèles (depuis Settings)
+            window.addEventListener('aiModelsRefreshed', () => {
+                console.log('=== DEBUG: aiModelsRefreshed reçu, rechargement des modèles dans la barre ===');
+                this.loadAIModels();
+            });
         }
         
         /**

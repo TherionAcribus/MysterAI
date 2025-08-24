@@ -494,6 +494,12 @@
                     currentPanel.replaceWith(newPanel);
                     this.connectionStatusTarget.textContent = 'Modèles rafraîchis';
                     this.connectionStatusTarget.className = 'ml-2 text-sm text-green-400';
+                    // Notifier la barre de statut de recharger sa liste
+                    try {
+                        window.dispatchEvent(new CustomEvent('aiModelsRefreshed'));
+                    } catch (e) {
+                        console.warn('Notification aiModelsRefreshed échouée:', e);
+                    }
                 } else {
                     // Fallback: si la structure ne correspond pas, ne pas casser l'UI
                     this.connectionStatusTarget.textContent = 'Rafraîchi (UI non remplacée)';
