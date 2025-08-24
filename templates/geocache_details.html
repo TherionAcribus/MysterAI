@@ -582,112 +582,133 @@
         }
         
         if (chatPanel) {
-            // Attendre que le contrôleur Stimulus expose ses méthodes si nécessaire
-            if (typeof chatPanel.addChat !== 'function') {
-                // Retenter après l'ouverture du panneau
-                setTimeout(() => openGeocacheAIChat(geocacheId, gcCode, geocacheName, sourceEl), 80);
-                return;
-            }
-            // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
-            let chatId;
-            let shouldAutoSend = true;
-            const chatInstances = chatPanel.querySelectorAll('.chat-instance');
-            
-            if (chatInstances.length === 0) {
-                // Aucun chat existant, créer un nouveau
-                chatId = chatPanel.addChat();
-                // Pour le tout premier chat, on ne déclenche pas l'envoi auto pour laisser lire
-                shouldAutoSend = false;
-
-                // Définir le label de l'onglet avec le code GC
-                const firstTabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
-                if (firstTabLabel) {
-                    firstTabLabel.textContent = gcCode;
+            const createNewChat = () => {
+                const beforeCount = chatPanel.querySelectorAll('.chat-instance').length;
+                const addBtn = chatPanel.querySelector('.chat-add-button');
+                if (addBtn) {
+                    addBtn.click();
                 }
-
-                // Renommer le titre du chat
-                const firstChatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
-                if (firstChatHeader) {
-                    firstChatHeader.textContent = `CHAT IA - ${gcCode}`;
+                // Essayer de récupérer immédiatement le nouvel id
+                const instances = chatPanel.querySelectorAll('.chat-instance');
+                if (instances.length > beforeCount) {
+                    const last = instances[instances.length - 1];
+                    return parseInt(last.dataset.chatId);
                 }
+                return null;
+            };
 
-                // Définir le message d'accueil spécifique
-                if (typeof chatPanel.setWelcomeForChat === 'function') {
-                    chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
-                } else {
-                    const firstSystemMessage = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-message.system .message-content`);
-                    if (firstSystemMessage) {
-                        firstSystemMessage.textContent = `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`;
+            const proceed = () => {
+                // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
+                let chatId;
+                let shouldAutoSend = true;
+                const chatInstances = chatPanel.querySelectorAll('.chat-instance');
+
+                if (chatInstances.length === 0) {
+                    // Aucun chat existant, créer un nouveau
+                    chatId = createNewChat();
+                    if (!chatId) {
+                        // petite attente si le DOM n'est pas encore mis à jour
+                        setTimeout(() => proceed(), 30);
+                        return;
                     }
-                }
+                    // Pour le tout premier chat, on ne déclenche pas l'envoi auto pour laisser lire
+                    shouldAutoSend = false;
 
-                // Stocker l'ID de la géocache dans le chat
-                const firstChatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
-                if (firstChatInstance) {
-                    firstChatInstance.dataset.geocacheId = geocacheId;
-                }
-            } else {
-                // Vérifier si un onglet est déjà ouvert pour cette géocache (via dataset exact)
-                let existingChatId = null;
-                chatInstances.forEach(instance => {
-                    const instGeoId = (instance.dataset.geocacheId || '').toString();
-                    if (instGeoId && geocacheId && instGeoId === geocacheId.toString()) {
-                        existingChatId = parseInt(instance.dataset.chatId);
+                    // Définir le label de l'onglet avec le code GC
+                    const firstTabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
+                    if (firstTabLabel) {
+                        firstTabLabel.textContent = gcCode;
                     }
-                });
-                
-                if (existingChatId) {
-                    // Utiliser l'onglet existant
-                    chatId = existingChatId;
-                    chatPanel.switchToChat(chatId);
-                } else {
-                    // Créer un nouvel onglet
-                    chatId = chatPanel.addChat();
-                    
-                    // Renommer l'onglet avec le code GC
-                    const tabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
-                    if (tabLabel) {
-                        tabLabel.textContent = gcCode;
-                    }
-                    
+
                     // Renommer le titre du chat
-                    const chatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
-                    if (chatHeader) {
-                        chatHeader.textContent = `CHAT IA - ${gcCode}`;
+                    const firstChatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
+                    if (firstChatHeader) {
+                        firstChatHeader.textContent = `CHAT IA - ${gcCode}`;
                     }
-                    
+
                     // Définir le message d'accueil spécifique
                     if (typeof chatPanel.setWelcomeForChat === 'function') {
                         chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                    }
+
+                    // Stocker l'ID de la géocache dans le chat
+                    const firstChatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+                    if (firstChatInstance) {
+                        firstChatInstance.dataset.geocacheId = geocacheId;
+                    }
+                } else {
+                    // Vérifier si un onglet est déjà ouvert pour cette géocache (via dataset exact)
+                    let existingChatId = null;
+                    chatInstances.forEach(instance => {
+                        const instGeoId = (instance.dataset.geocacheId || '').toString();
+                        if (instGeoId && geocacheId && instGeoId === geocacheId.toString()) {
+                            existingChatId = parseInt(instance.dataset.chatId);
+                        }
+                    });
+
+                    if (existingChatId) {
+                        // Utiliser l'onglet existant
+                        chatId = existingChatId;
+                        chatPanel.switchToChat(chatId);
                     } else {
-                        const sysMessage = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-message.system .message-content`);
-                        if (sysMessage) {
-                            sysMessage.textContent = `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`;
+                        // Créer un nouvel onglet
+                        chatId = createNewChat();
+                        if (!chatId) {
+                            setTimeout(() => proceed(), 30);
+                            return;
+                        }
+
+                        // Renommer l'onglet avec le code GC
+                        const tabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
+                        if (tabLabel) {
+                            tabLabel.textContent = gcCode;
+                        }
+
+                        // Renommer le titre du chat
+                        const chatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
+                        if (chatHeader) {
+                            chatHeader.textContent = `CHAT IA - ${gcCode}`;
+                        }
+
+                        // Définir le message d'accueil spécifique
+                        if (typeof chatPanel.setWelcomeForChat === 'function') {
+                            chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                        }
+
+                        // Stocker l'ID de la géocache dans le chat pour référence future
+                        const chatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+                        if (chatInstance) {
+                            chatInstance.dataset.geocacheId = geocacheId;
                         }
                     }
+                }
 
-                    // Stocker l'ID de la géocache dans le chat pour référence future
-                    const chatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
-                    if (chatInstance) {
-                        chatInstance.dataset.geocacheId = geocacheId;
+                // Préparer le message initial (attendre que le DOM soit prêt)
+                const start = Date.now();
+                const timeoutMs = 800;
+                (function fillWhenReady(){
+                    const activeChat = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+                    const sysMsg = activeChat?.querySelector('.chat-message.system .message-content');
+                    const textarea = activeChat?.querySelector('.chat-input');
+                    if (activeChat && sysMsg && textarea) {
+                        // Définir message d'accueil spécifique si disponible
+                        if (typeof chatPanel.setWelcomeForChat === 'function') {
+                            chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                        } else {
+                            sysMsg.textContent = `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`;
+                        }
+                        // Remplir le message initial utilisateur
+                        textarea.value = initialMessage;
+                        setTimeout(() => textarea.focus(), 0);
+                        window.__geoChatEverOpened = true;
+                    } else if (Date.now() - start < timeoutMs) {
+                        setTimeout(fillWhenReady, 40);
                     }
-                }
-            }
-            
-            // Préparer le message initial
-            const activeChat = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
-            if (activeChat) {
-                const textarea = activeChat.querySelector('.chat-input');
-                if (textarea) {
-                    textarea.value = initialMessage;
+                })();
+            };
 
-                    // Ne pas auto-envoyer le message initial pour laisser l'utilisateur lire/éditer
-                    setTimeout(() => textarea.focus(), 0);
-
-                    // Marquer qu'au moins un chat IA a été ouvert
-                    window.__geoChatEverOpened = true;
-                }
-            }
+            // Démarrer immédiatement; la création utilise un clic sur le bouton +
+            proceed();
         } else {
             console.error("Le panneau de chat n'a pas été trouvé.");
         }
