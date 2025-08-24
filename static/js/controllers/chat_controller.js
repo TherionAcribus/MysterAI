@@ -49,6 +49,7 @@
             // Exposer les méthodes publiques pour l'accès externe
             this.element.addChat = this.addChat.bind(this);
             this.element.switchToChat = this.switchToChat.bind(this);
+            this.element.setWelcomeForChat = this.setWelcomeForChat.bind(this);
         }
         
         /**
@@ -138,6 +139,28 @@
             this.adjustTabsPosition();
             
             return chatId;
+        }
+
+        /**
+         * Définit un message d'accueil personnalisé pour un chat donné
+         * @param {number} chatId - ID du chat
+         * @param {string} welcomeText - Texte d'accueil à afficher
+         * @returns {boolean} true si mis à jour, false sinon
+         */
+        setWelcomeForChat(chatId, welcomeText) {
+            const chatInstance = this.chatListTarget.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            if (!chatInstance) return false;
+            const messagesContainer = chatInstance.querySelector('.chat-messages');
+            if (!messagesContainer) return false;
+            const firstSystemMessage = messagesContainer.querySelector('.chat-message.system .message-content');
+            if (!firstSystemMessage) return false;
+            // Mettre à jour le contenu visuel (sécurisé)
+            firstSystemMessage.textContent = welcomeText;
+            // Mettre à jour l'historique interne si présent
+            if (this.conversations && this.conversations[chatId] && this.conversations[chatId][0] && this.conversations[chatId][0].role === 'assistant') {
+                this.conversations[chatId][0].content = welcomeText;
+            }
+            return true;
         }
         
         switchChat(event) {
