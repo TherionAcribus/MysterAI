@@ -441,7 +441,7 @@
                     notificationElement.className = 'chat-message system model-change';
                     notificationElement.innerHTML = `
                         <div class="message-content">
-                            <i class="fas fa-exchange-alt"></i> Modèle d'IA changé pour: <strong>${modelName}</strong>
+                            <i class="fas fa-exchange-alt"></i> Modèle d'IA changé !!! pour: <strong>${modelName}</strong>
                         </div>
                     `;
                     messagesContainer.appendChild(notificationElement);

@@ -413,45 +413,20 @@
 
         
         /**
-         * Affiche une notification temporaire
+         * Affiche une notification via AppNotify
          * @param {string} message - Le message à afficher
          * @param {boolean} isError - Indique si c'est une erreur
          * @param {boolean} autoHide - Indique si la notification doit disparaître automatiquement
          */
         showNotification(message, isError = false, autoHide = true) {
-            // Créer l'élément de notification
-            const notification = document.createElement('div');
-            notification.className = `notification ${isError ? 'error' : 'success'}`;
-            notification.textContent = message;
-            
-            // Ajouter au DOM
-            document.body.appendChild(notification);
-            
-            // Animer l'entrée
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 10);
-            
-            // Supprimer après un délai (sauf si autoHide est false)
-            if (autoHide) {
-                setTimeout(() => {
-                    notification.classList.remove('show');
-                    setTimeout(() => {
-                        notification.remove();
-                    }, 300);
-                }, 3000);
+            if (window.AppNotify) {
+                AppNotify.push({
+                    level: isError ? 'error' : 'success',
+                    message: message,
+                    ttl: autoHide ? 4000 : null
+                });
             } else {
-                // Ajouter un bouton pour fermer la notification
-                const closeBtn = document.createElement('button');
-                closeBtn.innerHTML = '&times;';
-                closeBtn.className = 'notification-close';
-                closeBtn.onclick = () => {
-                    notification.classList.remove('show');
-                    setTimeout(() => {
-                        notification.remove();
-                    }, 300);
-                };
-                notification.appendChild(closeBtn);
+                (isError ? console.error : console.log)(message);
             }
         }
         

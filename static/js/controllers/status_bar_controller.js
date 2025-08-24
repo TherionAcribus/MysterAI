@@ -168,31 +168,20 @@
         }
         
         /**
-         * Affiche une notification temporaire
+         * Affiche une notification via AppNotify
          * @param {string} message - Le message à afficher
          * @param {boolean} isError - Indique si c'est une erreur
          */
         showNotification(message, isError = false) {
-            // Créer l'élément de notification
-            const notification = document.createElement('div');
-            notification.className = `notification ${isError ? 'error' : 'success'}`;
-            notification.textContent = message;
-            
-            // Ajouter au DOM
-            document.body.appendChild(notification);
-            
-            // Animer l'entrée
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 10);
-            
-            // Supprimer après un délai
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 3000);
+            if (window.AppNotify) {
+                AppNotify.push({
+                    level: isError ? 'error' : 'success',
+                    message: message,
+                    ttl: 4000
+                });
+            } else {
+                (isError ? console.error : console.log)(message);
+            }
         }
     }
 
