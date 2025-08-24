@@ -561,8 +561,8 @@
         }
         const geocacheDescription = (descEl ? descEl.innerText : '').trim();
         
-        // Construire le message initial pour l'IA
-        const initialMessage = `Je travaille sur la géocache ${gcCode} - "${geocacheName}". Voici sa description:\n\n${geocacheDescription.substring(0, 1500)}\n\nPouvez-vous m'aider à analyser cette géocache et à trouver des indices potentiels?`;
+        // Construire le message initial pour l'IA (orienté pipeline)
+        const initialMessage = `Contexte: géocache ${gcCode} - "${geocacheName}".\nDescription (extrait):\n\n${geocacheDescription.substring(0, 1500)}\n\nMerci d'appliquer le pipeline Géocache (classification → plan/outils → vérification) et de proposer jusqu'à 3 pistes justifiées.`;
         
         // Vérifier si le panneau de chat est visible
         const chatPanel = document.getElementById('chat-panel');
@@ -623,18 +623,19 @@
                     // Renommer le titre du chat
                     const firstChatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
                     if (firstChatHeader) {
-                        firstChatHeader.textContent = `CHAT IA - ${gcCode}`;
+                        firstChatHeader.textContent = `CHAT IA - ${gcCode} (Pipeline: Géocache)`;
                     }
 
                     // Définir le message d'accueil spécifique
                     if (typeof chatPanel.setWelcomeForChat === 'function') {
-                        chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                        chatPanel.setWelcomeForChat(chatId, `Assistant de géocaching — Pipeline Géocache - Standard.\nRègles: 1) Pas d'invention de coordonnées; 2) Max 3 pistes avec outils; 3) Demander des données si incertain.`);
                     }
 
                     // Stocker l'ID de la géocache dans le chat
                     const firstChatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
                     if (firstChatInstance) {
                         firstChatInstance.dataset.geocacheId = geocacheId;
+                        firstChatInstance.dataset.pipelineId = 'geocache_default';
                     }
                 } else {
                     // Vérifier si un onglet est déjà ouvert pour cette géocache (via dataset exact)
@@ -667,18 +668,19 @@
                         // Renommer le titre du chat
                         const chatHeader = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"] .chat-header h2`);
                         if (chatHeader) {
-                            chatHeader.textContent = `CHAT IA - ${gcCode}`;
+                            chatHeader.textContent = `CHAT IA - ${gcCode} (Pipeline: Géocache)`;
                         }
 
                         // Définir le message d'accueil spécifique
                         if (typeof chatPanel.setWelcomeForChat === 'function') {
-                            chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                            chatPanel.setWelcomeForChat(chatId, `Assistant de géocaching — Pipeline Géocache - Standard.\nRègles: 1) Pas d'invention de coordonnées; 2) Max 3 pistes avec outils; 3) Demander des données si incertain.`);
                         }
 
                         // Stocker l'ID de la géocache dans le chat pour référence future
                         const chatInstance = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
                         if (chatInstance) {
                             chatInstance.dataset.geocacheId = geocacheId;
+                            chatInstance.dataset.pipelineId = 'geocache_default';
                         }
                     }
                 }
@@ -693,14 +695,21 @@
                     if (activeChat && sysMsg && textarea) {
                         // Définir message d'accueil spécifique si disponible
                         if (typeof chatPanel.setWelcomeForChat === 'function') {
-                            chatPanel.setWelcomeForChat(chatId, `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`);
+                            chatPanel.setWelcomeForChat(chatId, `Assistant de géocaching — Pipeline Géocache - Standard.\nRègles: 1) Pas d'invention de coordonnées; 2) Max 3 pistes avec outils; 3) Demander des données si incertain.`);
                         } else {
-                            sysMsg.textContent = `Bonjour, je vais vous aider à résoudre la géocache ${gcCode} - ${geocacheName}`;
+                            sysMsg.textContent = `Assistant de géocaching — Pipeline Géocache - Standard.\nRègles: 1) Pas d'invention de coordonnées; 2) Max 3 pistes avec outils; 3) Demander des données si incertain.`;
                         }
                         // Remplir le message initial utilisateur
                         textarea.value = initialMessage;
                         setTimeout(() => textarea.focus(), 0);
                         window.__geoChatEverOpened = true;
+                        // Auto-envoi si ce n'est pas le tout premier chat de la session
+                        if (shouldAutoSend) {
+                            const sendBtn = activeChat.querySelector('.chat-send-button');
+                            if (sendBtn) {
+                                setTimeout(() => sendBtn.click(), 50);
+                            }
+                        }
                     } else if (Date.now() - start < timeoutMs) {
                         setTimeout(fillWhenReady, 40);
                     }

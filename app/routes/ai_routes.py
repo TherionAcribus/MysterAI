@@ -1,10 +1,10 @@
-from flask import Blueprint, request, jsonify, render_template, Response
+from flask import Blueprint, request, jsonify, Response
 from app.services.ai_service import ai_service
 from app.services.model_registry import model_registry
 from app.models.app_config import AppConfig
 from app.services.ocr_service import get_ocr_service
+from app.services.pipeline_registry import pipeline_registry
 import logging
-import os
 
 # Configurer le logger
 logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ def chat():
         messages = data.get('messages', [])
         model_id = data.get('model_id')  # Récupérer l'ID du modèle spécifié
         system_prompt = data.get('system_prompt')  # Récupérer le prompt système personnalisé
+        pipeline_id = data.get('pipeline_id')  # Pipeline éditable optionnel
         use_tools = data.get('use_tools', True)  # Activer/désactiver l'utilisation des outils
         
         if not messages:
@@ -92,7 +93,7 @@ def chat():
             # pour résoudre des énigmes de géocaching
             # Importer ici pour éviter l'importation circulaire
             from app.services.langgraph_service import langgraph_service
-            response = langgraph_service.chat(messages, system_prompt)
+            response = langgraph_service.chat(messages, system_prompt, pipeline_id=pipeline_id)
         else:
             # Utiliser le service AI standard (LangChain)
             # Cette implémentation est plus simple et n'utilise pas les outils
@@ -515,6 +516,52 @@ def save_user_models_config():
     except Exception as e:
         logger.error(f"Erreur écriture user models config: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+@ai_bp.route('/pipelines', methods=['GET'])
+def get_pipelines():
+    """Retourne la liste fusionnée des pipelines (cache)."""
+    try:
+        cache = pipeline_registry.get_cache()
+        return jsonify({'success': True, 'pipelines': cache.get('pipelines', [])})
+    except Exception as e:
+        logger.error(f"Erreur lecture pipelines: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/pipelines/<pipeline_id>', methods=['GET'])
+def get_pipeline(pipeline_id):
+    try:
+        p = pipeline_registry.get_pipeline(pipeline_id)
+        if not p:
+            return jsonify({'success': False, 'error': 'Pipeline introuvable'}), 404
+        return jsonify({'success': True, 'pipeline': p})
+    except Exception as e:
+        logger.error(f"Erreur lecture pipeline {pipeline_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/pipelines/<pipeline_id>', methods=['POST'])
+def save_pipeline(pipeline_id):
+    """Écrit la configuration user (remplace ou ajoute le pipeline) puis rafraîchit le cache."""
+    try:
+        body = request.json or {}
+        # Charger l'actuel user config
+        user = pipeline_registry._read_json_file(pipeline_registry.USER_PATH)
+        pipes = {p.get('id'): p for p in user.get('pipelines', [])}
+        pipes[pipeline_id] = body
+        new_user = {"pipelines": list(pipes.values())}
+        cache = pipeline_registry.save_user_config(new_user)
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at')})
+    except Exception as e:
+        logger.error(f"Erreur écriture pipeline {pipeline_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/pipelines/refresh', methods=['POST'])
+def refresh_pipelines():
+    try:
+        cache = pipeline_registry.refresh()
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at'), 'count': len(cache.get('pipelines', []))})
+    except Exception as e:
+        logger.error(f"Erreur refresh pipelines: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @ai_bp.route('/use_cases', methods=['GET'])
 def get_use_cases_mapping():
@@ -682,11 +729,12 @@ def test_api_key():
         elif provider == 'anthropic':
             # Test pour Anthropic
             try:
-                import anthropic
+                from importlib import import_module
+                anthropic = import_module('anthropic')
                 client = anthropic.Anthropic(api_key=api_key)
                 
                 # Une simple requête pour vérifier que la clé est valide
-                response = client.messages.create(
+                _ = client.messages.create(
                     model="claude-3-haiku-20240307",
                     max_tokens=10,
                     messages=[{"role": "user", "content": "Hello Claude"}]

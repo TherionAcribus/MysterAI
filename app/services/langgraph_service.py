@@ -29,6 +29,7 @@ except Exception:
     # Fallback pour compatibilité
     from langchain_community.chat_models import ChatOllama
 from app.models.app_config import AppConfig
+from app.services.pipeline_registry import pipeline_registry
 from langchain_core.tools import tool
 from langchain_core.tools import BaseTool
 
@@ -270,13 +271,14 @@ class LangGraphService:
         
         return self._graph
     
-    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
+    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None) -> str:
         """
         Envoie une conversation au modèle d'IA via LangGraph et retourne la réponse
         
         Args:
             messages: Liste de messages au format {"role": "user"|"assistant", "content": "..."}
             system_prompt: Message système optionnel
+            pipeline_id: Identifiant d'un pipeline éditable à appliquer (optionnel)
             
         Returns:
             La réponse du modèle d'IA
@@ -307,7 +309,31 @@ class LangGraphService:
                         name=msg.get("name", "")
                     ))
             
-            # Utiliser le prompt système par défaut si aucun n'est fourni
+            # Compiler le prompt système à partir du pipeline si fourni
+            if pipeline_id:
+                pipeline = pipeline_registry.get_pipeline(pipeline_id)
+                if pipeline:
+                    base_prompt = pipeline.get('system_prompt') or system_prompt or DEFAULT_SYSTEM_PROMPT
+                    # Concaténer les instructions des étapes comme guide de structure
+                    steps = pipeline.get('steps', [])
+                    steps_instructions = []
+                    for step in steps:
+                        if step.get('type') == 'llm':
+                            label = step.get('id', 'step')
+                            prompt = step.get('prompt', '')
+                            steps_instructions.append(f"### {label}\n{prompt}")
+                        elif step.get('type') == 'tools':
+                            allowed = step.get('allowed_tools', [])
+                            if allowed:
+                                steps_instructions.append(
+                                    "### tools\nTu peux appeler des outils si nécessaire. Outils autorisés: " + ", ".join(allowed)
+                                )
+                    compiled = base_prompt
+                    if steps_instructions:
+                        compiled += "\n\nRespecte la structure suivante:\n" + "\n\n".join(steps_instructions)
+                    system_prompt = compiled
+            
+            # Fallback sur prompt par défaut si toujours absent
             if not system_prompt:
                 system_prompt = DEFAULT_SYSTEM_PROMPT
             

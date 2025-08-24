@@ -305,6 +305,18 @@
             // Récupérer le modèle actif
             const activeModel = document.getElementById('ai-model-selector')?.value || null;
             
+            // Déterminer le pipeline à utiliser si ce chat provient d'une géocache
+            let pipelineId = null;
+            const chatInstanceEl = this.chatListTarget.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            if (chatInstanceEl) {
+                // Priorité au dataset explicitement défini
+                if (chatInstanceEl.dataset.pipelineId) {
+                    pipelineId = chatInstanceEl.dataset.pipelineId;
+                } else if (chatInstanceEl.dataset.geocacheId) {
+                    pipelineId = 'geocache_default';
+                }
+            }
+
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -314,7 +326,8 @@
                 body: JSON.stringify({
                     messages: this.conversations[chatId],
                     model_id: activeModel,
-                    use_tools: true  // Activer l'utilisation des outils
+                    use_tools: true,  // Activer l'utilisation des outils
+                    pipeline_id: pipelineId
                 })
             })
             .then(response => response.json())

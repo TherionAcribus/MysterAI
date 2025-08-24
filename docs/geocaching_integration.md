@@ -423,6 +423,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 ```
 
+## Chat IA depuis une géocache
+
+- Le bouton « Chat IA » ouvre un onglet dédié dans le panel de chat.
+- Le message initial est orienté pipeline (contexte + résumé de description).
+- L’instance de chat porte `data-pipeline-id="geocache_default"` et le contrôleur envoie `pipeline_id` à `/api/ai/chat`.
+- Le backend applique alors le pipeline Géocache pour structurer la réponse (classification → plan/outils → vérification).
+
 ## Avantages et limitations
 
 ### Avantages

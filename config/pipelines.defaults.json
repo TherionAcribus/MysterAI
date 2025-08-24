@@ -1,0 +1,37 @@
+{
+  "pipelines": [
+    {
+      "id": "geocache_default",
+      "name": "Pipeline Géocache - Standard",
+      "system_prompt": "Tu es un assistant de géocaching. Tu aides à analyser des listings et à proposer des actions concrètes.\nRègles:\n- Ne pas inventer de coordonnées finales. Toute proposition doit être justifiée par une méthode claire.\n- Toujours proposer 3 pistes max, classées par probabilité, et les Tools à utiliser pour chacune.\n- Si tu n’es pas sûr, dis-le et demande des données précises (photos, EXIF, journal, hint).",
+      "steps": [
+        {
+          "id": "classify",
+          "type": "llm",
+          "prompt": "Classifie le puzzle (catégories probables: chiffrage, stéganographie, EXIF/photo, QR/Barcode, acrostiche, substitution, coordonnées cachées, etc.). Explique brièvement la justification.",
+          "output_key": "classification"
+        },
+        {
+          "id": "plan",
+          "type": "llm",
+          "prompt": "Sur la base de {classification}, propose au plus 3 pistes classées par probabilité. Pour chaque piste: méthode, étapes, et Tools recommandés (noms d’outils).",
+          "output_key": "plan"
+        },
+        {
+          "id": "tool_select",
+          "type": "tools",
+          "allowed_tools": ["ocr", "exif", "qr", "cipher", "formula"],
+          "selection_from": "plan"
+        },
+        {
+          "id": "verify",
+          "type": "llm",
+          "prompt": "Vérifie la cohérence des pistes de {plan}. Résume la meilleure piste, ce qui manque (si applicable), et les prochaines actions concrètes. Rappelle la règle de justification.",
+          "output_key": "final"
+        }
+      ]
+    }
+  ]
+}
+
+

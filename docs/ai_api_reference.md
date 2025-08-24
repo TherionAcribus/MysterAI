@@ -7,13 +7,72 @@ Ce document fournit une référence technique des API disponibles pour interagir
 1. [Vue d'ensemble](#vue-densemble)
 2. [Endpoints des paramètres](#endpoints-des-paramètres)
 3. [Endpoints des modèles](#endpoints-des-modèles)
-4. [Endpoints de chat](#endpoints-de-chat)
-5. [Endpoints de test](#endpoints-de-test)
-6. [Formats de requêtes et réponses](#formats-de-requêtes-et-réponses)
+4. [Endpoints des pipelines](#endpoints-des-pipelines)
+5. [Endpoints de chat](#endpoints-de-chat)
+6. [Endpoints de test](#endpoints-de-test)
+7. [Formats de requêtes et réponses](#formats-de-requêtes-et-réponses)
 
 ## Vue d'ensemble
 
 Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les endpoints sont définis dans le fichier `app/routes/ai_routes.py` et implémentent diverses fonctionnalités pour gérer les paramètres, les modèles, et les conversations avec l'IA.
+## Endpoints des pipelines
+
+### Récupérer les pipelines disponibles
+
+**Endpoint:** `GET /api/ai/pipelines`
+
+**Description:** Retourne la liste fusionnée des pipelines (defaults + user) depuis le cache.
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "pipelines": [{
+    "id": "geocache_default",
+    "name": "Pipeline Géocache - Standard",
+    "steps": []
+  }]
+}
+```
+
+### Récupérer un pipeline
+
+**Endpoint:** `GET /api/ai/pipelines/<pipeline_id>`
+
+**Description:** Retourne la définition d'un pipeline.
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "pipeline": {"id": "geocache_default", "steps": []}
+}
+```
+
+### Enregistrer/mettre à jour un pipeline utilisateur
+
+**Endpoint:** `POST /api/ai/pipelines/<pipeline_id>`
+
+**Description:** Met à jour (ou crée) la définition d'un pipeline dans `pipelines.user.json` puis rafraîchit le cache.
+
+**Corps de la requête:** contenu JSON complet du pipeline.
+
+**Réponse:**
+```json
+{ "success": true, "refreshed_at": "2025-01-01T12:00:00Z" }
+```
+
+### Rafraîchir le registre de pipelines
+
+**Endpoint:** `POST /api/ai/pipelines/refresh`
+
+**Description:** Re-fusionne defaults + user et met à jour `pipelines_cache` en DB.
+
+**Réponse:**
+```json
+{ "success": true, "refreshed_at": "2025-01-01T12:00:00Z", "count": 1 }
+```
+
 
 ## Endpoints des paramètres
 
@@ -269,7 +328,8 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
   ],
   "model_id": "gpt-4o",
   "system_prompt": "Tu es un assistant amical.",
-  "use_tools": true
+  "use_tools": true,
+  "pipeline_id": "geocache_default"
 }
 ```
 
@@ -287,6 +347,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 - `model_id` est optionnel ; si omis, le modèle actif configuré sera utilisé.
 - `system_prompt` est optionnel ; définit les instructions système pour le modèle.
 - `use_tools` détermine si LangGraph (avec outils) doit être utilisé.
+- `pipeline_id` est optionnel ; lorsqu'il est fourni et que `use_tools` est vrai, la réponse est orchestrée selon la définition du pipeline (étapes, prompts, outils autorisés).
 
 ## Endpoints de test
 

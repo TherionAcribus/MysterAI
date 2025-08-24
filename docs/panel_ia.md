@@ -47,6 +47,7 @@ Le panel IA s'intègre désormais avec les détails des géocaches, permettant a
 - Ouvrir un chat IA directement depuis la page de détails d'une géocache
 - Initialiser automatiquement le chat avec les informations de la géocache (code, nom, description)
 - Poser des questions spécifiques à l'IA concernant l'analyse de la géocache
+- Transmettre automatiquement `pipeline_id: geocache_default` pour orchestrer la réponse selon le pipeline Géocache
 
 ### 5. Changement de modèle d'IA en temps réel
 
@@ -122,10 +123,11 @@ L'intégration avec les géocaches est gérée par une fonction JavaScript dédi
 
 Fonctionnalités :
 - Récupération de la description de la géocache
-- Pré-remplissage du message initial pour l'IA (pas d'envoi automatique)
+- Pré-remplissage du message initial orienté pipeline
 - Ouverture du panneau de chat si nécessaire (`showSidePanel('chat', true)`)
 - Création d'un nouvel onglet ou utilisation d'un existant (détection par `dataset.geocacheId`)
-- Personnalisation de l'onglet avec le code GC et du header (`CHAT IA - GC...`)
+- Personnalisation de l'onglet avec le code GC et du header (`CHAT IA - GC… (Pipeline: Géocache)`)
+- Ajout de `data-pipeline-id="geocache_default"` sur l'instance de chat
 
 ## Structure HTML
 
@@ -266,7 +268,7 @@ sequenceDiagram
     Input->>Controller: sendMessage()
     Controller->>DOM: Ajoute le message utilisateur
     Controller->>DOM: Ajoute l'indicateur de frappe
-    Controller->>API: Envoie la requête à l'API IA
+    Controller->>API: Envoie la requête à l'API IA (avec pipeline_id si géocache)
     API->>Controller: Retourne la réponse
     Controller->>DOM: Ajoute la réponse de l'IA
 ```

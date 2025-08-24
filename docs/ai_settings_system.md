@@ -9,8 +9,9 @@ Ce document décrit le fonctionnement du système de paramètres IA et de la bar
 3. [Système de clés API](#système-de-clés-api)
 4. [Interface des paramètres](#interface-des-paramètres)
 5. [Contrôleur de la barre de statut](#contrôleur-de-la-barre-de-statut)
-6. [Cycle de vie des paramètres](#cycle-de-vie-des-paramètres)
-7. [Dépannage](#dépannage)
+6. [Pipelines IA](#pipelines-ia)
+7. [Cycle de vie des paramètres](#cycle-de-vie-des-paramètres)
+8. [Dépannage](#dépannage)
 
 ## Architecture générale
 
@@ -22,6 +23,7 @@ Le système de paramètres IA est composé de plusieurs composants clés :
 - **Routes API (`ai_routes.py`)** : Endpoints pour gérer les requêtes liées aux paramètres et aux modèles.
 - **Base de données des paramètres (`AppConfig`)** : Stockage persistant des paramètres.
 - **Registre de modèles (`ModelRegistry`)** : Fusionne des fichiers JSON (défauts + utilisateur), découvre les modèles disponibles (Ollama et en ligne) et met en cache l'état.
+ - **Registre de pipelines (`PipelineRegistry`)** : Fusionne `config/pipelines.defaults.json` et `config/pipelines.user.json`, met en cache en DB, expose des endpoints CRUD.
 
 ## Stockage des paramètres
 
@@ -69,6 +71,39 @@ Endpoints associés:
 - `POST /api/ai/models/refresh`
 - `GET/POST /api/ai/models/user`
 - `GET/POST /api/ai/use_cases`
+
+## Pipelines IA
+
+Les pipelines orchestrent des étapes multi‑LLM et l'usage d'outils. Ils sont éditables via JSON.
+
+- Fichiers:
+  - `config/pipelines.defaults.json` (versionné)
+  - `config/pipelines.user.json` (utilisateur)
+- Cache DB: `AppConfig['pipelines_cache']` contient `{ pipelines: [...], refreshed_at }`
+- Endpoints:
+  - `GET /api/ai/pipelines`
+  - `GET /api/ai/pipelines/<id>`
+  - `POST /api/ai/pipelines/<id>`
+  - `POST /api/ai/pipelines/refresh`
+- Utilisation:
+  - Passer `pipeline_id` dans `POST /api/ai/chat` (avec `use_tools: true`) pour activer le pipeline.
+  - Le backend compile un `system_prompt` enrichi (règles + structure d'étapes) et exécute via LangGraph.
+
+Exemple minimal de pipeline `geocache_default`:
+
+```json
+{
+  "id": "geocache_default",
+  "name": "Pipeline Géocache - Standard",
+  "system_prompt": "Règles…",
+  "steps": [
+    {"id": "classify", "type": "llm", "prompt": "Classifie…", "output_key": "classification"},
+    {"id": "plan", "type": "llm", "prompt": "Plan…", "output_key": "plan"},
+    {"id": "tool_select", "type": "tools", "allowed_tools": ["ocr","exif","qr","cipher","formula"], "selection_from": "plan"},
+    {"id": "verify", "type": "llm", "prompt": "Vérifie…", "output_key": "final"}
+  ]
+}
+```
 
 ## Système de clés API
 
