@@ -1,3 +1,5 @@
+# IA model registry user config
+config/models.user.json
 # Dossier images GC
 geocaches_images/
 

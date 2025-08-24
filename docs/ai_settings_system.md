@@ -21,6 +21,7 @@ Le système de paramètres IA est composé de plusieurs composants clés :
 - **Contrôleur de la barre de statut (`StatusBarController`)** : Gère l'affichage et la sélection des modèles d'IA dans la barre de statut.
 - **Routes API (`ai_routes.py`)** : Endpoints pour gérer les requêtes liées aux paramètres et aux modèles.
 - **Base de données des paramètres (`AppConfig`)** : Stockage persistant des paramètres.
+- **Registre de modèles (`ModelRegistry`)** : Fusionne des fichiers JSON (défauts + utilisateur), découvre les modèles disponibles (Ollama et en ligne) et met en cache l'état.
 
 ## Stockage des paramètres
 
@@ -44,6 +45,30 @@ Les paramètres sont stockés dans la base de données `app_config.db` via le mo
 | `ollama_url` | URL du serveur Ollama local | `http://localhost:11434` |
 | `local_model` | Modèle d'IA local par défaut | `deepseek-coder:latest` |
 | `local_models_enabled` | Liste des modèles locaux activés | JSON : `{"llama3": true, ...}` |
+
+### Registre de modèles (nouveau)
+
+Le registre consolide des définitions et l'état d'accessibilité/utilisabilité des modèles.
+
+- Fichiers:
+  - `config/models.defaults.json` (versionné, fourni par l'app)
+  - `config/models.user.json` (modifiable par l'utilisateur, ignoré par git)
+- Découverte:
+  - Local (Ollama): `GET {ollama_url}/api/tags`
+  - En ligne: selon présence de clé(s) API; l'état `is_usable` vaut true si la clé est disponible/valide
+- Cache DB:
+  - `AppConfig['model_registry_cache']` contient `{ models: [...], use_case_models: {...}, refreshed_at }`
+- Champs par modèle (principaux):
+  - `id` (ex: `openai:gpt-4o`, `ollama:llama3:latest`)
+  - `provider` (`openai|anthropic|google|ollama`), `type` (`online|local`)
+  - `model_id` (id du provider, ex: `gpt-4o`, `llama3:latest`)
+  - `name`, `capabilities`, `defaults`, `requires_api_key`
+  - `installed` (local), `is_usable`, `last_seen`
+
+Endpoints associés:
+- `POST /api/ai/models/refresh`
+- `GET/POST /api/ai/models/user`
+- `GET/POST /api/ai/use_cases`
 
 ## Système de clés API
 
@@ -107,26 +132,26 @@ Le contrôleur de la barre de statut (`StatusBarController`) dans `static/js/con
 
 ### Chargement des modèles
 
-Le contrôleur appelle l'endpoint `/api/ai/models` pour récupérer :
-- La liste des modèles en ligne disponibles
-- La liste des modèles locaux disponibles
-- Des informations sur chaque modèle (nom, type, disponibilité)
+Le contrôleur appelle l'endpoint `/api/ai/models` pour récupérer la liste fusionnée (registre):
+- Modèles en ligne et locaux (IDs locaux complets, ex: `llama3:latest`)
+- Informations par modèle: `name`, `type`, `is_active`, `is_usable`
 
 Les modèles sont ensuite affichés dans le sélecteur, regroupés par type.
 
 ### Gestion des modèles non disponibles
 
-Si un modèle nécessite une clé API qui n'est pas configurée, il est marqué comme "non utilisable" et :
+Si un modèle est "non utilisable" (`is_usable=false`) — clé API manquante (en ligne) ou non installé (local) — il est :
 - Affiché avec la mention "(API Key manquante)" dans le sélecteur
 - Bloqué à la sélection, avec un message d'erreur invitant l'utilisateur à configurer la clé API
 
 ## Cycle de vie des paramètres
 
-1. **Initialisation** : Lors du démarrage, `AIService` charge les paramètres depuis la base de données via la méthode `_ensure_initialized()`.
-2. **Affichage** : L'interface des paramètres et la barre de statut récupèrent les paramètres via les routes API.
-3. **Modification** : L'utilisateur modifie les paramètres via l'interface.
-4. **Enregistrement** : Les paramètres sont envoyés au serveur via la route `/api/ai/save_settings` et enregistrés dans la base de données.
-5. **Utilisation** : Le service IA utilise les paramètres pour les requêtes au modèle d'IA.
+1. **Initialisation** : `AIService` charge les paramètres depuis la base de données via `_ensure_initialized()`.
+2. **Rafraîchissement du registre** : `ModelRegistry` fusionne les JSON, découvre les modèles et met à jour le cache.
+3. **Affichage** : L'interface des paramètres et la barre de statut récupèrent les modèles via `/api/ai/models` et les paramètres via `/api/ai/settings`.
+4. **Modification** : L'utilisateur modifie les paramètres et/ou la configuration utilisateur (via `/api/ai/models/user`).
+5. **Enregistrement** : Les paramètres sont envoyés au serveur via `/api/ai/save_settings` et/ou `/api/ai/models/user`.
+6. **Utilisation** : Le service IA utilise ces paramètres pour les requêtes au modèle d'IA.
 
 ## Dépannage
 
@@ -150,3 +175,5 @@ Cette commande :
 1. Supprime tous les paramètres IA existants
 2. Recrée les paramètres par défaut
 3. Affiche les valeurs des paramètres pour vérification 
+
+Après une réinitialisation, pensez à relancer `POST /api/ai/models/refresh` pour reconstruire le cache du registre.

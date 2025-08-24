@@ -460,9 +460,21 @@
             this.modeRadioTargets.find(radio => radio.value === 'online').checked = true;
             this.frameworkRadioTargets.find(radio => radio.value === 'true').checked = true;
             this.providerTarget.value = 'openai';
-            this.onlineModelTarget.value = 'gpt-3.5-turbo';
+            // Sélectionner le premier modèle du provider "openai"
+            this.updateProviderVisibility();
+            const openaiGroup = Array.from(this.onlineModelTarget.querySelectorAll('optgroup')).find(g => g.getAttribute('data-provider') === 'openai');
+            if (openaiGroup) {
+                const firstOption = openaiGroup.querySelector('option');
+                if (firstOption) {
+                    firstOption.selected = true;
+                }
+            }
             this.ollamaUrlTarget.value = 'http://localhost:11434';
-            this.localModelTarget.value = 'deepseek-coder:latest';
+            // Sélectionner le premier modèle local disponible
+            const firstLocal = this.localModelTarget.querySelector('option');
+            if (firstLocal) {
+                this.localModelTarget.value = firstLocal.value;
+            }
             this.temperatureTarget.value = 0.7;
             this.temperatureValueTarget.textContent = '0.7';
             this.maxContextTarget.value = 10;
@@ -477,6 +489,46 @@
             this.updateProviderVisibility();
             
             this.showNotification('Paramètres réinitialisés aux valeurs par défaut');
+        }
+
+        // Rafraîchir le registre de modèles (serveur) puis recharger l'UI
+        refreshModels() {
+            this.connectionStatusTarget.textContent = 'Rafraîchissement...';
+            this.connectionStatusTarget.className = 'ml-2 text-sm text-yellow-400';
+
+            fetch('/api/ai/models/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Rafraîchissement échoué');
+                }
+                // Recharger uniquement le panneau des modèles via fetch + remplacement DOM
+                return fetch('/api/ai/settings_panel');
+            })
+            .then(r => r.text())
+            .then(html => {
+                // Extraire le sous-panel #models-panel du HTML reçu
+                const temp = document.createElement('div');
+                temp.innerHTML = html;
+                const newPanel = temp.querySelector('#models-panel');
+                const currentPanel = document.querySelector('#models-panel');
+                if (newPanel && currentPanel) {
+                    currentPanel.replaceWith(newPanel);
+                    this.connectionStatusTarget.textContent = 'Modèles rafraîchis';
+                    this.connectionStatusTarget.className = 'ml-2 text-sm text-green-400';
+                } else {
+                    // Fallback: si la structure ne correspond pas, ne pas casser l'UI
+                    this.connectionStatusTarget.textContent = 'Rafraîchi (UI non remplacée)';
+                    this.connectionStatusTarget.className = 'ml-2 text-sm text-yellow-400';
+                }
+            })
+            .catch(err => {
+                this.connectionStatusTarget.textContent = 'Erreur: ' + err.message;
+                this.connectionStatusTarget.className = 'ml-2 text-sm text-red-400';
+            });
         }
         
         // Charge la clé API pour le fournisseur sélectionné

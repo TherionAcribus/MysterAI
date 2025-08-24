@@ -117,29 +117,27 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 ```json
 {
   "success": true,
-  "models": [
-    {
-      "id": "gpt-4o",
-      "name": "GPT-4o",
-      "type": "online",
-      "is_active": true,
-      "is_usable": true
-    },
-    {
-      "id": "deepseek-coder",
-      "name": "DeepSeek Coder",
-      "type": "local",
-      "is_active": false,
-      "is_usable": true
-    }
-  ],
+  "models": [{
+    "id": "gpt-4o",
+    "name": "GPT-4o",
+    "type": "online",
+    "is_active": true,
+    "is_usable": true
+  },{
+    "id": "llama3:latest",
+    "name": "Llama 3",
+    "type": "local",
+    "is_active": false,
+    "is_usable": true
+  }],
   "current_mode": "online"
 }
 ```
 
 **Notes:**
-- Les modèles en ligne nécessitent une clé API configurée pour être utilisables.
-- Les modèles locaux nécessitent une connexion à Ollama.
+- Les modèles en ligne nécessitent une clé API configurée pour être utilisables (`is_usable: true`).
+- Les modèles locaux nécessitent une connexion à Ollama et un modèle installé.
+- Les identifiants de modèles locaux sont renvoyés au format complet (ex: `llama3:latest`).
 
 ### Définir le modèle actif
 
@@ -161,6 +159,97 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
   "model_id": "gpt-4o",
   "model_name": "GPT-4o",
   "model_type": "online"
+}
+```
+
+### Rafraîchir le registre de modèles
+
+**Endpoint:** `POST /api/ai/models/refresh`
+
+**Description:** Déclenche la fusion JSON + découverte dynamique (Ollama/clé API) et met à jour le cache.
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "refreshed_at": "2025-01-01T12:00:00Z",
+  "count": 12
+}
+```
+
+### Lire/Écrire la configuration des modèles utilisateur
+
+**Endpoint:** `GET /api/ai/models/user`
+
+**Description:** Retourne le contenu de `config/models.user.json`.
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "config": {
+    "models": [],
+    "use_case_models": {}
+  }
+}
+```
+
+**Endpoint:** `POST /api/ai/models/user`
+
+**Description:** Écrit la configuration utilisateur (fichier JSON) puis rafraîchit le registre.
+
+**Corps de la requête:**
+```json
+{
+  "models": [
+    {"id": "ollama:deepseek-coder:latest", "provider": "ollama", "type": "local", "model_id": "deepseek-coder:latest", "name": "DeepSeek Coder"}
+  ],
+  "use_case_models": {"traduction": "openai:gpt-4o"}
+}
+```
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "refreshed_at": "2025-01-01T12:00:00Z"
+}
+```
+
+### Gestion des cas d'usage (use-cases)
+
+**Endpoint:** `GET /api/ai/use_cases`
+
+**Description:** Retourne le mapping des cas d'usage vers les modèles.
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "use_case_models": {
+    "traduction": "openai:gpt-4o",
+    "recherche_code_secret": "ollama:deepseek-coder:latest"
+  }
+}
+```
+
+**Endpoint:** `POST /api/ai/use_cases`
+
+**Description:** Définit le modèle utilisé pour un cas d'usage donné.
+
+**Corps de la requête:**
+```json
+{
+  "use_case": "traduction",
+  "model_id": "openai:gpt-4o"
+}
+```
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "refreshed_at": "2025-01-01T12:00:00Z"
 }
 ```
 

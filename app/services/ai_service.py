@@ -1,11 +1,15 @@
-import os
 import json
 import requests
-from typing import List, Dict, Any, Optional, Union
-from langchain_community.chat_models import ChatOpenAI, ChatAnthropic, ChatOllama
+from typing import Dict, Any, Optional
+from langchain_community.chat_models import ChatOpenAI, ChatAnthropic
+try:
+    from langchain_ollama import ChatOllama  # type: ignore
+except Exception:
+    from langchain_community.chat_models import ChatOllama
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from app.models.app_config import AppConfig
 from langchain_openai import ChatOpenAI as OpenAI
+from app.services.model_registry import model_registry
 
 class AIService:
     """Service pour gérer les interactions avec les modèles d'IA"""
@@ -149,7 +153,7 @@ class AIService:
         # Déterminer si on utilise LangGraph ou LangChain
         use_langgraph = settings.get('use_langgraph', self.use_langgraph)
         
-        print(f"=== APPEL IA ===")
+        print("=== APPEL IA ===")
         print(f"Utilisation de LangGraph: {use_langgraph}")
         print(f"Mode: {settings.get('mode', 'online')}")
         print(f"Fournisseur: {settings.get('ai_provider', 'inconnu')}")
@@ -305,9 +309,9 @@ class AIService:
                     
                     # S'assurer que l'objet courant a aussi la clé API
                     self.api_key = settings['api_key']
-                    print(f"=== DEBUG: Clé API enregistrée avec succès ===")
+                    print("=== DEBUG: Clé API enregistrée avec succès ===")
                 else:
-                    print(f"=== DEBUG: Pas de clé API générique fournie ou clé vide ===")
+                    print("=== DEBUG: Pas de clé API générique fournie ou clé vide ===")
                 
                 # Log pour le débogage
                 print(f"=== DEBUG: Paramètres en ligne sauvegardés - Provider: {provider}, Model: {model} ===")
@@ -357,34 +361,32 @@ class AIService:
             Dictionnaire des paramètres
         """
         self._ensure_initialized()
-        
-        # Modèles en ligne par défaut
-        default_online_models = {
-            'gpt-3.5-turbo': {'name': 'GPT-3.5 Turbo'},
-            'gpt-4': {'name': 'GPT-4'},
-            'gpt-4o': {'name': 'GPT-4o'},
-            'claude-3-opus': {'name': 'Claude 3 Opus'},
-            'claude-3-sonnet': {'name': 'Claude 3 Sonnet'},
-            'claude-3-haiku': {'name': 'Claude 3 Haiku'}
-        }
-        
-        # Modèles locaux par défaut avec état activé
-        default_local_models = {
-            'llama3': {'name': 'Llama 3', 'enabled': False},
-            'mistral': {'name': 'Mistral', 'enabled': False},
-            'deepseek-coder': {'name': 'DeepSeek Coder', 'enabled': False},
-            'phi3': {'name': 'Phi-3', 'enabled': False}
-        }
-        
-        # Mettre à jour l'état activé des modèles locaux
+
+        # Construire les listes de modèles depuis le registre
+        registry_online = model_registry.get_models(type='online')
+        registry_local = model_registry.get_models(type='local')
+
+        # Dictionnaire attendu par le reste du système (compatibilité)
+        # Online: clé = model_id provider (ex: 'gpt-4o')
+        default_online_models = {m.get('model_id'): {'name': m.get('name', m.get('model_id'))}
+                                 for m in registry_online}
+
+        # Local: clé = short id (ex: 'llama3' pour 'llama3:latest')
+        default_local_models: Dict[str, Dict[str, Any]] = {}
+        for m in registry_local:
+            full = m.get('model_id') or ''
+            short_id = full.split(':')[0] if ':' in full else full
+            # Par défaut: enabled si installé
+            default_local_models[short_id] = {
+                'name': m.get('name', short_id),
+                'enabled': bool(m.get('installed', False))
+            }
+
+        # Appliquer les préférences d'activation locales stockées en DB si présentes
         if hasattr(self, 'local_models_enabled') and self.local_models_enabled:
             for model_id, enabled in self.local_models_enabled.items():
                 if model_id in default_local_models:
                     default_local_models[model_id]['enabled'] = enabled
-        else:
-            # Par défaut, activer tous les modèles si aucun n'est spécifié
-            for model_id in default_local_models:
-                default_local_models[model_id]['enabled'] = True
         
         # Paramètres de base
         settings = {
@@ -429,7 +431,7 @@ class AIService:
             model = settings.get('online_model', 'gpt-3.5-turbo')
             api_key = settings.get('api_key', '')
             
-            print(f"=== CHAT ONLINE ===")
+            print("=== CHAT ONLINE ===")
             print(f"Modèle: {model}")
             print(f"Température: {settings.get('temperature', 0.7)}")
             print(f"Max tokens: {settings.get('max_tokens', 1000)}")

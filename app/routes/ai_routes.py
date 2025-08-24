@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template, Response
 from app.services.ai_service import ai_service
+from app.services.model_registry import model_registry
 from app.models.app_config import AppConfig
 from app.services.ocr_service import get_ocr_service
 import logging
@@ -67,17 +68,19 @@ def chat():
         model_used = None
         
         if model_id:
-            # Déterminer si le modèle est en ligne ou local
+            # Déterminer si le modèle est en ligne ou local (accepter id court ou complet pour local)
+            short_local = model_id.split(':')[0] if ':' in model_id else model_id
             if settings.get('online_models') and model_id in settings['online_models']:
                 original_model = settings.get('online_model')
                 settings['mode'] = 'online'
                 settings['online_model'] = model_id
                 model_used = settings['online_models'][model_id].get('name', model_id)
-            elif settings.get('local_models') and model_id in settings['local_models']:
+            elif settings.get('local_models') and short_local in settings['local_models']:
                 original_model = settings.get('local_model')
                 settings['mode'] = 'local'
+                # Conserver l'id complet si fourni pour compatibilité Ollama
                 settings['local_model'] = model_id
-                model_used = settings['local_models'][model_id].get('name', model_id)
+                model_used = settings['local_models'][short_local].get('name', short_local)
         
         # Vérifier si on doit utiliser LangGraph
         use_langgraph = settings.get('use_langgraph', True)
@@ -152,6 +155,69 @@ def settings_panel():
         
         logger.info(f"=== DEBUG: Fournisseur actuel: {current_provider}, Clé masquée: {masked_api_key[:10]}... ===")
         
+        # Récupérer les modèles depuis le registre
+        registry_online = model_registry.get_models(type='online')
+        registry_local = model_registry.get_models(type='local')
+
+        # Construire les optgroups dynamiques pour les modèles en ligne
+        provider_order = ['openai', 'anthropic', 'google']
+        provider_labels = {
+            'openai': 'OpenAI',
+            'anthropic': 'Anthropic',
+            'google': 'Google'
+        }
+        grouped: dict = {}
+        for m in registry_online:
+            p = m.get('provider', 'autre')
+            grouped.setdefault(p, []).append(m)
+        # Ajouter providers non listés
+        for p in list(grouped.keys()):
+            if p not in provider_order:
+                provider_order.append(p)
+
+        online_optgroups_html = ''
+        current_online_model = settings.get('ai_model')
+        for p in provider_order:
+            models = grouped.get(p, [])
+            if not models:
+                # Créer un optgroup vide pour cohérence visuelle si provider connu
+                if p in provider_labels:
+                    online_optgroups_html += f"<optgroup label=\"{provider_labels.get(p, p.title())}\" data-provider=\"{p}\"></optgroup>"
+                continue
+            label = provider_labels.get(p, p.title())
+            online_optgroups_html += f"<optgroup label=\"{label}\" data-provider=\"{p}\">"
+            for m in models:
+                mid = m.get('model_id')
+                mname = m.get('name', mid)
+                selected = 'selected' if current_online_model == mid else ''
+                online_optgroups_html += f"<option value=\"{mid}\" {selected}>{mname}</option>"
+            online_optgroups_html += "</optgroup>"
+
+        # Construire les options dynamiques pour les modèles locaux (sélecteur)
+        local_options_html = ''
+        current_local_model = settings.get('local_model', '')
+        for m in registry_local:
+            full = m.get('model_id') or ''
+            name = m.get('name', full)
+            selected = 'selected' if current_local_model == full else ''
+            local_options_html += f"<option value=\"{full}\" {selected}>{name}</option>"
+
+        # Construire les cases à cocher pour les modèles locaux disponibles
+        local_checkboxes_html = ''
+        local_models_state = settings.get('local_models', {})
+        for m in registry_local:
+            full = m.get('model_id') or ''
+            short_id = full.split(':')[0] if ':' in full else full
+            enabled = local_models_state.get(short_id, {}).get('enabled', False)
+            checked = 'checked' if enabled else ''
+            label = m.get('name', short_id)
+            local_checkboxes_html += (
+                f"<div class=\"flex items-center\">"
+                f"<input type=\"checkbox\" class=\"mr-2 form-checkbox\" data-ai-settings-target=\"localModelEnabled\" data-model-id=\"{short_id}\" {checked}>"
+                f"<label>{label}</label>"
+                f"</div>"
+            )
+
         # Générer le HTML directement
         html = f"""
         <h2 class="text-lg font-semibold mb-4">Paramètres IA</h2>
@@ -202,6 +268,7 @@ def settings_panel():
                 <p class="text-xs text-gray-500 mt-1">LangGraph offre des fonctionnalités avancées comme les agents et les outils.</p>
             </div>
             
+            <div id="models-panel">
             <!-- Paramètres pour le mode en ligne -->
             <div id="online-settings" class="settings-group mb-6" data-ai-settings-target="onlineSettings">
                 <h3 class="text-md font-medium mb-2">Paramètres API</h3>
@@ -248,23 +315,7 @@ def settings_panel():
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">Modèle</label>
                     <select class="form-select w-full" data-ai-settings-target="onlineModel">
-                        <!-- OpenAI Models -->
-                        <optgroup label="OpenAI" data-provider="openai">
-                            <option value="gpt-4o" {"selected" if settings.get('ai_model') == 'gpt-4o' else ""}>GPT-4o</option>
-                            <option value="gpt-4-turbo" {"selected" if settings.get('ai_model') == 'gpt-4-turbo' else ""}>GPT-4 Turbo</option>
-                            <option value="gpt-3.5-turbo" {"selected" if settings.get('ai_model') == 'gpt-3.5-turbo' else ""}>GPT-3.5 Turbo</option>
-                        </optgroup>
-                        <!-- Anthropic Models -->
-                        <optgroup label="Anthropic" data-provider="anthropic">
-                            <option value="claude-3-opus" {"selected" if settings.get('ai_model') == 'claude-3-opus' else ""}>Claude 3 Opus</option>
-                            <option value="claude-3-sonnet" {"selected" if settings.get('ai_model') == 'claude-3-sonnet' else ""}>Claude 3 Sonnet</option>
-                            <option value="claude-3-haiku" {"selected" if settings.get('ai_model') == 'claude-3-haiku' else ""}>Claude 3 Haiku</option>
-                        </optgroup>
-                        <!-- Google Models -->
-                        <optgroup label="Google" data-provider="google">
-                            <option value="gemini-pro" {"selected" if settings.get('ai_model') == 'gemini-pro' else ""}>Gemini Pro</option>
-                            <option value="gemini-ultra" {"selected" if settings.get('ai_model') == 'gemini-ultra' else ""}>Gemini Ultra</option>
-                        </optgroup>
+                        {online_optgroups_html}
                     </select>
                 </div>
             </div>
@@ -286,13 +337,7 @@ def settings_panel():
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">Modèle</label>
                     <select class="form-select w-full" data-ai-settings-target="localModel">
-                        <option value="deepseek-coder:latest" {"selected" if settings.get('local_model') == 'deepseek-coder:latest' else ""}>DeepSeek Coder</option>
-                        <option value="deepseek-v3:latest" {"selected" if settings.get('local_model') == 'deepseek-v3:latest' else ""}>DeepSeek V3</option>
-                        <option value="deepseek-r1:latest" {"selected" if settings.get('local_model') == 'deepseek-r1:latest' else ""}>DeepSeek R1</option>
-                        <option value="gwent:latest" {"selected" if settings.get('local_model') == 'gwent:latest' else ""}>Gwent</option>
-                        <option value="mistral:latest" {"selected" if settings.get('local_model') == 'mistral:latest' else ""}>Mistral</option>
-                        <option value="llama3:latest" {"selected" if settings.get('local_model') == 'llama3:latest' else ""}>Llama 3</option>
-                        <option value="phi3:latest" {"selected" if settings.get('local_model') == 'phi3:latest' else ""}>Phi-3</option>
+                        {local_options_html}
                     </select>
                 </div>
                 
@@ -302,6 +347,10 @@ def settings_panel():
                             data-action="click->ai-settings#testOllamaConnection">
                         Tester la connexion
                     </button>
+                    <button type="button" class="ml-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white"
+                            data-action="click->ai-settings#refreshModels">
+                        Rafraîchir les modèles
+                    </button>
                     <span class="ml-2 text-sm" data-ai-settings-target="connectionStatus"></span>
                 </div>
                 
@@ -310,44 +359,11 @@ def settings_panel():
                     <h4 class="text-sm font-medium mb-2">Modèles locaux disponibles</h4>
                     <div class="bg-gray-800 p-3 rounded">
                         <div class="grid grid-cols-2 gap-2">
-                            <!-- Llama 3 -->
-                            <div class="flex items-center">
-                                <input type="checkbox" id="enable-llama3" class="mr-2 form-checkbox"
-                                       data-ai-settings-target="localModelEnabled"
-                                       data-model-id="llama3"
-                                       {"checked" if settings.get('local_models', {}).get('llama3', {}).get('enabled', False) else ""}>
-                                <label for="enable-llama3">Llama 3</label>
-                            </div>
-                            
-                            <!-- Mistral -->
-                            <div class="flex items-center">
-                                <input type="checkbox" id="enable-mistral" class="mr-2 form-checkbox"
-                                       data-ai-settings-target="localModelEnabled"
-                                       data-model-id="mistral"
-                                       {"checked" if settings.get('local_models', {}).get('mistral', {}).get('enabled', False) else ""}>
-                                <label for="enable-mistral">Mistral</label>
-                            </div>
-                            
-                            <!-- DeepSeek Coder -->
-                            <div class="flex items-center">
-                                <input type="checkbox" id="enable-deepseek-coder" class="mr-2 form-checkbox"
-                                       data-ai-settings-target="localModelEnabled"
-                                       data-model-id="deepseek-coder"
-                                       {"checked" if settings.get('local_models', {}).get('deepseek-coder', {}).get('enabled', False) else ""}>
-                                <label for="enable-deepseek-coder">DeepSeek Coder</label>
-                            </div>
-                            
-                            <!-- Phi-3 -->
-                            <div class="flex items-center">
-                                <input type="checkbox" id="enable-phi3" class="mr-2 form-checkbox"
-                                       data-ai-settings-target="localModelEnabled"
-                                       data-model-id="phi3"
-                                       {"checked" if settings.get('local_models', {}).get('phi3', {}).get('enabled', False) else ""}>
-                                <label for="enable-phi3">Phi-3</label>
-                            </div>
+                            {local_checkboxes_html}
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
             
             <!-- Paramètres communs -->
@@ -411,81 +427,113 @@ def get_ai_models():
     Récupère la liste des modèles d'IA disponibles
     """
     try:
-        # Récupérer les paramètres actuels
+        # Récupérer les paramètres actuels (mode, modèles actifs)
         settings = ai_service.get_settings()
-        
-        # Log détaillé des paramètres actuels pour le débogage
-        logger.info(f"=== DEBUG API MODELS === Paramètres: mode={settings.get('mode')}, provider={settings.get('provider')}")
-        logger.info(f"=== DEBUG API MODELS === api_key présente: {bool(settings.get('api_key'))}")
-        logger.info(f"=== DEBUG API MODELS === online_models: {list(settings.get('online_models', {}).keys())}")
-        logger.info(f"=== DEBUG API MODELS === online_model actif: {settings.get('online_model')}")
-        
-        # Construire la liste des modèles
+
+        # Récupérer les modèles depuis le registre
+        registry_online = model_registry.get_models(type='online')
+        registry_local = model_registry.get_models(type='local')
+
         models = []
-        
-        # Modèles en ligne (OpenAI, etc.) - Afficher même sans clé API
-        # Cela permet de visualiser les modèles disponibles même si la clé n'est pas configurée
-        if settings.get('online_models'):
-            for model_id, model_info in settings['online_models'].items():
-                # Vérifier si le modèle correspond au fournisseur actuel
-                provider = settings.get('provider', 'openai')
-                
-                # Log pour vérifier le filtrage
-                logger.info(f"=== DEBUG API MODELS === Vérification modèle: {model_id}, provider={provider}")
-                
-                # Filtrer selon le fournisseur (à adapter selon votre structure)
-                if (provider == 'openai' and model_id.startswith('gpt')) or \
-                   (provider == 'anthropic' and model_id.startswith('claude')) or \
-                   (provider == 'google' and model_id.startswith('gemini')):
-                    # Déterminer si le modèle est utilisable (clé API configurée)
-                    is_usable = bool(settings.get('api_key'))
-                    
-                    models.append({
-                        'id': model_id,
-                        'name': model_info.get('name', model_id) + ('' if is_usable else ' (API Key manquante)'),
-                        'type': 'online',
-                        'is_active': settings.get('mode') == 'online' and settings.get('online_model') == model_id,
-                        'is_usable': is_usable
-                    })
-                    logger.info(f"=== DEBUG API MODELS === Modèle ajouté: {model_id}, utilisable: {is_usable}")
-        else:
-            # Log pour comprendre pourquoi les modèles en ligne ne sont pas ajoutés
-            logger.info(f"=== DEBUG API MODELS === Modèles en ligne non ajoutés: online_models={bool(settings.get('online_models'))}")
-        
-        # Modèles locaux (Ollama, etc.) - uniquement ceux marqués comme enabled
-        if settings.get('local_models'):
-            for model_id, model_info in settings['local_models'].items():
-                if model_info.get('enabled', False):
-                    models.append({
-                        'id': model_id,
-                        'name': model_info.get('name', model_id),
-                        'type': 'local',
-                        'is_active': settings.get('mode') == 'local' and settings.get('local_model') == model_id
-                    })
-        
-        # Si aucun modèle n'est disponible, ajouter un modèle par défaut
-        if not models:
+
+        # Online: garder l'id legacy (model_id, ex: 'gpt-4o') pour compat UI
+        for m in registry_online:
+            legacy_id = m.get('model_id')
+            is_active = settings.get('mode') == 'online' and settings.get('online_model') == legacy_id
+            is_usable = bool(m.get('is_usable', False))
+            name = m.get('name', legacy_id) + ('' if is_usable else ' (API Key manquante)')
             models.append({
-                'id': 'default',
-                'name': 'Modèle par défaut (non configuré)',
+                'id': legacy_id,
+                'name': name,
                 'type': 'online',
-                'is_active': True
+                'is_active': is_active,
+                'is_usable': is_usable
             })
-        
-        # Trier les modèles par nom
+
+        # Local: utiliser l'identifiant complet (ex: 'llama3:latest') pour cohérence avec Ollama
+        for m in registry_local:
+            full = m.get('model_id') or ''
+            short_id = full.split(':')[0] if ':' in full else full
+            is_active = settings.get('mode') == 'local' and (
+                settings.get('local_model') == full or settings.get('local_model') == short_id
+            )
+            models.append({
+                'id': full,
+                'name': m.get('name', short_id),
+                'type': 'local',
+                'is_active': is_active,
+                'is_usable': bool(m.get('installed', False))
+            })
+
+        # Fallback si vide
+        if not models:
+            models.append({'id': 'default', 'name': 'Modèle par défaut (non configuré)', 'type': 'online', 'is_active': True})
+
         models.sort(key=lambda x: x['name'])
-        
-        return jsonify({
-            'success': True,
-            'models': models,
-            'current_mode': settings.get('mode', 'online')
-        })
+
+        return jsonify({'success': True, 'models': models, 'current_mode': settings.get('mode', 'online')})
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des modèles d'IA: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
+@ai_bp.route('/models/refresh', methods=['POST'])
+def refresh_ai_models():
+    """Force un rafraîchissement du registre de modèles (fichiers + découverte)."""
+    try:
+        cache = model_registry.refresh()
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at'), 'count': len(cache.get('models', []))})
+    except Exception as e:
+        logger.error(f"Erreur lors du rafraîchissement des modèles: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/models/user', methods=['GET'])
+def get_user_models_config():
+    """Retourne la configuration utilisateur (models.user.json)."""
+    try:
+        cfg = model_registry.get_user_config()
+        return jsonify({'success': True, 'config': cfg})
+    except Exception as e:
+        logger.error(f"Erreur lecture user models config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/models/user', methods=['POST'])
+def save_user_models_config():
+    """Enregistre la configuration utilisateur (models.user.json) et rafraîchit le registre."""
+    try:
+        body = request.json or {}
+        cache = model_registry.save_user_config(body)
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at')})
+    except Exception as e:
+        logger.error(f"Erreur écriture user models config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/use_cases', methods=['GET'])
+def get_use_cases_mapping():
+    """Retourne le mapping use_case → modèle issu du registre (cache)."""
+    try:
+        cache = model_registry.get_cache()
+        return jsonify({'success': True, 'use_case_models': cache.get('use_case_models', {})})
+    except Exception as e:
+        logger.error(f"Erreur lecture use_cases: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/use_cases', methods=['POST'])
+def set_use_case_model():
+    """Définit un modèle pour un cas d'usage puis rafraîchit le registre."""
+    try:
+        body = request.json or {}
+        use_case = body.get('use_case')
+        model_id = body.get('model_id')
+        if not use_case or not model_id:
+            return jsonify({'success': False, 'error': 'use_case ou model_id manquant'}), 400
+        cache = model_registry.set_use_case_model(use_case, model_id)
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at')})
+    except Exception as e:
+        logger.error(f"Erreur set use_case: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @ai_bp.route('/set_active_model', methods=['POST'])
 def set_active_model():
@@ -505,19 +553,31 @@ def set_active_model():
         # Récupérer les paramètres actuels
         settings = ai_service.get_settings()
         
-        # Déterminer si le modèle est en ligne ou local
+        # Déterminer si le modèle est en ligne ou local (via registre) et s'il est utilisable
         model_type = None
         model_name = model_id
+        is_usable = True
+
+        # Online
+        for m in model_registry.get_models(type='online'):
+            if m.get('model_id') == model_id:
+                model_type = 'online'
+                model_name = m.get('name', model_id)
+                is_usable = bool(m.get('is_usable', False))
+                break
         
-        # Vérifier dans les modèles en ligne
-        if settings.get('online_models') and model_id in settings['online_models']:
-            model_type = 'online'
-            model_name = settings['online_models'][model_id].get('name', model_id)
-        
-        # Vérifier dans les modèles locaux
-        elif settings.get('local_models') and model_id in settings['local_models']:
-            model_type = 'local'
-            model_name = settings['local_models'][model_id].get('name', model_id)
+        # Local
+        if model_type is None:
+            short_local = model_id.split(':')[0] if ':' in model_id else model_id
+            for m in model_registry.get_models(type='local'):
+                full = m.get('model_id') or ''
+                short = full.split(':')[0] if ':' in full else full
+                if full == model_id or short == short_local:
+                    model_type = 'local'
+                    model_name = m.get('name', short)
+                    is_usable = bool(m.get('installed', False))
+                    model_id = full or model_id
+                    break
         
         if not model_type:
             return jsonify({
@@ -525,6 +585,13 @@ def set_active_model():
                 'error': 'Modèle non trouvé'
             }), 404
         
+        # Rejeter si non utilisable
+        if not is_usable:
+            return jsonify({
+                'success': False,
+                'error': "Modèle non utilisable (clé API manquante ou modèle non installé)"
+            }), 400
+
         # Mettre à jour les paramètres
         settings['mode'] = model_type
         
@@ -540,6 +607,7 @@ def set_active_model():
             save_settings['ai_provider'] = settings.get('provider', 'openai')
             save_settings['ai_model'] = model_id  # Utiliser ai_model au lieu de online_model
         else:
+            # Conserver l'id complet si fourni
             settings['local_model'] = model_id
             save_settings['local_model'] = model_id
         

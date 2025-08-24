@@ -1,0 +1,141 @@
+{
+  "models": [
+    {
+      "id": "openai:gpt-3.5-turbo",
+      "provider": "openai",
+      "type": "online",
+      "model_id": "gpt-3.5-turbo",
+      "name": "GPT-3.5 Turbo",
+      "capabilities": ["chat"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 1500}
+    },
+    {
+      "id": "openai:gpt-4",
+      "provider": "openai",
+      "type": "online",
+      "model_id": "gpt-4",
+      "name": "GPT-4",
+      "capabilities": ["chat", "tools"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "openai:gpt-4o",
+      "provider": "openai",
+      "type": "online",
+      "model_id": "gpt-4o",
+      "name": "GPT-4o",
+      "capabilities": ["chat", "tools", "vision"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "anthropic:claude-3-opus",
+      "provider": "anthropic",
+      "type": "online",
+      "model_id": "claude-3-opus",
+      "name": "Claude 3 Opus",
+      "capabilities": ["chat", "tools"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "anthropic:claude-3-sonnet",
+      "provider": "anthropic",
+      "type": "online",
+      "model_id": "claude-3-sonnet",
+      "name": "Claude 3 Sonnet",
+      "capabilities": ["chat", "tools"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "anthropic:claude-3-haiku",
+      "provider": "anthropic",
+      "type": "online",
+      "model_id": "claude-3-haiku",
+      "name": "Claude 3 Haiku",
+      "capabilities": ["chat"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 1500}
+    },
+    {
+      "id": "google:gemini-pro",
+      "provider": "google",
+      "type": "online",
+      "model_id": "gemini-pro",
+      "name": "Gemini Pro",
+      "capabilities": ["chat", "tools"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "google:gemini-ultra",
+      "provider": "google",
+      "type": "online",
+      "model_id": "gemini-ultra",
+      "name": "Gemini Ultra",
+      "capabilities": ["chat", "tools", "vision"],
+      "requires_api_key": true,
+      "defaults": {"temperature": 0.7, "max_tokens": 2000}
+    },
+    {
+      "id": "ollama:llama3:latest",
+      "provider": "ollama",
+      "type": "local",
+      "model_id": "llama3:latest",
+      "name": "Llama 3",
+      "capabilities": ["chat"],
+      "requires_api_key": false,
+      "defaults": {"temperature": 0.7, "num_predict": 1000}
+    },
+    {
+      "id": "ollama:mistral:latest",
+      "provider": "ollama",
+      "type": "local",
+      "model_id": "mistral:latest",
+      "name": "Mistral",
+      "capabilities": ["chat"],
+      "requires_api_key": false,
+      "defaults": {"temperature": 0.7, "num_predict": 1000}
+    },
+    {
+      "id": "ollama:deepseek-coder:latest",
+      "provider": "ollama",
+      "type": "local",
+      "model_id": "deepseek-coder:latest",
+      "name": "DeepSeek Coder",
+      "capabilities": ["code", "chat"],
+      "requires_api_key": false,
+      "defaults": {"temperature": 0.2, "num_predict": 1500}
+    },
+    {
+      "id": "ollama:phi3:latest",
+      "provider": "ollama",
+      "type": "local",
+      "model_id": "phi3:latest",
+      "name": "Phi-3",
+      "capabilities": ["chat"],
+      "requires_api_key": false,
+      "defaults": {"temperature": 0.7, "num_predict": 1000}
+    },
+    {
+      "id": "ollama:gpt-oss:20b",
+      "provider": "ollama",
+      "type": "local",
+      "model_id": "gpt-oss:20b",
+      "name": "gpt-oss 20B",
+      "capabilities": ["chat"],
+      "requires_api_key": false,
+      "defaults": {"temperature": 0.7, "num_predict": 1200}
+    }
+  ],
+  "use_case_models": {
+    "traduction": "openai:gpt-4o",
+    "recherche_code_secret": "ollama:deepseek-coder:latest",
+    "outils": "openai:gpt-4o"
+  }
+}
+
+

@@ -22,7 +22,12 @@ from langgraph.prebuilt import ToolNode
 import operator
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama
+try:
+    # Préférer le paquet dédié si disponible
+    from langchain_ollama import ChatOllama  # type: ignore
+except Exception:
+    # Fallback pour compatibilité
+    from langchain_community.chat_models import ChatOllama
 from app.models.app_config import AppConfig
 from langchain_core.tools import tool
 from langchain_core.tools import BaseTool
@@ -89,12 +94,28 @@ class LangGraphService:
                     # Log pour le débogage
                     print(f"=== DEBUG: LangGraph - Mode local chargé - URL: {self.ollama_url}, Model: {self.model_name} ===")
                 
-                # Initialiser le plugin manager
-                from app import app
+                # Initialiser le plugin manager sans import circulaire de 'app'
                 plugins_dir = AppConfig.get_value('plugins_dir', 'plugins')
-                # Importer PluginManager ici pour éviter l'importation circulaire
-                from app.plugin_manager import PluginManager
-                self._plugin_manager = PluginManager(plugins_dir, app)
+                try:
+                    from flask import current_app
+                    flask_app = None
+                    try:
+                        flask_app = current_app._get_current_object()
+                    except Exception:
+                        flask_app = None
+                    # Importer PluginManager ici pour éviter l'importation circulaire
+                    from app.plugin_manager import PluginManager
+                    if flask_app is not None:
+                        self._plugin_manager = PluginManager(plugins_dir, flask_app)
+                    else:
+                        # Essayer une signature sans app si supportée
+                        try:
+                            self._plugin_manager = PluginManager(plugins_dir)
+                        except Exception:
+                            self._plugin_manager = None
+                except Exception as e_init:
+                    print(f"=== ERROR: Initialisation du PluginManager échouée: {str(e_init)} ===")
+                    self._plugin_manager = None
                 
                 # Créer les outils à partir des plugins
                 self._create_tools_from_plugins()
