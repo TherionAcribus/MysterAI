@@ -24,18 +24,21 @@
                 return;
             }
             
-            // Initialiser les valeurs par défaut
-            if (!this.hasNextIdValue) {
-                this.nextIdValue = 1;
+            // Initialiser nextId en fonction des chats existants
+            const existingIds = Array.from(this.chatListTarget.querySelectorAll('.chat-instance'))
+                .map(n => parseInt(n.dataset.chatId))
+                .filter(n => !isNaN(n));
+            const maxExistingId = existingIds.length ? Math.max(...existingIds) : 0;
+            if (!this.hasNextIdValue || (this.hasNextIdValue && this.nextIdValue <= maxExistingId)) {
+                this.nextIdValue = maxExistingId + 1;
             }
+            console.log('=== DEBUG: nextIdValue initialisé à ===', this.nextIdValue);
             
             // Initialiser l'objet conversations
             this.conversations = {};
             
-            // Créer un premier chat s'il n'y en a pas
-            if (this.chatListTarget.children.length === 0) {
-                this.addChat();
-            }
+            // Ne pas créer automatiquement un chat au chargement
+            // Le premier chat sera créé à la demande (bouton + ou openGeocacheAIChat)
             
             // Ajuster la position des onglets pour éviter le chevauchement
             this.adjustTabsPosition();
@@ -73,7 +76,15 @@
         addChat() {
             if (!this.hasRequiredTargets()) return;
             
-            const chatId = this.hasNextIdValue ? this.nextIdValue : 1;
+            // Garantir l'unicité de l'ID basé sur le DOM actuel
+            const existingIds = Array.from(this.chatListTarget.querySelectorAll('.chat-instance'))
+                .map(n => parseInt(n.dataset.chatId))
+                .filter(n => !isNaN(n));
+            const maxExistingId = existingIds.length ? Math.max(...existingIds) : 0;
+            if (!this.hasNextIdValue || this.nextIdValue <= maxExistingId) {
+                this.nextIdValue = maxExistingId + 1;
+            }
+            const chatId = this.nextIdValue;
             
             // Mettre à jour la valeur nextId
             if (this.hasNextIdValue) {

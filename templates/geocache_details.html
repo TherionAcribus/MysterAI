@@ -540,6 +540,8 @@
 <script>
     // Fonction pour ouvrir un onglet de chat IA avec les informations de la géocache
     function openGeocacheAIChat(geocacheId, gcCode, geocacheName) {
+        // Déterminer si c'est le tout premier chat IA depuis le chargement
+        const isFirstEverGeocacheChat = !window.__geoChatEverOpened;
         // Récupérer la description de la géocache
         const geocacheDescription = document.querySelector('.prose.prose-invert').innerText.trim();
         
@@ -564,13 +566,22 @@
         }
         
         if (chatPanel) {
+            // Attendre que le contrôleur Stimulus expose ses méthodes si nécessaire
+            if (typeof chatPanel.addChat !== 'function') {
+                // Retenter après l'ouverture du panneau
+                setTimeout(() => openGeocacheAIChat(geocacheId, gcCode, geocacheName), 80);
+                return;
+            }
             // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
             let chatId;
+            let shouldAutoSend = true;
             const chatInstances = chatPanel.querySelectorAll('.chat-instance');
             
             if (chatInstances.length === 0) {
                 // Aucun chat existant, créer un nouveau
                 chatId = chatPanel.addChat();
+                // Pour le tout premier chat, on ne déclenche pas l'envoi auto pour laisser lire
+                shouldAutoSend = false;
 
                 // Définir le label de l'onglet avec le code GC
                 const firstTabLabel = chatPanel.querySelector(`.chat-tab[data-chat-id="${chatId}"] .chat-tab-label`);
@@ -600,11 +611,11 @@
                     firstChatInstance.dataset.geocacheId = geocacheId;
                 }
             } else {
-                // Vérifier si un onglet est déjà ouvert pour cette géocache
+                // Vérifier si un onglet est déjà ouvert pour cette géocache (via dataset exact)
                 let existingChatId = null;
                 chatInstances.forEach(instance => {
-                    const header = instance.querySelector('.chat-header h2');
-                    if (header && header.textContent.includes(gcCode)) {
+                    const instGeoId = (instance.dataset.geocacheId || '').toString();
+                    if (instGeoId && geocacheId && instGeoId === geocacheId.toString()) {
                         existingChatId = parseInt(instance.dataset.chatId);
                     }
                 });
@@ -647,24 +658,18 @@
                 }
             }
             
-            // Envoyer le message initial
+            // Préparer le message initial
             const activeChat = chatPanel.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
             if (activeChat) {
                 const textarea = activeChat.querySelector('.chat-input');
                 if (textarea) {
                     textarea.value = initialMessage;
-                    
-                    // Simuler l'envoi du message
-                    const sendButton = activeChat.querySelector('.chat-send-button');
-                    if (sendButton) {
-                        // Créer et déclencher un événement de clic
-                        const clickEvent = new MouseEvent('click', {
-                            bubbles: true,
-                            cancelable: true,
-                            view: window
-                        });
-                        sendButton.dispatchEvent(clickEvent);
-                    }
+
+                    // Ne pas auto-envoyer le message initial pour laisser l'utilisateur lire/éditer
+                    setTimeout(() => textarea.focus(), 0);
+
+                    // Marquer qu'au moins un chat IA a été ouvert
+                    window.__geoChatEverOpened = true;
                 }
             }
         } else {
@@ -672,18 +677,7 @@
         }
     }
 
-    // Attacher le clic au bouton Chat IA (éviter l'attribut onclick)
-    (function(){
-        const btn = document.getElementById('ai-chat-geocache-button');
-        if (btn) {
-            const geocacheId = btn.getAttribute('data-geocache-id');
-            const gcCode = btn.getAttribute('data-gc-code');
-            const geocacheName = btn.getAttribute('data-geocache-name');
-            btn.addEventListener('click', function(){
-                openGeocacheAIChat(geocacheId, gcCode, geocacheName);
-            });
-        }
-    })();
+    // Le clic est géré globalement dans panels.js (délégation)
 </script>
 
 <!-- Modal OCR (hidden by default) -->

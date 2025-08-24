@@ -295,6 +295,29 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeResizers();
 
     console.log('=== Panels: Initialisation terminée ===');
+
+    // Écouteur global délégué pour le bouton "Chat IA" des géocaches
+    document.addEventListener('click', function(e) {
+        const trigger = e.target.closest('#ai-chat-geocache-button');
+        if (!trigger) return;
+
+        const geocacheId = trigger.getAttribute('data-geocache-id');
+        const gcCode = trigger.getAttribute('data-gc-code');
+        const geocacheName = trigger.getAttribute('data-geocache-name');
+
+        if (typeof openGeocacheAIChat === 'function') {
+            try {
+                openGeocacheAIChat(geocacheId, gcCode, geocacheName);
+            } catch (err) {
+                console.error('[ChatIA] Erreur lors de openGeocacheAIChat:', err);
+            }
+            // Important: ne pas stopper la propagation; laisser d'autres gestionnaires s'exécuter
+            // (mais empêcher le comportement par défaut si nécessaire)
+            e.preventDefault();
+        } else {
+            console.warn('[ChatIA] openGeocacheAIChat non défini au moment du clic');
+        }
+    }, false);
 });
 
 // Fonction d'initialisation des resizers
