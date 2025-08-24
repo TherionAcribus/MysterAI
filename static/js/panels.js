@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (typeof openGeocacheAIChat === 'function') {
             try {
-                openGeocacheAIChat(geocacheId, gcCode, geocacheName);
+                openGeocacheAIChat(geocacheId, gcCode, geocacheName, trigger);
             } catch (err) {
                 console.error('[ChatIA] Erreur lors de openGeocacheAIChat:', err);
             }

@@ -539,11 +539,27 @@
 
 <script>
     // Fonction pour ouvrir un onglet de chat IA avec les informations de la géocache
-    function openGeocacheAIChat(geocacheId, gcCode, geocacheName) {
+    function openGeocacheAIChat(geocacheId, gcCode, geocacheName, sourceEl = null) {
         // Déterminer si c'est le tout premier chat IA depuis le chargement
         const isFirstEverGeocacheChat = !window.__geoChatEverOpened;
-        // Récupérer la description de la géocache
-        const geocacheDescription = document.querySelector('.prose.prose-invert').innerText.trim();
+        // Récupérer la description de la géocache (scopée au conteneur du bouton si possible)
+        let descEl = null;
+        if (sourceEl && sourceEl instanceof Element) {
+            const card = sourceEl.closest('.bg-gray-800');
+            if (card) {
+                descEl = card.querySelector('.prose.prose-invert');
+            }
+            if (!descEl) {
+                const root = sourceEl.closest('.w-full');
+                if (root) {
+                    descEl = root.querySelector('.prose.prose-invert');
+                }
+            }
+        }
+        if (!descEl) {
+            descEl = document.querySelector('.prose.prose-invert');
+        }
+        const geocacheDescription = (descEl ? descEl.innerText : '').trim();
         
         // Construire le message initial pour l'IA
         const initialMessage = `Je travaille sur la géocache ${gcCode} - "${geocacheName}". Voici sa description:\n\n${geocacheDescription.substring(0, 1500)}\n\nPouvez-vous m'aider à analyser cette géocache et à trouver des indices potentiels?`;
@@ -569,7 +585,7 @@
             // Attendre que le contrôleur Stimulus expose ses méthodes si nécessaire
             if (typeof chatPanel.addChat !== 'function') {
                 // Retenter après l'ouverture du panneau
-                setTimeout(() => openGeocacheAIChat(geocacheId, gcCode, geocacheName), 80);
+                setTimeout(() => openGeocacheAIChat(geocacheId, gcCode, geocacheName, sourceEl), 80);
                 return;
             }
             // Créer un nouvel onglet de chat ou utiliser le premier s'il n'y en a pas
