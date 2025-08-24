@@ -47,7 +47,14 @@ def get_geocache_details_panel(geocache_id):
 
 ### Template (`geocache_details.html`)
 - Template Jinja2 qui affiche les détails de la géocache
-- Sections principales :
+- Intègre un bouton `#ai-chat-geocache-button` sans attribut `onclick`. Le clic est géré au global dans `static/js/panels.js`.
+- Appelle `openGeocacheAIChat(geocacheId, gcCode, geocacheName)` pour :
+  - Ouvrir le panneau de chat si nécessaire
+  - Créer un onglet par géocache (détection par `dataset.geocacheId`)
+  - Renommer onglet et header avec le code GC
+  - Pré-remplir le message initial (non auto-envoyé)
+
+Sections principales :
   - En-tête (nom, code GC, propriétaire)
   - Coordonnées (latitude, longitude)
   - Description

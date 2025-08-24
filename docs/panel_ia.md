@@ -4,13 +4,6 @@
 
 Le Panel IA est un composant modulaire de l'application MysteryAI qui permet aux utilisateurs d'interagir avec différentes instances d'assistants IA via une interface de chat. Ce panel est conçu pour être flexible, permettant la création de plusieurs conversations indépendantes accessibles via un système d'onglets.
 
-## Architecture
-
-Le Panel IA est construit autour de trois composants principaux :
-1. Un contrôleur Stimulus (`ChatController`) qui gère la logique
-2. Des styles CSS dédiés pour l'interface utilisateur
-3. Une intégration avec le système de panneaux latéraux de l'application
-
 ```
 +------------------+
 |    Chat Tabs     |
@@ -43,10 +36,10 @@ Chaque instance de chat comprend :
 
 ### 3. Interactions utilisateur
 
-- **Création d'un nouveau chat** : Cliquer sur le bouton "+" dans la barre d'onglets
-- **Changement de chat** : Cliquer sur l'onglet correspondant
-- **Fermeture d'un chat** : Cliquer sur le bouton "×" dans l'en-tête du chat
-- **Envoi de message** : Saisir du texte et cliquer sur le bouton d'envoi ou utiliser Ctrl+Entrée
+- Création d'un nouveau chat : Cliquer sur le bouton "+" dans la barre d'onglets
+- Changement de chat : Cliquer sur l'onglet correspondant
+- Fermeture d'un chat : Cliquer sur le bouton "×" dans l'en-tête du chat
+- Envoi de message : Saisir du texte et cliquer sur le bouton d'envoi ou utiliser Ctrl+Entrée
 
 ### 4. Intégration avec les géocaches
 
@@ -93,6 +86,7 @@ Le `ChatController` est responsable de la gestion des instances de chat et des i
 **Méthodes exposées pour l'accès externe** :
 - `element.addChat` : Permet d'ajouter un chat depuis l'extérieur du contrôleur
 - `element.switchToChat` : Permet de basculer vers un chat spécifique depuis l'extérieur
+- `element.setWelcomeForChat(chatId, welcomeText)` : Définit ou met à jour le message d'accueil système du chat
 
 ### Styles CSS
 
@@ -121,19 +115,17 @@ Le panel IA est intégré au système de panneaux latéraux de l'application.
 
 ### Intégration avec les géocaches
 
-L'intégration avec les géocaches est gérée par une fonction JavaScript dédiée.
+L'intégration avec les géocaches est gérée par une fonction JavaScript dédiée et une délégation d'événements globale.
 
-**Fichier** : `templates/geocache_details.html`
+- Fichier (fonction) : `templates/geocache_details.html` → `openGeocacheAIChat(geocacheId, gcCode, geocacheName)`
+- Fichier (délégation) : `static/js/panels.js` → écouteur global sur `#ai-chat-geocache-button`
 
-**Fonction** : `openGeocacheAIChat(geocacheId, gcCode, geocacheName)`
-
-**Fonctionnalités** :
+Fonctionnalités :
 - Récupération de la description de la géocache
-- Construction d'un message initial pour l'IA
-- Ouverture du panneau de chat si nécessaire
-- Création d'un nouvel onglet ou utilisation d'un onglet existant
-- Personnalisation de l'onglet avec le code GC
-- Envoi automatique du message initial
+- Pré-remplissage du message initial pour l'IA (pas d'envoi automatique)
+- Ouverture du panneau de chat si nécessaire (`showSidePanel('chat', true)`)
+- Création d'un nouvel onglet ou utilisation d'un existant (détection par `dataset.geocacheId`)
+- Personnalisation de l'onglet avec le code GC et du header (`CHAT IA - GC...`)
 
 ## Structure HTML
 
@@ -178,14 +170,15 @@ L'intégration avec les géocaches est gérée par une fonction JavaScript dédi
 
 ### Bouton "Chat IA" dans les détails de géocache
 
+Le clic est géré par délégation globale dans `static/js/panels.js`. Le bouton ne porte pas d'attribut `onclick`.
+
 ```html
 <button 
     id="ai-chat-geocache-button"
     class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-    onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', '{{ geocache.name|replace("'", "\\'") }}')"
     data-geocache-id="{{ geocache.id }}"
     data-gc-code="{{ geocache.gc_code }}"
-    data-geocache-name="{{ geocache.name|replace("'", "\\'") }}">
+    data-geocache-name="{{ geocache.name }}">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
     </svg>
@@ -297,7 +290,7 @@ sequenceDiagram
     Function->>ChatPanel: Vérifie les chats existants
     Function->>ChatPanel: Crée un nouvel onglet ou utilise un existant
     Function->>DOM: Personnalise l'onglet avec le code GC
-    Function->>DOM: Envoie le message initial
+    Function->>DOM: Pré-remplit le message initial (sans auto-envoi)
 ```
 
 ### 5. Changement de modèle d'IA
@@ -366,39 +359,39 @@ Les styles du panel peuvent être personnalisés en modifiant le fichier `static
 
 Pour étendre les fonctionnalités du panel IA, vous pouvez :
 
-1. **Ajouter des types de messages** : Modifier la méthode `sendMessage()` pour prendre en charge différents types de contenu (images, liens, code, etc.)
+1. Ajouter des types de messages : Modifier la méthode `sendMessage()` pour prendre en charge différents types de contenu (images, liens, code, etc.)
 
-2. **Intégrer d'autres modèles d'IA** : Ajouter la prise en charge de différents modèles d'IA (GPT-4, Claude, etc.)
+2. Intégrer d'autres modèles d'IA : Ajouter la prise en charge de différents modèles d'IA (GPT-4, Claude, etc.)
 
-3. **Ajouter des fonctionnalités avancées** : Historique des conversations, export de chat, suggestions de réponses, etc.
+3. Ajouter des fonctionnalités avancées : Historique des conversations, export de chat, suggestions de réponses, etc.
 
-4. **Améliorer l'intégration avec les géocaches** : Ajouter des fonctionnalités spécifiques pour l'analyse des géocaches
+4. Améliorer l'intégration avec les géocaches : Ajouter des fonctionnalités spécifiques pour l'analyse des géocaches
 
 ## Bonnes pratiques
 
-1. **Gestion de la mémoire** : Limiter le nombre de chats actifs pour éviter les problèmes de performance
+1. Gestion de la mémoire : Limiter le nombre de chats actifs pour éviter les problèmes de performance
 
-2. **Accessibilité** : S'assurer que le panel est utilisable au clavier et compatible avec les lecteurs d'écran
+2. Accessibilité : S'assurer que le panel est utilisable au clavier et compatible avec les lecteurs d'écran
 
-3. **Responsive design** : Adapter l'interface pour différentes tailles d'écran
+3. Responsive design : Adapter l'interface pour différentes tailles d'écran
 
-4. **Gestion des erreurs** : Implémenter une gestion robuste des erreurs pour les interactions avec l'API
+4. Gestion des erreurs : Implémenter une gestion robuste des erreurs pour les interactions avec l'API
 
-5. **Sécurité** : Masquer les clés API et autres informations sensibles
+5. Sécurité : Masquer les clés API et autres informations sensibles
 
 ## Dépannage
 
 ### Problèmes courants
 
-1. **Chevauchement des onglets** : Si les onglets sont masqués par la barre latérale, vérifiez que la méthode `adjustTabsPosition()` est correctement appelée.
+1. Chevauchement des onglets : Si les onglets sont masqués par la barre latérale, vérifiez que la méthode `adjustTabsPosition()` est correctement appelée.
 
-2. **Messages non affichés** : Assurez-vous que la structure HTML des messages est correcte et que les styles sont appliqués.
+2. Messages non affichés : Assurez-vous que la structure HTML des messages est correcte et que les styles sont appliqués.
 
-3. **Problèmes de focus** : Vérifiez que la méthode `switchToChat()` met correctement le focus sur la zone de texte.
+3. Problèmes de focus : Vérifiez que la méthode `switchToChat()` met correctement le focus sur la zone de texte.
 
-4. **Erreurs CORS** : Si vous rencontrez des erreurs CORS, vérifiez que la configuration CORS dans `app/__init__.py` inclut toutes les origines nécessaires.
+4. Erreurs CORS : Si vous rencontrez des erreurs CORS, vérifiez que la configuration CORS dans `app/__init__.py` inclut toutes les origines nécessaires.
 
-5. **Problèmes avec les caractères spéciaux** : Assurez-vous que les noms de géocaches contenant des caractères spéciaux sont correctement échappés avec `replace("'", "\\'")`.
+5. Problèmes avec les caractères spéciaux : Assurez-vous que les noms de géocaches contenant des caractères spéciaux sont correctement passés via `data-geocache-name` (pas d'onclick inline).
 
 ### Débogage
 
@@ -410,15 +403,15 @@ console.log('=== DEBUG: ChatController connecté ===');
 
 ## Évolutions futures
 
-1. **Intégration avec d'autres fonctionnalités** : Connecter le panel IA avec d'autres composants de l'application (solver, analyseur, etc.)
+1. Intégration avec d'autres fonctionnalités : Connecter le panel IA avec d'autres composants de l'application (solver, analyseur, etc.)
 
-2. **Amélioration de l'interface utilisateur** : Ajouter des fonctionnalités comme la saisie prédictive, les raccourcis clavier, etc.
+2. Amélioration de l'interface utilisateur : Ajouter des fonctionnalités comme la saisie prédictive, les raccourcis clavier, etc.
 
-3. **Personnalisation avancée** : Permettre aux utilisateurs de personnaliser l'apparence et le comportement du panel
+3. Personnalisation avancée : Permettre aux utilisateurs de personnaliser l'apparence et le comportement du panel
 
-4. **Analyse contextuelle** : Améliorer la capacité de l'IA à comprendre le contexte des géocaches et à fournir des analyses plus pertinentes
+4. Analyse contextuelle : Améliorer la capacité de l'IA à comprendre le contexte des géocaches et à fournir des analyses plus pertinentes
 
-5. **Intégration avec les waypoints** : Permettre à l'IA d'analyser et de suggérer des waypoints basés sur la description de la géocache
+5. Intégration avec les waypoints : Permettre à l'IA d'analyser et de suggérer des waypoints basés sur la description de la géocache
 
 ## Références
 
