@@ -1,11 +1,23 @@
 from datetime import datetime, timezone
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, make_response
+import json
 from app.database import db
 from app.models import Note, Geocache, GeocacheNote
 from app.geocaching_client import GeocachingClient, PersonalNotes, GeocachingLogs
 import logging
 
 logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
+
+
+def respond_with_notification(payload: dict, body: dict, status: int = 200):
+    """Retourne une réponse JSON avec en-tête HTMX HX-Trigger pour AppNotify."""
+    response = make_response(jsonify(body), status)
+    try:
+        response.headers['HX-Trigger'] = json.dumps({'app:notify': payload})
+    except Exception:
+        # Ne pas bloquer la réponse si la sérialisation échoue
+        pass
+    return response
 
 @logs_bp.route('/note/<note_id>/send_to_geocaching', methods=['POST'])
 def send_note_to_geocaching(note_id):
@@ -44,30 +56,34 @@ def send_note_to_geocaching(note_id):
         # Créer le client Geocaching et vérifier que l'utilisateur est connecté
         client = GeocachingClient()
         if not client.ensure_login():
-            return jsonify({
-                'success': False,
-                'error': 'Impossible de se connecter à Geocaching.com. Assurez-vous d\'être connecté dans Firefox.'
-            }), 401
+            return respond_with_notification(
+                { 'level': 'error', 'message': "Impossible de se connecter à Geocaching.com. Assurez-vous d'être connecté dans Firefox.", 'ttl': 7000 },
+                { 'success': False, 'error': "Impossible de se connecter à Geocaching.com. Assurez-vous d'être connecté dans Firefox." },
+                401
+            )
             
         # Créer l'instance de PersonalNotes et envoyer la note
         personal_notes = PersonalNotes(client)
         if personal_notes.update(geocache.gc_code, note.content):
-            return jsonify({
-                'success': True,
-                'message': 'Note envoyée avec succès à Geocaching.com'
-            })
+            return respond_with_notification(
+                { 'level': 'success', 'message': 'Note envoyée avec succès à Geocaching.com', 'ttl': 5000 },
+                { 'success': True, 'message': 'Note envoyée avec succès à Geocaching.com' },
+                200
+            )
         else:
-            return jsonify({
-                'success': False,
-                'error': 'Échec de l\'envoi de la note à Geocaching.com'
-            }), 500
+            return respond_with_notification(
+                { 'level': 'error', 'message': "Échec de l'envoi de la note à Geocaching.com", 'ttl': 7000 },
+                { 'success': False, 'error': "Échec de l'envoi de la note à Geocaching.com" },
+                500
+            )
             
     except Exception as e:
         logging.error(f"Erreur lors de l'envoi de la note vers Geocaching.com: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return respond_with_notification(
+            { 'level': 'error', 'message': f"Erreur lors de l'envoi de la note: {str(e)}", 'ttl': 7000 },
+            { 'success': False, 'error': str(e) },
+            500
+        )
 
 @logs_bp.route('/notes_panel')
 def get_notes_panel():

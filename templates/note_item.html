@@ -59,26 +59,67 @@ function sendNoteToGeocaching(button, noteId, geocacheId) {
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async response => {
+        let notifiedFromHeader = false;
+        // Consommer l'entête HX-Trigger pour AppNotify si présent
+        try {
+            const hx = response.headers.get('HX-Trigger');
+            if (hx) {
+                const evt = JSON.parse(hx);
+                const payload = evt && (evt['app:notify'] || evt.appNotify || evt.app_notify);
+                if (payload) {
+                    if (window.AppNotify) {
+                        window.AppNotify.push(payload);
+                        notifiedFromHeader = true;
+                    } else {
+                        // Fallback: déclencher l'événement local si un listener existe
+                        document.dispatchEvent(new CustomEvent('app:notify', { detail: payload }));
+                        notifiedFromHeader = true;
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignorer les erreurs de parsing d'entête
+        }
+        // Continuer avec le corps JSON et renvoyer l'indicateur
+        let data = {};
+        try { data = await response.json(); } catch {}
+        return { data, notifiedFromHeader };
+    })
+    .then(({ data, notifiedFromHeader }) => {
         // Réactiver le bouton
         button.disabled = false;
         button.innerHTML = originalHTML;
         
         if (data.success) {
-            alert(data.message);
+            if (window.AppNotify && !notifiedFromHeader) {
+                window.AppNotify.push({ level: 'success', message: data.message || 'Note envoyée avec succès', ttl: 5000 });
+            } else {
+                // Fallback minimal si AppNotify indisponible
+                if (!notifiedFromHeader) console.log(data.message || 'Note envoyée avec succès');
+            }
             // Ajouter une classe pour indiquer que la note a été envoyée
             button.classList.add('text-green-500');
             button.title = 'Note envoyée à Geocaching.com';
         } else {
-            alert(`Erreur: ${data.error}`);
+            const msg = `Erreur: ${data.error || 'Erreur inconnue'}`;
+            if (window.AppNotify && !notifiedFromHeader) {
+                window.AppNotify.push({ level: 'error', message: msg, ttl: 7000 });
+            } else {
+                if (!notifiedFromHeader) console.error(msg);
+            }
         }
     })
     .catch(error => {
         // Réactiver le bouton
         button.disabled = false;
         button.innerHTML = originalHTML;
-        alert(`Erreur: ${error.message}`);
+        const msg = `Erreur: ${error.message}`;
+        if (window.AppNotify) {
+            window.AppNotify.push({ level: 'error', message: msg, ttl: 7000 });
+        } else {
+            console.error(msg);
+        }
     });
 }
 </script>
