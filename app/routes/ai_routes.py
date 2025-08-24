@@ -230,6 +230,17 @@ def settings_panel():
         <div class="bg-blue-900 text-white p-2 mb-4 rounded">
             Template AI Settings chargé avec succès! Mode: {settings.get('ai_mode', 'online')}
         </div>
+        <div class="mb-4">
+            <button
+                class="inline-flex items-center px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm"
+                data-tab-opener="pipelines-editor"
+                data-tab-title="Pipelines IA"
+                data-tab-component="pipelines-editor"
+                data-tab-unique-id="ai-pipelines-editor"
+                data-tab-config-url="/api/ai/pipelines/editor">
+                <i class="fas fa-project-diagram mr-2"></i>Ouvrir l'éditeur de pipelines
+            </button>
+        </div>
         
         <form id="ai-settings-form" class="space-y-6">
             <!-- Sélection du mode (en ligne/local) -->
@@ -561,6 +572,201 @@ def refresh_pipelines():
     except Exception as e:
         logger.error(f"Erreur refresh pipelines: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ai_bp.route('/pipelines/editor', methods=['GET'])
+def pipelines_editor():
+    """Page HTML d'édition des pipelines (simple éditeur JSON + liste)."""
+    try:
+        # Forcer un refresh si le cache est vide
+        cache = pipeline_registry.get_cache()
+        pipelines = cache.get('pipelines', []) or []
+        if not pipelines:
+            cache = pipeline_registry.refresh()
+            pipelines = cache.get('pipelines', []) or []
+
+        # JSON compact pour injection initiale
+        import json as _json
+        initial_json = _json.dumps(pipelines, ensure_ascii=False)
+
+        html = """
+        <div class=\"p-4 text-gray-200\" style=\"font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial\"> 
+            <h2 class=\"text-xl font-semibold mb-4\">Éditeur de Pipelines IA</h2>
+
+            <div class=\"mb-3 flex items-center gap-2\">
+                <button id=\"btn-refresh\" class=\"px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded\">Rafraîchir</button>
+                <button id=\"btn-new\" class=\"px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded\">Nouveau pipeline</button>
+                <span id=\"status\" class=\"ml-2 text-sm text-gray-400\"></span>
+            </div>
+
+            <div class=\"grid grid-cols-1 md:grid-cols-4 gap-4\">
+                <div class=\"md:col-span-1 bg-gray-800 rounded p-3\" style=\"min-height: 400px\">
+                    <h3 class=\"text-sm font-medium mb-2\">Pipelines</h3>
+                    <ul id=\"pipeline-list\" class=\"space-y-1 text-sm\"></ul>
+                </div>
+                <div class=\"md:col-span-3 bg-gray-800 rounded p-3\">
+                    <div class=\"grid grid-cols-1 md:grid-cols-2 gap-3 mb-3\">
+                        <div>
+                            <label class=\"block text-xs text-gray-400 mb-1\">ID du pipeline</label>
+                            <input id=\"pipeline-id\" class=\"w-full bg-gray-700 text-white rounded px-2 py-1\" placeholder=\"ex: geocache_default\" />
+                        </div>
+                        <div>
+                            <label class=\"block text-xs text-gray-400 mb-1\">Nom</label>
+                            <input id=\"pipeline-name\" class=\"w-full bg-gray-700 text-white rounded px-2 py-1\" placeholder=\"ex: Pipeline Géocache - Standard\" />
+                        </div>
+                    </div>
+                    <label class=\"block text-xs text-gray-400 mb-1\">Définition JSON</label>
+                    <textarea id=\"pipeline-json\" class=\"w-full h-80 bg-gray-900 text-gray-200 rounded p-2 font-mono text-xs\" spellcheck=\"false\"></textarea>
+
+                    <div class=\"mt-3 flex items-center gap-2\">
+                        <button id=\"btn-duplicate\" class=\"px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded\">Dupliquer</button>
+                        <button id=\"btn-save\" class=\"px-3 py-2 bg-green-700 hover:bg-green-600 rounded\">Enregistrer</button>
+                        <span id=\"save-status\" class=\"ml-2 text-sm\"></span>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                const initialPipelines = %%INITIAL_JSON%%;
+                const listEl = document.getElementById('pipeline-list');
+                const idEl = document.getElementById('pipeline-id');
+                const nameEl = document.getElementById('pipeline-name');
+                const jsonEl = document.getElementById('pipeline-json');
+                const statusEl = document.getElementById('status');
+                const saveStatusEl = document.getElementById('save-status');
+
+                function renderList(pipelines) {
+                    listEl.innerHTML = '';
+                    pipelines.forEach(p => {
+                        const li = document.createElement('li');
+                        li.className = 'px-2 py-1 rounded hover:bg-gray-700 cursor-pointer flex items-center justify-between';
+                        const title = document.createElement('span');
+                        title.textContent = (p.name || p.id || 'Sans nom');
+                        const small = document.createElement('small');
+                        small.className = 'text-gray-400 ml-2';
+                        small.textContent = p.id || '';
+                        const wrap = document.createElement('div');
+                        wrap.appendChild(title);
+                        wrap.appendChild(small);
+                        li.appendChild(wrap);
+                        li.onclick = () => loadPipeline(p);
+                        listEl.appendChild(li);
+                    });
+                }
+
+                function loadPipeline(p) {
+                    idEl.value = p.id || '';
+                    nameEl.value = p.name || '';
+                    jsonEl.value = JSON.stringify(p, null, 2);
+                    saveStatusEl.textContent = '';
+                }
+
+                function newPipeline() {
+                    const idBase = 'pipeline_' + Date.now();
+                    const skeleton = {
+                        id: idBase,
+                        name: 'Nouveau Pipeline',
+                        system_prompt: 'Décrivez ici vos règles et consignes globales',
+                        steps: [
+                            { id: 'classify', type: 'llm', prompt: 'Classifiez le problème', output_key: 'classification' },
+                            { id: 'plan', type: 'llm', prompt: 'Proposez un plan', output_key: 'plan' },
+                            { id: 'tools', type: 'tools', allowed_tools: [] },
+                            { id: 'verify', type: 'llm', prompt: 'Vérifier la cohérence', output_key: 'final' }
+                        ]
+                    };
+                    idEl.value = skeleton.id;
+                    nameEl.value = skeleton.name;
+                    jsonEl.value = JSON.stringify(skeleton, null, 2);
+                    saveStatusEl.textContent = '';
+                }
+
+                async function refresh() {
+                    statusEl.textContent = 'Rafraîchissement…';
+                    try {
+                        const res = await fetch('/api/ai/pipelines');
+                        const data = await res.json();
+                        if (data.success) {
+                            renderList(data.pipelines || []);
+                            statusEl.textContent = 'OK';
+                        } else {
+                            statusEl.textContent = 'Erreur: ' + (data.error || '');
+                        }
+                    } catch (e) {
+                        statusEl.textContent = 'Erreur réseau';
+                    }
+                }
+
+                async function save() {
+                    saveStatusEl.textContent = '';
+                    let obj;
+                    try {
+                        obj = JSON.parse(jsonEl.value || '{}');
+                    } catch(e) {
+                        saveStatusEl.textContent = 'JSON invalide';
+                        return;
+                    }
+                    const pid = (idEl.value || obj.id || '').trim();
+                    if (!pid) {
+                        saveStatusEl.textContent = 'ID requis';
+                        return;
+                    }
+                    // Synchroniser id et name
+                    obj.id = pid;
+                    obj.name = nameEl.value || obj.name || pid;
+
+                    try {
+                        const res = await fetch(`/api/ai/pipelines/${pid}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(obj)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            saveStatusEl.textContent = 'Enregistré';
+                            await refresh();
+                        } else {
+                            saveStatusEl.textContent = 'Erreur: ' + (data.error || '');
+                        }
+                    } catch(e) {
+                        saveStatusEl.textContent = 'Erreur réseau';
+                    }
+                }
+
+                function duplicateCurrent() {
+                    let obj;
+                    try { obj = JSON.parse(jsonEl.value || '{}'); } catch(e) { return; }
+                    obj.id = (obj.id || 'pipeline') + '_copy';
+                    obj.name = (obj.name || 'Pipeline') + ' (copie)';
+                    jsonEl.value = JSON.stringify(obj, null, 2);
+                    idEl.value = obj.id;
+                    nameEl.value = obj.name;
+                }
+
+                document.getElementById('btn-refresh').onclick = refresh;
+                document.getElementById('btn-new').onclick = newPipeline;
+                document.getElementById('btn-save').onclick = save;
+                document.getElementById('btn-duplicate').onclick = duplicateCurrent;
+
+                // Initialisation
+                try {
+                    renderList(initialPipelines || []);
+                    if ((initialPipelines || []).length) {
+                        loadPipeline(initialPipelines[0]);
+                    }
+                } catch (e) {
+                    console.warn('Pipelines init depuis serveur indisponible, tentative via API…', e);
+                }
+
+                // Toujours tenter un refresh pour récupérer l'état réel
+                refresh();
+            </script>
+        </div>
+        """
+        html = html.replace('%%INITIAL_JSON%%', initial_json)
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur génération éditeur pipelines: {e}")
+        return Response(f"<div class='p-4 text-red-200'>Erreur: {str(e)}</div>", mimetype='text/html', status=500)
 
 
 @ai_bp.route('/use_cases', methods=['GET'])

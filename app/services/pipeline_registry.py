@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from app.models.app_config import AppConfig
 
@@ -7,8 +8,10 @@ from app.models.app_config import AppConfig
 class PipelineRegistry:
     """Registre des pipelines IA (merge defaults + user, avec cache DB)."""
 
-    DEFAULTS_PATH = os.path.join('config', 'pipelines.defaults.json')
-    USER_PATH = os.path.join('config', 'pipelines.user.json')
+    # Résoudre des chemins absolus vers le dossier racine du projet
+    _BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    DEFAULTS_PATH = os.path.join(_BASE_DIR, 'config', 'pipelines.defaults.json')
+    USER_PATH = os.path.join(_BASE_DIR, 'config', 'pipelines.user.json')
     CACHE_KEY = 'pipelines_cache'
 
     def __init__(self) -> None:
@@ -33,7 +36,7 @@ class PipelineRegistry:
         defaults = self._read_json_file(self.DEFAULTS_PATH)
         user = self._read_json_file(self.USER_PATH)
         merged = self._merge(defaults, user)
-        merged['refreshed_at'] = AppConfig.set_value('now_timestamp', '', category='general').updated_at.isoformat() if hasattr(AppConfig, 'set_value') else None
+        merged['refreshed_at'] = datetime.utcnow().isoformat()
         # stocker en DB
         AppConfig.set_value(self.CACHE_KEY, merged, category='general')
         self._cache = merged

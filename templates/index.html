@@ -766,6 +766,35 @@
                     window.application.start();
                 });
             });
+
+            // Editeur de pipelines IA (charge le HTML depuis une URL)
+            layout.registerComponent('pipelines-editor', function(container, state) {
+                const el = container.getElement();
+                el.innerHTML = '<div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div></div>';
+
+                const url = state && (state.url || state.href || state.panelUrl) || '/api/ai/pipelines/editor';
+
+                fetch(url, { credentials: 'include' })
+                    .then(r => r.text())
+                    .then(html => {
+                        el.innerHTML = html;
+                        // Exécuter les scripts inline éventuellement présents dans le contenu injecté
+                        const scripts = el.querySelectorAll('script');
+                        scripts.forEach(original => {
+                            const s = document.createElement('script');
+                            if (original.src) {
+                                s.src = original.src;
+                            } else {
+                                s.textContent = original.textContent || '';
+                            }
+                            document.body.appendChild(s);
+                            document.body.removeChild(s);
+                        });
+                    })
+                    .catch(err => {
+                        el.innerHTML = `<div class="p-4 text-red-300">Erreur de chargement: ${err && err.message ? err.message : 'inconnue'}</div>`;
+                    });
+            });
         };
     </script>
 </body>
