@@ -220,10 +220,10 @@
                     <button 
                         id="ai-chat-geocache-button"
                         class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 ml-2"
-                        onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', {{ geocache.name|tojson }})"
+                        onclick="openGeocacheAIChat('{{ geocache.id }}', '{{ geocache.gc_code }}', '{{ geocache.name|replace("'", "\\'") }}')"
                         data-geocache-id="{{ geocache.id }}"
                         data-gc-code="{{ geocache.gc_code }}"
-                        data-geocache-name="{{ geocache.name|tojson }}">
+                        data-geocache-name="{{ geocache.name }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                         </svg>
@@ -551,12 +551,16 @@
         const chatPanel = document.getElementById('chat-panel');
         const rightPanel = document.querySelector('.right-panel');
         
-        // Si le panneau de droite est fermé, l'ouvrir
-        if (rightPanel.classList.contains('collapsed')) {
-            // Trouver le bouton de chat dans la barre latérale droite
-            const chatButton = document.querySelector('.right-sidebar .sidebar-button[data-panel="chat"]');
-            if (chatButton) {
-                chatButton.click();
+        // Si le panneau de droite n'est pas visible, l'ouvrir
+        if (rightPanel && !rightPanel.classList.contains('visible')) {
+            if (typeof showSidePanel === 'function') {
+                showSidePanel('chat', true);
+            } else {
+                // Fallback: simuler un clic sur le bouton de la barre latérale
+                const chatButton = document.querySelector('.right-sidebar .sidebar-button[data-panel="chat"]');
+                if (chatButton) {
+                    chatButton.click();
+                }
             }
         }
         
