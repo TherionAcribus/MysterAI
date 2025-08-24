@@ -422,36 +422,7 @@
             });
         }
         
-        /**
-         * Gère le changement de modèle d'IA
-         * @param {CustomEvent} event - L'événement contenant les détails du modèle
-         */
-        handleAIModelChanged(event) {
-            const modelId = event.detail.modelId;
-            const modelName = event.detail.modelName;
-            
-            // Ajouter un message système dans tous les chats actifs
-            this.chatListTarget.querySelectorAll('.chat-instance').forEach(chatInstance => {
-                const chatId = parseInt(chatInstance.dataset.chatId);
-                const messagesContainer = chatInstance.querySelector('.chat-messages');
-                
-                if (messagesContainer) {
-                    // Créer le message de notification
-                    const notificationElement = document.createElement('div');
-                    notificationElement.className = 'chat-message system model-change';
-                    notificationElement.innerHTML = `
-                        <div class="message-content">
-                            <i class="fas fa-exchange-alt"></i> Modèle d'IA changé !!! pour: <strong>${modelName}</strong>
-                        </div>
-                    `;
-                    messagesContainer.appendChild(notificationElement);
-                    
-                    // Faire défiler vers le bas
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }
-            });
-        }
-        
+       
         escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
