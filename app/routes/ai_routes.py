@@ -564,6 +564,26 @@ def save_pipeline(pipeline_id):
         logger.error(f"Erreur écriture pipeline {pipeline_id}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@ai_bp.route('/pipelines/<pipeline_id>/delete', methods=['POST'])
+def delete_pipeline(pipeline_id):
+    """Supprime un pipeline de la configuration user et rafraîchit le cache."""
+    try:
+        # Charger l'actuel user config
+        user = pipeline_registry._read_json_file(pipeline_registry.USER_PATH)
+        current = {p.get('id'): p for p in user.get('pipelines', [])}
+        # Supprimer si présent
+        if pipeline_id in current:
+            current.pop(pipeline_id, None)
+            new_user = {"pipelines": list(current.values())}
+        else:
+            # Rien à supprimer, renvoyer succès pour idempotence
+            new_user = user
+        cache = pipeline_registry.save_user_config(new_user)
+        return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at')})
+    except Exception as e:
+        logger.error(f"Erreur suppression pipeline {pipeline_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @ai_bp.route('/pipelines/refresh', methods=['POST'])
 def refresh_pipelines():
     try:
@@ -599,12 +619,14 @@ def pipelines_editor():
                 <span id=\"status\" class=\"ml-2 text-sm text-gray-400\"></span>
             </div>
 
-            <div class=\"grid grid-cols-1 md:grid-cols-4 gap-4\">
-                <div class=\"md:col-span-1 bg-gray-800 rounded p-3\" style=\"min-height: 400px\">
+            <div class=\"grid grid-cols-1 md:grid-cols-5 gap-4\">
+                <div class=\"md:col-span-1 bg-gray-800 rounded p-3\">
                     <h3 class=\"text-sm font-medium mb-2\">Pipelines</h3>
-                    <ul id=\"pipeline-list\" class=\"space-y-1 text-sm\"></ul>
+                    <div class=\"max-h-64 overflow-auto\">
+                        <ul id=\"pipeline-list\" class=\"space-y-1 text-sm\"></ul>
+                    </div>
                 </div>
-                <div class=\"md:col-span-3 bg-gray-800 rounded p-3\">
+                <div class=\"md:col-span-4 bg-gray-800 rounded p-3\">
                     <div class=\"grid grid-cols-1 md:grid-cols-2 gap-3 mb-3\">
                         <div>
                             <label class=\"block text-xs text-gray-400 mb-1\">ID du pipeline</label>
@@ -615,12 +637,36 @@ def pipelines_editor():
                             <input id=\"pipeline-name\" class=\"w-full bg-gray-700 text-white rounded px-2 py-1\" placeholder=\"ex: Pipeline Géocache - Standard\" />
                         </div>
                     </div>
-                    <label class=\"block text-xs text-gray-400 mb-1\">Définition JSON</label>
-                    <textarea id=\"pipeline-json\" class=\"w-full h-80 bg-gray-900 text-gray-200 rounded p-2 font-mono text-xs\" spellcheck=\"false\"></textarea>
+                    <div class=\"mb-2 flex items-center space-x-2\">
+                        <button id=\"mode-blocks\" class=\"px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-white text-xs\">Édition par blocs (défaut)</button>
+                        <button id=\"mode-json\" class=\"px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs\">JSON</button>
+                        <span class=\"text-xs text-gray-400\">(basculer selon préférence)</span>
+                    </div>
+
+                    <div id=\"blocks-editor\" class=\"space-y-3\">
+                        <div>
+                            <label class=\"block text-xs text-gray-400 mb-1\">Règles / System prompt</label>
+                            <textarea id=\"be-system-prompt\" class=\"w-full h-28 bg-gray-900 text-gray-200 rounded p-2 text-sm\" placeholder=\"Règles et consignes globales...\"></textarea>
+                        </div>
+                        <div class=\"flex items-center justify-between\">
+                            <h4 class=\"text-sm font-medium\">Étapes</h4>
+                            <div class=\"space-x-2\">
+                                <button id=\"btn-add-llm\" class=\"px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs\">+ Étape LLM</button>
+                                <button id=\"btn-add-tools\" class=\"px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs\">+ Étape Tools</button>
+                            </div>
+                        </div>
+                        <div id=\"steps-container\" class=\"space-y-2\"></div>
+                    </div>
+
+                    <div id=\"json-editor\" class=\"hidden\">
+                        <label class=\"block text-xs text-gray-400 mb-1\">Définition JSON</label>
+                        <textarea id=\"pipeline-json\" class=\"w-full h-96 bg-gray-900 text-gray-200 rounded p-2 font-mono text-xs\" spellcheck=\"false\"></textarea>
+                    </div>
 
                     <div class=\"mt-3 flex items-center gap-2\">
                         <button id=\"btn-duplicate\" class=\"px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded\">Dupliquer</button>
                         <button id=\"btn-save\" class=\"px-3 py-2 bg-green-700 hover:bg-green-600 rounded\">Enregistrer</button>
+                        <button id=\"btn-delete\" class=\"px-3 py-2 bg-red-700 hover:bg-red-600 rounded\">Supprimer</button>
                         <span id=\"save-status\" class=\"ml-2 text-sm\"></span>
                     </div>
                 </div>
@@ -634,6 +680,13 @@ def pipelines_editor():
                 const jsonEl = document.getElementById('pipeline-json');
                 const statusEl = document.getElementById('status');
                 const saveStatusEl = document.getElementById('save-status');
+                const beSystemPrompt = document.getElementById('be-system-prompt');
+                const stepsContainer = document.getElementById('steps-container');
+                const blocksEditor = document.getElementById('blocks-editor');
+                const jsonEditor = document.getElementById('json-editor');
+                const modeBlocksBtn = document.getElementById('mode-blocks');
+                const modeJsonBtn = document.getElementById('mode-json');
+                let currentMode = 'blocks';
 
                 function renderList(pipelines) {
                     listEl.innerHTML = '';
@@ -659,6 +712,7 @@ def pipelines_editor():
                     nameEl.value = p.name || '';
                     jsonEl.value = JSON.stringify(p, null, 2);
                     saveStatusEl.textContent = '';
+                    applyBlocksFromJSON(p);
                 }
 
                 function newPipeline() {
@@ -678,6 +732,7 @@ def pipelines_editor():
                     nameEl.value = skeleton.name;
                     jsonEl.value = JSON.stringify(skeleton, null, 2);
                     saveStatusEl.textContent = '';
+                    applyBlocksFromJSON(skeleton);
                 }
 
                 async function refresh() {
@@ -699,11 +754,11 @@ def pipelines_editor():
                 async function save() {
                     saveStatusEl.textContent = '';
                     let obj;
-                    try {
-                        obj = JSON.parse(jsonEl.value || '{}');
-                    } catch(e) {
-                        saveStatusEl.textContent = 'JSON invalide';
-                        return;
+                    if (currentMode === 'blocks') {
+                        obj = buildJSONFromBlocks();
+                        if (!obj) { saveStatusEl.textContent = 'Données invalides'; return; }
+                    } else {
+                        try { obj = JSON.parse(jsonEl.value || '{}'); } catch(e) { saveStatusEl.textContent = 'JSON invalide'; return; }
                     }
                     const pid = (idEl.value || obj.id || '').trim();
                     if (!pid) {
@@ -742,10 +797,155 @@ def pipelines_editor():
                     nameEl.value = obj.name;
                 }
 
+                async function removeCurrent() {
+                    saveStatusEl.textContent = '';
+                    const pid = (idEl.value || '').trim();
+                    if (!pid) {
+                        saveStatusEl.textContent = 'ID manquant';
+                        return;
+                    }
+                    if (!confirm(`Supprimer le pipeline "${pid}" ?`)) {
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`/api/ai/pipelines/${pid}/delete`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            saveStatusEl.textContent = 'Supprimé';
+                            idEl.value = '';
+                            nameEl.value = '';
+                            jsonEl.value = '';
+                            await refresh();
+                        } else {
+                            saveStatusEl.textContent = 'Erreur: ' + (data.error || '');
+                        }
+                    } catch (e) {
+                        saveStatusEl.textContent = 'Erreur réseau';
+                    }
+                }
+
                 document.getElementById('btn-refresh').onclick = refresh;
                 document.getElementById('btn-new').onclick = newPipeline;
                 document.getElementById('btn-save').onclick = save;
                 document.getElementById('btn-duplicate').onclick = duplicateCurrent;
+                document.getElementById('btn-delete').onclick = removeCurrent;
+
+                // Mode switch
+                modeBlocksBtn.onclick = () => {
+                    currentMode = 'blocks';
+                    blocksEditor.classList.remove('hidden');
+                    jsonEditor.classList.add('hidden');
+                    const obj = buildJSONFromBlocks();
+                    if (obj) jsonEl.value = JSON.stringify(obj, null, 2);
+                };
+                modeJsonBtn.onclick = () => {
+                    currentMode = 'json';
+                    try { const obj = JSON.parse(jsonEl.value || '{}'); applyBlocksFromJSON(obj); } catch (e) {}
+                    blocksEditor.classList.add('hidden');
+                    jsonEditor.classList.remove('hidden');
+                };
+
+                // Blocks editor helpers
+                function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+                function applyBlocksFromJSON(p) {
+                    beSystemPrompt.value = p.system_prompt || '';
+                    clearChildren(stepsContainer);
+                    const steps = Array.isArray(p.steps) ? p.steps : [];
+                    steps.forEach(s => addStepRow(s));
+                }
+                function buildJSONFromBlocks() {
+                    const obj = {
+                        id: (idEl.value || '').trim(),
+                        name: (nameEl.value || '').trim(),
+                        system_prompt: beSystemPrompt.value || '',
+                        steps: []
+                    };
+                    if (!obj.id) return null;
+                    const rows = stepsContainer.querySelectorAll('[data-step-row]');
+                    rows.forEach(row => {
+                        const type = row.querySelector('[data-step-type]').value;
+                        const sid = row.querySelector('[data-step-id]').value.trim();
+                        if (!sid) return;
+                        if (type === 'llm') {
+                            const prompt = row.querySelector('[data-step-prompt]').value;
+                            const outk = row.querySelector('[data-step-output]').value.trim();
+                            obj.steps.push({ id: sid, type: 'llm', prompt: prompt || '', output_key: outk || undefined });
+                        } else {
+                            const tools = row.querySelector('[data-step-tools]').value.trim();
+                            const sel = row.querySelector('[data-step-selectfrom]').value.trim();
+                            const arr = tools ? tools.split(',').map(x => x.trim()).filter(Boolean) : [];
+                            const st = { id: sid, type: 'tools', allowed_tools: arr };
+                            if (sel) st.selection_from = sel;
+                            obj.steps.push(st);
+                        }
+                    });
+                    return obj;
+                }
+                function addStepRow(step) {
+                    const row = document.createElement('div');
+                    row.setAttribute('data-step-row','');
+                    row.className = 'p-2 rounded bg-gray-900';
+                    const type = (step && step.type) || 'llm';
+                    const idv = (step && step.id) || '';
+                    const prompt = (step && step.prompt) || '';
+                    const outk = (step && step.output_key) || '';
+                    const tools = (step && step.allowed_tools || []).join(', ');
+                    const sel = (step && step.selection_from) || '';
+                    row.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-6 gap-2 items-start">
+                            <div class="md:col-span-1">
+                                <label class="block text-xs text-gray-400 mb-1">Type</label>
+                                <select data-step-type class="w-full bg-gray-700 text-white rounded px-2 py-1">
+                                    <option value="llm" ${type==='llm'?'selected':''}>LLM</option>
+                                    <option value="tools" ${type==='tools'?'selected':''}>Tools</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs text-gray-400 mb-1">ID</label>
+                                <input data-step-id class="w-full bg-gray-700 text-white rounded px-2 py-1" value="${idv}" placeholder="ex: classify" />
+                            </div>
+                            <div class="md:col-span-2" data-llm-fields>
+                                <label class="block text-xs text-gray-400 mb-1">Prompt</label>
+                                <textarea data-step-prompt class="w-full bg-gray-800 text-gray-200 rounded p-2 text-xs" rows="2" placeholder="Décrivez l'étape...">${prompt}</textarea>
+                            </div>
+                            <div class="md:col-span-1" data-llm-fields>
+                                <label class="block text-xs text-gray-400 mb-1">output_key</label>
+                                <input data-step-output class="w-full bg-gray-700 text-white rounded px-2 py-1" value="${outk}" placeholder="ex: classification" />
+                            </div>
+                            <div class="md:col-span-3 hidden" data-tools-fields>
+                                <label class="block text-xs text-gray-400 mb-1">allowed_tools (séparés par des ,)</label>
+                                <input data-step-tools class="w-full bg-gray-700 text-white rounded px-2 py-1" value="${tools}" placeholder="ex: ocr, exif, qr" />
+                            </div>
+                            <div class="md:col-span-2 hidden" data-tools-fields>
+                                <label class="block text-xs text-gray-400 mb-1">selection_from</label>
+                                <input data-step-selectfrom class="w-full bg-gray-700 text-white rounded px-2 py-1" value="${sel}" placeholder="ex: plan" />
+                            </div>
+                            <div class="md:col-span-1 flex items-end justify-end gap-1">
+                                <button class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs" data-action="up">↑</button>
+                                <button class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs" data-action="down">↓</button>
+                                <button class="px-2 py-1 bg-red-700 hover:bg-red-600 rounded text-white text-xs" data-action="remove">✕</button>
+                            </div>
+                        </div>
+                    `;
+                    stepsContainer.appendChild(row);
+                    function updateVisibility() {
+                        const t = row.querySelector('[data-step-type]').value;
+                        row.querySelectorAll('[data-llm-fields]').forEach(e=>{ e.classList.toggle('hidden', t!=='llm'); });
+                        row.querySelectorAll('[data-tools-fields]').forEach(e=>{ e.classList.toggle('hidden', t!=='tools'); });
+                    }
+                    row.querySelector('[data-step-type]').addEventListener('change', updateVisibility);
+                    row.addEventListener('click', (ev)=>{
+                        const btn = ev.target.closest('button');
+                        if (!btn) return;
+                        const action = btn.getAttribute('data-action');
+                        if (action==='remove') { row.remove(); }
+                        if (action==='up' && row.previousElementSibling) { stepsContainer.insertBefore(row, row.previousElementSibling); }
+                        if (action==='down' && row.nextElementSibling) { stepsContainer.insertBefore(row.nextElementSibling, row); }
+                    });
+                    updateVisibility();
+                }
+                document.getElementById('btn-add-llm').onclick = ()=> addStepRow({ type:'llm', id:'', prompt:'', output_key:'' });
+                document.getElementById('btn-add-tools').onclick = ()=> addStepRow({ type:'tools', id:'', allowed_tools:[], selection_from:'' });
 
                 // Initialisation
                 try {
