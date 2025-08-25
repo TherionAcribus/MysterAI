@@ -436,6 +436,13 @@ class AIService:
             print(f"Température: {settings.get('temperature', 0.7)}")
             print(f"Max tokens: {settings.get('max_tokens', 1000)}")
             print(f"API Key configurée: {'Oui' if api_key else 'Non'}")
+            try:
+                print("[LC] Messages envoyés:", [(m.get('role'), len(m.get('content') or '')) for m in messages])
+                sysm = next((m for m in messages if m.get('role')=='system'), None)
+                if sysm:
+                    print("[LC] system prompt len:", len(sysm.get('content') or ''))
+            except Exception:
+                pass
             
             if not api_key:
                 return "Erreur: Clé API non configurée. Veuillez configurer votre clé API dans les paramètres."

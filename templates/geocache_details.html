@@ -636,6 +636,10 @@
                     if (firstChatInstance) {
                         firstChatInstance.dataset.geocacheId = geocacheId;
                         firstChatInstance.dataset.pipelineId = 'geocache_default';
+                        // Stocker la description en dataset pour l'enveloppe du premier envoi
+                        try {
+                            firstChatInstance.dataset.geocacheDesc = (geocacheDescription || '').substring(0, 4000);
+                        } catch(e) {}
                     }
                 } else {
                     // Vérifier si un onglet est déjà ouvert pour cette géocache (via dataset exact)
@@ -681,6 +685,9 @@
                         if (chatInstance) {
                             chatInstance.dataset.geocacheId = geocacheId;
                             chatInstance.dataset.pipelineId = 'geocache_default';
+                            try {
+                                chatInstance.dataset.geocacheDesc = (geocacheDescription || '').substring(0, 4000);
+                            } catch(e) {}
                         }
                     }
                 }
@@ -699,14 +706,38 @@
                         } else {
                             sysMsg.textContent = `Assistant de géocaching — Pipeline Géocache - Standard.\nRègles: 1) Pas d'invention de coordonnées; 2) Max 3 pistes avec outils; 3) Demander des données si incertain.`;
                         }
-                        // Remplir le message initial utilisateur
-                        textarea.value = initialMessage;
+                        // Ajouter la description comme message de contexte (utilisateur) pour le LLM
+                        const sysCtx = `Contexte géocache :\n\n${geocacheDescription.substring(0, 1500)}`;
+                        if (typeof chatPanel.addContextMessage === 'function') {
+                            chatPanel.addContextMessage(chatId, 'system', sysCtx);
+                        } else {
+                            const msgWrap = activeChat.querySelector('.chat-messages');
+                            if (msgWrap) {
+                                const ctxEl = document.createElement('div');
+                                ctxEl.className = 'chat-message system';
+                                ctxEl.innerHTML = `<div class=\"message-content\">${sysCtx.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>`;
+                                msgWrap.appendChild(ctxEl);
+                            }
+                        }
+                        // Pré-remplir la zone de saisie avec prompt par défaut (pipeline ou fallback)
+                        const textareaDefault = (() => {
+                            try {
+                                const selector = activeChat.querySelector('.chat-pipeline-selector');
+                                const val = selector ? (selector.value || '') : '';
+                                const prompts = window.__pipelineDefaultUserPrompts || {};
+                                const fallback = "Merci d'analyser cette géocache en appliquant le pipeline sélectionné (classification → plan/outils → vérification).";
+                                return val && prompts[val] ? prompts[val] : fallback;
+                            } catch(e) { return "Merci d'analyser cette géocache en appliquant le pipeline sélectionné (classification → plan/outils → vérification)."; }
+                        })();
+                        textarea.value = textareaDefault;
                         setTimeout(() => textarea.focus(), 0);
                         window.__geoChatEverOpened = true;
                         // Auto-envoi si ce n'est pas le tout premier chat de la session
                         if (shouldAutoSend) {
                             const sendBtn = activeChat.querySelector('.chat-send-button');
                             if (sendBtn) {
+                                // Envoyer un message minimal orienté pipeline plutôt que la description brute
+                                textarea.value = `Analyse cette géocache en appliquant le pipeline sélectionné.`;
                                 setTimeout(() => sendBtn.click(), 50);
                             }
                         }

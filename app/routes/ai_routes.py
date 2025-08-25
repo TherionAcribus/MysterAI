@@ -55,6 +55,30 @@ def chat():
         system_prompt = data.get('system_prompt')  # Récupérer le prompt système personnalisé
         pipeline_id = data.get('pipeline_id')  # Pipeline éditable optionnel
         use_tools = data.get('use_tools', True)  # Activer/désactiver l'utilisation des outils
+        try:
+            # Logs détaillés entrée
+            logger.info("[CHAT] Requête reçue → model_id=%s, pipeline_id=%s, use_tools=%s", model_id, pipeline_id, use_tools)
+            # Résumé compact
+            logger.info("[CHAT] Messages (%d): %s", len(messages),
+                        ", ".join([f"{m.get('role','?')}({len((m.get('content') or ''))}c)" for m in messages]))
+            # Détail par message (contenu complet ou tronqué)
+            for i, m in enumerate(messages or []):
+                role = m.get('role', '?')
+                content = (m.get('content') or '')
+                length = len(content)
+                # Prévoir un maximum raisonnable pour les logs
+                max_preview = 2000
+                preview = content if length <= max_preview else (content[:max_preview] + "…[tronc]")
+                logger.info("[CHAT] msg[%d] role=%s len=%d\n-----8<-----\n%s\n-----8<-----", i, role, length, preview)
+            # Log aperçu du dernier user
+            last_user = next((m for m in reversed(messages) if m.get('role') == 'user'), None)
+            if last_user:
+                preview = (last_user.get('content') or '')[:300].replace('\n', ' ')
+                logger.info("[CHAT] Dernier user (aperçu 300c): %s", preview)
+            if system_prompt:
+                logger.info("[CHAT] system_prompt fourni (%d caractères)", len(system_prompt or ''))
+        except Exception as _:
+            pass
         
         if not messages:
             return jsonify({
@@ -108,6 +132,14 @@ def chat():
                 else:
                     settings['local_model'] = original_model
         
+        try:
+            logger.info("[CHAT] Réponse IA reçue (%d caractères)", len(response or ''))
+            if response:
+                logger.debug("[CHAT] Réponse (aperçu 500c): %s", (response or '')[:500].replace('\n', ' '))
+            logger.info("[CHAT] used_langgraph=%s, model_used=%s", use_langgraph and use_tools, model_used)
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
             'response': response,

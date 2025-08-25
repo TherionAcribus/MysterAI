@@ -336,6 +336,11 @@ class LangGraphService:
             # Fallback sur prompt par défaut si toujours absent
             if not system_prompt:
                 system_prompt = DEFAULT_SYSTEM_PROMPT
+            try:
+                print("[LG] Appel LangGraph → messages:", [(m.get('role'), len(m.get('content') or '')) for m in messages])
+                print("[LG] system_prompt len:", len(system_prompt or ''))
+            except Exception:
+                pass
             
             # Préparer l'état initial
             initial_state = {
@@ -350,6 +355,10 @@ class LangGraphService:
             # Extraire la réponse
             final_messages = result["messages"]
             if final_messages and isinstance(final_messages[-1], AIMessage):
+                try:
+                    print("[LG] Sortie IA len:", len(final_messages[-1].content or ''))
+                except Exception:
+                    pass
                 return final_messages[-1].content
             
             return "Erreur: Aucune réponse générée par le modèle"

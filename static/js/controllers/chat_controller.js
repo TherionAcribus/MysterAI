@@ -53,6 +53,7 @@
             this.element.addChat = this.addChat.bind(this);
             this.element.switchToChat = this.switchToChat.bind(this);
             this.element.setWelcomeForChat = this.setWelcomeForChat.bind(this);
+            this.element.addContextMessage = this.addContextMessage.bind(this);
         }
         
         /**
@@ -71,6 +72,22 @@
             
             // Ajuster la largeur du conteneur d'onglets
             this.tabsTarget.style.paddingRight = `${sidebarWidth + 10}px`;
+        }
+
+        #notifyPipelineChanged(chatContainer, label) {
+            try {
+                const messagesContainer = chatContainer.querySelector('.chat-messages');
+                if (!messagesContainer) return;
+                const info = document.createElement('div');
+                info.className = 'chat-message system';
+                info.innerHTML = `
+                    <div class="message-content">
+                        Pipeline sélectionné: <strong>${this.escapeHtml(label)}</strong>
+                    </div>
+                `;
+                messagesContainer.appendChild(info);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } catch (e) {}
         }
 
         addChat() {
@@ -109,6 +126,12 @@
             chatContainer.innerHTML = `
                 <div class="chat-header">
                     <h2 class="text-sm font-semibold mb-2">CHAT IA #${chatId}</h2>
+                    <div class="flex items-center space-x-2">
+                        <label class="text-xs text-gray-400">Pipeline</label>
+                        <select class="chat-pipeline-selector bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
+                            <option value="">(par défaut)</option>
+                        </select>
+                    </div>
                     <button class="chat-close-button" data-action="click->chat#closeChat" data-chat-id="${chatId}">
                         <i class="fas fa-times"></i>
                     </button>
@@ -130,6 +153,63 @@
                 </div>
             `;
             this.chatListTarget.appendChild(chatContainer);
+
+            // Charger la liste des pipelines pour le sélecteur
+            const selector = chatContainer.querySelector('.chat-pipeline-selector');
+            if (selector) {
+                fetch('/api/ai/pipelines')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.success && Array.isArray(data.pipelines)) {
+                            // Cache pipelines côté client pour usage ultérieur
+                            window.__pipelinesCache = data.pipelines;
+                            window.__pipelinesMap = (data.pipelines || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+                            if (!window.__pipelineDefaultUserPrompts) window.__pipelineDefaultUserPrompts = {};
+                            data.pipelines.forEach(p => {
+                                const opt = document.createElement('option');
+                                opt.value = p.id;
+                                opt.textContent = p.name || p.id;
+                                selector.appendChild(opt);
+                                if (p.user_default_prompt) {
+                                    window.__pipelineDefaultUserPrompts[p.id] = p.user_default_prompt;
+                                }
+                            });
+                            // Préselect pipeline si le chat a un dataset
+                            if (chatContainer.dataset.pipelineId) {
+                                selector.value = chatContainer.dataset.pipelineId;
+                            }
+                            // Pré-remplir la zone de saisie avec message standard (pipeline ou fallback)
+                            const textarea = chatContainer.querySelector('.chat-input');
+                            if (textarea) {
+                                const sel = selector.value || '';
+                                const prompts = window.__pipelineDefaultUserPrompts || {};
+                                const fallback = "Merci d'analyser cette géocache en appliquant le pipeline sélectionné (classification → plan/outils → vérification).";
+                                textarea.value = sel && prompts[sel] ? prompts[sel] : fallback;
+                            }
+                        }
+                    })
+                    .catch(() => {});
+
+                // Persister le choix dans dataset
+                selector.addEventListener('change', () => {
+                    const val = selector.value || '';
+                    if (val) {
+                        chatContainer.dataset.pipelineId = val;
+                    } else {
+                        delete chatContainer.dataset.pipelineId;
+                    }
+                    // Notifier dans l'UI
+                    const label = selector.options[selector.selectedIndex]?.text || (val || '(par défaut)');
+                    this.#notifyPipelineChanged(chatContainer, label);
+                    // Mettre à jour le message par défaut dans le textarea
+                    const textarea = chatContainer.querySelector('.chat-input');
+                    if (textarea) {
+                        const prompts = window.__pipelineDefaultUserPrompts || {};
+                        const fallback = "Merci d'analyser cette géocache en appliquant le pipeline sélectionné (classification → plan/outils → vérification).";
+                        textarea.value = val && prompts[val] ? prompts[val] : fallback;
+                    }
+                });
+            }
             
             // Initialiser la conversation pour ce chat
             if (!this.conversations) {
@@ -171,6 +251,35 @@
             if (this.conversations && this.conversations[chatId] && this.conversations[chatId][0] && this.conversations[chatId][0].role === 'assistant') {
                 this.conversations[chatId][0].content = welcomeText;
             }
+            return true;
+        }
+
+        addContextMessage(chatId, role, content) {
+            const chatInstance = this.chatListTarget.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            if (!chatInstance) return false;
+            const messagesContainer = chatInstance.querySelector('.chat-messages');
+            if (!messagesContainer) return false;
+            const wrap = document.createElement('div');
+            wrap.className = `chat-message ${role === 'system' ? 'system' : 'user'}`;
+            wrap.innerHTML = `
+                <div class="message-content">${this.escapeHtml(content).replace(/\n/g,'<br>')}</div>
+            `;
+            messagesContainer.appendChild(wrap);
+            if (this.conversations && this.conversations[chatId]) {
+                const msg = { role: role === 'system' ? 'system' : 'user', content };
+                // Si c'est un contexte système et qu'aucun message système n'existe encore, l'insérer en 0 après le message d'accueil assistant
+                if (msg.role === 'system') {
+                    // position après le premier message assistant si présent
+                    if (this.conversations[chatId].length >= 1 && this.conversations[chatId][0].role === 'assistant') {
+                        this.conversations[chatId].splice(1, 0, msg);
+                    } else {
+                        this.conversations[chatId].unshift(msg);
+                    }
+                } else {
+                    this.conversations[chatId].push(msg);
+                }
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
             return true;
         }
         
@@ -317,6 +426,34 @@
                 }
             }
 
+            // Construire les messages: cas spécial premier envoi → enveloppe (contexte + étape1 pipeline + dernier user)
+            const isFirstUserSend = this.conversations[chatId].filter(m => m.role === 'user').length === 1;
+            let messagesToSend = this.conversations[chatId];
+            if (isFirstUserSend) {
+                try {
+                    const pipelineId = chatInstanceEl && chatInstanceEl.dataset.pipelineId ? chatInstanceEl.dataset.pipelineId : null;
+                    const pipeline = pipelineId && window.__pipelinesMap ? window.__pipelinesMap[pipelineId] : null;
+                    const firstStep = pipeline && Array.isArray(pipeline.steps) ? pipeline.steps.find(s => s.type === 'llm') : null;
+                    const firstStepPrompt = firstStep && firstStep.prompt ? firstStep.prompt : null;
+                    // Construire un contexte formaté avec la description stockée en dataset
+                    let sysCtxMsg = this.conversations[chatId].find(m => m.role === 'system');
+                    if (!sysCtxMsg && chatInstanceEl && chatInstanceEl.dataset.geocacheDesc) {
+                        const desc = chatInstanceEl.dataset.geocacheDesc;
+                        sysCtxMsg = { role: 'system', content: `Contexte géocache (listing) :\n\n${desc}` };
+                    }
+                    const userLast = this.conversations[chatId][this.conversations[chatId].length - 1];
+                    const envelope = [];
+                    if (sysCtxMsg) envelope.push(sysCtxMsg);
+                    if (firstStepPrompt) envelope.push({ role: 'system', content: firstStepPrompt });
+                    if (userLast && userLast.role === 'user') envelope.push(userLast);
+                    // Conserver aussi le tout premier assistant (accueil) en tête si présent
+                    const firstAssistant = this.conversations[chatId][0] && this.conversations[chatId][0].role === 'assistant' ? this.conversations[chatId][0] : null;
+                    messagesToSend = firstAssistant ? [firstAssistant, ...envelope] : envelope;
+                } catch(e) {
+                    messagesToSend = this.conversations[chatId];
+                }
+            }
+
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -324,7 +461,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    messages: this.conversations[chatId],
+                    messages: messagesToSend,
                     model_id: activeModel,
                     use_tools: true,  // Activer l'utilisation des outils
                     pipeline_id: pipelineId
