@@ -192,13 +192,15 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
     "name": "GPT-4o",
     "type": "online",
     "is_active": true,
-    "is_usable": true
+    "is_usable": true,
+    "supports_vision": true
   },{
     "id": "llama3:latest",
     "name": "Llama 3",
     "type": "local",
     "is_active": false,
-    "is_usable": true
+    "is_usable": true,
+    "supports_vision": false
   }],
   "current_mode": "online"
 }
@@ -343,7 +345,11 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
   "model_id": "gpt-4o",
   "system_prompt": "Tu es un assistant amical.",
   "use_tools": true,
-  "pipeline_id": "geocache_default"
+  "pipeline_id": "geocache_default",
+  "images": [
+    "https://example.local/geocaches_images/GC12345/abc.jpg",
+    "https://example.local/geocaches_images/GC12345/def.png"
+  ]
 }
 ```
 
@@ -366,6 +372,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 - `system_prompt` est optionnel ; définit les instructions système pour le modèle.
 - `use_tools` détermine si LangGraph (avec outils) doit être utilisé.
 - `pipeline_id` est optionnel ; lorsqu'il est fourni et que `use_tools` est vrai, la réponse est orchestrée selon la définition du pipeline (étapes, prompts, outils autorisés).
+- `images` est optionnel ; si le modèle supporte la vision, les images sont jointes au dernier message utilisateur. Sinon, les URLs sont ajoutées en texte.
 - En cas d'ouverture depuis une géocache, le client enverra un message `system` supplémentaire contenant le listing (description) afin d'assurer sa prise en compte dans le premier tour.
 
 ## Endpoints de test

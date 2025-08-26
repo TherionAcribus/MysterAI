@@ -131,6 +131,9 @@
                         <select class="chat-pipeline-selector bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
                             <option value="">(par défaut)</option>
                         </select>
+                        <button class="chat-images-toggle bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600" title="Sélectionner des images" data-action="click->chat#toggleImages">
+                            <i class="fas fa-image"></i> Images
+                        </button>
                     </div>
                     <button class="chat-close-button" data-action="click->chat#closeChat" data-chat-id="${chatId}">
                         <i class="fas fa-times"></i>
@@ -143,6 +146,11 @@
                             Bonjour, je suis votre assistant IA. Comment puis-je vous aider aujourd'hui?
                         </div>
                     </div>
+                </div>
+                <div class="chat-image-picker hidden">
+                    <div class="text-xs text-gray-300 mb-2">Sélectionnez les images pertinentes à envoyer au modèle (facultatif)</div>
+                    <div class="image-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
+                    <div class="text-xs text-gray-400 mt-2"><span class="selected-count">0</span> image(s) sélectionnée(s)</div>
                 </div>
                 <div class="chat-input-container">
                     <textarea class="chat-input" rows="3" placeholder="Tapez votre message..." 
@@ -230,6 +238,106 @@
             this.adjustTabsPosition();
             
             return chatId;
+        }
+
+        toggleImages(event) {
+            // Trouver le chat actif
+            const activeChat = this.chatListTarget.querySelector('.chat-instance.active');
+            if (!activeChat) return;
+            const picker = activeChat.querySelector('.chat-image-picker');
+            if (!picker) return;
+            const wasHidden = picker.classList.contains('hidden');
+            picker.classList.toggle('hidden');
+            if (wasHidden) {
+                // Charger les images si pas encore chargées
+                if (!activeChat.dataset.imagesLoaded) {
+                    const geocacheId = activeChat.dataset.geocacheId;
+                    const grid = picker.querySelector('.image-grid');
+                    const countEl = picker.querySelector('.selected-count');
+                    if (!geocacheId) {
+                        if (grid) grid.innerHTML = '<div class="text-xs text-gray-400">Ce chat n\'est pas lié à une géocache. Ouvrez le chat depuis une fiche géocache pour sélectionner des images.</div>';
+                        if (countEl) countEl.textContent = '0';
+                        return;
+                    }
+                    this.loadImagesForChat(activeChat);
+                }
+            }
+        }
+
+        async loadImagesForChat(chatContainer) {
+            try {
+                const geocacheId = chatContainer.dataset.geocacheId;
+                if (!geocacheId) return;
+                const resp = await fetch(`/api/geocaches/${geocacheId}/images`);
+                if (!resp.ok) {
+                    const grid = chatContainer.querySelector('.chat-image-picker .image-grid');
+                    const countEl = chatContainer.querySelector('.chat-image-picker .selected-count');
+                    if (grid) grid.innerHTML = '<div class="text-xs text-red-400">Erreur HTTP lors du chargement des images.</div>';
+                    if (countEl) countEl.textContent = '0';
+                    return;
+                }
+                const data = await resp.json();
+                const grid = chatContainer.querySelector('.chat-image-picker .image-grid');
+                const countEl = chatContainer.querySelector('.chat-image-picker .selected-count');
+                if (!data.success || !Array.isArray(data.images)) {
+                    if (grid) grid.innerHTML = '<div class="text-xs text-red-400">Erreur lors du chargement des images.</div>';
+                    if (countEl) countEl.textContent = '0';
+                    return;
+                }
+                if (!grid) return;
+                grid.innerHTML = '';
+                // Préserver sélection précédente
+                const selectedSet = new Set((chatContainer.dataset.selectedImages ? JSON.parse(chatContainer.dataset.selectedImages) : []));
+                if (data.images.length === 0) {
+                    grid.innerHTML = '<div class="text-xs text-gray-400">Aucune image trouvée pour cette géocache.</div>';
+                    if (countEl) countEl.textContent = '0';
+                }
+                data.images.forEach(img => {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'image-thumb';
+                    wrap.innerHTML = `
+                        <label style="display:block;cursor:pointer;">
+                            <input type="checkbox" class="image-select" data-url="${this.escapeHtml(img.url)}" style="display:none;">
+                            <div style="position:relative;border:1px solid #444;border-radius:6px;overflow:hidden;">
+                                <img src="${this.escapeHtml(img.url)}" alt="${this.escapeHtml(img.name || '')}" style="width:100%;height:72px;object-fit:cover;display:block;">
+                                <div class="check-overlay" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border-radius:9999px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0;transition:opacity .15s;">✓</div>
+                            </div>
+                            <div class="text-2xs text-gray-400 mt-1 truncate" title="${this.escapeHtml(img.name || '')}">${this.escapeHtml(img.name || '')}</div>
+                        </label>
+                    `;
+                    const checkbox = wrap.querySelector('.image-select');
+                    const overlay = wrap.querySelector('.check-overlay');
+                    if (selectedSet.has(img.url)) {
+                        checkbox.checked = true;
+                        if (overlay) overlay.style.opacity = '1';
+                    }
+                    wrap.addEventListener('click', (e) => {
+                        // éviter double toggle si clic sur input
+                        if (e.target && e.target.classList && e.target.classList.contains('image-select')) return;
+                        checkbox.checked = !checkbox.checked;
+                        overlay.style.opacity = checkbox.checked ? '1' : '0';
+                        this.#updateSelectedImages(chatContainer);
+                    });
+                    grid.appendChild(wrap);
+                });
+                chatContainer.dataset.imagesLoaded = '1';
+                this.#updateSelectedImages(chatContainer);
+            } catch (e) {
+                // silencieux
+                const grid = chatContainer.querySelector('.chat-image-picker .image-grid');
+                const countEl = chatContainer.querySelector('.chat-image-picker .selected-count');
+                if (grid) grid.innerHTML = '<div class="text-xs text-red-400">Erreur lors du chargement des images.</div>';
+                if (countEl) countEl.textContent = '0';
+            }
+        }
+
+        #updateSelectedImages(chatContainer) {
+            const checkboxes = chatContainer.querySelectorAll('.chat-image-picker .image-select');
+            const selected = [];
+            checkboxes.forEach(cb => { if (cb.checked && cb.dataset.url) selected.push(cb.dataset.url); });
+            chatContainer.dataset.selectedImages = JSON.stringify(selected);
+            const countEl = chatContainer.querySelector('.chat-image-picker .selected-count');
+            if (countEl) countEl.textContent = String(selected.length);
         }
 
         /**
@@ -454,6 +562,15 @@
                 }
             }
 
+            // Récupérer les images sélectionnées (si le chat est lié à une géocache)
+            let images = [];
+            try {
+                const selected = chatInstanceEl && chatInstanceEl.dataset.selectedImages ? JSON.parse(chatInstanceEl.dataset.selectedImages) : [];
+                if (Array.isArray(selected)) {
+                    images = selected;
+                }
+            } catch(e) {}
+
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -464,7 +581,8 @@
                     messages: messagesToSend,
                     model_id: activeModel,
                     use_tools: true,  // Activer l'utilisation des outils
-                    pipeline_id: pipelineId
+                    pipeline_id: pipelineId,
+                    images: images
                 })
             })
             .then(response => response.json())

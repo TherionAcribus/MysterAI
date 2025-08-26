@@ -1183,6 +1183,25 @@ def get_geocache_gallery(geocache_id):
     return render_template('partials/geocache_gallery.html', geocache=geocache)
 
 
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/images', methods=['GET'])
+def list_geocache_images(geocache_id):
+    """Retourne la liste JSON des images d'une géocache (id, url, nom, original)."""
+    try:
+        geocache = Geocache.query.options(db.joinedload(Geocache.images)).get_or_404(geocache_id)
+        images = []
+        for img in geocache.images:
+            images.append({
+                'id': img.id,
+                'url': url_for('geocaches.serve_image', filename=f'{geocache.gc_code}/{img.filename}'),
+                'name': img.name,
+                'is_original': bool(img.is_original)
+            })
+        return jsonify({'success': True, 'images': images})
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des images pour la géocache {geocache_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @geocaches_bp.route('/geocaches/<int:geocache_id>/solver/panel', methods=['GET'])
 def get_geocache_solver_panel(geocache_id):
     """Renvoie le panneau HTML du solver d'une géocache."""

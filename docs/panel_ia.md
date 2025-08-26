@@ -49,6 +49,7 @@ Le panel IA s'intègre désormais avec les détails des géocaches, permettant a
 - Insérer un message `system` contenant la description (listing) de la géocache au premier tour
 - Pré-remplir la zone de saisie avec `user_default_prompt` du pipeline sélectionné
 - Transmettre automatiquement `pipeline_id: geocache_default` pour orchestrer la réponse selon le pipeline Géocache
+- Afficher un sélecteur d'images (vignettes) pour choisir quelles images de la géocache envoyer au modèle (si le modèle supporte la vision)
 
 ### 5. Changement de modèle d'IA en temps réel
 
@@ -208,6 +209,9 @@ Chaque instance de chat est créée dynamiquement avec la structure suivante :
                 Bonjour, je suis votre assistant IA. Comment puis-je vous aider aujourd'hui?
             </div>
         </div>
+    </div>
+    <div class="chat-image-picker hidden">
+        <!-- Grille de vignettes sélectionnables chargées via /api/geocaches/<id>/images -->
     </div>
     <div class="chat-input-container">
         <textarea class="chat-input" rows="3" placeholder="Tapez votre message..." 

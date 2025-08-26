@@ -271,7 +271,7 @@ class LangGraphService:
         
         return self._graph
     
-    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None) -> str:
+    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None, images: Optional[List[str]] = None) -> str:
         """
         Envoie une conversation au modèle d'IA via LangGraph et retourne la réponse
         
@@ -294,9 +294,25 @@ class LangGraphService:
             langchain_messages = []
             
             # Ajouter les messages de la conversation
-            for msg in messages:
+            # Insérer les images sur le dernier message utilisateur si fournies
+            last_user_index = None
+            for i, _m in enumerate(messages):
+                if _m.get('role') == 'user':
+                    last_user_index = i
+            for idx, msg in enumerate(messages):
                 if msg["role"] == "user":
-                    langchain_messages.append(HumanMessage(content=msg["content"]))
+                    if images and idx == last_user_index:
+                        parts = []
+                        if msg.get("content"):
+                            parts.append({"type": "text", "text": msg["content"]})
+                        try:
+                            for url in images:
+                                parts.append({"type": "image_url", "image_url": {"url": url}})
+                        except Exception:
+                            pass
+                        langchain_messages.append(HumanMessage(content=parts))
+                    else:
+                        langchain_messages.append(HumanMessage(content=msg["content"]))
                 elif msg["role"] == "assistant":
                     langchain_messages.append(AIMessage(content=msg["content"]))
                 elif msg["role"] == "system":

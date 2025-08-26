@@ -5,6 +5,9 @@ from app.models.app_config import AppConfig
 from app.services.ocr_service import get_ocr_service
 from app.services.pipeline_registry import pipeline_registry
 import logging
+import os
+import base64
+import mimetypes
 
 # Configurer le logger
 logger = logging.getLogger(__name__)
@@ -51,13 +54,14 @@ def chat():
     try:
         data = request.json
         messages = data.get('messages', [])
+        images = data.get('images', [])
         model_id = data.get('model_id')  # Récupérer l'ID du modèle spécifié
         system_prompt = data.get('system_prompt')  # Récupérer le prompt système personnalisé
         pipeline_id = data.get('pipeline_id')  # Pipeline éditable optionnel
         use_tools = data.get('use_tools', True)  # Activer/désactiver l'utilisation des outils
         try:
             # Logs détaillés entrée
-            logger.info("[CHAT] Requête reçue → model_id=%s, pipeline_id=%s, use_tools=%s", model_id, pipeline_id, use_tools)
+            logger.info("[CHAT] Requête reçue → model_id=%s, pipeline_id=%s, use_tools=%s, images=%d", model_id, pipeline_id, use_tools, len(images or []))
             # Résumé compact
             logger.info("[CHAT] Messages (%d): %s", len(messages),
                         ", ".join([f"{m.get('role','?')}({len((m.get('content') or ''))}c)" for m in messages]))
@@ -107,6 +111,61 @@ def chat():
                 settings['local_model'] = model_id
                 model_used = settings['local_models'][short_local].get('name', short_local)
         
+        # Normaliser les URLs d'images en URLs absolues si nécessaire
+        abs_images = []
+        try:
+            base = request.host_url
+            for u in (images or []):
+                if not u:
+                    continue
+                if isinstance(u, str) and (u.startswith('http://') or u.startswith('https://') or u.startswith('data:')):
+                    abs_images.append(u)
+                elif isinstance(u, str):
+                    abs_images.append((base.rstrip('/') + '/' + u.lstrip('/')))
+        except Exception:
+            abs_images = images or []
+
+        # Réécrire les URLs locales en data: URLs (embeds) pour que l'API puisse accéder aux images
+        prepared_images = []
+        try:
+            host = (request.host_url or '').rstrip('/')
+            prefix = host + '/geocaches_images/'
+            for u in abs_images:
+                if not isinstance(u, str) or not u:
+                    continue
+                if u.startswith('data:'):
+                    prepared_images.append(u)
+                    continue
+                if u.startswith(prefix):
+                    # Convertir en data URL
+                    rel = u[len(host)+1:]  # ex: geocaches_images/GCXXXX/file.jpg
+                    try:
+                        # Construire chemin disque: ../geocaches_images/<...>
+                        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+                        fs_path = os.path.normpath(os.path.join(base_dir, rel.replace('/', os.sep)))
+                        # Sécurité: vérifier que le fichier est bien sous geocaches_images
+                        allowed_root = os.path.normpath(os.path.join(base_dir, 'geocaches_images'))
+                        if not fs_path.startswith(allowed_root):
+                            prepared_images.append(u)
+                            continue
+                        if not os.path.exists(fs_path):
+                            prepared_images.append(u)
+                            continue
+                        mime, _ = mimetypes.guess_type(fs_path)
+                        if not mime:
+                            mime = 'image/jpeg'
+                        with open(fs_path, 'rb') as f:
+                            b64 = base64.b64encode(f.read()).decode('ascii')
+                        data_url = f"data:{mime};base64,{b64}"
+                        prepared_images.append(data_url)
+                    except Exception:
+                        prepared_images.append(u)
+                else:
+                    # Laisser tel quel pour URLs publiques
+                    prepared_images.append(u)
+        except Exception:
+            prepared_images = abs_images
+
         # Vérifier si on doit utiliser LangGraph
         use_langgraph = settings.get('use_langgraph', True)
         
@@ -117,11 +176,12 @@ def chat():
             # pour résoudre des énigmes de géocaching
             # Importer ici pour éviter l'importation circulaire
             from app.services.langgraph_service import langgraph_service
-            response = langgraph_service.chat(messages, system_prompt, pipeline_id=pipeline_id)
+            response = langgraph_service.chat(messages, system_prompt, pipeline_id=pipeline_id, images=prepared_images)
         else:
             # Utiliser le service AI standard (LangChain)
             # Cette implémentation est plus simple et n'utilise pas les outils
-            response = ai_service.chat(messages, settings)
+            # Passer également les images au service IA standard
+            response = ai_service.chat(messages, settings, images=prepared_images)
         
         # Restaurer les paramètres originaux si nécessaire
         if model_id and original_mode:
@@ -490,12 +550,20 @@ def get_ai_models():
             is_active = settings.get('mode') == 'online' and settings.get('online_model') == legacy_id
             is_usable = bool(m.get('is_usable', False))
             name = m.get('name', legacy_id) + ('' if is_usable else ' (API Key manquante)')
+            # Déterminer si le modèle supporte la vision
+            supports_vision = False
+            try:
+                lower_id = (legacy_id or '').lower()
+                supports_vision = any(x in lower_id for x in ['gpt-4o', 'gpt-4.1', 'vision'])
+            except Exception:
+                supports_vision = False
             models.append({
                 'id': legacy_id,
                 'name': name,
                 'type': 'online',
                 'is_active': is_active,
-                'is_usable': is_usable
+                'is_usable': is_usable,
+                'supports_vision': supports_vision
             })
 
         # Local: n'afficher QUE les modèles installés; id complet (ex: 'llama3:latest')
@@ -507,12 +575,20 @@ def get_ai_models():
             is_active = settings.get('mode') == 'local' and (
                 settings.get('local_model') == full or settings.get('local_model') == short_id
             )
+            # Heuristique simple pour vision côté local (peut être enrichie plus tard)
+            supports_vision = False
+            try:
+                lower_full = (full or '').lower()
+                supports_vision = any(x in lower_full for x in ['llava', 'moondream', 'vision'])
+            except Exception:
+                supports_vision = False
             models.append({
                 'id': full,
                 'name': m.get('name', short_id),
                 'type': 'local',
                 'is_active': is_active,
-                'is_usable': True
+                'is_usable': True,
+                'supports_vision': supports_vision
             })
 
         # Fallback si vide

@@ -65,6 +65,7 @@
                             option.textContent = model.name;
                             option.selected = model.is_active;
                             option.setAttribute('data-usable', model.is_usable ? 'true' : 'false');
+                            if (model.supports_vision) option.setAttribute('data-vision', 'true');
                             onlineGroup.appendChild(option);
                         });
                         
@@ -82,6 +83,7 @@
                             option.textContent = model.name;
                             option.selected = model.is_active;
                             option.setAttribute('data-usable', model.is_usable !== false ? 'true' : 'false');
+                            if (model.supports_vision) option.setAttribute('data-vision', 'true');
                             localGroup.appendChild(option);
                         });
                         

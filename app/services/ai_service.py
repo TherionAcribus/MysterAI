@@ -120,7 +120,7 @@ class AIService:
                 base_url=self.ollama_url
             )
     
-    def chat(self, messages, settings=None):
+    def chat(self, messages, settings=None, images=None):
         """
         Envoie une conversation au modèle d'IA et retourne la réponse.
         Cette méthode sert de point d'entrée unique et délègue aux implémentations
@@ -165,16 +165,16 @@ class AIService:
             from app.services.langgraph_service import langgraph_service
             system_prompt = settings.get('system_prompt', '')
             print(f"Utilisation de LangGraph avec system_prompt de {len(system_prompt)} caractères")
-            return langgraph_service.chat(messages, system_prompt)
+            return langgraph_service.chat(messages, system_prompt, images=images)
         else:
             # Utiliser LangChain (implémentation simple sans outils)
             mode = settings.get('mode', 'online')
             print(f"Utilisation de LangChain en mode {mode}")
             
             if mode == 'online':
-                return self.chat_online(messages, settings)
+                return self.chat_online(messages, settings, images=images)
             else:
-                return self.chat_local(messages, settings)
+                return self.chat_local(messages, settings, images=images)
     
     def test_ollama_connection(self, url: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -416,7 +416,7 @@ class AIService:
         
         return settings
 
-    def chat_online(self, messages, settings):
+    def chat_online(self, messages, settings, images=None):
         """
         Utilise un service en ligne (OpenAI, etc.) pour le chat
         
@@ -457,6 +457,15 @@ class AIService:
             
             # Préparer les messages pour l'API
             formatted_messages = []
+            # Déterminer si le modèle supporte la vision
+            def _supports_vision(model_id: str) -> bool:
+                vision_models = {
+                    'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4-turbo', 'gpt-4-turbo-2024-04-09'
+                }
+                try:
+                    return model_id in vision_models or 'gpt-4o' in model_id or 'gpt-4-vision' in model_id
+                except Exception:
+                    return False
             
             # Ajouter un message système si configuré
             system_prompt = settings.get('system_prompt', '')
@@ -465,18 +474,44 @@ class AIService:
                 print(f"Message système ajouté: {len(system_prompt)} caractères")
             
             # Ajouter les messages de la conversation
-            for msg in messages:
+            # Trouver l'index du dernier message user
+            last_user_index = None
+            for i, m in enumerate(messages):
+                if m.get('role') == 'user':
+                    last_user_index = i
+            for idx, msg in enumerate(messages):
                 role = msg.get('role', 'user')
                 content = msg.get('content', '')
-                
                 if role == 'user':
-                    formatted_messages.append(HumanMessage(content=content))
+                    # Combiner le texte avec les images si fournies et supportées
+                    if images and _supports_vision(model):
+                        if idx == last_user_index:
+                            parts = []
+                            if content:
+                                parts.append({"type": "text", "text": content})
+                            try:
+                                for url in images:
+                                    parts.append({"type": "image_url", "image_url": {"url": url}})
+                            except Exception:
+                                pass
+                            formatted_messages.append(HumanMessage(content=parts))
+                        else:
+                            formatted_messages.append(HumanMessage(content=content))
+                    else:
+                        # Fallback: insérer les URLs d'images dans le texte
+                        if idx == last_user_index and images:
+                            fallback_text = content + "\n\nImages: " + ", ".join(images)
+                            formatted_messages.append(HumanMessage(content=fallback_text))
+                        else:
+                            formatted_messages.append(HumanMessage(content=content))
                 elif role == 'assistant':
                     formatted_messages.append(AIMessage(content=content))
                 elif role == 'system':
                     formatted_messages.append(SystemMessage(content=content))
-                    
-                print(f"Message {role}: {len(content)} caractères")
+                try:
+                    print(f"Message {role}: {len(content)} caractères")
+                except Exception:
+                    pass
             
             print(f"Envoi de {len(formatted_messages)} messages à l'API")
             
@@ -492,7 +527,7 @@ class AIService:
             print(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
             return f"Erreur: {str(e)}"
 
-    def chat_local(self, messages, settings):
+    def chat_local(self, messages, settings, images=None):
         """
         Utilise un service local (Ollama, etc.) pour le chat
         
@@ -519,10 +554,19 @@ class AIService:
                 })
             
             # Ajouter les messages de la conversation
-            for msg in messages:
+            # Pour Ollama, sans support vision explicite ici, on concatène les URLs en fallback
+            last_user_index = None
+            for i, m in enumerate(messages):
+                if m.get('role') == 'user':
+                    last_user_index = i
+            for idx, msg in enumerate(messages):
+                role = msg.get('role', 'user')
+                content = msg.get('content', '')
+                if role == 'user' and images and idx == last_user_index:
+                    content = content + "\n\nImages: " + ", ".join(images)
                 formatted_messages.append({
-                    "role": msg.get('role', 'user'),
-                    "content": msg.get('content', '')
+                    "role": role,
+                    "content": content
                 })
             
             # Appeler l'API Ollama
