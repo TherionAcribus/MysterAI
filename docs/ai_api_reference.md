@@ -62,6 +62,17 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 { "success": true, "refreshed_at": "2025-01-01T12:00:00Z" }
 ```
 
+### Supprimer un pipeline utilisateur
+
+**Endpoint:** `POST /api/ai/pipelines/<pipeline_id>/delete`
+
+**Description:** Supprime le pipeline dans `pipelines.user.json` (si présent) et rafraîchit le cache.
+
+**Réponse:**
+```json
+{ "success": true, "refreshed_at": "2025-01-01T12:00:00Z" }
+```
+
 ### Rafraîchir le registre de pipelines
 
 **Endpoint:** `POST /api/ai/pipelines/refresh`
@@ -324,7 +335,10 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 ```json
 {
   "messages": [
-    {"role": "user", "content": "Bonjour, comment ça va?"}
+    {"role": "assistant", "content": "Bienvenue dans le Chat IA"},
+    {"role": "system", "content": "Contexte géocache : <listing tronqué>"},
+    {"role": "system", "content": "Tu es un assistant de géocaching... (system_prompt du pipeline)"},
+    {"role": "user", "content": "Merci d'analyser cette géocache..."}
   ],
   "model_id": "gpt-4o",
   "system_prompt": "Tu es un assistant amical.",
@@ -339,7 +353,11 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
   "success": true,
   "response": "Bonjour ! Je vais bien, merci de demander. Comment puis-je vous aider aujourd'hui ?",
   "model_used": "GPT-4o",
-  "used_langgraph": true
+  "used_langgraph": true,
+  "debug": {
+    "message_count": 4,
+    "log_keys": ["[CHAT] Messages", "[CHAT] msg[0]", "[CHAT] msg[1]"]
+  }
 }
 ```
 
@@ -348,6 +366,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 - `system_prompt` est optionnel ; définit les instructions système pour le modèle.
 - `use_tools` détermine si LangGraph (avec outils) doit être utilisé.
 - `pipeline_id` est optionnel ; lorsqu'il est fourni et que `use_tools` est vrai, la réponse est orchestrée selon la définition du pipeline (étapes, prompts, outils autorisés).
+- En cas d'ouverture depuis une géocache, le client enverra un message `system` supplémentaire contenant le listing (description) afin d'assurer sa prise en compte dans le premier tour.
 
 ## Endpoints de test
 

@@ -45,8 +45,9 @@ Chaque instance de chat comprend :
 
 Le panel IA s'intègre désormais avec les détails des géocaches, permettant aux utilisateurs de :
 - Ouvrir un chat IA directement depuis la page de détails d'une géocache
-- Initialiser automatiquement le chat avec les informations de la géocache (code, nom, description)
-- Poser des questions spécifiques à l'IA concernant l'analyse de la géocache
+- Initialiser automatiquement le chat avec les informations de la géocache (code, nom)
+- Insérer un message `system` contenant la description (listing) de la géocache au premier tour
+- Pré-remplir la zone de saisie avec `user_default_prompt` du pipeline sélectionné
 - Transmettre automatiquement `pipeline_id: geocache_default` pour orchestrer la réponse selon le pipeline Géocache
 
 ### 5. Changement de modèle d'IA en temps réel
@@ -269,6 +270,7 @@ sequenceDiagram
     Controller->>DOM: Ajoute le message utilisateur
     Controller->>DOM: Ajoute l'indicateur de frappe
     Controller->>API: Envoie la requête à l'API IA (avec pipeline_id si géocache)
+    Note over Controller,API: Premier tour = assistant welcome (si présent) + system(listing) + system(pipeline rules) + user
     API->>Controller: Retourne la réponse
     Controller->>DOM: Ajoute la réponse de l'IA
 ```
@@ -286,7 +288,8 @@ sequenceDiagram
     User->>GeocacheDetails: Clic sur bouton "Chat IA"
     GeocacheDetails->>Function: openGeocacheAIChat()
     Function->>Function: Récupère la description
-    Function->>Function: Construit le message initial
+    Function->>Function: Construit le message initial (pré-rempli via user_default_prompt)
+    Function->>ChatPanel: Ajoute un message system contenant le listing
     Function->>ChatPanel: Vérifie si le panel est ouvert
     Function->>ChatPanel: Ouvre le panel si nécessaire
     Function->>ChatPanel: Vérifie les chats existants
