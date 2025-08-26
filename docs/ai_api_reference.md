@@ -331,7 +331,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 
 **Endpoint:** `POST /api/ai/chat`
 
-**Description:** Envoie une conversation au modèle d'IA et retourne la réponse.
+**Description:** Envoie une conversation au modèle d'IA et retourne la réponse. Pour les usages de traduction, vous pouvez forcer le chemin sans outils et fournir un `system_prompt` spécifique.
 
 **Corps de la requête:**
 ```json
@@ -374,6 +374,24 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 - `pipeline_id` est optionnel ; lorsqu'il est fourni et que `use_tools` est vrai, la réponse est orchestrée selon la définition du pipeline (étapes, prompts, outils autorisés).
 - `images` est optionnel ; si le modèle supporte la vision, les images sont jointes au dernier message utilisateur. Sinon, les URLs sont ajoutées en texte.
 - En cas d'ouverture depuis une géocache, le client enverra un message `system` supplémentaire contenant le listing (description) afin d'assurer sa prise en compte dans le premier tour.
+
+#### Utilisation pour la traduction
+
+Pour obtenir une traduction précise en préservant le HTML et éviter tout encadrement avec des guillemets/backticks, forcer le mode simple et fournir un `system_prompt` explicite:
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "<div>Original HTML...</div>"}
+  ],
+  "system_prompt": "Tu es un traducteur professionnel... (contraintes: préserver strictement les balises/attributs, ne renvoyer que le HTML traduit, langue cible: fr-FR)",
+  "use_langgraph": false,
+  "mode": "online",
+  "model_id": "gpt-4o"
+}
+```
+
+La réponse contiendra le HTML traduit dans `response`, sans enrobage.
 
 ## Endpoints de test
 

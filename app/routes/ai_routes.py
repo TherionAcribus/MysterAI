@@ -92,6 +92,17 @@ def chat():
         
         # Si un modèle spécifique est demandé, l'utiliser temporairement
         settings = ai_service.get_settings()
+        # Prendre en compte les overrides simples transmis par le client
+        try:
+            if 'use_langgraph' in data:
+                settings['use_langgraph'] = bool(data.get('use_langgraph'))
+            if 'mode' in data and data.get('mode') in ('online', 'local'):
+                settings['mode'] = data.get('mode')
+            if system_prompt:
+                # Injecter le prompt système dans settings pour la voie LangChain
+                settings['system_prompt'] = system_prompt
+        except Exception:
+            pass
         original_mode = settings.get('mode')
         original_model = None
         model_used = None
@@ -194,8 +205,11 @@ def chat():
         
         try:
             logger.info("[CHAT] Réponse IA reçue (%d caractères)", len(response or ''))
-            if response:
+            if response is not None:
+                # Aperçu court
                 logger.debug("[CHAT] Réponse (aperçu 500c): %s", (response or '')[:500].replace('\n', ' '))
+                # Réponse brute complète (attention au volume)
+                logger.info("[CHAT] Réponse brute complète:\n-----8<-----\n%s\n-----8<-----", response)
             logger.info("[CHAT] used_langgraph=%s, model_used=%s", use_langgraph and use_tools, model_used)
         except Exception:
             pass

@@ -128,6 +128,27 @@ def update_geocache_description(geocache_id):
         logger.error(f"Erreur lors de la mise à jour de description_modified pour {geocache_id}: {str(e)}")
         return jsonify({'error': 'Failed to update description_modified'}), 500
 
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/description/modified', methods=['DELETE'])
+def delete_geocache_description_modified(geocache_id):
+    """Supprime la version modifiée de la description d'une géocache."""
+    try:
+        geocache = Geocache.query.get_or_404(geocache_id)
+        
+        # Supprimer la version modifiée
+        geocache.description_modified = None
+        geocache.last_updated = datetime.now(timezone.utc)
+        db.session.commit()
+        
+        return jsonify({
+            'id': geocache.id,
+            'gc_code': geocache.gc_code,
+            'message': 'Version modifiée supprimée avec succès'
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors de la suppression de description_modified pour {geocache_id}: {str(e)}")
+        return jsonify({'error': 'Failed to delete description_modified'}), 500
+
 @geocaches_bp.route('/geocaches/fetch', methods=['POST'])
 def fetch_gc_data():
     """Recupere les donnees d'une geocache via son code GC."""

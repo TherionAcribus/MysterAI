@@ -169,6 +169,22 @@
             <h2 class="text-lg font-semibold text-gray-100 mb-4 flex justify-between items-center">
                 <span>Description</span>
                 <div class="flex">
+                    {% if geocache.description_modified %}
+                    <button 
+                        id="toggle-description-version"
+                        class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center space-x-2 mr-2">
+                        <span>Voir original</span>
+                    </button>
+                    <button 
+                        id="delete-modified-version"
+                        class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm flex items-center space-x-2 mr-2"
+                        title="Supprimer la version modifiée et revenir à l'original">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Supprimer modifiée</span>
+                    </button>
+                    {% endif %}
                     <button 
                         id="edit-description-button"
                         class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 mr-2">
@@ -243,14 +259,52 @@
                 {{ (geocache.description_modified or geocache.description)|safe }}
             </div>
 
+            <!-- Stockage caché des versions -->
+            <div id="geocache-description-original-store" class="hidden">
+                {{ geocache.description|safe }}
+            </div>
+            {% if geocache.description_modified %}
+            <div id="geocache-description-modified-store" class="hidden">
+                {{ geocache.description_modified|safe }}
+            </div>
+            {% endif %}
+
             <!-- Editeur de description (caché par défaut) -->
             <div id="geocache-description-editor" class="mt-3 hidden">
                 <label class="block text-gray-300 text-sm font-bold mb-2" for="geocache-description-textarea">
                     Éditer la description (HTML autorisé)
                 </label>
+                <div class="mb-2 flex items-center gap-2">
+                    <label for="translate-language" class="text-xs text-gray-400">Langue cible</label>
+                    <select id="translate-language" class="bg-gray-800 text-gray-100 border border-gray-700 rounded px-2 py-1 text-sm">
+                        <option value="fr-FR" selected>Français (fr-FR)</option>
+                        <option value="en-US">Anglais (en-US)</option>
+                        <option value="en-GB">Anglais (en-GB)</option>
+                        <option value="de-DE">Allemand (de-DE)</option>
+                        <option value="es-ES">Espagnol (es-ES)</option>
+                        <option value="it-IT">Italien (it-IT)</option>
+                        <option value="nl-NL">Néerlandais (nl-NL)</option>
+                        <option value="pt-PT">Portugais (pt-PT)</option>
+                        <option value="pt-BR">Portugais (pt-BR)</option>
+                        <option value="pl-PL">Polonais (pl-PL)</option>
+                        <option value="ru-RU">Russe (ru-RU)</option>
+                        <option value="zh-CN">Chinois simplifié (zh-CN)</option>
+                        <option value="ja-JP">Japonais (ja-JP)</option>
+                    </select>
+                    <button id="translate-description"
+                            class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1.5 rounded-lg text-xs">
+                        Traduire
+                    </button>
+                    <span class="text-xs text-gray-500">Choisir la langue puis traduire</span>
+                </div>
                 <textarea id="geocache-description-textarea" rows="12"
                           class="w-full bg-gray-900 text-gray-100 border border-gray-700 rounded p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
                           placeholder="Saisissez ici votre version modifiée de la description...">{{ (geocache.description_modified or geocache.description) }}</textarea>
+                <!-- Prévisualisation du HTML -->
+                <div id="geocache-description-preview" class="mt-3 bg-gray-900 text-gray-100 border border-gray-700 rounded p-3">
+                    <div class="text-xs text-gray-400 mb-2">Prévisualisation</div>
+                    <div id="geocache-description-preview-content" class="prose prose-invert max-w-none"></div>
+                </div>
                 <div class="flex justify-end mt-3 gap-2">
                     <button id="cancel-description-edit"
                             class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
@@ -795,8 +849,18 @@
             const textarea = document.getElementById('geocache-description-textarea');
             const cancelBtn = document.getElementById('cancel-description-edit');
             const saveBtn = document.getElementById('save-description-edit');
+            const translateBtn = document.getElementById('translate-description');
+            const langSelect = document.getElementById('translate-language');
             const feedback = document.getElementById('description-edit-feedback');
             const geocacheId = '{{ geocache.id }}';
+            const previewWrap = document.getElementById('geocache-description-preview');
+            const previewContent = document.getElementById('geocache-description-preview-content');
+            const toggleBtn = document.getElementById('toggle-description-version');
+            const deleteModifiedBtn = document.getElementById('delete-modified-version');
+            const originalStore = document.getElementById('geocache-description-original-store');
+            const modifiedStore = document.getElementById('geocache-description-modified-store');
+            let showing = 'modified'; // par défaut on affiche la version active (modifiée si présente)
+            if (!modifiedStore) showing = 'original';
 
             if (!editBtn || !view || !editor || !textarea || !cancelBtn || !saveBtn) return;
 
@@ -804,6 +868,7 @@
                 editor.classList.remove('hidden');
                 view.classList.add('hidden');
                 setTimeout(() => textarea.focus(), 0);
+                refreshPreview();
             }
 
             function hideEditor() {
@@ -822,6 +887,7 @@
                 // Réinitialiser le textarea avec la valeur courante
                 textarea.value = view.innerHTML.trim();
                 hideEditor();
+                refreshPreview();
             });
 
             saveBtn.addEventListener('click', async (e) => {
@@ -840,8 +906,50 @@
                         body: JSON.stringify({ description_modified: value })
                     });
                     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    // Mettre à jour la vue
-                    view.innerHTML = value || '';
+                                         // Mettre à jour la vue
+                     view.innerHTML = value || '';
+                     refreshPreview();
+                     
+                     // Mettre à jour le store modifié et afficher les boutons de gestion si nécessaire
+                     try {
+                         if (!value || value.trim() === '') {
+                             // Si la valeur est vide, revenir à l'original et masquer les boutons
+                             view.innerHTML = originalStore.innerHTML || '';
+                             showing = 'original';
+                             
+                             // Masquer les boutons de gestion des versions
+                             if (toggleBtn) toggleBtn.classList.add('hidden');
+                             if (deleteModifiedBtn) deleteModifiedBtn.classList.add('hidden');
+                             
+                             // Supprimer le store modifié s'il existe
+                             if (modifiedStore) {
+                                 modifiedStore.remove();
+                             }
+                         } else {
+                             // Mettre à jour le store modifié et afficher les boutons
+                             if (modifiedStore) {
+                                 modifiedStore.innerHTML = value;
+                             } else {
+                                 // Créer dynamiquement si première modification
+                                 const ms = document.createElement('div');
+                                 ms.id = 'geocache-description-modified-store';
+                                 ms.className = 'hidden';
+                                 ms.innerHTML = value;
+                                 originalStore.parentNode.insertBefore(ms, originalStore.nextSibling);
+                             }
+                             
+                             // Afficher les boutons de gestion des versions
+                             if (toggleBtn) {
+                                 toggleBtn.classList.remove('hidden');
+                                 toggleBtn.querySelector('span').textContent = 'Voir original';
+                             }
+                             if (deleteModifiedBtn) {
+                                 deleteModifiedBtn.classList.remove('hidden');
+                             }
+                             
+                             showing = 'modified';
+                         }
+                     } catch(_) {}
                     if (feedback) {
                         feedback.textContent = 'Description sauvegardée.';
                         feedback.classList.remove('text-gray-400');
@@ -857,6 +965,181 @@
                     }
                 }
             });
+
+            function refreshPreview() {
+                try {
+                    if (previewContent) {
+                        previewContent.innerHTML = textarea.value || '';
+                    }
+                } catch(_) {}
+            }
+
+            if (textarea) {
+                textarea.addEventListener('input', () => {
+                    refreshPreview();
+                });
+            }
+
+            if (translateBtn) {
+                translateBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    const originalHtml = textarea.value || '';
+                    if (!originalHtml.trim()) return;
+                    const targetLang = (langSelect && langSelect.value) ? langSelect.value : 'fr-FR';
+                    if (feedback) {
+                        feedback.textContent = 'Traduction en cours...';
+                        feedback.classList.remove('hidden');
+                        feedback.classList.remove('text-red-400');
+                        feedback.classList.add('text-gray-400');
+                    }
+                    try {
+                        const system_prompt = (
+                            'Tu es un traducteur professionnel.\n' +
+                            'Tâche: traduire le contenu HTML fourni vers la langue cible spécifiée, avec une traduction précise et fidèle, sans omission ni résumé.\n' +
+                            'Langue cible: ' + targetLang + '\n' +
+                            'Contraintes IMPORTANTES (respect absolu):\n' +
+                            '1) Préserver strictement et à l\'identique le code HTML: même structure, mêmes balises, même ordre.\n' +
+                            '2) Conserver tous les attributs (class, id, data-*, href/src, style), les entités HTML et les liens/ancres.\n' +
+                            '3) Ne pas échapper le HTML, ne pas ajouter d\'enrobage (pas de ``` ou balises supplémentaires).\n' +
+                            '4) Ne pas halluciner: ne pas inventer d\'informations; conserver nombres, unités, alt des images.\n' +
+                            '5) Laisser inchangés les segments non traduisibles (noms propres, code).\n' +
+                            '6) Sortie: retourner uniquement le HTML traduit, rien d\'autre.\n' +
+                            "7) Ne pas encadrer le résultat par des guillemets, backticks ou blocs de code."
+                        );
+                        const payload = {
+                            // Forcer le mode simple (sans LangGraph) pour éviter les formats indésirables
+                            use_langgraph: false,
+                            mode: 'online',
+                            system_prompt,
+                            messages: [
+                                { role: 'user', content: originalHtml }
+                            ]
+                        };
+                        const resp = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                        const data = await resp.json();
+                        const raw = (data && (data.response || data.content || data.text)) || '';
+                        // Nettoyage: enlever éventuels guillemets/backticks/blocs de code autour du HTML
+                        const clean = (function cleanupWrapper(s){
+                            let out = (s || '').trim();
+                            // Enlever blocs ```lang\n ... ```
+                            out = out.replace(/^```[a-zA-Z]*\n([\s\S]*?)\n```\s*$/m, '$1');
+                            out = out.replace(/^```([\s\S]*?)```\s*$/m, '$1');
+                            // Enlever triples guillemets
+                            out = out.replace(/^\s*"""\s*([\s\S]*?)\s*"""\s*$/m, '$1');
+                            // Enlever simples guillemets entourant l\'ensemble si clairement du HTML
+                            if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
+                                const inner = out.slice(1, -1);
+                                if (inner.includes('<') && inner.includes('>')) out = inner;
+                            }
+                            return out.trim();
+                        })(raw);
+                        const translated = clean;
+                        if (!translated) throw new Error('Réponse vide');
+                        textarea.value = translated;
+                        refreshPreview();
+                        if (feedback) {
+                            feedback.textContent = 'Traduction terminée. Vérifiez puis sauvegardez.';
+                            feedback.classList.remove('text-gray-400');
+                            feedback.classList.add('text-green-400');
+                        }
+                    } catch (err) {
+                        if (feedback) {
+                            feedback.textContent = 'Erreur lors de la traduction.';
+                            feedback.classList.remove('text-gray-400');
+                            feedback.classList.add('text-red-400');
+                            feedback.classList.remove('hidden');
+                        }
+                    }
+                });
+            }
+
+            // Bascule entre original et modifié
+            if (toggleBtn && originalStore) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    try {
+                        if (showing === 'modified') {
+                            // Afficher original
+                            view.innerHTML = originalStore.innerHTML || '';
+                            showing = 'original';
+                            toggleBtn.querySelector('span').textContent = 'Voir version modifiée';
+                        } else {
+                            // Afficher modifié si disponible, sinon rester sur original
+                            const ms = document.getElementById('geocache-description-modified-store');
+                            if (ms) {
+                                view.innerHTML = ms.innerHTML || '';
+                                showing = 'modified';
+                                toggleBtn.querySelector('span').textContent = 'Voir original';
+                            }
+                        }
+                    } catch(_) {}
+                });
+            }
+
+                         // Supprimer la version modifiée
+             if (deleteModifiedBtn && originalStore) {
+                 deleteModifiedBtn.addEventListener('click', async (e) => {
+                     e.preventDefault();
+                     if (confirm('Êtes-vous sûr de vouloir supprimer la version modifiée de cette description ? Cette action est irréversible.')) {
+                         if (feedback) {
+                             feedback.textContent = 'Suppression en cours...';
+                             feedback.classList.remove('hidden');
+                             feedback.classList.remove('text-red-400');
+                             feedback.classList.add('text-gray-400');
+                         }
+                         try {
+                             const resp = await fetch(`/api/geocaches/${geocacheId}/description/modified`, {
+                                 method: 'DELETE'
+                             });
+                             if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                             
+                             // Mettre à jour la vue pour afficher l'original
+                             view.innerHTML = originalStore.innerHTML || '';
+                             showing = 'original';
+                             
+                             // Mettre à jour le textarea si l'éditeur est ouvert
+                             if (textarea) {
+                                 textarea.value = originalStore.innerHTML || '';
+                                 refreshPreview();
+                             }
+                             
+                             // Masquer les boutons de gestion des versions modifiées
+                             if (deleteModifiedBtn) {
+                                 deleteModifiedBtn.classList.add('hidden');
+                             }
+                             if (toggleBtn) {
+                                 toggleBtn.classList.add('hidden');
+                             }
+                             
+                             // Supprimer le store modifié du DOM
+                             if (modifiedStore) {
+                                 modifiedStore.remove();
+                             }
+                             
+                             if (feedback) {
+                                 feedback.textContent = 'Version modifiée supprimée. Retour à la version originale.';
+                                 feedback.classList.remove('text-gray-400');
+                                 feedback.classList.add('text-green-400');
+                                 setTimeout(() => {
+                                     feedback.classList.add('hidden');
+                                 }, 3000);
+                             }
+                         } catch (err) {
+                             if (feedback) {
+                                 feedback.textContent = 'Erreur lors de la suppression de la version modifiée.';
+                                 feedback.classList.remove('text-gray-400');
+                                 feedback.classList.add('text-red-400');
+                                 feedback.classList.remove('hidden');
+                             }
+                         }
+                     }
+                 });
+             }
         } catch(e) {}
     })();
 </script>
