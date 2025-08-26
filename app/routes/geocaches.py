@@ -93,6 +93,41 @@ def get_geocaches(zone_id):
     } for cache in geocaches])
 
 
+@geocaches_bp.route('/api/geocaches/<int:geocache_id>/description', methods=['PUT'])
+def update_geocache_description(geocache_id):
+    """Met à jour la description modifiée (description_modified) d'une géocache.
+
+    Corps JSON attendu:
+    {
+        "description_modified": "<html ou texte>"
+    }
+    """
+    try:
+        geocache = Geocache.query.get_or_404(geocache_id)
+
+        if not request.is_json:
+            return jsonify({'error': 'Requête JSON requise'}), 400
+
+        data = request.get_json(silent=True) or {}
+        new_desc = data.get('description_modified', None)
+
+        # Autoriser la mise à vide explicite, sinon conserver la valeur actuelle si None
+        if new_desc is not None:
+            geocache.description_modified = new_desc
+
+        geocache.last_updated = datetime.now(timezone.utc)
+        db.session.commit()
+
+        return jsonify({
+            'id': geocache.id,
+            'gc_code': geocache.gc_code,
+            'description_modified': geocache.description_modified
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erreur lors de la mise à jour de description_modified pour {geocache_id}: {str(e)}")
+        return jsonify({'error': 'Failed to update description_modified'}), 500
+
 @geocaches_bp.route('/geocaches/fetch', methods=['POST'])
 def fetch_gc_data():
     """Recupere les donnees d'une geocache via son code GC."""

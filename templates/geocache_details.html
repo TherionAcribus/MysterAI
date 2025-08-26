@@ -170,6 +170,15 @@
                 <span>Description</span>
                 <div class="flex">
                     <button 
+                        id="edit-description-button"
+                        class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        <span>Modifier</span>
+                    </button>
+                    <button 
                         id="analyze-geocache-button"
                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2"
                         data-tab-opener="geocache-analysis"
@@ -230,8 +239,29 @@
                     </button>
                 </div>
             </h2>
-            <div class="prose prose-invert max-w-none">
-                {{ geocache.description|safe }}
+            <div id="geocache-description-view" class="prose prose-invert max-w-none">
+                {{ (geocache.description_modified or geocache.description)|safe }}
+            </div>
+
+            <!-- Editeur de description (caché par défaut) -->
+            <div id="geocache-description-editor" class="mt-3 hidden">
+                <label class="block text-gray-300 text-sm font-bold mb-2" for="geocache-description-textarea">
+                    Éditer la description (HTML autorisé)
+                </label>
+                <textarea id="geocache-description-textarea" rows="12"
+                          class="w-full bg-gray-900 text-gray-100 border border-gray-700 rounded p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Saisissez ici votre version modifiée de la description...">{{ (geocache.description_modified or geocache.description) }}</textarea>
+                <div class="flex justify-end mt-3 gap-2">
+                    <button id="cancel-description-edit"
+                            class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
+                        Annuler
+                    </button>
+                    <button id="save-description-edit"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                        Sauvegarder
+                    </button>
+                </div>
+                <p id="description-edit-feedback" class="text-sm mt-2 text-gray-400 hidden"></p>
             </div>
         </div>
 
@@ -755,6 +785,80 @@
     }
 
     // Le clic est géré globalement dans panels.js (délégation)
+
+    // Gestion de l'édition de la description (affichage/masquage + sauvegarde)
+    (function setupDescriptionEditor(){
+        try {
+            const editBtn = document.getElementById('edit-description-button');
+            const view = document.getElementById('geocache-description-view');
+            const editor = document.getElementById('geocache-description-editor');
+            const textarea = document.getElementById('geocache-description-textarea');
+            const cancelBtn = document.getElementById('cancel-description-edit');
+            const saveBtn = document.getElementById('save-description-edit');
+            const feedback = document.getElementById('description-edit-feedback');
+            const geocacheId = '{{ geocache.id }}';
+
+            if (!editBtn || !view || !editor || !textarea || !cancelBtn || !saveBtn) return;
+
+            function showEditor() {
+                editor.classList.remove('hidden');
+                view.classList.add('hidden');
+                setTimeout(() => textarea.focus(), 0);
+            }
+
+            function hideEditor() {
+                editor.classList.add('hidden');
+                view.classList.remove('hidden');
+                if (feedback) feedback.classList.add('hidden');
+            }
+
+            editBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showEditor();
+            });
+
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Réinitialiser le textarea avec la valeur courante
+                textarea.value = view.innerHTML.trim();
+                hideEditor();
+            });
+
+            saveBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const value = textarea.value;
+                if (feedback) {
+                    feedback.textContent = 'Sauvegarde en cours...';
+                    feedback.classList.remove('hidden');
+                    feedback.classList.remove('text-red-400');
+                    feedback.classList.add('text-gray-400');
+                }
+                try {
+                    const resp = await fetch(`/api/geocaches/${geocacheId}/description`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ description_modified: value })
+                    });
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    // Mettre à jour la vue
+                    view.innerHTML = value || '';
+                    if (feedback) {
+                        feedback.textContent = 'Description sauvegardée.';
+                        feedback.classList.remove('text-gray-400');
+                        feedback.classList.add('text-green-400');
+                    }
+                    setTimeout(() => hideEditor(), 400);
+                } catch (err) {
+                    if (feedback) {
+                        feedback.textContent = 'Erreur lors de la sauvegarde.';
+                        feedback.classList.remove('text-gray-400');
+                        feedback.classList.add('text-red-400');
+                        feedback.classList.remove('hidden');
+                    }
+                }
+            });
+        } catch(e) {}
+    })();
 </script>
 
 <!-- Modal OCR (hidden by default) -->

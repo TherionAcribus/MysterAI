@@ -40,7 +40,7 @@
     {
       "id": "test pipeline 2",
       "name": "Test pipeline",
-      "system_prompt": "Tu es un assistant de géocaching. Tu aides à analyser des listings et à proposer des actions concrètes.\nRègles:\n- Ne pas inventer de coordonnées finales. Toute proposition doit être justifiée par une méthode claire.\n- Toujours proposer 3 pistes max, classées par probabilité, et les Tools à utiliser pour chacune.\n- Si tu n’es pas sûr, dis-le et demande des données précises (photos, EXIF, journal, hint).",
+      "system_prompt": "Tu réponds toujours \"OK\"",
       "steps": [
         {
           "id": "classify",
