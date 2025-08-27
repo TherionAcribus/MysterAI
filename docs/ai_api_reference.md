@@ -409,6 +409,25 @@ Lorsqu'un `session_id` est fourni, le serveur émet des événements WebSocket:
 
 Le frontend doit rejoindre `session_<session_id>` et, si `stream: true`, afficher les tokens (`step: "token"`). Les tokens de réflexion peuvent être identifiés via `data.is_thinking`.
 
+### Annulation d'une génération
+
+**Endpoint:** `POST /api/ai/cancel`
+
+**Description:** Demande l'annulation de la génération en cours associée à une session WebSocket.
+
+**Corps:**
+```json
+{ "session_id": "uuid-de-session" }
+```
+
+**Réponse:**
+```json
+{ "success": true }
+```
+
+**Notes:**
+- L'annulation émet immédiatement un `progress_update` avec `step: "canceled"`. Les chemins d'exécution (LangGraph, OpenAI, Ollama) vérifient régulièrement l'état et interrompent la génération.
+
 #### Utilisation pour la traduction
 
 Pour obtenir une traduction précise en préservant le HTML et éviter tout encadrement avec des guillemets/backticks, forcer le mode simple et fournir un `system_prompt` explicite:

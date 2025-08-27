@@ -53,6 +53,7 @@ class ChatState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     system_prompt: Optional[str]
     next: Optional[str]
+    session_id: Optional[str]
 
 class LangGraphService:
     """Service pour gérer les interactions avec les modèles d'IA via LangGraph"""
@@ -224,16 +225,57 @@ class LangGraphService:
             """Nœud pour l'appel au modèle de langage"""
             messages = state["messages"]
             system_prompt = state.get("system_prompt")
+            session_id = state.get("session_id")
             
             # Ajouter le message système s'il est fourni
             if system_prompt and not any(isinstance(msg, SystemMessage) for msg in messages):
                 messages = [SystemMessage(content=system_prompt)] + list(messages)
             
-            # Appeler le LLM
-            response = llm.invoke(messages)
+            # Appeler le LLM (avec support du streaming pour annulation)
+            response_msg: Optional[AIMessage] = None
+            try:
+                if hasattr(llm, 'stream') and session_id:
+                    # Streaming avec annulation coopérative
+                    content_parts: List[str] = []
+                    try:
+                        from app.services.websocket_service import get_websocket_service
+                        ws = get_websocket_service()
+                    except Exception:
+                        ws = None
+                    try:
+                        for chunk in llm.stream(messages):
+                            try:
+                                txt = getattr(chunk, 'content', None)
+                                if txt:
+                                    content_parts.append(txt)
+                            except Exception:
+                                pass
+                            # Vérifier annulation
+                            try:
+                                if ws:
+                                    ctl = ws.get_control(session_id)
+                                    if ctl and ctl.get('canceled'):
+                                        # Interrompre le flux
+                                        response_msg = AIMessage(content="(Génération annulée)")
+                                        break
+                            except Exception:
+                                pass
+                    except Exception:
+                        # Fallback non-stream
+                        resp = llm.invoke(messages)
+                        response_msg = resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
+                    if response_msg is None:
+                        response_msg = AIMessage(content=''.join(content_parts))
+                else:
+                    # Pas de streaming disponible
+                    resp = llm.invoke(messages)
+                    response_msg = resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
+            except Exception as _e:
+                # En cas d'erreur, renvoyer un message explicite
+                response_msg = AIMessage(content=f"Erreur: {str(_e)}")
             
             # Mettre à jour l'état
-            return {"messages": [response], "next": None}
+            return {"messages": [response_msg], "next": None}
         
         # Créer le graphe
         builder = StateGraph(ChatState)
@@ -362,7 +404,8 @@ class LangGraphService:
             initial_state = {
                 "messages": langchain_messages,
                 "system_prompt": system_prompt,
-                "next": None
+                "next": None,
+                "session_id": session_id
             }
             
             # Exécuter le graphe
@@ -377,8 +420,23 @@ class LangGraphService:
                     result = self._graph.invoke(initial_state, config=cfg)
                 else:
                     result = self._graph.invoke(initial_state)
-            except Exception:
-                result = self._graph.invoke(initial_state)
+            except Exception as e:
+                # Annulation propre
+                try:
+                    from app.services.ai_callbacks import GenerationCanceled
+                    if isinstance(e, GenerationCanceled):
+                        try:
+                            if session_id:
+                                from app.services.websocket_service import get_websocket_service
+                                ws = get_websocket_service()
+                                ws.emit_progress(session_id, 'canceled', 'Génération annulée', 100, {})
+                        except Exception:
+                            pass
+                        return "(Génération annulée)"
+                except Exception:
+                    pass
+                # Autres erreurs: relancer exception pour traitement global
+                raise
             
             # Extraire la réponse
             final_messages = result["messages"]

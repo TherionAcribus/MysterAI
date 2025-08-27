@@ -1421,3 +1421,22 @@ def qr_extract():
     except Exception as e:
         logger.error(f"Erreur QR Code : {e}")
         return jsonify({'success': False, 'error': str(e)}), 500 
+
+@ai_bp.route('/cancel', methods=['POST'])
+def cancel_generation():
+    """
+    Annule une génération en cours pour une session donnée.
+    Corps: { "session_id": "..." }
+    """
+    try:
+        body = request.json or {}
+        session_id = body.get('session_id')
+        if not session_id:
+            return jsonify({'success': False, 'error': 'session_id manquant'}), 400
+        ws = get_websocket_service()
+        ws.set_control(session_id, canceled=True)
+        ws.emit_progress(session_id, 'canceled', 'Annulation demandée', None, {})
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Erreur annulation: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500 

@@ -13,6 +13,11 @@ except Exception:
 from app.services.websocket_service import get_websocket_service
 
 
+class GenerationCanceled(Exception):
+    """Exception levée pour interrompre proprement une génération sur annulation utilisateur."""
+    pass
+
+
 class WebSocketCallbackHandler(BaseCallbackHandler):
     """
     CallbackHandler LangChain/LangGraph qui émet des événements de progression via WebSocketService.
@@ -29,8 +34,17 @@ class WebSocketCallbackHandler(BaseCallbackHandler):
         # État pour la détection des sections de réflexion (ex: <think>...</think>)
         self._in_think = False
 
+    def _raise_if_canceled(self):
+        try:
+            ctl = self.ws.get_control(self.session_id)
+            if ctl and ctl.get('canceled'):
+                raise GenerationCanceled("Annulé par l'utilisateur")
+        except Exception:
+            return
+
     # LLM lifecycle
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
+        self._raise_if_canceled()
         model = (serialized or {}).get("name") or (serialized or {}).get("id") or "llm"
         message = f"Appel LLM démarré ({model})"
         data = {"model": model, "prompt_count": len(prompts or []), **self.meta}
@@ -81,6 +95,7 @@ class WebSocketCallbackHandler(BaseCallbackHandler):
     def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         if not self.stream:
             return
+        self._raise_if_canceled()
         text = token or ""
         if not text:
             return

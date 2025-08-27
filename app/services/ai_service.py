@@ -10,6 +10,7 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from app.models.app_config import AppConfig
 from langchain_openai import ChatOpenAI as OpenAI
 from app.services.model_registry import model_registry
+from app.services.ai_callbacks import GenerationCanceled
 
 class AIService:
     """Service pour gérer les interactions avec les modèles d'IA"""
@@ -524,19 +525,45 @@ class AIService:
             print(f"Envoi de {len(formatted_messages)} messages à l'API")
             
             # Appeler l'API via l'interface de LangChain
-            if stream and hasattr(chat_model, 'stream'):
-                # Stream token-par-token via callbacks
+            # Toujours utiliser le streaming interne si disponible pour permettre l'annulation
+            if hasattr(chat_model, 'stream'):
+                from app.services.websocket_service import get_websocket_service
+                ws = None
                 try:
-                    _ = list(chat_model.stream(formatted_messages))
+                    ws = get_websocket_service()
                 except Exception:
-                    # Fallback au non-stream
-                    response = chat_model.invoke(formatted_messages)
-                else:
-                    # La réponse finale n'est pas toujours fournie ici; relancer un call court pour récupérer le message complet
+                    ws = None
+                buffer: list[str] = []
+                try:
+                    for chunk in chat_model.stream(formatted_messages):
+                        # Accumuler le texte (même si l'UI ne veut pas streamer, on aura la réponse)
+                        try:
+                            txt = getattr(chunk, 'content', None)
+                            if txt:
+                                buffer.append(txt)
+                        except Exception:
+                            pass
+                        # Annulation coopérative
+                        try:
+                            if session_id and ws:
+                                ctl = ws.get_control(session_id)
+                                if ctl and ctl.get('canceled'):
+                                    raise GenerationCanceled("Annulé par l'utilisateur")
+                        except GenerationCanceled:
+                            raise
+                        except Exception:
+                            pass
+                    # Fin normale → constituer un objet réponse simulé
+                    content = ''.join(buffer)
+                    response = type('Obj', (), {'content': content})
+                except GenerationCanceled:
+                    raise
+                except Exception as e_stream:
+                    # Fallback ultime: tenter un invoke non-stream (peut déjà être trop tard)
                     try:
                         response = chat_model.invoke(formatted_messages)
                     except Exception as e2:
-                        response = type('Obj', (), {'content': f"Erreur (post-stream): {e2}"})
+                        response = type('Obj', (), {'content': f"Erreur: {e_stream} / {e2}"})
             else:
                 response = chat_model.invoke(formatted_messages)
             
@@ -545,6 +572,16 @@ class AIService:
             print(f"Réponse reçue: {len(content)} caractères")
             
             return content
+        except GenerationCanceled:
+            try:
+                from app.services.websocket_service import get_websocket_service
+                ws = get_websocket_service()
+                if session_id:
+                    ws.emit_progress(session_id, 'canceled', 'Génération annulée', 100, {})
+                    ws.emit_error(session_id, 'Annulé par l\'utilisateur')
+            except Exception:
+                pass
+            return "(Génération annulée)"
         except Exception as e:
             print(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
             return f"Erreur: {str(e)}"
@@ -603,45 +640,78 @@ class AIService:
                 pass
 
             # Appeler l'API Ollama
-            response = requests.post(
+            # Utiliser un stream HTTP pour pouvoir interrompre à la volée (NDJSON)
+            use_stream = True
+            req = requests.post(
                 f"{ollama_url}/api/chat",
                 json={
                     "model": model,
                     "messages": formatted_messages,
-                    "stream": bool(stream),
+                    "stream": use_stream,
                     "temperature": settings.get('temperature', 0.7),
                     "num_predict": settings.get('max_tokens', 1000)
-                }
+                },
+                stream=True
             )
-            
-            if response.status_code == 200:
-                if stream:
-                    # L'API Ollama renvoie un NDJSON stream quand stream=True; ici on a déjà consommé en bloc.
-                    # Pour une V1, on lit le champ 'message.content' final si présent.
-                    j = response.json()
-                    content = (j.get('message') or {}).get('content', '') if isinstance(j, dict) else ''
-                else:
-                    content = response.json().get('message', {}).get('content', '')
+            content_parts: list[str] = []
+            if req.status_code == 200:
+                from app.services.websocket_service import get_websocket_service
+                ws = None
                 try:
-                    if session_id:
-                        from app.services.websocket_service import get_websocket_service
-                        ws = get_websocket_service()
-                        ws.emit_progress(session_id, 'ollama_response', 'Réponse Ollama reçue', 100, {
-                            'chars': len(content or '')
-                        })
+                    ws = get_websocket_service()
                 except Exception:
-                    pass
-                return content
+                    ws = None
+                try:
+                    for line in req.iter_lines(decode_unicode=True):
+                        if not line:
+                            continue
+                        try:
+                            import json as _json
+                            obj = _json.loads(line)
+                            msg = ((obj.get('message') or {}).get('content')) if isinstance(obj, dict) else None
+                            if msg:
+                                content_parts.append(msg)
+                        except Exception:
+                            pass
+                        # Annulation coopérative
+                        try:
+                            if session_id and ws:
+                                ctl = ws.get_control(session_id)
+                                if ctl and ctl.get('canceled'):
+                                    try:
+                                        req.close()
+                                    except Exception:
+                                        pass
+                                    raise GenerationCanceled("Annulé par l'utilisateur")
+                        except GenerationCanceled:
+                            raise
+                        except Exception:
+                            pass
+                    content = ''.join(content_parts)
+                    try:
+                        if session_id and ws:
+                            ws.emit_progress(session_id, 'ollama_response', 'Réponse Ollama reçue', 100, {
+                                'chars': len(content or '')
+                            })
+                    except Exception:
+                        pass
+                    return content
+                except GenerationCanceled:
+                    raise
+                except Exception as e_stream:
+                    return f"Erreur: {str(e_stream)}"
             else:
-                err = f"Erreur: {response.status_code} - {response.text}"
-                try:
-                    if session_id:
-                        from app.services.websocket_service import get_websocket_service
-                        ws = get_websocket_service()
-                        ws.emit_error(session_id, err)
-                except Exception:
-                    pass
-                return err
+                return f"Erreur: {req.status_code} - {req.text}"
+        except GenerationCanceled:
+            try:
+                from app.services.websocket_service import get_websocket_service
+                ws = get_websocket_service()
+                if session_id:
+                    ws.emit_progress(session_id, 'canceled', 'Génération annulée', 100, {})
+                    ws.emit_error(session_id, 'Annulé par l\'utilisateur')
+            except Exception:
+                pass
+            return "(Génération annulée)"
         except Exception as e:
             print(f"Erreur lors de l'appel à l'API Ollama: {str(e)}")
             return f"Erreur: {str(e)}"

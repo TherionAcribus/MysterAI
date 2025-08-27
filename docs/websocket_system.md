@@ -18,6 +18,7 @@ Le service WebSocket centralisé gère toutes les communications temps réel :
 - **Gestion d'erreurs** : Robustesse avec timeout et reconnexion
  - **Contrôles d'orchestration** : Drapeaux par session (pause/reprise/annulation) via `set_control/get_control`
  - **Événements token-par-token** : pour `ai_chat` avec `step: token` (optionnel, si `stream: true`)
+ - **Annulation** : `set_control(session_id, canceled=True)` et émission d'un `progress_update` avec `step: canceled`
 
 ```python
 # Exemple d'utilisation côté backend
@@ -80,6 +81,12 @@ window.wsService.on('complete_add_geocache', (data) => {
   - `step: token` → `message` contient le token courant, `data.is_thinking` si réflexion
   - autres étapes: `llm_start`, `llm_end`, `tool_start`, `tool_end`, `chain_start`, `chain_end`
 - `operation_complete`: statut final et méta (`model_used`, `used_langgraph`)
+
+#### Annulation
+
+- `POST /api/ai/cancel` avec `session_id` déclenche `ws.set_control(..., canceled=True)`.
+- Le backend vérifie périodiquement ce flag et coupe les flux (LangGraph/OpenAI/Ollama).
+- Un `progress_update` `step: canceled` est émis pour informer l'UI.
 
 #### Interface de Progression Intégrée
 

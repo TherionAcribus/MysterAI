@@ -155,7 +155,12 @@
                         </div>
                     </div>
                 </div>
-                <div class="chat-progress text-2xs text-gray-400 mt-1 hidden"></div>
+                <div class="chat-status-row flex items-center mt-1">
+                    <div class="chat-progress text-2xs text-gray-400 flex-1 hidden"></div>
+                    <button class="chat-stop bg-red-700 hover:bg-red-600 text-white text-xs rounded px-2 py-1 border border-red-600 ml-2 hidden" title="Arrêter la génération" data-action="click->chat#stopGeneration">
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                </div>
                 <div class="chat-image-picker hidden">
                     <div class="text-xs text-gray-300 mb-2">Sélectionnez les images pertinentes à envoyer au modèle (facultatif)</div>
                     <div class="image-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
@@ -661,6 +666,7 @@
                     try { console.log('[CHAT UI] onProg', data && data.step, data && data.message); } catch(e) {}
                     if (!data || data.session_id !== sessionId) return;
                     const el = activeChat.querySelector('.chat-progress');
+                    const stopBtn = activeChat.querySelector('.chat-stop');
                     if (!el) return;
                     const step = data.step || 'progress';
                     const rawMsg = data.message || '';
@@ -675,9 +681,20 @@
                     else if (step === 'llm_end') friendly = 'Génération terminée';
                     else if (step === 'chain_end') friendly = 'Finalisation…';
                     else if (step === 'token') friendly = 'Réception de la réponse…';
+                    else if (step === 'canceled') friendly = 'Génération annulée';
                     else friendly = rawMsg || 'En cours…';
                     el.classList.remove('hidden');
                     el.textContent = `[${step}] ${friendly}${pct}`;
+                    // Afficher/masquer le bouton Stop uniquement lorsque LLM actif
+                    if (stopBtn) {
+                        if (step === 'llm_start' || step === 'token') {
+                            stopBtn.classList.remove('hidden');
+                            stopBtn.disabled = false;
+                        } else if (['llm_end','chain_end','canceled','tool_end'].includes(step)) {
+                            stopBtn.classList.add('hidden');
+                            stopBtn.disabled = true;
+                        }
+                    }
                     // Injecter des événements notables dans le fil des messages
                     if (['tool_start','tool_end','llm_start','llm_end'].includes(step)) {
                         const info = document.createElement('div');
@@ -705,12 +722,25 @@
                         }
                         mc.textContent += (rawMsg || '');
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    } else if (step === 'canceled') {
+                        // Nettoyer l'UI: retirer typing et finaliser la bulle de streaming
+                        const typing = messagesContainer.querySelector('.typing');
+                        if (typing) typing.remove();
+                        const streamingBubble = activeChat.querySelector('.chat-message.streaming-current');
+                        if (streamingBubble) streamingBubble.classList.remove('streaming-current');
                     }
                 };
                 const onDone = (data) => {
                     if (!data || data.session_id !== sessionId) return;
                     const el = activeChat.querySelector('.chat-progress');
+                    const stopBtn = activeChat.querySelector('.chat-stop');
                     if (!el) return;
+                    // Nettoyer typing et bulle streaming
+                    const typing = messagesContainer.querySelector('.typing');
+                    if (typing) typing.remove();
+                    const streamingBubble = activeChat.querySelector('.chat-message.streaming-current');
+                    if (streamingBubble) streamingBubble.classList.remove('streaming-current');
+                    if (stopBtn) { stopBtn.classList.add('hidden'); stopBtn.disabled = true; }
                     if (data.status === 'success') {
                         el.textContent = 'Réponse prête';
                         setTimeout(()=> el.classList.add('hidden'), 1500);
@@ -877,6 +907,35 @@
             });
         }
         
+        async stopGeneration(event) {
+            // Trouver le chat actif
+            const activeChat = this.chatListTarget.querySelector('.chat-instance.active');
+            if (!activeChat) return;
+            const sessionId = activeChat.dataset.sessionId;
+            if (!sessionId) return;
+            try {
+                await fetch('/api/ai/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+            } catch (e) {}
+            // Feedback UI immédiat
+            const el = activeChat.querySelector('.chat-progress');
+            if (el) {
+                el.classList.remove('hidden');
+                el.textContent = '[canceled] Annulation demandée…';
+            }
+            // Cacher le bouton stop
+            const stopBtn = activeChat.querySelector('.chat-stop');
+            if (stopBtn) { stopBtn.classList.add('hidden'); stopBtn.disabled = true; }
+            // Retirer l'indicateur de frappe et finaliser la bulle streaming si présente
+            const messagesContainer = activeChat.querySelector('.chat-messages');
+            const typing = messagesContainer && messagesContainer.querySelector('.typing');
+            if (typing) typing.remove();
+            const streamingBubble = activeChat.querySelector('.chat-message.streaming-current');
+            if (streamingBubble) streamingBubble.classList.remove('streaming-current');
+        }
        
         escapeHtml(text) {
             const div = document.createElement('div');

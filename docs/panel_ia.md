@@ -70,6 +70,12 @@ Intégration WebSocket:
 - Les événements `progress_update` mettent à jour le statut et, si `step: token`, appendent les tokens dans une bulle "streaming".
 - À la fin, `operation_complete` masque le statut.
 
+### 7. Bouton d'annulation (Stop)
+
+- Le bouton Stop est affiché en bas à droite de chaque chat, à côté de la ligne de statut, uniquement lorsque le LLM est actif (`llm_start`/`token`).
+- Au clic, il envoie `POST /api/ai/cancel` avec le `session_id` du chat et met immédiatement à jour l'UI (statut et arrêt de l'animation).
+- Les événements `canceled` interrompent la génération côté backend (LangGraph/OpenAI/Ollama) et finalisent l'UI.
+
 ## Implémentation technique
 
 ### Contrôleur Stimulus

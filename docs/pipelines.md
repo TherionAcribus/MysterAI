@@ -92,6 +92,7 @@ Backend (`app/routes/ai_routes.py`, `app/services/langgraph_service.py`):
 - Orchestration potentielle via LangGraph selon `steps` (LLM + tools).
 - Streaming optionnel (`stream: true`) avec émissions WebSocket `progress_update` (tokens) et `operation_complete`.
 - `show_thinking` permet de baliser les tokens de réflexion (`data.is_thinking`) pour filtrage côté UI.
+- Annulation: le nœud LLM du graphe utilise le streaming interne si possible et vérifie `get_control(session_id)` à chaque chunk; sur `canceled`, le graphe renvoie une sortie courte "(Génération annulée)".
 - Logs serveurs détaillés:
   - résumé des rôles/longueurs,
   - détail par message (prévisualisation jusqu’à ~2000 caractères),
