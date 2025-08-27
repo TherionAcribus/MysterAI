@@ -632,9 +632,14 @@ def get_ai_models():
                 supports_vision = any(x in lower_full for x in ['llava', 'moondream', 'vision'])
             except Exception:
                 supports_vision = False
+            # Enrichir le nom d'affichage avec la taille si disponible (ex: Gemma3 4B)
+            display_name = m.get('name', short_id)
+            size = m.get('size')
+            if size and size.lower() not in display_name.lower():
+                display_name = f"{display_name} ({size})"
             models.append({
                 'id': full,
-                'name': m.get('name', short_id),
+                'name': display_name,
                 'type': 'local',
                 'is_active': is_active,
                 'is_usable': True,

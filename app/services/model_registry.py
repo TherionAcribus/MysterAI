@@ -76,13 +76,18 @@ class ModelRegistry:
             if composite_id not in by_id:
                 # Créer une entrée minimale pour ce modèle découvert
                 base_name = (local_name.split(':')[0] if ':' in local_name else local_name)
-                human_name = base_name.replace('-', ' ').title()
+                size_part = (local_name.split(':')[1] if ':' in local_name else '')
+                human_base = base_name.replace('-', ' ').title()
+                human_size = size_part.upper() if size_part else ''
+                human_name = f"{human_base} {human_size}".strip()
                 by_id[composite_id] = {
                     'id': composite_id,
                     'provider': 'ollama',
                     'type': 'local',
                     'model_id': local_name,
                     'name': human_name,
+                    'base': base_name,
+                    'size': size_part,
                     'capabilities': ['chat'],
                     'requires_api_key': False,
                     'defaults': {'temperature': 0.7, 'num_predict': 1000}
