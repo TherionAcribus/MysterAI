@@ -331,7 +331,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 
 **Endpoint:** `POST /api/ai/chat`
 
-**Description:** Envoie une conversation au modèle d'IA et retourne la réponse. Pour les usages de traduction, vous pouvez forcer le chemin sans outils et fournir un `system_prompt` spécifique.
+**Description:** Envoie une conversation au modèle d'IA et retourne la réponse. Supporte le suivi temps réel via WebSocket (progression, tokens) et des options de streaming et d'affichage de la réflexion.
 
 **Corps de la requête:**
 ```json
@@ -346,6 +346,9 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
   "system_prompt": "Tu es un assistant amical.",
   "use_tools": true,
   "pipeline_id": "geocache_default",
+  "session_id": "uuid-optionnel-pour-websocket",
+  "stream": true,
+  "show_thinking": false,
   "images": [
     "https://example.local/geocaches_images/GC12345/abc.jpg",
     "https://example.local/geocaches_images/GC12345/def.png"
@@ -374,6 +377,37 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 - `pipeline_id` est optionnel ; lorsqu'il est fourni et que `use_tools` est vrai, la réponse est orchestrée selon la définition du pipeline (étapes, prompts, outils autorisés).
 - `images` est optionnel ; si le modèle supporte la vision, les images sont jointes au dernier message utilisateur. Sinon, les URLs sont ajoutées en texte.
 - En cas d'ouverture depuis une géocache, le client enverra un message `system` supplémentaire contenant le listing (description) afin d'assurer sa prise en compte dans le premier tour.
+- `session_id` (optionnel) permet au client de rejoindre une room WebSocket dédiée pour recevoir la progression et les tokens en direct. Si omis, le serveur peut en générer un.
+- `stream` (bool) active le streaming token-par-token si le modèle et le provider le supportent.
+- `show_thinking` (bool) affiche la réflexion des modèles "thinking" si fournie; sinon, ces tokens sont filtrés côté UI.
+#### Streaming et WebSocket
+
+Lorsqu'un `session_id` est fourni, le serveur émet des événements WebSocket:
+
+- `progress_update` (room: `session_<session_id>`):
+```json
+{
+  "session_id": "...",
+  "operation_type": "ai_chat",
+  "step": "token|llm_start|llm_end|tool_start|tool_end|...",
+  "message": "texte du token ou info",
+  "progress": null,
+  "data": {"is_thinking": false}
+}
+```
+
+- `operation_complete` (room: `session_<session_id>`):
+```json
+{
+  "session_id": "...",
+  "operation_type": "ai_chat",
+  "status": "success|error",
+  "message": "Réponse IA prête",
+  "result": {"model_used": "...", "used_langgraph": true}
+}
+```
+
+Le frontend doit rejoindre `session_<session_id>` et, si `stream: true`, afficher les tokens (`step: "token"`). Les tokens de réflexion peuvent être identifiés via `data.is_thinking`.
 
 #### Utilisation pour la traduction
 

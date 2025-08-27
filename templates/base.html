@@ -90,6 +90,10 @@
         <script src="{{ url_for('static', filename='js/layout_initialize.js') }}"></script>
         <script src="{{ url_for('static', filename='js/plugin_golden_layout_integration.js') }}"></script>
         
+        <!-- Client Socket.IO et service WebSocket global -->
+        <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" integrity="sha384-VC7x6qBP7tRr1x4p7H1nGm9y5O2h+S0m7vNQ1GkQ0Fv7v7Hk9d0YVQG6L7G8e2eE" crossorigin="anonymous"></script>
+        <script src="{{ url_for('static', filename='js/services/websocket_service.js') }}"></script>
+        
         <!-- Nouveau système de TabOpener -->
         <script src="{{ url_for('static', filename='js/services/tab_opener_service.js') }}"></script>
         <script src="{{ url_for('static', filename='js/layout_tab_opener_integration.js') }}"></script>

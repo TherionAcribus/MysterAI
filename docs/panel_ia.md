@@ -59,6 +59,17 @@ Le panel IA permet désormais de changer de modèle d'IA en temps réel pendant 
 - Affichage du modèle utilisé pour chaque réponse
 - Conservation du contexte de la conversation lors du changement de modèle
 
+### 6. Options de Streaming et Réflexion
+
+- Un toggle "Streaming" permet d'activer l'affichage en temps réel des tokens générés par le modèle.
+- Un toggle "Réflexion" permet d'afficher (ou masquer) la chaîne de pensée des modèles "thinking" lorsque celle-ci est émise. Quand décoché, les tokens marqués réflexion sont filtrés côté UI.
+- Une ligne de statut par chat (`.chat-progress`) indique l'étape en cours (ex: `llm_start`, `tool_start`, `token`, etc.).
+
+Intégration WebSocket:
+- Chaque envoi génère ou réutilise un `session_id` pour rejoindre la room `session_<session_id>`.
+- Les événements `progress_update` mettent à jour le statut et, si `step: token`, appendent les tokens dans une bulle "streaming".
+- À la fin, `operation_complete` masque le statut.
+
 ## Implémentation technique
 
 ### Contrôleur Stimulus

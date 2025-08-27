@@ -90,6 +90,8 @@ Frontend (`static/js/controllers/chat_controller.js`):
 Backend (`app/routes/ai_routes.py`, `app/services/langgraph_service.py`):
 - Prend en compte `pipeline_id` et applique `system_prompt` du pipeline.
 - Orchestration potentielle via LangGraph selon `steps` (LLM + tools).
+- Streaming optionnel (`stream: true`) avec émissions WebSocket `progress_update` (tokens) et `operation_complete`.
+- `show_thinking` permet de baliser les tokens de réflexion (`data.is_thinking`) pour filtrage côté UI.
 - Logs serveurs détaillés:
   - résumé des rôles/longueurs,
   - détail par message (prévisualisation jusqu’à ~2000 caractères),

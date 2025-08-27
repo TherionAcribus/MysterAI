@@ -47,6 +47,28 @@ class WebSocketService:
         }
         return session_id
     
+    def register_session(self, session_id: str, operation_type: str, zone_id: Optional[int] = None) -> str:
+        """
+        Enregistre une session fournie par le client (UUID généré côté frontend).
+        Ne réécrit pas une session existante.
+        """
+        if not session_id:
+            return self.create_session(operation_type, zone_id)
+        if session_id in self.active_sessions:
+            return session_id
+        self.active_sessions[session_id] = {
+            'operation_type': operation_type,
+            'zone_id': zone_id,
+            'started_at': None,
+            'completed_at': None,
+            'status': 'created',
+            'control': {
+                'paused': False,
+                'canceled': False
+            }
+        }
+        return session_id
+    
     def emit_progress(self, session_id: str, step: str, message: str, 
                      progress: Optional[int] = None, data: Optional[Dict] = None):
         """

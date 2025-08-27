@@ -131,6 +131,14 @@
                         <select class="chat-pipeline-selector bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600">
                             <option value="">(par défaut)</option>
                         </select>
+                        <label class="text-xs text-gray-400 ml-2 flex items-center space-x-1" title="Activer le streaming (tokens en direct)">
+                            <input type="checkbox" class="chat-toggle-stream" />
+                            <span>Streaming</span>
+                        </label>
+                        <label class="text-xs text-gray-400 ml-1 flex items-center space-x-1" title="Afficher la réflexion (si disponible)">
+                            <input type="checkbox" class="chat-toggle-thinking" />
+                            <span>Réflexion</span>
+                        </label>
                         <button class="chat-images-toggle bg-gray-700 text-white text-xs rounded px-2 py-1 border border-gray-600" title="Sélectionner des images" data-action="click->chat#toggleImages">
                             <i class="fas fa-image"></i> Images
                         </button>
@@ -147,6 +155,7 @@
                         </div>
                     </div>
                 </div>
+                <div class="chat-progress text-2xs text-gray-400 mt-1 hidden"></div>
                 <div class="chat-image-picker hidden">
                     <div class="text-xs text-gray-300 mb-2">Sélectionnez les images pertinentes à envoyer au modèle (facultatif)</div>
                     <div class="image-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px;"></div>
@@ -470,7 +479,7 @@
             }
         }
         
-        sendMessage(event) {
+        async sendMessage(event) {
             // Trouver le chat actif
             const activeChat = this.chatListTarget.querySelector('.chat-instance.active');
             if (!activeChat) return;
@@ -571,6 +580,153 @@
                 }
             } catch(e) {}
 
+            // Créer/obtenir un session_id pour WebSocket et rejoindre la room
+            let sessionId = activeChat.dataset.sessionId;
+            if (!sessionId) {
+                try {
+                    sessionId = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                    );
+                } catch (e) {
+                    sessionId = 'sess_' + Date.now() + '_' + Math.floor(Math.random()*1e6);
+                }
+                activeChat.dataset.sessionId = sessionId;
+            }
+            // Fallback: s’assurer que wsService est initialisé et que Socket.IO est chargé
+            const ensureWsReady = async () => {
+                if (window.wsService && window.wsService.socket) return true;
+                // Charger socket.io si absent
+                if (typeof io === 'undefined') {
+                    await new Promise((resolve) => {
+                        const s = document.createElement('script');
+                        s.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+                        s.onload = resolve;
+                        s.onerror = resolve;
+                        document.head.appendChild(s);
+                    });
+                }
+                // Charger le service WebSocket si absent
+                if (typeof WebSocketService === 'undefined') {
+                    await new Promise((resolve) => {
+                        const s = document.createElement('script');
+                        s.src = '/js/services/websocket_service.js';
+                        s.onload = resolve;
+                        s.onerror = resolve;
+                        document.head.appendChild(s);
+                    });
+                }
+                // Initialiser le service si besoin
+                if (!window.wsService && typeof WebSocketService !== 'undefined') {
+                    try { window.wsService = new WebSocketService(); } catch(e) {}
+                }
+                return !!(window.wsService && window.wsService.socket);
+            };
+            try {
+                await ensureWsReady();
+                // Attendre la connexion si nécessaire (timeout court)
+                if (window.wsService && !window.wsService.isConnected) {
+                    await new Promise((resolve) => {
+                        let done = false;
+                        const finish = () => { if (!done) { done = true; resolve(); } };
+                        window.wsService.on('websocket_connected', finish);
+                        setTimeout(finish, 600);
+                    });
+                }
+                if (window.wsService) {
+                    window.wsService.joinSession(sessionId);
+                    // micro délai pour laisser l'event join partir
+                    await new Promise(r => setTimeout(r, 20));
+                }
+            } catch(e) {}
+
+            // Afficher une zone de progression pour ce chat
+            const progressEl = activeChat.querySelector('.chat-progress');
+            if (progressEl) { progressEl.classList.remove('hidden'); progressEl.textContent = 'Envoi au modèle…'; }
+
+            // Abonner des handlers spécifiques à cette session (une seule fois)
+            if (activeChat.dataset.boundSessionId !== sessionId) {
+                const onProg = (data) => {
+                    // Debug UI
+                    try { console.log('[CHAT UI] onProg', data && data.step, data && data.message); } catch(e) {}
+                    if (!data || data.session_id !== sessionId) return;
+                    const el = activeChat.querySelector('.chat-progress');
+                    if (!el) return;
+                    const step = data.step || 'progress';
+                    const rawMsg = data.message || '';
+                    const pct = (typeof data.progress === 'number') ? ` (${data.progress}%)` : '';
+                    // Libellés conviviaux
+                    let friendly = '';
+                    if (step === 'start') friendly = 'Préparation…';
+                    else if (step === 'chain_start') friendly = 'Orchestration…';
+                    else if (step === 'llm_start') friendly = 'Le modèle réfléchit…';
+                    else if (step === 'tool_start') friendly = `Exécution outil${data.data && data.data.tool ? ' '+data.data.tool : ''}…`;
+                    else if (step === 'tool_end') friendly = 'Outil terminé';
+                    else if (step === 'llm_end') friendly = 'Génération terminée';
+                    else if (step === 'chain_end') friendly = 'Finalisation…';
+                    else if (step === 'token') friendly = 'Réception de la réponse…';
+                    else friendly = rawMsg || 'En cours…';
+                    el.classList.remove('hidden');
+                    el.textContent = `[${step}] ${friendly}${pct}`;
+                    // Injecter des événements notables dans le fil des messages
+                    if (['tool_start','tool_end','llm_start','llm_end'].includes(step)) {
+                        const info = document.createElement('div');
+                        info.className = 'chat-message system';
+                        info.innerHTML = `<div class="message-content">${this.escapeHtml(el.textContent)}</div>`;
+                        messagesContainer.appendChild(info);
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                    // Streaming de tokens (optionnel)
+                    if (step === 'token') {
+                        const streamEnabled = !!activeChat.querySelector('.chat-toggle-stream')?.checked;
+                        if (!streamEnabled) return;
+                        let streamingBubble = activeChat.querySelector('.chat-message.streaming-current');
+                        if (!streamingBubble) {
+                            streamingBubble = document.createElement('div');
+                            streamingBubble.className = 'chat-message system streaming-current';
+                            streamingBubble.innerHTML = '<div class="message-content"></div>';
+                            messagesContainer.appendChild(streamingBubble);
+                        }
+                        const mc = streamingBubble.querySelector('.message-content');
+                        const isThinking = !!(data.data && data.data.is_thinking);
+                        const showThinking = !!activeChat.querySelector('.chat-toggle-thinking')?.checked;
+                        if (isThinking && !showThinking) {
+                            return;
+                        }
+                        mc.textContent += (rawMsg || '');
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                };
+                const onDone = (data) => {
+                    if (!data || data.session_id !== sessionId) return;
+                    const el = activeChat.querySelector('.chat-progress');
+                    if (!el) return;
+                    if (data.status === 'success') {
+                        el.textContent = 'Réponse prête';
+                        setTimeout(()=> el.classList.add('hidden'), 1500);
+                    } else if (data.status === 'error') {
+                        el.textContent = 'Erreur: ' + (data.message || '');
+                    }
+                };
+                try {
+                    if (window.wsService) {
+                        window.wsService.on(`session_${sessionId}_progress`, onProg);
+                        // Fallback générique: au cas où l'événement session ne parvient pas
+                        window.wsService.on('progress_update', onProg);
+                        window.wsService.on(`session_${sessionId}_complete`, onDone);
+                    }
+                } catch(e) {}
+                // Brancher les fallbacks globaux
+                try {
+                    window.onAIChatProgress = (d) => onProg(d);
+                    window.onAIChatComplete = (d) => onDone(d);
+                } catch(e) {}
+                activeChat.dataset.boundSessionId = sessionId;
+            }
+
+            // Lire options Streaming / Réflexion
+            const streamEnabled = !!activeChat.querySelector('.chat-toggle-stream')?.checked;
+            const thinkingEnabled = !!activeChat.querySelector('.chat-toggle-thinking')?.checked;
+
             // Envoyer la requête à l'API
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -582,7 +738,10 @@
                     model_id: activeModel,
                     use_tools: true,  // Activer l'utilisation des outils
                     pipeline_id: pipelineId,
-                    images: images
+                    images: images,
+                    session_id: sessionId,
+                    stream: streamEnabled,
+                    show_thinking: thinkingEnabled
                 })
             })
             .then(response => response.json())
@@ -663,10 +822,25 @@
                         </div>
                     `;
                     messagesContainer.appendChild(errorElement);
+                    // Mettre à jour le statut
+                    const progressEl = activeChat.querySelector('.chat-progress');
+                    if (progressEl) {
+                        progressEl.classList.remove('hidden');
+                        progressEl.textContent = 'Erreur: ' + (data.error || '');
+                    }
                 }
                 
                 // Faire défiler vers le bas
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                // Fallback: mettre à jour/masquer le statut même si l'événement WebSocket est manqué
+                const progressEl = activeChat.querySelector('.chat-progress');
+                if (progressEl) {
+                    if (data.success) {
+                        progressEl.textContent = 'Terminé';
+                        setTimeout(() => progressEl.classList.add('hidden'), 1500);
+                    }
+                }
             })
             .catch(error => {
                 // Supprimer l'indicateur de frappe
@@ -687,6 +861,13 @@
                 
                 // Faire défiler vers le bas
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                // Mettre à jour le statut
+                const progressEl = activeChat.querySelector('.chat-progress');
+                if (progressEl) {
+                    progressEl.classList.remove('hidden');
+                    progressEl.textContent = 'Erreur: ' + (error.message || '');
+                }
             });
         }
         

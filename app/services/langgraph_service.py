@@ -271,7 +271,7 @@ class LangGraphService:
         
         return self._graph
     
-    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None, images: Optional[List[str]] = None) -> str:
+    def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None, images: Optional[List[str]] = None, session_id: Optional[str] = None, stream: bool = False, show_thinking: bool = False) -> str:
         """
         Envoie une conversation au modèle d'IA via LangGraph et retourne la réponse
         
@@ -366,7 +366,19 @@ class LangGraphService:
             }
             
             # Exécuter le graphe
-            result = self._graph.invoke(initial_state)
+            # Brancher callbacks si session fournie
+            try:
+                if session_id:
+                    from app.services.ai_callbacks import WebSocketCallbackHandler
+                    cb = WebSocketCallbackHandler(session_id, operation_type="ai_chat", meta={"mode": self.mode, "provider": self.provider, "pipeline_id": pipeline_id}, show_thinking=show_thinking, stream=stream)
+                    cfg = {"callbacks": [cb]}
+                    if stream:
+                        cfg["stream"] = True
+                    result = self._graph.invoke(initial_state, config=cfg)
+                else:
+                    result = self._graph.invoke(initial_state)
+            except Exception:
+                result = self._graph.invoke(initial_state)
             
             # Extraire la réponse
             final_messages = result["messages"]
@@ -381,6 +393,13 @@ class LangGraphService:
             
         except Exception as e:
             print(f"Erreur lors de l'appel au modèle d'IA via LangGraph: {str(e)}")
+            try:
+                if session_id:
+                    from app.services.websocket_service import get_websocket_service
+                    ws = get_websocket_service()
+                    ws.emit_error(session_id, f"Erreur LangGraph: {str(e)}")
+            except Exception:
+                pass
             return f"Erreur: {str(e)}"
 
 # Instance singleton du service

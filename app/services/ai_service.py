@@ -120,7 +120,7 @@ class AIService:
                 base_url=self.ollama_url
             )
     
-    def chat(self, messages, settings=None, images=None):
+    def chat(self, messages, settings=None, images=None, session_id: Optional[str] = None, stream: bool = False, show_thinking: bool = False):
         """
         Envoie une conversation au modèle d'IA et retourne la réponse.
         Cette méthode sert de point d'entrée unique et délègue aux implémentations
@@ -165,16 +165,16 @@ class AIService:
             from app.services.langgraph_service import langgraph_service
             system_prompt = settings.get('system_prompt', '')
             print(f"Utilisation de LangGraph avec system_prompt de {len(system_prompt)} caractères")
-            return langgraph_service.chat(messages, system_prompt, images=images)
+            return langgraph_service.chat(messages, system_prompt, images=images, session_id=session_id, stream=stream, show_thinking=show_thinking)
         else:
             # Utiliser LangChain (implémentation simple sans outils)
             mode = settings.get('mode', 'online')
             print(f"Utilisation de LangChain en mode {mode}")
             
             if mode == 'online':
-                return self.chat_online(messages, settings, images=images)
+                return self.chat_online(messages, settings, images=images, session_id=session_id, stream=stream, show_thinking=show_thinking)
             else:
-                return self.chat_local(messages, settings, images=images)
+                return self.chat_local(messages, settings, images=images, session_id=session_id, stream=stream, show_thinking=show_thinking)
     
     def test_ollama_connection(self, url: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -416,7 +416,7 @@ class AIService:
         
         return settings
 
-    def chat_online(self, messages, settings, images=None):
+    def chat_online(self, messages, settings, images=None, session_id: Optional[str] = None, stream: bool = False, show_thinking: bool = False):
         """
         Utilise un service en ligne (OpenAI, etc.) pour le chat
         
@@ -454,6 +454,14 @@ class AIService:
                 openai_api_key=api_key,
                 max_tokens=settings.get('max_tokens', 1000)
             )
+            # Brancher callbacks WebSocket si session fournie
+            try:
+                if session_id:
+                    from app.services.ai_callbacks import WebSocketCallbackHandler
+                    handler = WebSocketCallbackHandler(session_id, operation_type="ai_chat", meta={"mode": "online", "model": model}, show_thinking=show_thinking, stream=stream)
+                    chat_model = chat_model.bind(callbacks=[handler])
+            except Exception:
+                pass
             
             # Préparer les messages pour l'API
             formatted_messages = []
@@ -516,7 +524,21 @@ class AIService:
             print(f"Envoi de {len(formatted_messages)} messages à l'API")
             
             # Appeler l'API via l'interface de LangChain
-            response = chat_model.invoke(formatted_messages)
+            if stream and hasattr(chat_model, 'stream'):
+                # Stream token-par-token via callbacks
+                try:
+                    _ = list(chat_model.stream(formatted_messages))
+                except Exception:
+                    # Fallback au non-stream
+                    response = chat_model.invoke(formatted_messages)
+                else:
+                    # La réponse finale n'est pas toujours fournie ici; relancer un call court pour récupérer le message complet
+                    try:
+                        response = chat_model.invoke(formatted_messages)
+                    except Exception as e2:
+                        response = type('Obj', (), {'content': f"Erreur (post-stream): {e2}"})
+            else:
+                response = chat_model.invoke(formatted_messages)
             
             # Extraire la réponse
             content = response.content
@@ -527,7 +549,7 @@ class AIService:
             print(f"Erreur lors de l'appel à l'API OpenAI: {str(e)}")
             return f"Erreur: {str(e)}"
 
-    def chat_local(self, messages, settings, images=None):
+    def chat_local(self, messages, settings, images=None, session_id: Optional[str] = None, stream: bool = False, show_thinking: bool = False):
         """
         Utilise un service local (Ollama, etc.) pour le chat
         
@@ -569,22 +591,57 @@ class AIService:
                     "content": content
                 })
             
+            # Émettre progression via WebSocket si session
+            try:
+                if session_id:
+                    from app.services.websocket_service import get_websocket_service
+                    ws = get_websocket_service()
+                    ws.emit_progress(session_id, 'ollama_request', 'Requête envoyée à Ollama', None, {
+                        'model': model
+                    })
+            except Exception:
+                pass
+
             # Appeler l'API Ollama
             response = requests.post(
                 f"{ollama_url}/api/chat",
                 json={
                     "model": model,
                     "messages": formatted_messages,
-                    "stream": False,
+                    "stream": bool(stream),
                     "temperature": settings.get('temperature', 0.7),
                     "num_predict": settings.get('max_tokens', 1000)
                 }
             )
             
             if response.status_code == 200:
-                return response.json().get('message', {}).get('content', '')
+                if stream:
+                    # L'API Ollama renvoie un NDJSON stream quand stream=True; ici on a déjà consommé en bloc.
+                    # Pour une V1, on lit le champ 'message.content' final si présent.
+                    j = response.json()
+                    content = (j.get('message') or {}).get('content', '') if isinstance(j, dict) else ''
+                else:
+                    content = response.json().get('message', {}).get('content', '')
+                try:
+                    if session_id:
+                        from app.services.websocket_service import get_websocket_service
+                        ws = get_websocket_service()
+                        ws.emit_progress(session_id, 'ollama_response', 'Réponse Ollama reçue', 100, {
+                            'chars': len(content or '')
+                        })
+                except Exception:
+                    pass
+                return content
             else:
-                return f"Erreur: {response.status_code} - {response.text}"
+                err = f"Erreur: {response.status_code} - {response.text}"
+                try:
+                    if session_id:
+                        from app.services.websocket_service import get_websocket_service
+                        ws = get_websocket_service()
+                        ws.emit_error(session_id, err)
+                except Exception:
+                    pass
+                return err
         except Exception as e:
             print(f"Erreur lors de l'appel à l'API Ollama: {str(e)}")
             return f"Erreur: {str(e)}"

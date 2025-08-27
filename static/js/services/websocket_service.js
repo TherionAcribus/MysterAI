@@ -26,10 +26,36 @@ class WebSocketService {
         this.currentSessions = new Set();
         this.currentZones = new Set();
         
-        // Auto-connexion si configurée
+        // Auto-connexion si configurée → seulement après chargement de Socket.IO
         if (this.config.autoConnect) {
-            this.connect();
+            this.ensureIo().then(() => this.connect());
         }
+    }
+    
+    /**
+     * S'assure que le client Socket.IO (io) est disponible, sinon le charge dynamiquement
+     */
+    ensureIo() {
+        if (typeof io !== 'undefined') {
+            return Promise.resolve(true);
+        }
+        return new Promise((resolve) => {
+            try {
+                const existing = document.querySelector('script[src*="/socket.io/socket.io.js"]');
+                if (existing) {
+                    existing.addEventListener('load', () => resolve(true));
+                    existing.addEventListener('error', () => resolve(false));
+                    return;
+                }
+                const s = document.createElement('script');
+                s.src = '/socket.io/socket.io.js';
+                s.onload = () => resolve(true);
+                s.onerror = () => resolve(false);
+                document.head.appendChild(s);
+            } catch (e) {
+                resolve(false);
+            }
+        });
     }
     
     /**
@@ -38,6 +64,18 @@ class WebSocketService {
     connect() {
         if (this.socket && this.isConnected) {
             this.log('WebSocket déjà connecté');
+            return;
+        }
+        
+        if (typeof io === 'undefined') {
+            this.log('Client Socket.IO non chargé; tentative de chargement…');
+            this.ensureIo().then((ok) => {
+                if (ok) {
+                    this.connect();
+                } else {
+                    this.attemptReconnect();
+                }
+            });
             return;
         }
         
@@ -122,7 +160,7 @@ class WebSocketService {
         
         setTimeout(() => {
             if (!this.isConnected) {
-                this.connect();
+                this.ensureIo().then(() => this.connect());
             }
         }, this.config.reconnectDelay);
     }
@@ -208,6 +246,9 @@ class WebSocketService {
         
         // Émettre l'événement spécifique à la session
         this.emit(`session_${data.session_id}_progress`, data);
+        
+        // Pont global (fallback UI)
+        try { if (typeof window !== 'undefined' && typeof window.onAIChatProgress === 'function') { window.onAIChatProgress(data); } } catch(e) {}
     }
     
     /**
@@ -224,6 +265,9 @@ class WebSocketService {
         
         // Émettre l'événement spécifique à la session
         this.emit(`session_${data.session_id}_complete`, data);
+        
+        // Pont global (fallback UI)
+        try { if (typeof window !== 'undefined' && typeof window.onAIChatComplete === 'function') { window.onAIChatComplete(data); } } catch(e) {}
         
         // Nettoyer la session si nécessaire
         setTimeout(() => {

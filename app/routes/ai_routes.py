@@ -4,6 +4,7 @@ from app.services.model_registry import model_registry
 from app.models.app_config import AppConfig
 from app.services.ocr_service import get_ocr_service
 from app.services.pipeline_registry import pipeline_registry
+from app.services.websocket_service import get_websocket_service
 import logging
 import os
 import base64
@@ -59,6 +60,18 @@ def chat():
         system_prompt = data.get('system_prompt')  # Récupérer le prompt système personnalisé
         pipeline_id = data.get('pipeline_id')  # Pipeline éditable optionnel
         use_tools = data.get('use_tools', True)  # Activer/désactiver l'utilisation des outils
+        # Options UI
+        stream = bool(data.get('stream', False))
+        show_thinking = bool(data.get('show_thinking', False))
+        # Session WebSocket pour suivi en temps réel (optionnelle)
+        session_id = data.get('session_id')
+        ws = None
+        try:
+            ws = get_websocket_service()
+            if session_id:
+                ws.register_session(session_id, 'ai_chat', None)
+        except Exception:
+            ws = None
         try:
             # Logs détaillés entrée
             logger.info("[CHAT] Requête reçue → model_id=%s, pipeline_id=%s, use_tools=%s, images=%d", model_id, pipeline_id, use_tools, len(images or []))
@@ -187,12 +200,29 @@ def chat():
             # pour résoudre des énigmes de géocaching
             # Importer ici pour éviter l'importation circulaire
             from app.services.langgraph_service import langgraph_service
-            response = langgraph_service.chat(messages, system_prompt, pipeline_id=pipeline_id, images=prepared_images)
+            # Émettre début
+            try:
+                if ws and session_id:
+                    ws.emit_progress(session_id, 'start', 'Traitement LangGraph démarré', 1, {
+                        'pipeline_id': pipeline_id,
+                        'images_count': len(prepared_images or [])
+                    })
+            except Exception:
+                pass
+            response = langgraph_service.chat(messages, system_prompt, pipeline_id=pipeline_id, images=prepared_images, session_id=session_id, stream=stream, show_thinking=show_thinking)
         else:
             # Utiliser le service AI standard (LangChain)
             # Cette implémentation est plus simple et n'utilise pas les outils
             # Passer également les images au service IA standard
-            response = ai_service.chat(messages, settings, images=prepared_images)
+            # Callback handler pour suivi temps réel si possible
+            try:
+                if ws and session_id:
+                    ws.emit_progress(session_id, 'start', 'Traitement LangChain démarré', 1, {
+                        'images_count': len(prepared_images or [])
+                    })
+            except Exception:
+                pass
+            response = ai_service.chat(messages, settings, images=prepared_images, session_id=session_id, stream=stream, show_thinking=show_thinking)
         
         # Restaurer les paramètres originaux si nécessaire
         if model_id and original_mode:
@@ -211,6 +241,12 @@ def chat():
                 # Réponse brute complète (attention au volume)
                 logger.info("[CHAT] Réponse brute complète:\n-----8<-----\n%s\n-----8<-----", response)
             logger.info("[CHAT] used_langgraph=%s, model_used=%s", use_langgraph and use_tools, model_used)
+        except Exception:
+            pass
+
+        try:
+            if ws and session_id:
+                ws.emit_success(session_id, 'Réponse IA prête', {'model_used': model_used, 'used_langgraph': use_langgraph and use_tools})
         except Exception:
             pass
 

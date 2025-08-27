@@ -17,6 +17,7 @@ Le service WebSocket centralisé gère toutes les communications temps réel :
 - **Messages standardisés** : Format uniforme pour tous les types de messages
 - **Gestion d'erreurs** : Robustesse avec timeout et reconnexion
  - **Contrôles d'orchestration** : Drapeaux par session (pause/reprise/annulation) via `set_control/get_control`
+ - **Événements token-par-token** : pour `ai_chat` avec `step: token` (optionnel, si `stream: true`)
 
 ```python
 # Exemple d'utilisation côté backend
@@ -56,6 +57,7 @@ Service JavaScript pour la communication côté client :
 - **Gestion des salles** : Jonction automatique aux zones et sessions
 - **Événements typés** : Émission d'événements spécifiques par opération
  - **Rooms persistantes** : Rejoint automatiquement les sessions actives après reconnexion
+ - **Fallbacks globaux** : `window.onAIChatProgress/Complete` pour intégration UI rapide
 
 ```javascript
 // Utilisation côté frontend
@@ -71,6 +73,13 @@ window.wsService.on('complete_add_geocache', (data) => {
     }
 });
 ```
+
+#### Opération `ai_chat` (Streaming)
+
+- `progress_update` (room `session_<id>`):
+  - `step: token` → `message` contient le token courant, `data.is_thinking` si réflexion
+  - autres étapes: `llm_start`, `llm_end`, `tool_start`, `tool_end`, `chain_start`, `chain_end`
+- `operation_complete`: statut final et méta (`model_used`, `used_langgraph`)
 
 #### Interface de Progression Intégrée
 
