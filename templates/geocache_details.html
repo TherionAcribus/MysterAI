@@ -1009,7 +1009,7 @@
                         const payload = {
                             // Forcer le mode simple (sans LangGraph) pour éviter les formats indésirables
                             use_langgraph: false,
-                            mode: 'online',
+                            // Ne pas forcer le mode, laisser l'IA utiliser sa configuration actuelle
                             system_prompt,
                             messages: [
                                 { role: 'user', content: originalHtml }
