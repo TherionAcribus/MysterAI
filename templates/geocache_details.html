@@ -269,6 +269,13 @@
             </div>
             {% endif %}
 
+            <!-- Stockage caché des indices originaux -->
+            {% if geocache.hints %}
+            <div id="geocache-hints-original-store" class="hidden">
+                {{ geocache.hints }}
+            </div>
+            {% endif %}
+
             <!-- Editeur de description (caché par défaut) -->
             <div id="geocache-description-editor" class="mt-3 hidden">
                 <label class="block text-gray-300 text-sm font-bold mb-2" for="geocache-description-textarea">
@@ -295,8 +302,18 @@
                             class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1.5 rounded-lg text-xs">
                         Traduire
                     </button>
-                    <span class="text-xs text-gray-500">Choisir la langue puis traduire</span>
                 </div>
+
+                <!-- Option pour traduire les indices -->
+                {% if geocache.hints %}
+                <div class="mb-2 flex items-center gap-2">
+                    <input type="checkbox" id="translate-include-hints" class="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-600 rounded">
+                    <label for="translate-include-hints" class="text-xs text-gray-400">
+                        Inclure les indices dans la traduction
+                    </label>
+                    <span class="text-xs text-gray-500">(sera ajouté à la fin du descriptif)</span>
+                </div>
+                {% endif %}
                 <textarea id="geocache-description-textarea" rows="12"
                           class="w-full bg-gray-900 text-gray-100 border border-gray-700 rounded p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
                           placeholder="Saisissez ici votre version modifiée de la description...">{{ (geocache.description_modified or geocache.description) }}</textarea>
@@ -851,6 +868,7 @@
             const saveBtn = document.getElementById('save-description-edit');
             const translateBtn = document.getElementById('translate-description');
             const langSelect = document.getElementById('translate-language');
+            const translateIncludeHints = document.getElementById('translate-include-hints');
             const feedback = document.getElementById('description-edit-feedback');
             const geocacheId = '{{ geocache.id }}';
             const previewWrap = document.getElementById('geocache-description-preview');
@@ -859,6 +877,7 @@
             const deleteModifiedBtn = document.getElementById('delete-modified-version');
             const originalStore = document.getElementById('geocache-description-original-store');
             const modifiedStore = document.getElementById('geocache-description-modified-store');
+            const hintsOriginalStore = document.getElementById('geocache-hints-original-store');
             let showing = 'modified'; // par défaut on affiche la version active (modifiée si présente)
             if (!modifiedStore) showing = 'original';
 
@@ -986,6 +1005,7 @@
                     const originalHtml = textarea.value || '';
                     if (!originalHtml.trim()) return;
                     const targetLang = (langSelect && langSelect.value) ? langSelect.value : 'fr-FR';
+                    const includeHints = translateIncludeHints && translateIncludeHints.checked && hintsOriginalStore;
                     if (feedback) {
                         feedback.textContent = 'Traduction en cours...';
                         feedback.classList.remove('hidden');
@@ -993,7 +1013,8 @@
                         feedback.classList.add('text-gray-400');
                     }
                     try {
-                        const system_prompt = (
+                        let contentToTranslate = originalHtml;
+                        let system_prompt = (
                             'Tu es un traducteur professionnel.\n' +
                             'Tâche: traduire le contenu HTML fourni vers la langue cible spécifiée, avec une traduction précise et fidèle, sans omission ni résumé.\n' +
                             'Langue cible: ' + targetLang + '\n' +
@@ -1006,13 +1027,24 @@
                             '6) Sortie: retourner uniquement le HTML traduit, rien d\'autre.\n' +
                             "7) Ne pas encadrer le résultat par des guillemets, backticks ou blocs de code."
                         );
+
+                        if (includeHints && hintsOriginalStore) {
+                            const originalHints = hintsOriginalStore.textContent || '';
+                            contentToTranslate = originalHtml + '\n\n--- INDICES À TRADUIRE ---\n' + originalHints;
+                            system_prompt += '\n\nINSTRUCTIONS SPÉCIALES POUR LES INDICES:\n' +
+                            '8) Les indices commencent après "--- INDICES À TRADUIRE ---".\n' +
+                            '9) Traduire les indices en gardant le même format texte simple (pas de HTML).\n' +
+                            '10) Ajouter les indices traduits à la fin du HTML sous forme d\'une section dédiée.\n' +
+                            '11) Format: ajouter "<h3>Indices traduits</h3><p>[indices traduits]</p>" à la fin du HTML.';
+                        }
+
                         const payload = {
                             // Forcer le mode simple (sans LangGraph) pour éviter les formats indésirables
                             use_langgraph: false,
                             // Ne pas forcer le mode, laisser l'IA utiliser sa configuration actuelle
                             system_prompt,
                             messages: [
-                                { role: 'user', content: originalHtml }
+                                { role: 'user', content: contentToTranslate }
                             ]
                         };
                         const resp = await fetch('/api/ai/chat', {
@@ -1043,7 +1075,10 @@
                         textarea.value = translated;
                         refreshPreview();
                         if (feedback) {
-                            feedback.textContent = 'Traduction terminée. Vérifiez puis sauvegardez.';
+                            const message = includeHints ?
+                                'Traduction terminée (description + indices). Vérifiez puis sauvegardez.' :
+                                'Traduction terminée. Vérifiez puis sauvegardez.';
+                            feedback.textContent = message;
                             feedback.classList.remove('text-gray-400');
                             feedback.classList.add('text-green-400');
                         }
