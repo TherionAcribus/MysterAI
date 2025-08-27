@@ -246,9 +246,6 @@ class WebSocketService {
         
         // Émettre l'événement spécifique à la session
         this.emit(`session_${data.session_id}_progress`, data);
-        
-        // Pont global (fallback UI)
-        try { if (typeof window !== 'undefined' && typeof window.onAIChatProgress === 'function') { window.onAIChatProgress(data); } } catch(e) {}
     }
     
     /**
@@ -265,9 +262,6 @@ class WebSocketService {
         
         // Émettre l'événement spécifique à la session
         this.emit(`session_${data.session_id}_complete`, data);
-        
-        // Pont global (fallback UI)
-        try { if (typeof window !== 'undefined' && typeof window.onAIChatComplete === 'function') { window.onAIChatComplete(data); } } catch(e) {}
         
         // Nettoyer la session si nécessaire
         setTimeout(() => {

@@ -597,13 +597,24 @@
                 if (window.wsService && window.wsService.socket) return true;
                 // Charger socket.io si absent
                 if (typeof io === 'undefined') {
-                    await new Promise((resolve) => {
+                    // Essayer en local d'abord
+                    let loaded = await new Promise((resolve) => {
                         const s = document.createElement('script');
-                        s.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
-                        s.onload = resolve;
-                        s.onerror = resolve;
+                        s.src = '/js/vendor/socket.io.min.js';
+                        s.onload = () => resolve(true);
+                        s.onerror = () => resolve(false);
                         document.head.appendChild(s);
                     });
+                    if (!loaded) {
+                        // Fallback CDN
+                        await new Promise((resolve) => {
+                            const s = document.createElement('script');
+                            s.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+                            s.onload = resolve;
+                            s.onerror = resolve;
+                            document.head.appendChild(s);
+                        });
+                    }
                 }
                 // Charger le service WebSocket si absent
                 if (typeof WebSocketService === 'undefined') {
@@ -710,16 +721,11 @@
                 try {
                     if (window.wsService) {
                         window.wsService.on(`session_${sessionId}_progress`, onProg);
-                        // Fallback générique: au cas où l'événement session ne parvient pas
-                        window.wsService.on('progress_update', onProg);
                         window.wsService.on(`session_${sessionId}_complete`, onDone);
                     }
                 } catch(e) {}
-                // Brancher les fallbacks globaux
-                try {
-                    window.onAIChatProgress = (d) => onProg(d);
-                    window.onAIChatComplete = (d) => onDone(d);
-                } catch(e) {}
+                // Neutraliser d'éventuels fallbacks globaux pour éviter les doublons
+                try { window.onAIChatProgress = null; window.onAIChatComplete = null; } catch(e) {}
                 activeChat.dataset.boundSessionId = sessionId;
             }
 
