@@ -46,9 +46,13 @@ Chaque instance de chat comprend :
 Le panel IA s'intègre désormais avec les détails des géocaches, permettant aux utilisateurs de :
 - Ouvrir un chat IA directement depuis la page de détails d'une géocache
 - Initialiser automatiquement le chat avec les informations de la géocache (code, nom)
-- Insérer un message `system` contenant la description (listing) de la géocache au premier tour
+- **Exécution conditionnelle du pipeline** :
+  - Le pipeline `geocache_default` s'exécute automatiquement seulement au premier message
+  - Après exécution, un message système confirme la fin du pipeline
+  - Les messages suivants utilisent une conversation normale sans réexécution du pipeline
+- Insérer un message `system` contenant la description (listing) de la géocache au premier tour (seulement si pipeline exécuté)
 - Pré-remplir la zone de saisie avec `user_default_prompt` du pipeline sélectionné
-- Transmettre automatiquement `pipeline_id: geocache_default` pour orchestrer la réponse selon le pipeline Géocache
+- Transmettre `pipeline_id: geocache_default` seulement lors de la première exécution
 - Afficher un sélecteur d'images (vignettes) pour choisir quelles images de la géocache envoyer au modèle (si le modèle supporte la vision)
 
 ### 5. Changement de modèle d'IA en temps réel
@@ -299,8 +303,8 @@ sequenceDiagram
     Input->>Controller: sendMessage()
     Controller->>DOM: Ajoute le message utilisateur
     Controller->>DOM: Ajoute l'indicateur de frappe
-    Controller->>API: Envoie la requête à l'API IA (avec pipeline_id si géocache)
-    Note over Controller,API: Premier tour = assistant welcome (si présent) + system(listing) + system(pipeline rules) + user
+    Controller->>API: Envoie la requête à l'API IA (avec pipeline_id seulement au premier message géocache)
+    Note over Controller,API: Premier tour géocache = assistant welcome + system(listing) + system(pipeline rules) + user<br/>Tours suivants = conversation normale sans pipeline
     API->>Controller: Retourne la réponse
     Controller->>DOM: Ajoute la réponse de l'IA
 ```
@@ -319,13 +323,14 @@ sequenceDiagram
     GeocacheDetails->>Function: openGeocacheAIChat()
     Function->>Function: Récupère la description
     Function->>Function: Construit le message initial (pré-rempli via user_default_prompt)
-    Function->>ChatPanel: Ajoute un message system contenant le listing
+    Function->>ChatPanel: Marque le chat comme lié à une géocache (dataset.geocacheId)
     Function->>ChatPanel: Vérifie si le panel est ouvert
     Function->>ChatPanel: Ouvre le panel si nécessaire
     Function->>ChatPanel: Vérifie les chats existants
     Function->>ChatPanel: Crée un nouvel onglet ou utilise un existant
     Function->>DOM: Personnalise l'onglet avec le code GC
     Function->>DOM: Pré-remplit le message initial (sans auto-envoi)
+    Note over DOM: Premier message déclenchera automatiquement le pipeline geocache_default
 ```
 
 ### 5. Changement de modèle d'IA
@@ -427,6 +432,12 @@ Pour étendre les fonctionnalités du panel IA, vous pouvez :
 4. Erreurs CORS : Si vous rencontrez des erreurs CORS, vérifiez que la configuration CORS dans `app/__init__.py` inclut toutes les origines nécessaires.
 
 5. Problèmes avec les caractères spéciaux : Assurez-vous que les noms de géocaches contenant des caractères spéciaux sont correctement passés via `data-geocache-name` (pas d'onclick inline).
+
+6. **Pipeline qui se relance à chaque message** : Vérifiez que le flag `dataset.pipelineExecuted` est correctement défini après la première exécution du pipeline.
+
+7. **Pipeline qui ne s'exécute pas pour les géocaches** : Assurez-vous que le chat a bien l'attribut `dataset.geocacheId` défini lors de l'ouverture depuis une fiche géocache.
+
+8. **Pipeline qui s'exécute dans les chats libres** : Les chats sans `dataset.geocacheId` ne doivent pas déclencher l'exécution automatique du pipeline.
 
 ### Débogage
 

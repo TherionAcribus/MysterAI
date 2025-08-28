@@ -539,39 +539,63 @@
             // Déterminer le pipeline à utiliser si ce chat provient d'une géocache
             let pipelineId = null;
             const chatInstanceEl = this.chatListTarget.querySelector(`.chat-instance[data-chat-id="${chatId}"]`);
+            const isGeocacheChat = chatInstanceEl && chatInstanceEl.dataset.geocacheId;
+            const pipelineAlreadyExecuted = chatInstanceEl && chatInstanceEl.dataset.pipelineExecuted === 'true';
+
             if (chatInstanceEl) {
                 // Priorité au dataset explicitement défini
                 if (chatInstanceEl.dataset.pipelineId) {
                     pipelineId = chatInstanceEl.dataset.pipelineId;
-                } else if (chatInstanceEl.dataset.geocacheId) {
+                } else if (isGeocacheChat && !pipelineAlreadyExecuted) {
+                    // Appliquer le pipeline seulement pour les chats géocache au premier message
                     pipelineId = 'geocache_default';
                 }
             }
 
-            // Construire les messages: cas spécial premier envoi → enveloppe (contexte + étape1 pipeline + dernier user)
+            // Construire les messages: cas spécial premier envoi avec pipeline pour géocache
             const isFirstUserSend = this.conversations[chatId].filter(m => m.role === 'user').length === 1;
             let messagesToSend = this.conversations[chatId];
-            if (isFirstUserSend) {
+
+            // Appliquer le pipeline seulement au premier message d'un chat géocache
+            if (isFirstUserSend && pipelineId && isGeocacheChat && !pipelineAlreadyExecuted) {
                 try {
-                    const pipelineId = chatInstanceEl && chatInstanceEl.dataset.pipelineId ? chatInstanceEl.dataset.pipelineId : null;
-                    const pipeline = pipelineId && window.__pipelinesMap ? window.__pipelinesMap[pipelineId] : null;
+                    const pipeline = window.__pipelinesMap ? window.__pipelinesMap[pipelineId] : null;
                     const firstStep = pipeline && Array.isArray(pipeline.steps) ? pipeline.steps.find(s => s.type === 'llm') : null;
                     const firstStepPrompt = firstStep && firstStep.prompt ? firstStep.prompt : null;
+
                     // Construire un contexte formaté avec la description stockée en dataset
                     let sysCtxMsg = this.conversations[chatId].find(m => m.role === 'system');
                     if (!sysCtxMsg && chatInstanceEl && chatInstanceEl.dataset.geocacheDesc) {
                         const desc = chatInstanceEl.dataset.geocacheDesc;
                         sysCtxMsg = { role: 'system', content: `Contexte géocache (listing) :\n\n${desc}` };
                     }
+
                     const userLast = this.conversations[chatId][this.conversations[chatId].length - 1];
                     const envelope = [];
                     if (sysCtxMsg) envelope.push(sysCtxMsg);
                     if (firstStepPrompt) envelope.push({ role: 'system', content: firstStepPrompt });
                     if (userLast && userLast.role === 'user') envelope.push(userLast);
+
                     // Conserver aussi le tout premier assistant (accueil) en tête si présent
                     const firstAssistant = this.conversations[chatId][0] && this.conversations[chatId][0].role === 'assistant' ? this.conversations[chatId][0] : null;
                     messagesToSend = firstAssistant ? [firstAssistant, ...envelope] : envelope;
+
+                    // Marquer que le pipeline a été exécuté pour ce chat
+                    chatInstanceEl.dataset.pipelineExecuted = 'true';
+
+                    // Ajouter un message informatif à l'utilisateur
+                    const pipelineMessage = document.createElement('div');
+                    pipelineMessage.className = 'chat-message system';
+                    pipelineMessage.innerHTML = `
+                        <div class="message-content">
+                            <strong>Pipeline exécuté avec succès !</strong><br>
+                            Vous pouvez maintenant discuter normalement avec l'IA. Le pipeline ne se relancera plus automatiquement.
+                        </div>
+                    `;
+                    messagesContainer.appendChild(pipelineMessage);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 } catch(e) {
+                    console.error('Erreur lors de la construction du pipeline:', e);
                     messagesToSend = this.conversations[chatId];
                 }
             }
@@ -787,21 +811,27 @@
             const thinkingEnabled = !!activeChat.querySelector('.chat-toggle-thinking')?.checked;
 
             // Envoyer la requête à l'API
+            const requestData = {
+                messages: messagesToSend,
+                model_id: activeModel,
+                use_tools: true,  // Activer l'utilisation des outils
+                images: images,
+                session_id: sessionId,
+                stream: streamEnabled,
+                show_thinking: thinkingEnabled
+            };
+
+            // N'ajouter pipeline_id que si le pipeline doit être exécuté (premier message géocache)
+            if (pipelineId && isGeocacheChat && !pipelineAlreadyExecuted) {
+                requestData.pipeline_id = pipelineId;
+            }
+
             fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    messages: messagesToSend,
-                    model_id: activeModel,
-                    use_tools: true,  // Activer l'utilisation des outils
-                    pipeline_id: pipelineId,
-                    images: images,
-                    session_id: sessionId,
-                    stream: streamEnabled,
-                    show_thinking: thinkingEnabled
-                })
+                body: JSON.stringify(requestData)
             })
             .then(response => response.json())
             .then(data => {

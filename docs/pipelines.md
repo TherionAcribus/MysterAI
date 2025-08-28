@@ -79,13 +79,20 @@ Le `PipelineRegistry`:
 Frontend (`static/js/controllers/chat_controller.js`):
 - Sélecteur de pipeline dans l’en-tête du chat.
 - Sur changement, met à jour `dataset.pipelineId` et le textarea avec `user_default_prompt`.
-- Premier envoi depuis une géocache:
-  - Construit `messagesToSend` en injectant, dans cet ordre:
+- **Exécution conditionnelle du pipeline**:
+  - Le pipeline n'est appliqué que pour les chats liés à une géocache (`dataset.geocacheId`)
+  - Le pipeline n'est exécuté qu'une seule fois, au premier message utilisateur
+  - Après exécution, un message système confirme que le pipeline est terminé
+  - Les messages suivants utilisent la conversation normale sans réexécution du pipeline
+- **Construction des messages pour pipeline géocache**:
+  - Au premier message d'un chat géocache, construit `messagesToSend` en injectant:
     1) éventuel message d’accueil assistant,
     2) message `system` avec le listing (description) de la géocache,
     3) prompt de la première étape LLM du pipeline sélectionné,
     4) message `user` saisi.
-- Envoie toujours `pipeline_id` dans la requête `/api/ai/chat`.
+- **Envoi sélectif du `pipeline_id`**:
+  - `pipeline_id` n'est envoyé que lors de la première exécution du pipeline
+  - Les messages suivants utilisent la conversation normale sans `pipeline_id`
 
 Backend (`app/routes/ai_routes.py`, `app/services/langgraph_service.py`):
 - Prend en compte `pipeline_id` et applique `system_prompt` du pipeline.
@@ -113,6 +120,10 @@ Cela permet à l'utilisateur de suivre en temps réel l'exécution du pipeline �
 
 ## Bonnes pratiques
 
+- **Exécution conditionnelle** : Le pipeline s'exécute automatiquement seulement pour les chats géocache au premier message.
+- **Contexte préservé** : Après exécution du pipeline, la conversation continue normalement avec le contexte maintenu.
+- **Performance** : Éviter la réexécution inutile du pipeline grâce au flag `pipelineExecuted`.
+- **UX claire** : Message système informatif après exécution du pipeline pour guider l'utilisateur.
 - Mettre les règles essentielles dans `system_prompt` (non ambiguës, concises).
 - Utiliser `user_default_prompt` pour guider l’utilisateur dès le premier message.
 - Garder les étapes au strict nécessaire; éviter la redondance entre prompts.
