@@ -700,8 +700,15 @@
                     if (step === 'start') friendly = 'Préparation…';
                     else if (step === 'chain_start') friendly = 'Orchestration…';
                     else if (step === 'llm_start') friendly = 'Le modèle réfléchit…';
-                    else if (step === 'tool_start') friendly = `Exécution outil${data.data && data.data.tool ? ' '+data.data.tool : ''}…`;
-                    else if (step === 'tool_end') friendly = 'Outil terminé';
+                    else if (step === 'tool_start') friendly = `🔧 Exécution outil${data.data && data.data.tool ? ' '+data.data.tool : ''}…`;
+                    else if (step === 'tool_end') {
+                        const toolData = data.data || {};
+                        const status = toolData.success === false ? '❌' : '✅';
+                        const toolName = toolData.tool || 'inconnu';
+                        const result = toolData.result_preview || toolData.error_preview || toolData.error || '';
+                        const truncatedResult = result ? result.substring(0, 80) + (result.length > 80 ? '...' : '') : '';
+                        friendly = `${status} ${toolName}${truncatedResult ? ': ' + truncatedResult : ''}`;
+                    }
                     else if (step === 'llm_end') friendly = 'Génération terminée';
                     else if (step === 'chain_end') friendly = 'Finalisation…';
                     else if (step === 'token') friendly = 'Réception de la réponse…';
@@ -725,7 +732,7 @@
                     if (['tool_start','tool_end','llm_start','llm_end','step_start','step_end'].includes(step)) {
                         const info = document.createElement('div');
                         info.className = 'chat-message system';
-                        // Construire détail enrichi pour step_start/step_end
+                        // Construire détail enrichi pour step_start/step_end et tool_start/tool_end
                         if (step === 'step_start' || step === 'step_end') {
                             const meta = (data && data.data) ? data.data : {};
                             let detailsHtml = '';
@@ -742,6 +749,26 @@
                                 if (meta.output_preview) {
                                     detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Sortie (aperçu):</div><pre class="code-block" style="white-space:pre-wrap;">${this.escapeHtml(String(meta.output_preview))}</pre>`;
                                 }
+                            }
+                            info.innerHTML = `<div class="message-content"><strong>${this.escapeHtml(rawMsg || '')}</strong>${detailsHtml}</div>`;
+                        } else if (step === 'tool_start' || step === 'tool_end') {
+                            const meta = (data && data.data) ? data.data : {};
+                            let detailsHtml = '';
+                            if (meta.tool) {
+                                detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Outil: <code>${this.escapeHtml(String(meta.tool))}</code></div>`;
+                            }
+                            if (meta.args) {
+                                detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Arguments: ${this.escapeHtml(String(meta.args))}</div>`;
+                            }
+                            if (meta.result_preview) {
+                                detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Résultat: <pre class="code-block" style="white-space:pre-wrap;">${this.escapeHtml(String(meta.result_preview))}</pre></div>`;
+                            }
+                            if (meta.error) {
+                                detailsHtml += `<div class="text-2xs text-red-400 mt-1">Erreur: ${this.escapeHtml(String(meta.error))}</div>`;
+                            }
+                            if (meta.success !== undefined) {
+                                const status = meta.success ? '✅ Succès' : '❌ Échec';
+                                detailsHtml += `<div class="text-2xs mt-1">${status}</div>`;
                             }
                             info.innerHTML = `<div class="message-content"><strong>${this.escapeHtml(rawMsg || '')}</strong>${detailsHtml}</div>`;
                         } else {

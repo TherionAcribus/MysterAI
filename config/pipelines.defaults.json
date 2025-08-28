@@ -21,7 +21,8 @@
           "id": "tool_select",
           "type": "tools",
           "allowed_tools": ["ocr", "exif", "qr", "cipher", "formula"],
-          "selection_from": "plan"
+          "selection_from": "plan",
+          "prompt": "CRITIQUE: Tu DOIS faire des vrais tool calls - PAS décrire ce que tu ferais.\n- Si l'outil concerne un CHIFFREMENT/CODE (kenny_code, caesar_code, vigenere_cipher, atbash, etc.), par défaut tu dois DÉCODER (mode=decode) sauf indication contraire explicite.\n- Si des données manquent, DEMANDE-les; sinon, fais le tool call réel.\n\nFORMAT OBLIGATOIRE pour tool calls:\n```json\n{\"tool_calls\": [{\"name\": \"outil_nom\", \"arguments\": {\"text\": \"...\", \"mode\": \"decode\"}}]}\n```\n\nEXEMPLE:\n{\"tool_calls\": [{\"name\": \"kenny_code\", \"arguments\": {\"text\": \"<le texte à décoder>\", \"mode\": \"decode\"}}]}\n\nAnalyse {plan}, choisis 1 outil MAXIMUM. NE SIMULE PAS!"
         },
         {
           "id": "verify",

@@ -58,6 +58,26 @@ class ChatState(TypedDict):
 
 class LangGraphService:
     """Service pour gérer les interactions avec les modèles d'IA via LangGraph"""
+
+    # Mapping des noms génériques vers les vrais noms de plugins
+    TOOL_NAME_MAPPING = {
+        "ocr": ["html_text_extractor", "image_alt_text_extractor"],
+        "exif": ["metadetection"],
+        "qr": ["qr_code_detector"],
+        "cipher": [
+            "caesar_code", "vigenere_cipher", "atbash", "bacon_code", "polybius_square",
+            "bifid_delastelle", "beaufort_cipher", "gronsfeld_cipher", "nihilist_cipher",
+            "rail_fence_cipher", "redefence_cipher", "tap_code", "tom_tom", "wolseley_cipher",
+            "gold_bug", "multiplicative_code", "modulo_cipher", "abaddon_code", "fox_code",
+            "houdini_code", "kenny_code", "morse_code", "t9_code", "multitap_code"
+        ],
+        "formula": ["formula_parser"],
+        "coordinates": ["coordinate_format_converter", "coordinates_finder"],
+        "analysis": ["additional_waypoints_analyzer", "analysis_web_page", "orientation_calculation", "projection_calculation"],
+        "text": ["alpha_decoder", "color_text_detector", "consonants_vowels_rank", "html_comments_finder", "letter_value"],
+        "numbers": ["base_converter", "chemical_elements", "hexadecimal_to_decimal", "prime_numbers", "roman_code", "shadok_numbers"],
+        "other": ["antipode", "checksum", "postnet_barcode", "what3words", "word_coords_converter", "wherigo_reverse_decoder"]
+    }
     
     def __init__(self):
         """Initialise le service LangGraph avec des valeurs par défaut"""
@@ -98,8 +118,7 @@ class LangGraphService:
                     # Log pour le débogage
                     print(f"=== DEBUG: LangGraph - Mode local chargé - URL: {self.ollama_url}, Model: {self.model_name} ===")
                 
-                # Initialiser le plugin manager sans import circulaire de 'app'
-                plugins_dir = AppConfig.get_value('plugins_dir', 'plugins')
+                # Utiliser le PluginManager global de l'application
                 try:
                     from flask import current_app
                     flask_app = None
@@ -107,18 +126,21 @@ class LangGraphService:
                         flask_app = current_app._get_current_object()
                     except Exception:
                         flask_app = None
-                    # Importer PluginManager ici pour éviter l'importation circulaire
-                    from app.plugin_manager import PluginManager
-                    if flask_app is not None:
-                        self._plugin_manager = PluginManager(plugins_dir, flask_app)
+
+                    if flask_app is not None and hasattr(flask_app, 'plugin_manager'):
+                        self._plugin_manager = flask_app.plugin_manager
+                        print("=== DEBUG: LangGraph - PluginManager récupéré depuis l'application ===")
+                        # Vérifier que les plugins sont chargés
+                        if hasattr(self._plugin_manager, 'loaded_plugins'):
+                            loaded_count = len(self._plugin_manager.loaded_plugins)
+                            print(f"=== DEBUG: LangGraph - {loaded_count} plugins chargés dans PluginManager ===")
+                        else:
+                            print("=== WARNING: LangGraph - PluginManager n'a pas de loaded_plugins ===")
                     else:
-                        # Essayer une signature sans app si supportée
-                        try:
-                            self._plugin_manager = PluginManager(plugins_dir)
-                        except Exception:
-                            self._plugin_manager = None
+                        print("=== WARNING: LangGraph - PluginManager non disponible dans l'application ===")
+                        self._plugin_manager = None
                 except Exception as e_init:
-                    print(f"=== ERROR: Initialisation du PluginManager échouée: {str(e_init)} ===")
+                    print(f"=== ERROR: Récupération du PluginManager échouée: {str(e_init)} ===")
                     self._plugin_manager = None
                 
                 # Créer les outils à partir des plugins
@@ -139,64 +161,50 @@ class LangGraphService:
         if not self._plugin_manager:
             print("=== ERROR: Plugin Manager non initialisé ===")
             return
-        
-        # Récupérer tous les plugins activés
-        from app.models.plugin_model import Plugin
-        plugins = Plugin.query.filter_by(enabled=True).all()
-        
-        for plugin in plugins:
+
+        loaded_count = len(self._plugin_manager.loaded_plugins) if hasattr(self._plugin_manager, 'loaded_plugins') else 'N/A'
+        print(f"=== DEBUG: Création des outils depuis PluginManager (loaded_plugins: {loaded_count}) ===")
+
+        if not hasattr(self._plugin_manager, 'loaded_plugins'):
+            return
+
+        for plugin_name, plugin_wrapper in self._plugin_manager.loaded_plugins.items():
             try:
-                # Charger les métadonnées du plugin
-                metadata = json.loads(plugin.metadata_json)
-                
                 # Créer une fonction de wrapper pour le plugin
-                def create_plugin_tool(plugin_name):
+                def create_plugin_tool(p_name, p_wrapper):
+                    import json
+                    from langchain_core.tools import tool
+
                     @tool
-                    def plugin_tool(text: str, **kwargs) -> str:
-                        """
-                        Utilise le plugin {plugin_name} pour traiter le texte.
-                        
-                        Args:
-                            text: Le texte à traiter
-                            **kwargs: Paramètres supplémentaires spécifiques au plugin
-                        
-                        Returns:
-                            Le résultat du traitement
-                        """
-                        inputs = {"text": text, **kwargs}
-                        result = self._plugin_manager.execute_plugin(plugin_name, inputs)
-                        
-                        # Formater la sortie pour qu'elle soit lisible
+                    def plugin_tool(text: str = "", **kwargs) -> str:
+                        """Utilise le plugin p_name pour traiter le texte."""
+                        inputs = {"text": text}
+                        inputs.update(kwargs or {})
+                        result = self._plugin_manager.execute_plugin(p_name, inputs)
                         if result:
                             if "text_output" in result:
-                                return f"Résultat de {plugin_name}: {result['text_output']}"
-                            elif "bruteforce_solutions" in result:
-                                solutions = result["bruteforce_solutions"]
-                                formatted_solutions = "\n".join([
-                                    f"- Décalage {sol['shift']}: {sol['decoded_text']}"
-                                    for sol in solutions[:5]  # Limiter à 5 solutions pour la lisibilité
-                                ])
-                                return f"Résultats de bruteforce avec {plugin_name}:\n{formatted_solutions}\n..."
-                            else:
-                                return f"Résultat de {plugin_name}: {json.dumps(result, ensure_ascii=False)}"
-                        else:
-                            return f"Erreur lors de l'exécution du plugin {plugin_name}"
-                
-                    # Personnaliser le nom et la description de l'outil
-                    plugin_tool.__name__ = plugin.name
-                    plugin_tool.name = plugin.name
-                    plugin_tool.description = f"{plugin.description}. Utilisez ce plugin pour {plugin.name.replace('_', ' ')}."
-                    
+                                return f"Résultat de {p_name}: {result['text_output']}"
+                            return f"Résultat de {p_name}: {json.dumps(result, ensure_ascii=False)}"
+                        return f"Erreur lors de l'exécution du plugin {p_name}"
+
+                    # Métadonnées
+                    plugin_tool.__name__ = p_name
+                    plugin_tool.name = p_name
+                    if hasattr(p_wrapper, 'metadata') and getattr(p_wrapper, 'metadata'):
+                        plugin_tool.description = f"{getattr(p_wrapper.metadata, 'description', p_name) or p_name}. Utilisez ce plugin pour {p_name.replace('_', ' ')}."
+                    else:
+                        plugin_tool.description = f"Plugin {p_name}. Utilisez ce plugin pour {p_name.replace('_', ' ')}."
                     return plugin_tool
-                
-                # Créer l'outil pour ce plugin
-                tool = create_plugin_tool(plugin.name)
-                self._tools.append(tool)
-                
-                print(f"=== DEBUG: Outil créé pour le plugin {plugin.name} ===")
-                
+
+                tool_fn = create_plugin_tool(plugin_name, plugin_wrapper)
+                self._tools.append(tool_fn)
+                print(f"=== DEBUG: Outil créé pour le plugin {plugin_name} ===")
             except Exception as e:
-                print(f"=== ERROR: Erreur lors de la création de l'outil pour le plugin {plugin.name}: {str(e)} ===")
+                print(f"=== ERROR: Erreur lors de la création de l'outil pour le plugin {plugin_name}: {str(e)} ===")
+
+        print(f"=== DEBUG: Total outils créés: {len(self._tools)} ===")
+        for t in self._tools:
+            print(f"=== DEBUG: Outil disponible: {getattr(t, 'name', getattr(t, '__name__', 'inconnu'))} ===")
     
     def _get_llm(self):
         """Retourne le modèle de langage approprié en fonction de la configuration"""
@@ -277,7 +285,7 @@ class LangGraphService:
     def _build_graph(self):
         """Construit un graphe simple (fallback)"""
         llm = self._get_llm()
-
+        
         def llm_node(state: ChatState) -> ChatState:
             messages = state["messages"]
             system_prompt = state.get("system_prompt")
@@ -303,10 +311,10 @@ class LangGraphService:
         else:
             builder.set_entry_point("llm")
             builder.add_edge("llm", END)
-
+        
         self._graph = builder.compile()
         return self._graph
-
+    
     def _build_graph_for_pipeline(self, pipeline: Dict[str, Any]):
         llm = self._get_llm()
         steps = pipeline.get('steps', []) or []
@@ -354,8 +362,181 @@ class LangGraphService:
             node_llm = f"llm_tools__{step_id}"
             node_tools = f"tools__{step_id}"
 
-            filtered_tools = [tool_by_name[n] for n in allowed if n in tool_by_name] if allowed else all_tools
-            tool_node = ToolNode(filtered_tools)
+            # Résoudre les noms génériques vers les vrais noms de plugins
+            resolved_tool_names = set()
+            if allowed:
+                for generic_name in allowed:
+                    if generic_name in self.TOOL_NAME_MAPPING:
+                        resolved_tool_names.update(self.TOOL_NAME_MAPPING[generic_name])
+                    else:
+                        # Si ce n'est pas un nom générique, l'ajouter tel quel
+                        resolved_tool_names.add(generic_name)
+            else:
+                # Si aucun outil spécifié, utiliser tous les outils disponibles
+                resolved_tool_names = set(tool_by_name.keys())
+
+            # Filtrer les outils disponibles
+            filtered_tools = [tool_by_name[name] for name in resolved_tool_names if name in tool_by_name]
+
+            # Debug: afficher les outils disponibles et filtrés
+            print(f"=== DEBUG: Étape {step_id} - Outils demandés (génériques): {allowed}")
+            print(f"=== DEBUG: Étape {step_id} - Outils résolus: {resolved_tool_names}")
+            print(f"=== DEBUG: Étape {step_id} - Outils disponibles: {list(tool_by_name.keys())}")
+            print(f"=== DEBUG: Étape {step_id} - Outils filtrés: {[getattr(t, 'name', getattr(t, '__name__', 'outil')) for t in filtered_tools]}")
+
+            # Créer un wrapper pour ToolNode qui émet des événements
+            class ToolNodeWithEvents:
+                def __init__(self, tools, session_id_getter, emit_ws_func):
+                    self.tools = tools
+                    self.session_id_getter = session_id_getter
+                    self.emit_ws = emit_ws_func
+                    # Par défaut, ces outils doivent décoder si le LLM n'a pas précisé le mode
+                    self.default_decode_tools = {
+                        "kenny_code", "caesar_code", "vigenere_cipher", "atbash", "morse_code",
+                        "rail_fence_cipher", "polybius_square", "bacon_code", "gronsfeld_cipher",
+                        "nihilist_cipher", "wolseley_cipher", "multitap_code", "t9_code",
+                        "bifid_delastelle", "gold_bug", "modulo_cipher", "multiplicative_code",
+                        "ubchi_cipher"
+                    }
+
+                def __call__(self, state: ChatState):
+                    messages = []
+                    session_id = self.session_id_getter(state)
+                    for msg in state["messages"]:
+                        if isinstance(msg, AIMessage) and getattr(msg, 'tool_calls', None):
+                            for tool_call in msg.tool_calls:
+                                tool_name = tool_call["name"]
+                                tool_args = tool_call.get("args", {})
+
+                                # Émettre événement tool_start
+                                self.emit_ws(
+                                    session_id,
+                                    'tool_start',
+                                    f"Exécution de l'outil {tool_name}",
+                                    {"tool": tool_name, "args": str(tool_args)[:100]}
+                                )
+
+                                # Forcer le mode decode par défaut pour les outils de chiffrement si non précisé
+                                try:
+                                    if isinstance(tool_args, str):
+                                        import json as _json
+                                        parsed_args = _json.loads(tool_args)
+                                    else:
+                                        parsed_args = dict(tool_args or {})
+                                except Exception:
+                                    parsed_args = {"text": str(tool_args)}
+
+                                if tool_name in self.default_decode_tools and not any(k in parsed_args for k in ("mode", "action", "operation")):
+                                    parsed_args["mode"] = "decode"
+
+                                # Trouver et exécuter l'outil
+                                for tool in self.tools:
+                                    if getattr(tool, 'name', getattr(tool, '__name__', '')) == tool_name:
+                                        try:
+                                            # Exécuter en privilégiant l'appel direct à la fonction si disponible
+                                            if hasattr(tool, 'func') and callable(getattr(tool, 'func')):
+                                                result = tool.func(**parsed_args)
+                                            else:
+                                                result = tool.invoke(parsed_args)
+
+                                            # Si le plugin a encodé au lieu de décoder, relancer en mode decode
+                                            try:
+                                                needs_retry_decode = False
+                                                if isinstance(result, dict):
+                                                    # Vérifier indication de mode = encode
+                                                    if result.get('results'):
+                                                        first = result['results'][0] or {}
+                                                        params = first.get('parameters') or {}
+                                                        if str(params.get('mode', '')).lower() == 'encode':
+                                                            needs_retry_decode = True
+                                                    summary = (result.get('summary') or {}).get('message', '')
+                                                    if 'encodage' in summary.lower() or 'encode' in summary.lower():
+                                                        needs_retry_decode = True
+                                                if needs_retry_decode:
+                                                    parsed_args_retry = dict(parsed_args)
+                                                    parsed_args_retry['mode'] = 'decode'
+                                                    if hasattr(tool, 'func') and callable(getattr(tool, 'func')):
+                                                        result = tool.func(**parsed_args_retry)
+                                                    else:
+                                                        result = tool.invoke(parsed_args_retry)
+                                            except Exception:
+                                                pass
+                                            result_content = str(result) if hasattr(result, '__str__') else repr(result)
+
+                                            # Émettre événement tool_end avec succès
+                                            self.emit_ws(
+                                                session_id,
+                                                'tool_end',
+                                                f"✅ {tool_name} exécuté avec succès",
+                                                {
+                                                    "tool": tool_name,
+                                                    "success": True,
+                                                    "result_preview": result_content[:200],
+                                                    "full_result": result_content
+                                                }
+                                            )
+
+                                            # Créer ToolMessage
+                                            tool_msg = ToolMessage(
+                                                content=result_content,
+                                                name=tool_name,
+                                                tool_call_id=tool_call.get("id", "")
+                                            )
+                                            messages.append(tool_msg)
+                                            break
+                                        except Exception as e:
+                                            error_msg = f"Erreur lors de l'exécution de {tool_name}: {str(e)}"
+
+                                            # Émettre événement tool_end avec erreur
+                                            self.emit_ws(
+                                                session_id,
+                                                'tool_end',
+                                                f"❌ Erreur {tool_name}: {str(e)[:100]}",
+                                                {
+                                                    "tool": tool_name,
+                                                    "success": False,
+                                                    "error": str(e),
+                                                    "error_preview": str(e)[:100]
+                                                }
+                                            )
+
+                                            # Créer ToolMessage avec erreur
+                                            tool_msg = ToolMessage(
+                                                content=error_msg,
+                                                name=tool_name,
+                                                tool_call_id=tool_call.get("id", "")
+                                            )
+                                            messages.append(tool_msg)
+                                            break
+                                else:
+                                    # Outil non trouvé
+                                    error_msg = f"Outil {tool_name} non trouvé"
+                                    self.emit_ws(
+                                        session_id,
+                                        'tool_end',
+                                        error_msg,
+                                        {
+                                            "tool": tool_name,
+                                            "success": False,
+                                            "error": "Outil non trouvé"
+                                        }
+                                    )
+
+                                    tool_msg = ToolMessage(
+                                        content=error_msg,
+                                        name=tool_name,
+                                        tool_call_id=tool_call.get("id", "")
+                                    )
+                                    messages.append(tool_msg)
+
+                    # Retourner uniquement les ToolMessage; ils seront ajoutés après l'AIMessage par l'agrégateur
+                    return {"messages": messages}
+
+            # Utiliser le wrapper au lieu de ToolNode standard
+            def get_session_id(state):
+                return state.get("session_id")
+
+            tool_node = ToolNodeWithEvents(filtered_tools, get_session_id, self._emit_ws)
             builder.add_node(node_tools, tool_node)
 
             def llm_for_tools(state: ChatState) -> ChatState:
@@ -365,20 +546,86 @@ class LangGraphService:
                 ctx = dict(state.get("context") or {})
                 if system_prompt and not any(isinstance(m, SystemMessage) for m in messages):
                     messages = [SystemMessage(content=system_prompt)] + messages
-                hint = ""
-                if selection_from and selection_from in ctx:
-                    hint = f"\nContexte de sélection ({selection_from}):\n{ctx[selection_from]}"
-                tools_names = ", ".join([getattr(t, 'name', getattr(t, '__name__', 'outil')) for t in filtered_tools]) or "(aucun)"
-                directive = f"[{step_id}] Tu peux utiliser des outils si nécessaire. Outils autorisés: {tools_names}.{hint}\nDécide et appelle les outils, puis résume."
+
+                # Créer une liste des noms d'outils pour l'affichage
+                tool_names_list = [getattr(t, 'name', getattr(t, '__name__', 'outil')) for t in filtered_tools]
+                tools_names = ", ".join(tool_names_list) if tool_names_list else "(aucun)"
+
+                # Utiliser le prompt personnalisé de l'étape s'il existe, sinon le prompt par défaut
+                step_prompt = step.get('prompt', '')
+                if step_prompt:
+                    directive = self._format_with_context(step_prompt, ctx)
+                else:
+                    hint = ""
+                    if selection_from and selection_from in ctx:
+                        hint = f"\nContexte de sélection ({selection_from}):\n{ctx[selection_from]}"
+                    directive = f"[{step_id}] Tu peux utiliser des outils si nécessaire. Outils autorisés: {tools_names}.{hint}\nDécide et appelle les outils, puis résume."
+
                 self._emit_ws(session_id, 'step_start', f"Étape {step_id} (TOOLS) — décision et appels d’outils", {"allowed_tools": tools_names})
-                messages2 = messages + [SystemMessage(content=directive)]
-                ai = self._invoke_llm(llm, messages2, session_id)
-                # Si pas de tool_calls, alors fin d'étape tools
+
+                # Si nous venons d'exécuter des outils, NE PAS insérer de nouveau message système
+                # OpenAI exige que les ToolMessage suivent immédiatement l'AIMessage contenant tool_calls
+                has_tool_messages = False
+                for m in reversed(messages):
+                    if isinstance(m, ToolMessage):
+                        has_tool_messages = True
+                        break
+                    if isinstance(m, AIMessage):
+                        break
+
+                if has_tool_messages:
+                    messages_to_send = messages
+                else:
+                    messages_to_send = messages + [SystemMessage(content=directive)]
+
+                # Lier explicitement les outils pour autoriser de vrais tool_calls (premier passage)
                 try:
-                    if not getattr(ai, 'tool_calls', None):
-                        self._emit_ws(session_id, 'step_end', f"Étape {step_id} (TOOLS) terminée", {"summary_preview": (ai.content or '')[:240]})
+                    bound_llm = llm.bind_tools(filtered_tools) if hasattr(llm, 'bind_tools') else llm
                 except Exception:
-                    pass
+                    bound_llm = llm
+
+                # Ne pas streamer ici pour préserver les tool_calls
+                try:
+                    ai = bound_llm.invoke(messages_to_send)
+                except Exception:
+                    ai = self._invoke_llm(bound_llm, messages_to_send, session_id)
+
+                # Vérifier et logger les tool calls
+                tool_calls = getattr(ai, 'tool_calls', None)
+                print(f"=== DEBUG: Étape {step_id} - Réponse complète de l'IA: {ai.content[:500]}... ===")
+                print(f"=== DEBUG: Étape {step_id} - Attributs de l'IA: {dir(ai)} ===")
+
+                if tool_calls:
+                    print(f"=== DEBUG: Étape {step_id} - Tool calls détectés: {len(tool_calls)} ===")
+                    for i, tc in enumerate(tool_calls):
+                        print(f"=== DEBUG: Tool call {i+1}: {tc.get('name', 'unknown')} avec args: {tc.get('args', {})} ===")
+                else:
+                    print(f"=== DEBUG: Étape {step_id} - Aucun tool call détecté dans tool_calls ===")
+
+                    # Essayer de détecter les tool calls dans le contenu textuel
+                    content = ai.content or ""
+                    if "tool_calls:" in content.lower() or '{"tool_calls"' in content:
+                        print(f"=== DEBUG: Étape {step_id} - Tool calls détectés dans le texte ===")
+                        # Extraire et analyser le JSON des tool calls du texte
+                        try:
+                            import json
+                            # Chercher du JSON dans le texte
+                            json_start = content.find('{')
+                            json_end = content.rfind('}') + 1
+                            if json_start >= 0 and json_end > json_start:
+                                json_part = content[json_start:json_end]
+                                parsed = json.loads(json_part)
+                                if 'tool_calls' in parsed:
+                                    print(f"=== DEBUG: Étape {step_id} - Tool calls parsés du texte: {parsed['tool_calls']} ===")
+                        except Exception as e:
+                            print(f"=== DEBUG: Étape {step_id} - Erreur parsing tool calls du texte: {e} ===")
+
+                # Si pas de tool_calls, alors fin d'étape tools
+                if not tool_calls:
+                    # Ajouter un message d'aide pour l'utilisateur
+                    help_message = f"\n\n💡 L'IA n'a pas pu faire d'appels d'outils automatiques. Outils disponibles: {tools_names}. Vous pouvez les utiliser manuellement si nécessaire."
+                    full_content = (ai.content or '') + help_message
+                    self._emit_ws(session_id, 'step_end', f"Étape {step_id} (TOOLS) terminée", {"summary_preview": full_content[:240]})
                 return {"messages": [ai], "next": None}
 
             builder.add_node(node_llm, llm_for_tools)
