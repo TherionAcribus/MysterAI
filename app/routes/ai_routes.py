@@ -320,6 +320,15 @@ def settings_panel():
 
         online_optgroups_html = ''
         current_online_model = settings.get('ai_model')
+
+        # Créer un dictionnaire pour vérifier les noms dupliqués au niveau global
+        global_name_counts = {}
+        for p in provider_order:
+            models = grouped.get(p, [])
+            for m in models:
+                mname = m.get('name', m.get('model_id', ''))
+                global_name_counts[mname] = global_name_counts.get(mname, 0) + 1
+
         for p in provider_order:
             models = grouped.get(p, [])
             if not models:
@@ -332,6 +341,11 @@ def settings_panel():
             for m in models:
                 mid = m.get('model_id')
                 mname = m.get('name', mid)
+
+                # Si le nom est dupliqué globalement, ajouter le model_id pour le différencier
+                if global_name_counts.get(mname, 0) > 1:
+                    mname = f"{mname} ({mid})"
+
                 selected = 'selected' if current_online_model == mid else ''
                 online_optgroups_html += f"<option value=\"{mid}\" {selected}>{mname}</option>"
             online_optgroups_html += "</optgroup>"
@@ -339,11 +353,25 @@ def settings_panel():
         # Construire les options dynamiques pour les modèles locaux (sélecteur)
         local_options_html = ''
         current_local_model = settings.get('local_model', '')
+
+        # Créer un dictionnaire pour vérifier les noms dupliqués
+        name_counts = {}
+        for m in registry_local:
+            if not m.get('installed', False):
+                continue
+            name = m.get('name', m.get('model_id', ''))
+            name_counts[name] = name_counts.get(name, 0) + 1
+
         for m in registry_local:
             if not m.get('installed', False):
                 continue
             full = m.get('model_id') or ''
             name = m.get('name', full)
+
+            # Si le nom est dupliqué, ajouter le model_id pour le différencier
+            if name_counts.get(name, 0) > 1:
+                name = f"{name} ({full})"
+
             selected = 'selected' if current_local_model == full else ''
             local_options_html += f"<option value=\"{full}\" {selected}>{name}</option>"
 
@@ -597,19 +625,26 @@ def get_ai_models():
     try:
         # Récupérer les paramètres actuels (mode, modèles actifs)
         settings = ai_service.get_settings()
-        
+        logger.info(f"=== DEBUG API: Paramètres actuels - Mode: {settings.get('mode')}, OnlineModel: {settings.get('online_model')}, LocalModel: {settings.get('local_model')}")
+
         # Récupérer les modèles depuis le registre
         registry_online = model_registry.get_models(type='online')
         registry_local = model_registry.get_models(type='local')
 
+        logger.info(f"=== DEBUG API: Modèles trouvés - Online: {len(registry_online)}, Local: {len(registry_local)}")
+
         models = []
         
-        # Online: garder l'id legacy (model_id, ex: 'gpt-4o') pour compat UI
+        # Online: préparer les données et détecter les dupliqués
+        online_models_data = []
+        online_name_counts = {}
+
         for m in registry_online:
             legacy_id = m.get('model_id')
-            is_active = settings.get('mode') == 'online' and settings.get('online_model') == legacy_id
+            raw_name = m.get('name', legacy_id)
             is_usable = bool(m.get('is_usable', False))
-            name = m.get('name', legacy_id) + ('' if is_usable else ' (API Key manquante)')
+            name = raw_name + ('' if is_usable else ' (API Key manquante)')
+
             # Déterminer si le modèle supporte la vision
             supports_vision = False
             try:
@@ -617,24 +652,53 @@ def get_ai_models():
                 supports_vision = any(x in lower_id for x in ['gpt-4o', 'gpt-4.1', 'vision'])
             except Exception:
                 supports_vision = False
-            models.append({
-                'id': legacy_id,
+
+            online_models_data.append({
+                'legacy_id': legacy_id,
+                'raw_name': raw_name,
                 'name': name,
-                'type': 'online',
-                'is_active': is_active,
                 'is_usable': is_usable,
                 'supports_vision': supports_vision
             })
 
+            # Compter les occurrences des noms pour détecter les dupliqués
+            online_name_counts[name] = online_name_counts.get(name, 0) + 1
+
+        # Générer les modèles en ligne avec différenciation des noms dupliqués
+        for data in online_models_data:
+            display_name = data['name']
+
+            # Si le nom est dupliqué, ajouter l'id pour le différencier
+            if online_name_counts.get(display_name, 0) > 1:
+                display_name = f"{display_name} ({data['legacy_id']})"
+                logger.info(f"=== DEBUG ONLINE: Nom dupliqué détecté - {data['name']} -> {display_name}")
+
+            is_active = settings.get('mode') == 'online' and settings.get('online_model') == data['legacy_id']
+
+            models.append({
+                'id': data['legacy_id'],
+                'name': display_name,
+                'type': 'online',
+                'is_active': is_active,
+                'is_usable': data['is_usable'],
+                'supports_vision': data['supports_vision']
+            })
+
+            logger.info(f"=== DEBUG ONLINE: Modèle ajouté - ID: {data['legacy_id']}, Nom: {display_name}, Actif: {is_active}")
+
         # Local: n'afficher QUE les modèles installés; id complet (ex: 'llama3:latest')
+
+        # Préparer les noms d'affichage et détecter les dupliqués
+        local_models_data = []
+        name_counts = {}
+
         for m in registry_local:
             full = m.get('model_id') or ''
             if not m.get('installed', False):
                 continue
             short_id = full.split(':')[0] if ':' in full else full
-            is_active = settings.get('mode') == 'local' and (
-                settings.get('local_model') == full or settings.get('local_model') == short_id
-            )
+            raw_name = m.get('name', short_id)
+
             # Vision: lire d'abord les capacités du registre (models.user.json peut définir 'vision')
             caps = m.get('capabilities') or []
             supports_vision = 'vision' in caps
@@ -645,26 +709,63 @@ def get_ai_models():
                     supports_vision = any(x in lower_full for x in ['llava', 'moondream', 'vision'])
                 except Exception:
                     supports_vision = False
+
             # Enrichir le nom d'affichage avec la taille si disponible (ex: Gemma3 4B)
-            display_name = m.get('name', short_id)
+            display_name = raw_name
             size = m.get('size')
             if size and size.lower() not in display_name.lower():
                 display_name = f"{display_name} ({size})"
+
+            logger.info(f"=== DEBUG LOCAL RAW: ID={full}, RawName='{raw_name}', DisplayName='{display_name}', Size='{size}'")
+
+            local_models_data.append({
+                'full': full,
+                'short_id': short_id,
+                'raw_name': raw_name,
+                'display_name': display_name,
+                'supports_vision': supports_vision
+            })
+
+            # Compter les occurrences des noms pour détecter les dupliqués
+            name_counts[display_name] = name_counts.get(display_name, 0) + 1
+
+        logger.info(f"=== DEBUG LOCAL: Comptage des noms - {name_counts}")
+
+        # Générer les modèles locaux avec différenciation des noms dupliqués
+        for data in local_models_data:
+            display_name = data['display_name']
+
+            # Si le nom est dupliqué, ajouter l'id complet pour le différencier
+            if name_counts.get(display_name, 0) > 1:
+                display_name = f"{display_name} ({data['full']})"
+                logger.info(f"=== DEBUG LOCAL: Nom dupliqué détecté - {data['display_name']} -> {display_name}")
+
+            is_active = settings.get('mode') == 'local' and (
+                settings.get('local_model') == data['full'] or settings.get('local_model') == data['short_id']
+            )
+
             models.append({
-                'id': full,
+                'id': data['full'],
                 'name': display_name,
                 'type': 'local',
                 'is_active': is_active,
                 'is_usable': True,
-                'supports_vision': supports_vision
+                'supports_vision': data['supports_vision']
             })
-        
+
+            logger.info(f"=== DEBUG LOCAL: Modèle ajouté - ID: {data['full']}, Nom: {display_name}, Actif: {is_active}")
+
         # Fallback si vide
         if not models:
             models.append({'id': 'default', 'name': 'Modèle par défaut (non configuré)', 'type': 'online', 'is_active': True})
 
         models.sort(key=lambda x: x['name'])
-        
+
+        # Log final des modèles envoyés
+        logger.info(f"=== DEBUG API: Liste finale des modèles ({len(models)} modèles)")
+        for m in models:
+            logger.info(f"  - [{m['type']}] {m['name']} (ID: {m['id']}, Actif: {m['is_active']})")
+
         return jsonify({'success': True, 'models': models, 'current_mode': settings.get('mode', 'online')})
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des modèles d'IA: {str(e)}")
@@ -1406,15 +1507,30 @@ def set_active_model():
         # Local
         if model_type is None:
             short_local = model_id.split(':')[0] if ':' in model_id else model_id
+            logger.info(f"=== DEBUG SET ACTIVE: Recherche modèle local - model_id: {model_id}, short_local: {short_local}")
+
+            # Première passe : chercher un match exact
             for m in model_registry.get_models(type='local'):
                 full = m.get('model_id') or ''
-                short = full.split(':')[0] if ':' in full else full
-                if full == model_id or short == short_local:
+                if full == model_id:
                     model_type = 'local'
-                    model_name = m.get('name', short)
+                    model_name = m.get('name', full.split(':')[0] if ':' in full else full)
                     is_usable = bool(m.get('installed', False))
-                    model_id = full or model_id
+                    logger.info(f"=== DEBUG SET ACTIVE: Match exact trouvé - {full}, nom: {model_name}")
                     break
+
+            # Deuxième passe : si pas de match exact, chercher un match partiel
+            if model_type is None:
+                for m in model_registry.get_models(type='local'):
+                    full = m.get('model_id') or ''
+                    short = full.split(':')[0] if ':' in full else full
+                    if short == short_local:
+                        model_type = 'local'
+                        model_name = m.get('name', short)
+                        is_usable = bool(m.get('installed', False))
+                        model_id = full or model_id
+                        logger.info(f"=== DEBUG SET ACTIVE: Match partiel trouvé - {full}, nom: {model_name}")
+                        break
         
         if not model_type:
             return jsonify({

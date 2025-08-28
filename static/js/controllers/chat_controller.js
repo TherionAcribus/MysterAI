@@ -682,6 +682,8 @@
                     else if (step === 'chain_end') friendly = 'Finalisation…';
                     else if (step === 'token') friendly = 'Réception de la réponse…';
                     else if (step === 'canceled') friendly = 'Génération annulée';
+                    else if (step === 'step_start') friendly = rawMsg || 'Début étape';
+                    else if (step === 'step_end') friendly = rawMsg || 'Fin étape';
                     else friendly = rawMsg || 'En cours…';
                     el.classList.remove('hidden');
                     el.textContent = `[${step}] ${friendly}${pct}`;
@@ -696,10 +698,31 @@
                         }
                     }
                     // Injecter des événements notables dans le fil des messages
-                    if (['tool_start','tool_end','llm_start','llm_end'].includes(step)) {
+                    if (['tool_start','tool_end','llm_start','llm_end','step_start','step_end'].includes(step)) {
                         const info = document.createElement('div');
                         info.className = 'chat-message system';
-                        info.innerHTML = `<div class="message-content">${this.escapeHtml(el.textContent)}</div>`;
+                        // Construire détail enrichi pour step_start/step_end
+                        if (step === 'step_start' || step === 'step_end') {
+                            const meta = (data && data.data) ? data.data : {};
+                            let detailsHtml = '';
+                            if (meta.prompt_preview) {
+                                detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Prompt (aperçu):</div><pre class="code-block" style="white-space:pre-wrap;">${this.escapeHtml(String(meta.prompt_preview))}</pre>`;
+                            }
+                            if (meta.allowed_tools) {
+                                detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Outils autorisés: ${this.escapeHtml(String(meta.allowed_tools))}</div>`;
+                            }
+                            if (meta.output_key || meta.output_preview) {
+                                if (meta.output_key) {
+                                    detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Sortie enregistrée sous: <code>${this.escapeHtml(String(meta.output_key))}</code></div>`;
+                                }
+                                if (meta.output_preview) {
+                                    detailsHtml += `<div class="text-2xs text-gray-400 mt-1">Sortie (aperçu):</div><pre class="code-block" style="white-space:pre-wrap;">${this.escapeHtml(String(meta.output_preview))}</pre>`;
+                                }
+                            }
+                            info.innerHTML = `<div class="message-content"><strong>${this.escapeHtml(rawMsg || '')}</strong>${detailsHtml}</div>`;
+                        } else {
+                            info.innerHTML = `<div class="message-content">${this.escapeHtml(el.textContent)}</div>`;
+                        }
                         messagesContainer.appendChild(info);
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     }

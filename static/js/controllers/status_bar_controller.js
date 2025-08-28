@@ -46,6 +46,10 @@
                         currentMode: data.current_mode,
                         apiKey: data.models.some(m => m.type === 'online') ? 'Configurée' : 'Non configurée'
                     });
+
+                    // Log détaillé des modèles actifs
+                    const activeModels = data.models.filter(m => m.is_active);
+                    console.log('=== DEBUG: Modèles actifs ===', activeModels.map(m => `${m.name} (${m.id})`));
                     
                     // Vider le sélecteur
                     this.aiModelSelectorTarget.innerHTML = '';
@@ -84,6 +88,7 @@
                             option.selected = model.is_active;
                             option.setAttribute('data-usable', model.is_usable !== false ? 'true' : 'false');
                             if (model.supports_vision) option.setAttribute('data-vision', 'true');
+                            console.log(`=== DEBUG: Création option locale - ID: ${model.id}, Nom: ${model.name}, Actif: ${model.is_active}`);
                             localGroup.appendChild(option);
                         });
                         
@@ -110,16 +115,18 @@
          */
         changeAIModel(event) {
             const modelId = event.target.value;
-            console.log(`=== DEBUG: Changement de modèle d'IA vers ${modelId} ===`);
-            
-            // Vérifier si l'option sélectionnée a l'attribut data-usable à false
             const selectedOption = event.target.options[event.target.selectedIndex];
+            const selectedText = selectedOption.textContent;
+            console.log(`=== DEBUG: Changement de modèle d'IA vers ${modelId} (Texte: ${selectedText}) ===`);
+
+            // Vérifier si l'option sélectionnée a l'attribut data-usable à false
             const isUsable = selectedOption.getAttribute('data-usable') !== 'false';
-            
+            console.log(`=== DEBUG: Option sélectionnée - Usable: ${isUsable}, Valeur: ${modelId}, Texte: ${selectedText} ===`);
+
             if (!isUsable) {
                 console.log(`=== DEBUG: Modèle ${modelId} non utilisable (clé API manquante) ===`);
                 this.showNotification('Veuillez configurer une clé API valide dans les paramètres pour utiliser ce modèle', true);
-                
+
                 // Restaurer la sélection précédente
                 this.loadAIModels(); // Recharger les modèles avec la sélection correcte
                 return;

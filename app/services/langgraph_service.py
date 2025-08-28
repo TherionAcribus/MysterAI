@@ -54,6 +54,7 @@ class ChatState(TypedDict):
     system_prompt: Optional[str]
     next: Optional[str]
     session_id: Optional[str]
+    context: Dict[str, Any]
 
 class LangGraphService:
     """Service pour gérer les interactions avec les modèles d'IA via LangGraph"""
@@ -70,6 +71,7 @@ class LangGraphService:
         # Les paramètres seront chargés lors de la première utilisation
         self._initialized = False
         self._graph = None
+        self._graphs_by_pipeline: Dict[str, Any] = {}
         self._plugin_manager = None
         self._tools = []
     
@@ -215,103 +217,204 @@ class LangGraphService:
                 temperature=self.temperature,
                 base_url=self.ollama_url
             )
+
+    def _format_with_context(self, template: str, ctx: Dict[str, Any]) -> str:
+        if not template:
+            return ""
+        out = template
+        try:
+            for k, v in (ctx or {}).items():
+                out = out.replace("{" + str(k) + "}", str(v))
+        except Exception:
+            pass
+        return out
+
+    def _invoke_llm(self, llm, messages: List[BaseMessage], session_id: Optional[str]) -> AIMessage:
+        response_msg: Optional[AIMessage] = None
+        try:
+            if hasattr(llm, 'stream') and session_id:
+                content_parts: List[str] = []
+                try:
+                    from app.services.websocket_service import get_websocket_service
+                    ws = get_websocket_service()
+                except Exception:
+                    ws = None
+                try:
+                    for chunk in llm.stream(messages):
+                        try:
+                            txt = getattr(chunk, 'content', None)
+                            if txt:
+                                content_parts.append(txt)
+                        except Exception:
+                            pass
+                        try:
+                            if ws:
+                                ctl = ws.get_control(session_id)
+                                if ctl and ctl.get('canceled'):
+                                    return AIMessage(content="(Génération annulée)")
+                        except Exception:
+                            pass
+                except Exception:
+                    resp = llm.invoke(messages)
+                    return resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
+                return AIMessage(content=''.join(content_parts))
+            else:
+                resp = llm.invoke(messages)
+                return resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
+        except Exception as _e:
+            return AIMessage(content=f"Erreur: {str(_e)}")
+
+    def _emit_ws(self, session_id: Optional[str], step: str, message: str, data: Optional[Dict[str, Any]] = None):
+        if not session_id:
+            return
+        try:
+            from app.services.websocket_service import get_websocket_service
+            ws = get_websocket_service()
+            ws.emit_progress(session_id, step, message, None, data or {})
+        except Exception:
+            pass
     
     def _build_graph(self):
-        """Construit le graphe LangGraph pour le chat"""
+        """Construit un graphe simple (fallback)"""
         llm = self._get_llm()
-        
-        # Définir les nœuds du graphe
+
         def llm_node(state: ChatState) -> ChatState:
-            """Nœud pour l'appel au modèle de langage"""
             messages = state["messages"]
             system_prompt = state.get("system_prompt")
             session_id = state.get("session_id")
-            
-            # Ajouter le message système s'il est fourni
             if system_prompt and not any(isinstance(msg, SystemMessage) for msg in messages):
                 messages = [SystemMessage(content=system_prompt)] + list(messages)
-            
-            # Appeler le LLM (avec support du streaming pour annulation)
-            response_msg: Optional[AIMessage] = None
-            try:
-                if hasattr(llm, 'stream') and session_id:
-                    # Streaming avec annulation coopérative
-                    content_parts: List[str] = []
-                    try:
-                        from app.services.websocket_service import get_websocket_service
-                        ws = get_websocket_service()
-                    except Exception:
-                        ws = None
-                    try:
-                        for chunk in llm.stream(messages):
-                            try:
-                                txt = getattr(chunk, 'content', None)
-                                if txt:
-                                    content_parts.append(txt)
-                            except Exception:
-                                pass
-                            # Vérifier annulation
-                            try:
-                                if ws:
-                                    ctl = ws.get_control(session_id)
-                                    if ctl and ctl.get('canceled'):
-                                        # Interrompre le flux
-                                        response_msg = AIMessage(content="(Génération annulée)")
-                                        break
-                            except Exception:
-                                pass
-                    except Exception:
-                        # Fallback non-stream
-                        resp = llm.invoke(messages)
-                        response_msg = resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
-                    if response_msg is None:
-                        response_msg = AIMessage(content=''.join(content_parts))
-                else:
-                    # Pas de streaming disponible
-                    resp = llm.invoke(messages)
-                    response_msg = resp if isinstance(resp, AIMessage) else AIMessage(content=str(resp))
-            except Exception as _e:
-                # En cas d'erreur, renvoyer un message explicite
-                response_msg = AIMessage(content=f"Erreur: {str(_e)}")
-            
-            # Mettre à jour l'état
-            return {"messages": [response_msg], "next": None}
-        
-        # Créer le graphe
+            ai = self._invoke_llm(llm, messages, session_id)
+            return {"messages": [ai], "next": None}
+
         builder = StateGraph(ChatState)
-        
-        # Ajouter les nœuds
         builder.add_node("llm", llm_node)
-        
-        # Ajouter le nœud d'outils si des outils sont disponibles
         if self._tools:
-            # Créer un nœud d'outils
             tool_node = ToolNode(self._tools)
             builder.add_node("tools", tool_node)
-            
-            # Définir le flux avec les outils
             builder.set_entry_point("llm")
-            
-            # Fonction pour déterminer si on doit utiliser des outils
             def should_use_tools(state: ChatState) -> str:
-                """Détermine si le LLM veut utiliser des outils"""
                 messages = state["messages"]
                 if messages and isinstance(messages[-1], AIMessage) and messages[-1].tool_calls:
                     return "tools"
                 return "end"
-            
-            # Ajouter les transitions
             builder.add_conditional_edges("llm", should_use_tools)
             builder.add_edge("tools", "llm")
         else:
-            # Flux simple sans outils
             builder.set_entry_point("llm")
             builder.add_edge("llm", END)
-        
-        # Compiler le graphe
+
         self._graph = builder.compile()
-        
         return self._graph
+
+    def _build_graph_for_pipeline(self, pipeline: Dict[str, Any]):
+        llm = self._get_llm()
+        steps = pipeline.get('steps', []) or []
+        builder = StateGraph(ChatState)
+
+        # Index outils par nom
+        all_tools = self._tools or []
+        tool_by_name: Dict[str, Any] = {}
+        for t in all_tools:
+            nm = getattr(t, 'name', getattr(t, '__name__', None))
+            if nm:
+                tool_by_name[nm] = t
+
+        node_names: List[str] = []
+
+        def make_llm_step_node(step: Dict[str, Any]):
+            step_id = step.get('id', 'step')
+            prompt_tpl = step.get('prompt', '')
+            out_key = step.get('output_key')
+            node_name = f"llm__{step_id}"
+
+            def node(state: ChatState) -> ChatState:
+                messages = list(state["messages"])
+                system_prompt = state.get("system_prompt")
+                session_id = state.get("session_id")
+                ctx = dict(state.get("context") or {})
+                if system_prompt and not any(isinstance(m, SystemMessage) for m in messages):
+                    messages = [SystemMessage(content=system_prompt)] + messages
+                step_prompt = self._format_with_context(prompt_tpl, ctx)
+                self._emit_ws(session_id, 'step_start', f"Étape {step_id} (LLM) — exécution", {"prompt_preview": step_prompt[:240]})
+                messages2 = messages + [SystemMessage(content=f"[{step_id}] {step_prompt}")]
+                ai = self._invoke_llm(llm, messages2, session_id)
+                if out_key:
+                    ctx[out_key] = ai.content
+                self._emit_ws(session_id, 'step_end', f"Étape {step_id} terminée", {"output_key": out_key or None, "output_preview": (ai.content or '')[:240]})
+                return {"messages": [ai], "context": ctx, "next": None}
+
+            builder.add_node(node_name, node)
+            return node_name
+
+        def make_tools_step_nodes(step: Dict[str, Any]):
+            step_id = step.get('id', 'tools')
+            allowed = step.get('allowed_tools', []) or []
+            selection_from = step.get('selection_from')
+            node_llm = f"llm_tools__{step_id}"
+            node_tools = f"tools__{step_id}"
+
+            filtered_tools = [tool_by_name[n] for n in allowed if n in tool_by_name] if allowed else all_tools
+            tool_node = ToolNode(filtered_tools)
+            builder.add_node(node_tools, tool_node)
+
+            def llm_for_tools(state: ChatState) -> ChatState:
+                messages = list(state["messages"])
+                system_prompt = state.get("system_prompt")
+                session_id = state.get("session_id")
+                ctx = dict(state.get("context") or {})
+                if system_prompt and not any(isinstance(m, SystemMessage) for m in messages):
+                    messages = [SystemMessage(content=system_prompt)] + messages
+                hint = ""
+                if selection_from and selection_from in ctx:
+                    hint = f"\nContexte de sélection ({selection_from}):\n{ctx[selection_from]}"
+                tools_names = ", ".join([getattr(t, 'name', getattr(t, '__name__', 'outil')) for t in filtered_tools]) or "(aucun)"
+                directive = f"[{step_id}] Tu peux utiliser des outils si nécessaire. Outils autorisés: {tools_names}.{hint}\nDécide et appelle les outils, puis résume."
+                self._emit_ws(session_id, 'step_start', f"Étape {step_id} (TOOLS) — décision et appels d’outils", {"allowed_tools": tools_names})
+                messages2 = messages + [SystemMessage(content=directive)]
+                ai = self._invoke_llm(llm, messages2, session_id)
+                # Si pas de tool_calls, alors fin d'étape tools
+                try:
+                    if not getattr(ai, 'tool_calls', None):
+                        self._emit_ws(session_id, 'step_end', f"Étape {step_id} (TOOLS) terminée", {"summary_preview": (ai.content or '')[:240]})
+                except Exception:
+                    pass
+                return {"messages": [ai], "next": None}
+
+            builder.add_node(node_llm, llm_for_tools)
+
+            def router(state: ChatState) -> str:
+                msgs = state["messages"]
+                if msgs and isinstance(msgs[-1], AIMessage) and msgs[-1].tool_calls:
+                    return node_tools
+                return "end"
+
+            builder.add_conditional_edges(node_llm, router)
+            builder.add_edge(node_tools, node_llm)
+            return node_llm
+
+        # Construire les nœuds
+        for step in steps:
+            stype = step.get('type')
+            if stype == 'llm':
+                node = make_llm_step_node(step)
+                node_names.append(node)
+            elif stype == 'tools':
+                node = make_tools_step_nodes(step)
+                node_names.append(node)
+
+        # Définir l'entrée et transitions séquentielles
+        if node_names:
+            builder.set_entry_point(node_names[0])
+            for idx, name in enumerate(node_names):
+                if name.startswith("llm__"):
+                    if idx + 1 < len(node_names):
+                        builder.add_edge(name, node_names[idx + 1])
+                    else:
+                        builder.add_edge(name, END)
+
+        self._graphs_by_pipeline[pipeline.get('id', 'default')] = builder.compile()
+        return self._graphs_by_pipeline[pipeline.get('id', 'default')]
     
     def chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None, pipeline_id: Optional[str] = None, images: Optional[List[str]] = None, session_id: Optional[str] = None, stream: bool = False, show_thinking: bool = False) -> str:
         """
@@ -329,8 +432,20 @@ class LangGraphService:
             self._ensure_initialized()
             
             # Construire le graphe si nécessaire
-            if self._graph is None:
-                self._build_graph()
+            graph = self._graph
+            pipeline = None
+            if pipeline_id:
+                try:
+                    pipeline = pipeline_registry.get_pipeline(pipeline_id)
+                except Exception:
+                    pipeline = None
+            if pipeline:
+                if pipeline_id not in self._graphs_by_pipeline:
+                    self._build_graph_for_pipeline(pipeline)
+                graph = self._graphs_by_pipeline.get(pipeline_id)
+            else:
+                if graph is None:
+                    graph = self._build_graph()
             
             # Convertir les messages au format LangChain
             langchain_messages = []
@@ -405,7 +520,8 @@ class LangGraphService:
                 "messages": langchain_messages,
                 "system_prompt": system_prompt,
                 "next": None,
-                "session_id": session_id
+                "session_id": session_id,
+                "context": {}
             }
             
             # Exécuter le graphe
@@ -417,9 +533,9 @@ class LangGraphService:
                     cfg = {"callbacks": [cb]}
                     if stream:
                         cfg["stream"] = True
-                    result = self._graph.invoke(initial_state, config=cfg)
+                    result = graph.invoke(initial_state, config=cfg)
                 else:
-                    result = self._graph.invoke(initial_state)
+                    result = graph.invoke(initial_state)
             except Exception as e:
                 # Annulation propre
                 try:
