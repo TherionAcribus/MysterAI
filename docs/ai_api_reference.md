@@ -389,12 +389,40 @@ Lorsqu'un `session_id` est fourni, le serveur émet des événements WebSocket:
 {
   "session_id": "...",
   "operation_type": "ai_chat",
-  "step": "token|llm_start|llm_end|tool_start|tool_end|...",
+  "step": "token|llm_start|llm_end|tool_start|tool_end|step_start|step_end|...",
   "message": "texte du token ou info",
   "progress": null,
   "data": {"is_thinking": false}
 }
 ```
+
+**Événements spécifiques aux pipelines :**
+- `step_start` : Émis au début de chaque étape du pipeline
+  ```json
+  {
+    "session_id": "...",
+    "operation_type": "ai_chat",
+    "step": "step_start",
+    "message": "Étape classify (LLM) — exécution",
+    "data": {
+      "prompt_preview": "Classifie le puzzle (catégories probables...)",
+      "allowed_tools": null
+    }
+  }
+  ```
+- `step_end` : Émis à la fin de chaque étape du pipeline
+  ```json
+  {
+    "session_id": "...",
+    "operation_type": "ai_chat",
+    "step": "step_end",
+    "message": "Étape classify terminée",
+    "data": {
+      "output_key": "classification",
+      "output_preview": "Catégorie principale: Coordonnées cachées..."
+    }
+  }
+  ```
 
 - `operation_complete` (room: `session_<session_id>`):
 ```json

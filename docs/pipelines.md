@@ -97,6 +97,19 @@ Backend (`app/routes/ai_routes.py`, `app/services/langgraph_service.py`):
   - résumé des rôles/longueurs,
   - détail par message (prévisualisation jusqu’à ~2000 caractères),
   - aperçu du dernier `user`, taille du `system_prompt`.
+- Émissions WebSocket par étape:
+  - `step_start`: au début de chaque étape (avec `prompt_preview` pour LLM, `allowed_tools` pour tools).
+  - `step_end`: à la fin d’une étape (avec `output_key` et `output_preview`).
+
+## Affichage en temps réel dans le Chat
+
+Le frontend (`static/js/controllers/chat_controller.js`) écoute les événements WebSocket et affiche automatiquement dans le fil du chat:
+
+- **Début d'étape**: Message système avec le nom de l'étape et détails (prompt, outils autorisés).
+- **Fin d'étape**: Message système avec la clé de sortie et aperçu du résultat généré.
+- **Progression**: Mise à jour de la barre de statut avec l'état actuel (llm_start, tool_start, etc.).
+
+Cela permet à l'utilisateur de suivre en temps réel l'exécution du pipeline étape par étape.
 
 ## Bonnes pratiques
 

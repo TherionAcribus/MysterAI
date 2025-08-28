@@ -76,6 +76,15 @@ Intégration WebSocket:
 - Au clic, il envoie `POST /api/ai/cancel` avec le `session_id` du chat et met immédiatement à jour l'UI (statut et arrêt de l'animation).
 - Les événements `canceled` interrompent la génération côté backend (LangGraph/OpenAI/Ollama) et finalisent l'UI.
 
+### 8. Affichage des étapes du pipeline
+
+- **Affichage en temps réel**: Lorsque le chat utilise un pipeline IA, chaque étape (classification, plan, outils, vérification) est affichée automatiquement dans le fil de discussion.
+- **Messages système automatiques**:
+  - Au début de chaque étape: message indiquant le nom de l'étape et ses détails (prompt utilisé, outils autorisés).
+  - À la fin de chaque étape: message avec la clé de sortie et un aperçu du résultat généré.
+- **Progression visuelle**: La barre de statut se met à jour avec l'état actuel ("Étape classify (LLM) — exécution", "Étape tool_select (TOOLS) — décision et appels d'outils", etc.).
+- **Détails enrichis**: Les messages incluent des aperçus formatés du prompt, des outils utilisés et des résultats obtenus pour une transparence complète.
+
 ## Implémentation technique
 
 ### Contrôleur Stimulus
