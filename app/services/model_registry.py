@@ -113,7 +113,7 @@ class ModelRegistry:
             m['last_seen'] = now_iso
 
         cache = {
-            'models': sorted(by_id.values(), key=lambda x: x.get('name', x.get('id'))),
+            'models': sorted(by_id.values(), key=lambda x: (x.get('provider', ''), x.get('name', x.get('id')))),
             'use_case_models': {**defaults.get('use_case_models', {}), **user.get('use_case_models', {})},
             'refreshed_at': now_iso
         }

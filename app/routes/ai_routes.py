@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify, Response
 from app.services.ai_service import ai_service
 from app.services.model_registry import model_registry
+from app.services.pipeline_registry import pipeline_registry
 from app.models.app_config import AppConfig
 from app.services.ocr_service import get_ocr_service
-from app.services.pipeline_registry import pipeline_registry
 from app.services.websocket_service import get_websocket_service
 import logging
 import os
@@ -189,7 +189,7 @@ def chat():
                     prepared_images.append(u)
         except Exception:
             prepared_images = abs_images
-
+        
         # Vérifier si on doit utiliser LangGraph
         use_langgraph = settings.get('use_langgraph', True)
         
@@ -249,7 +249,7 @@ def chat():
                 ws.emit_success(session_id, 'Réponse IA prête', {'model_used': model_used, 'used_langgraph': use_langgraph and use_tools})
         except Exception:
             pass
-
+        
         return jsonify({
             'success': True,
             'response': response,
@@ -364,7 +364,7 @@ def settings_panel():
                 f"<label>{label}</label>"
                 f"</div>"
             )
-
+        
         # Générer le HTML directement
         html = f"""
         <h2 class="text-lg font-semibold mb-4">Paramètres IA</h2>
@@ -509,6 +509,16 @@ def settings_panel():
                             data-action="click->ai-settings#refreshModels">
                         Rafraîchir les modèles
                     </button>
+                    <button
+                        type="button"
+                        class="ml-2 inline-flex items-center px-3 py-2 bg-purple-700 hover:bg-purple-600 rounded text-white text-sm"
+                        data-tab-opener="models-editor"
+                        data-tab-title="Modèles IA"
+                        data-tab-component="models-editor"
+                        data-tab-unique-id="ai-models-editor"
+                        data-tab-config-url="/api/ai/models/editor">
+                        <i class="fas fa-database mr-2"></i>Éditeur de modèles
+                    </button>
                     <span class="ml-2 text-sm" data-ai-settings-target="connectionStatus"></span>
                 </div>
                 
@@ -518,10 +528,10 @@ def settings_panel():
                     <div class="bg-gray-800 p-3 rounded">
                         <div class="grid grid-cols-2 gap-2">
                             {local_checkboxes_html}
-                        </div>
+                            </div>
+                            </div>
                     </div>
                 </div>
-            </div>
             </div>
             
             <!-- Paramètres communs -->
@@ -587,13 +597,13 @@ def get_ai_models():
     try:
         # Récupérer les paramètres actuels (mode, modèles actifs)
         settings = ai_service.get_settings()
-
+        
         # Récupérer les modèles depuis le registre
         registry_online = model_registry.get_models(type='online')
         registry_local = model_registry.get_models(type='local')
 
         models = []
-
+        
         # Online: garder l'id legacy (model_id, ex: 'gpt-4o') pour compat UI
         for m in registry_online:
             legacy_id = m.get('model_id')
@@ -625,13 +635,16 @@ def get_ai_models():
             is_active = settings.get('mode') == 'local' and (
                 settings.get('local_model') == full or settings.get('local_model') == short_id
             )
-            # Heuristique simple pour vision côté local (peut être enrichie plus tard)
-            supports_vision = False
-            try:
-                lower_full = (full or '').lower()
-                supports_vision = any(x in lower_full for x in ['llava', 'moondream', 'vision'])
-            except Exception:
-                supports_vision = False
+            # Vision: lire d'abord les capacités du registre (models.user.json peut définir 'vision')
+            caps = m.get('capabilities') or []
+            supports_vision = 'vision' in caps
+            if not supports_vision:
+                # fallback heuristique (legacy)
+                try:
+                    lower_full = (full or '').lower()
+                    supports_vision = any(x in lower_full for x in ['llava', 'moondream', 'vision'])
+                except Exception:
+                    supports_vision = False
             # Enrichir le nom d'affichage avec la taille si disponible (ex: Gemma3 4B)
             display_name = m.get('name', short_id)
             size = m.get('size')
@@ -645,13 +658,13 @@ def get_ai_models():
                 'is_usable': True,
                 'supports_vision': supports_vision
             })
-
+        
         # Fallback si vide
         if not models:
             models.append({'id': 'default', 'name': 'Modèle par défaut (non configuré)', 'type': 'online', 'is_active': True})
 
         models.sort(key=lambda x: x['name'])
-
+        
         return jsonify({'success': True, 'models': models, 'current_mode': settings.get('mode', 'online')})
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des modèles d'IA: {str(e)}")
@@ -668,6 +681,208 @@ def refresh_ai_models():
         return jsonify({'success': True, 'refreshed_at': cache.get('refreshed_at'), 'count': len(cache.get('models', []))})
     except Exception as e:
         logger.error(f"Erreur lors du rafraîchissement des modèles: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ai_bp.route('/models/editor', methods=['GET'])
+def models_editor():
+    """Page HTML d'édition des modèles (similaire éditeur pipelines)."""
+    try:
+        user_cfg = model_registry.get_user_config()
+        cache = model_registry.get_cache()
+        import json as _json
+        initial_user = _json.dumps(user_cfg, ensure_ascii=False)
+        initial_cache = _json.dumps(cache.get('models', []), ensure_ascii=False)
+
+        html = """
+        <div class=\"p-4 text-gray-200\" style=\"font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial\"> 
+            <h2 class=\"text-xl font-semibold mb-4\">Éditeur de Modèles IA</h2>
+
+            <div class=\"mb-3 flex items-center gap-2\">
+                <button id=\"btn-refresh\" class=\"px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded\">Rafraîchir</button>
+                <button id=\"btn-save\" class=\"px-3 py-2 bg-green-700 hover:bg-green-600 rounded\">Enregistrer</button>
+                <span id=\"status\" class=\"ml-2 text-sm text-gray-400\"></span>
+            </div>
+
+            <div class=\"grid grid-cols-1 md:grid-cols-5 gap-4\">
+                <div class=\"md:col-span-1 bg-gray-800 rounded p-3\">
+                    <h3 class=\"text-sm font-medium mb-2\">Astuces</h3>
+                    <ul class=\"text-xs text-gray-400 space-y-1\">
+                        <li>Qualifiez les modèles découverts (ex: vision, tools, code, thinking).</li>
+                        <li>Ajoutez des champs: <code>description</code>, <code>tags</code>, <code>defaults</code>.</li>
+                        <li>Les modifications sont fusionnées au prochain rafraîchissement.</li>
+                    </ul>
+                    <div class=\"mt-3 text-xs text-gray-400\">Mode avancé (JSON brut)</div>
+                    <textarea id=\"models-json\" class=\"w-full h-40 bg-gray-900 text-gray-200 rounded p-2 font-mono text-xs\" spellcheck=\"false\">%%INITIAL_USER%%</textarea>
+                </div>
+                <div class=\"md:col-span-4 bg-gray-800 rounded p-3\">
+                    <label class=\"block text-xs text-gray-400 mb-2\">Édition simplifiée</label>
+                    <div id=\"models-list\" class=\"space-y-3 max-h-[70vh] overflow-auto\"></div>
+                </div>
+            </div>
+
+            <script>
+                const ta = document.getElementById('models-json');
+                const statusEl = document.getElementById('status');
+                const btnRefresh = document.getElementById('btn-refresh');
+                const btnSave = document.getElementById('btn-save');
+                const listEl = document.getElementById('models-list');
+
+                const INITIAL_USER = %%INITIAL_USER_JS%%;
+                const INITIAL_CACHE = %%INITIAL_CACHE_JS%%;
+
+                const KNOWN_CAPS = ['vision','tools','thinking']; // 'chat' implicite
+
+                function renderList() {
+                    listEl.innerHTML = '';
+                    const userById = {};
+                    (INITIAL_USER.models || []).forEach(m => { userById[m.id] = m; });
+
+                    INITIAL_CACHE.forEach(m => {
+                        const id = m.id || (m.provider + ':' + m.model_id);
+                        const user = userById[id] || {};
+                        const name = (user.name || m.name || m.model_id || id);
+                        const provider = m.provider || 'ollama';
+                        const type = m.type || (provider === 'ollama' ? 'local' : 'online');
+                        const modelId = m.model_id || '';
+                        const caps = (user.capabilities || m.capabilities || []).slice();
+                        const hasCap = (c) => caps.includes(c);
+                        const defaults = user.defaults || m.defaults || {};
+                        const include = !!user.id; // coché si override existant
+
+                        const userDesc = user.description || '';
+                        const row = document.createElement('div');
+                        row.className = 'bg-gray-900 rounded p-3';
+                        row.dataset.modelId = id;
+                        row.innerHTML = `
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1">
+                                    <div class="text-sm font-semibold">${name}</div>
+                                    <div class="text-xs text-gray-400">${provider} · ${type} · ${modelId}</div>
+                                    ${userDesc ? `<div class="text-xs text-gray-300 mt-1 italic">📝 ${userDesc}</div>` : ''}
+                                </div>
+                                <label class="text-xs"><input type="checkbox" class="form-checkbox mr-2 include-toggle" ${include ? 'checked' : ''}/>Inclure dans models.user.json</label>
+                            </div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Nom</label>
+                                    <input type="text" class="w-full bg-gray-800 rounded px-2 py-1 text-sm name-input" value="${name.replace(/"/g,'&quot;')}">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Capacités</label>
+                                    <div class="flex flex-wrap gap-2 text-xs">
+                                        ${KNOWN_CAPS.map(c => `
+                                            <label><input type="checkbox" class="form-checkbox cap-box" data-cap="${c}" ${hasCap(c)?'checked':''}/> ${c}</label>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Paramètres par défaut</label>
+                                    <div class="grid grid-cols-2 gap-2 text-xs">
+                                        <label class="flex items-center gap-1">
+                                            <span>Temp.</span>
+                                            <input type="number" step="0.1" class="w-full bg-gray-800 rounded px-2 py-1 def-temp" value="${(defaults.temperature ?? '')}">
+                                        </label>
+                                        ${type === 'local' ? `
+                                            <label class="flex items-center gap-1">
+                                                <span>Predict</span>
+                                                <input type="number" class="w-full bg-gray-800 rounded px-2 py-1 def-num" value="${(defaults.num_predict ?? '')}">
+                                            </label>
+                                        ` : `
+                                            <label class="flex items-center gap-1">
+                                                <span>MaxTok</span>
+                                                <input type="number" class="w-full bg-gray-800 rounded px-2 py-1 def-max" value="${(defaults.max_tokens ?? '')}">
+                                            </label>
+                                        `}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Description/Notes</label>
+                                    <textarea class="w-full bg-gray-800 rounded px-2 py-1 text-sm desc-input" rows="2" placeholder="Ex: Bon pour les questions générales, rapide pour les tâches simples...">${(user.description || '').replace(/"/g,'&quot;')}</textarea>
+                                </div>
+                            </div>
+                        `;
+                        listEl.appendChild(row);
+                    });
+                }
+
+                renderList();
+
+                btnRefresh.onclick = () => {
+                    statusEl.textContent = 'Rafraîchissement...';
+                    fetch('/api/ai/models/refresh', { method: 'POST' })
+                      .then(r => r.json())
+                      .then(d => {
+                        if (d.success) {
+                          statusEl.textContent = 'OK (' + d.count + ' modèles)';
+                        } else {
+                          statusEl.textContent = 'Erreur: ' + d.error;
+                        }
+                      })
+                      .catch(e => statusEl.textContent = 'Erreur: ' + e.message);
+                };
+
+                btnSave.onclick = () => {
+                    statusEl.textContent = 'Enregistrement...';
+                    // Construire models.user.json à partir des cases cochées
+                    const models = [];
+                    listEl.querySelectorAll('[data-model-id]').forEach(row => {
+                        const include = row.querySelector('.include-toggle').checked;
+                        if (!include) return;
+                        const title = row.querySelector('.name-input').value.trim();
+                        const id = row.dataset.modelId;
+                        const cached = INITIAL_CACHE.find(x => x.id === id) || {};
+                        const provider = cached.provider || 'ollama';
+                        const type = cached.type || (provider === 'ollama' ? 'local' : 'online');
+                        const model_id = cached.model_id || '';
+                        const caps = [];
+                        row.querySelectorAll('.cap-box').forEach(cb => { if (cb.checked) caps.push(cb.getAttribute('data-cap')); });
+                        const defaults = {};
+                        const temp = row.querySelector('.def-temp')?.value;
+                        if (temp !== '' && !isNaN(parseFloat(temp))) defaults.temperature = parseFloat(temp);
+                        if (type === 'local') {
+                            const num = row.querySelector('.def-num')?.value;
+                            if (num !== '' && !isNaN(parseInt(num))) defaults.num_predict = parseInt(num);
+                        } else {
+                            const max = row.querySelector('.def-max')?.value;
+                            if (max !== '' && !isNaN(parseInt(max))) defaults.max_tokens = parseInt(max);
+                        }
+                        const description = row.querySelector('.desc-input')?.value.trim() || null;
+                        const entry = {
+                            id, provider, type, model_id,
+                            name: title,
+                            capabilities: caps,
+                            defaults
+                        };
+                        if (description) entry.description = description;
+                        models.push(entry);
+                    });
+
+                    const body = {
+                        models,
+                        use_case_models: INITIAL_USER.use_case_models || {}
+                    };
+                    // Mettre aussi à jour le textarea JSON (mode avancé)
+                    ta.value = JSON.stringify(body, null, 2);
+                    fetch('/api/ai/models/user', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    })
+                      .then(r => r.json())
+                      .then(d => {
+                        if (d.success) { statusEl.textContent = 'Enregistré'; }
+                        else { statusEl.textContent = 'Erreur: ' + d.error; }
+                      })
+                      .catch(e => statusEl.textContent = 'Erreur: ' + e.message);
+                };
+            </script>
+        </div>
+        """
+        return Response(html
+            .replace('%%INITIAL_USER%%', initial_user)
+            .replace('%%INITIAL_USER_JS%%', initial_user)
+            .replace('%%INITIAL_CACHE_JS%%', initial_cache)
+        , mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur éditeur de modèles : {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @ai_bp.route('/models/user', methods=['GET'])
@@ -1179,7 +1394,7 @@ def set_active_model():
         model_type = None
         model_name = model_id
         is_usable = True
-
+        
         # Online
         for m in model_registry.get_models(type='online'):
             if m.get('model_id') == model_id:
@@ -1187,7 +1402,7 @@ def set_active_model():
                 model_name = m.get('name', model_id)
                 is_usable = bool(m.get('is_usable', False))
                 break
-        
+
         # Local
         if model_type is None:
             short_local = model_id.split(':')[0] if ':' in model_id else model_id
@@ -1213,7 +1428,7 @@ def set_active_model():
                 'success': False,
                 'error': "Modèle non utilisable (clé API manquante ou modèle non installé)"
             }), 400
-
+        
         # Mettre à jour les paramètres
         settings['mode'] = model_type
         

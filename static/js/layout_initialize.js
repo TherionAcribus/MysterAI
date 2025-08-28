@@ -1341,6 +1341,59 @@ function initializeLayout() {
             }
         });
 
+        // Enregistrer le composant models-editor (éditeur JSON models.user.json)
+        mainLayout.registerComponent('models-editor', function(container, state) {
+            try {
+                const $el = container.getElement();
+                $el.html(`
+                    <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                        <div class="flex items-center justify-center h-full">
+                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                            <span class="ml-2 text-gray-300">Chargement de l'éditeur de modèles…</span>
+                        </div>
+                    </div>
+                `);
+
+                const url = (state && (state.url || state.href || state.panelUrl)) || '/api/ai/models/editor';
+
+                fetch(url, { credentials: 'include' })
+                    .then(resp => {
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        return resp.text();
+                    })
+                    .then(html => {
+                        $el.html(html);
+                        // Exécuter les scripts inline du contenu injecté
+                        const el = $el[0];
+                        const scripts = el.querySelectorAll('script');
+                        scripts.forEach(original => {
+                            const s = document.createElement('script');
+                            if (original.src) {
+                                s.src = original.src;
+                            } else {
+                                s.textContent = original.textContent || '';
+                            }
+                            document.body.appendChild(s);
+                            document.body.removeChild(s);
+                        });
+                        if (window.StimulusApp) {
+                            window.StimulusApp.start();
+                        }
+                    })
+                    .catch(err => {
+                        $el.html(`
+                            <div class="w-full h-full bg-gray-900 p-4">
+                                <div class="text-red-500 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Erreur de chargement</div>
+                                <div class="text-gray-400 text-sm">${(err && err.message) || 'inconnue'}</div>
+                            </div>
+                        `);
+                    });
+            } catch (e) {
+                console.error('models-editor: erreur initialisation', e);
+                container.getElement().html(`<div class="p-4 text-red-500">Erreur: ${e && e.message ? e.message : 'inconnue'}</div>`);
+            }
+        });
+
         mainLayout.init();
 
         // Ajuster la taille lors du redimensionnement de la fenêtre
