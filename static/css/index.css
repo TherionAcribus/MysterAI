@@ -35,7 +35,7 @@
     height: 100%;
     position: absolute;
     top: 0;
-    bottom: 0;
+    bottom: 24px; /* Hauteur de la barre de status */
     left: 0;
     transform: translateX(-100%);
     transition: transform 0.15s ease-out;
@@ -51,12 +51,6 @@
     transform: translateX(100%);
     border-right: none;
     border-left: 1px solid #3c3c3c;
-    position: fixed;
-    top: 0;
-    bottom: 22px; /* Hauteur de la barre de statut */
-    width: 250px;
-    padding-right: 48px; /* Ajouter un padding pour éviter le chevauchement avec la barre latérale */
-    box-sizing: border-box; /* S'assurer que le padding est inclus dans la largeur */
 }
 
 .side-panel.visible {
@@ -360,9 +354,9 @@
     opacity: 0.4;
 }
 
-/* Ajustement du panneau droit quand le panneau inférieur est ouvert */
-.side-panel.right-panel.with-bottom-panel {
-    bottom: 322px; /* 300px + 22px */
+/* Ajustement des panneaux quand le panneau inférieur est ouvert */
+.side-panel.with-bottom-panel {
+    bottom: 346px; /* 300px (panneau inférieur) + 24px (barre de status) + 22px (marge) */
 }
 
 /* Style pour les panneaux de contenu */
