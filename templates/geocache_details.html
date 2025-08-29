@@ -1,4 +1,4 @@
-<div class="w-full h-full bg-gray-900 overflow-auto p-4" 
+<div id="geocache-details-{{ geocache.id }}" class="w-full h-full bg-gray-900 overflow-auto p-4" 
      hx-ext="include-vals" 
      hx-headers='{"X-Layout-Component": "true"}'
      x-init="console.log('Component initialized with geocache ID:', '{{ geocache.id }}')"
@@ -860,24 +860,25 @@
     // Gestion de l'édition de la description (affichage/masquage + sauvegarde)
     (function setupDescriptionEditor(){
         try {
-            const editBtn = document.getElementById('edit-description-button');
-            const view = document.getElementById('geocache-description-view');
-            const editor = document.getElementById('geocache-description-editor');
-            const textarea = document.getElementById('geocache-description-textarea');
-            const cancelBtn = document.getElementById('cancel-description-edit');
-            const saveBtn = document.getElementById('save-description-edit');
-            const translateBtn = document.getElementById('translate-description');
-            const langSelect = document.getElementById('translate-language');
-            const translateIncludeHints = document.getElementById('translate-include-hints');
-            const feedback = document.getElementById('description-edit-feedback');
+            const root = document.getElementById('geocache-details-{{ geocache.id }}') || document;
+            const editBtn = root.querySelector('#edit-description-button');
+            const view = root.querySelector('#geocache-description-view');
+            const editor = root.querySelector('#geocache-description-editor');
+            const textarea = root.querySelector('#geocache-description-textarea');
+            const cancelBtn = root.querySelector('#cancel-description-edit');
+            const saveBtn = root.querySelector('#save-description-edit');
+            const translateBtn = root.querySelector('#translate-description');
+            const langSelect = root.querySelector('#translate-language');
+            const translateIncludeHints = root.querySelector('#translate-include-hints');
+            const feedback = root.querySelector('#description-edit-feedback');
             const geocacheId = '{{ geocache.id }}';
-            const previewWrap = document.getElementById('geocache-description-preview');
-            const previewContent = document.getElementById('geocache-description-preview-content');
-            const toggleBtn = document.getElementById('toggle-description-version');
-            const deleteModifiedBtn = document.getElementById('delete-modified-version');
-            const originalStore = document.getElementById('geocache-description-original-store');
-            const modifiedStore = document.getElementById('geocache-description-modified-store');
-            const hintsOriginalStore = document.getElementById('geocache-hints-original-store');
+            const previewWrap = root.querySelector('#geocache-description-preview');
+            const previewContent = root.querySelector('#geocache-description-preview-content');
+            const toggleBtn = root.querySelector('#toggle-description-version');
+            const deleteModifiedBtn = root.querySelector('#delete-modified-version');
+            const originalStore = root.querySelector('#geocache-description-original-store');
+            const modifiedStore = root.querySelector('#geocache-description-modified-store');
+            const hintsOriginalStore = root.querySelector('#geocache-hints-original-store');
             let showing = 'modified'; // par défaut on affiche la version active (modifiée si présente)
             if (!modifiedStore) showing = 'original';
 
