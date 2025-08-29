@@ -39,7 +39,9 @@ Chaque instance de chat comprend :
 - Création d'un nouveau chat : Cliquer sur le bouton "+" dans la barre d'onglets
 - Changement de chat : Cliquer sur l'onglet correspondant
 - Fermeture d'un chat : Cliquer sur le bouton "×" dans l'en-tête du chat
-- Envoi de message : Saisir du texte et cliquer sur le bouton d'envoi ou utiliser Ctrl+Entrée
+- Envoi de message : Saisir du texte et cliquer sur le bouton d'envoi ou appuyer sur Entrée
+- Saut de ligne : Maintenir Maj enfoncé et appuyer sur Entrée (Maj+Entrée)
+- Alternative : Ctrl+Entrée pour envoyer (compatibilité)
 
 ### 4. Intégration avec les géocaches
 
@@ -300,7 +302,7 @@ sequenceDiagram
     participant API
 
     User->>Input: Saisit un message
-    User->>Input: Ctrl+Entrée ou clic sur Envoyer
+    User->>Input: Entrée ou clic sur Envoyer
     Input->>Controller: sendMessage()
     Controller->>DOM: Ajoute le message utilisateur
     Controller->>DOM: Ajoute l'indicateur de frappe

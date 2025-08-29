@@ -500,8 +500,25 @@
         }
         
         handleKeydown(event) {
-            // Envoyer le message avec Ctrl+Enter ou Cmd+Enter
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            if (event.key === 'Enter') {
+                // Shift+Enter : insérer un saut de ligne
+                if (event.shiftKey) {
+                    // Laisser le comportement par défaut (saut de ligne)
+                    return;
+                }
+                // Enter seul : envoyer le message
+                else {
+                    event.preventDefault();
+                    // Bloquer si une génération est en cours pour ce chat
+                    try {
+                        const activeChat = event.currentTarget.closest('.chat-instance');
+                        if (this.#isChatBusy(activeChat)) return;
+                    } catch (e) {}
+                    this.sendMessage(event);
+                }
+            }
+            // Garder Ctrl+Enter comme alternative pour la compatibilité
+            else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
                 // Bloquer si une génération est en cours pour ce chat
                 try {
