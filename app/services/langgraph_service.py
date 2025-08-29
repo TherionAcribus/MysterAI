@@ -14,13 +14,10 @@ Cette implémentation est utilisée lorsque les paramètres 'use_langgraph' et '
 sont tous deux activés dans les paramètres de l'application.
 """
 
-import json
-from typing import Dict, List, Any, Optional, TypedDict, Annotated, Sequence, Union, Callable
+from typing import Dict, List, Any, Optional, TypedDict, Annotated, Sequence
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage, ToolMessage
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
 import operator
-from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 try:
     # Préférer le paquet dédié si disponible
@@ -30,8 +27,7 @@ except Exception:
     from langchain_community.chat_models import ChatOllama
 from app.models.app_config import AppConfig
 from app.services.pipeline_registry import pipeline_registry
-from langchain_core.tools import tool
-from langchain_core.tools import BaseTool
+# Note: the `tool` decorator is imported locally where needed to avoid linter complaints
 
 # Prompt système par défaut pour le chat IA
 DEFAULT_SYSTEM_PROMPT = """Tu es un assistant spécialisé dans la résolution d'énigmes de géocaching. 
@@ -161,7 +157,7 @@ class LangGraphService:
         if not self._plugin_manager:
             print("=== ERROR: Plugin Manager non initialisé ===")
             return
-
+        
         loaded_count = len(self._plugin_manager.loaded_plugins) if hasattr(self._plugin_manager, 'loaded_plugins') else 'N/A'
         print(f"=== DEBUG: Création des outils depuis PluginManager (loaded_plugins: {loaded_count}) ===")
 
@@ -195,7 +191,7 @@ class LangGraphService:
                     else:
                         plugin_tool.description = f"Plugin {p_name}. Utilisez ce plugin pour {p_name.replace('_', ' ')}."
                     return plugin_tool
-
+                
                 tool_fn = create_plugin_tool(plugin_name, plugin_wrapper)
                 self._tools.append(tool_fn)
                 print(f"=== DEBUG: Outil créé pour le plugin {plugin_name} ===")
@@ -238,7 +234,7 @@ class LangGraphService:
         return out
 
     def _invoke_llm(self, llm, messages: List[BaseMessage], session_id: Optional[str]) -> AIMessage:
-        response_msg: Optional[AIMessage] = None
+        # response_msg kept for future debugging; not used directly
         try:
             if hasattr(llm, 'stream') and session_id:
                 content_parts: List[str] = []
@@ -343,29 +339,87 @@ class LangGraphService:
                                 tool_args = dict(tool_args or {})
                         except Exception:
                             tool_args = {"text": str(tool_args)}
-                        # Forcer decode par défaut
-                        if tool_name in self.default_decode_tools and not any(k in tool_args for k in ("mode","action","operation")):
+
+                        # Déterminer l'intention utilisateur (encoder vs décoder)
+                        want_encode = False
+                        try:
+                            encode_tokens = ["encode", "encoder", "encrypter", "encrypt", "encryption", "chiffrer", "chiffrage"]
+                            for mm in reversed(state["messages"]):
+                                if isinstance(mm, HumanMessage):
+                                    txt = (mm.content or "").lower()
+                                    if any(tok in txt for tok in encode_tokens):
+                                        want_encode = True
+                                        break
+                        except Exception:
+                            want_encode = False
+
+                        # DEBUG
+                        try:
+                            print(f"=== TOOL DEBUG: normalized_args_before_policy for {tool_name}: {tool_args}")
+                            print(f"=== TOOL DEBUG: want_encode={want_encode}")
+                        except Exception:
+                            pass
+
+                        # Forcer DECODE par défaut pour les outils de chiffrement, sauf demande explicite d'encodage
+                        if tool_name in self.default_decode_tools and not want_encode:
                             tool_args["mode"] = "decode"
-                        # Emit start
+                            tool_args["operation"] = "decode"
+                            tool_args["action"] = "decode"
+
+                        # DEBUG
+                        try:
+                            print(f"=== TOOL DEBUG: final_args_for_plugin {tool_name}: {tool_args}")
+                        except Exception:
+                            pass
+
+                        # Émettre start
                         self.emit_ws(session_id, 'tool_start', f"Exécution de l'outil {tool_name}", {"tool": tool_name, "args": str(tool_args)[:120]})
+
                         run_ok = False
                         for tool in self.tools:
                             if getattr(tool, 'name', getattr(tool, '__name__', '')) == tool_name:
                                 try:
-                                    result = tool.invoke(tool_args)
+                                    # Exécuter en privilégiant l'appel direct à la fonction si disponible (préserve **kwargs)
+                                    if hasattr(tool, 'func') and callable(getattr(tool, 'func')):
+                                        result = tool.func(**tool_args)
+                                    else:
+                                        result = tool.invoke(tool_args)
+
                                     # Retry decode si encodage détecté
                                     try:
+                                        needs_retry_decode = False
                                         if isinstance(result, dict):
                                             params = ((result.get('results') or [{}])[0] or {}).get('parameters') or {}
                                             summary = (result.get('summary') or {}).get('message','')
-                                            if str(params.get('mode','')).lower() == 'encode' or ('encodage' in summary.lower()):
-                                                tool_args_retry = dict(tool_args); tool_args_retry['mode'] = 'decode'
+                                            if str(params.get('mode','')).lower() == 'encode' or ('encodage' in summary.lower() or 'encode' in summary.lower()):
+                                                needs_retry_decode = True
+                                        else:
+                                            # Résultat string: essayer de détecter encode dans le texte/JSON embarqué
+                                            low = str(result).lower()
+                                            if '"mode"' in low and '"encode"' in low:
+                                                needs_retry_decode = True
+                                            if 'encodage' in low or ' encode' in low:
+                                                needs_retry_decode = True
+                                        if needs_retry_decode:
+                                            tool_args_retry = dict(tool_args)
+                                            tool_args_retry['mode'] = 'decode'
+                                            if hasattr(tool, 'func') and callable(getattr(tool, 'func')):
+                                                result = tool.func(**tool_args_retry)
+                                            else:
                                                 result = tool.invoke(tool_args_retry)
                                     except Exception:
                                         pass
+
                                     content = str(result) if not isinstance(result, str) else result
                                     out_messages.append(ToolMessage(content=content, name=tool_name, tool_call_id=tc.get('id','')))
                                     self.emit_ws(session_id, 'tool_end', f"✅ {tool_name} exécuté avec succès", {"tool": tool_name, "success": True, "result_preview": content[:200]})
+
+                                    # DEBUG
+                                    try:
+                                        print(f"=== TOOL DEBUG: plugin_feedback {tool_name}: type={type(result).__name__}")
+                                    except Exception:
+                                        pass
+
                                     run_ok = True
                                 except Exception as e:
                                     err = str(e)
@@ -506,8 +560,37 @@ class LangGraphService:
                                 except Exception:
                                     parsed_args = {"text": str(tool_args)}
 
-                                if tool_name in self.default_decode_tools and not any(k in parsed_args for k in ("mode", "action", "operation")):
+                                # Déterminer l'intention utilisateur (encoder vs décoder)
+                                want_encode = False
+                                try:
+                                    encode_tokens = ["encode", "encoder", "encrypter", "encrypt", "encryption", "chiffrer", "chiffrage"]
+                                    for m in reversed(state["messages"]):
+                                        if isinstance(m, HumanMessage):
+                                            txt = (m.content or "").lower()
+                                            if any(tok in txt for tok in encode_tokens):
+                                                want_encode = True
+                                                break
+                                except Exception:
+                                    want_encode = False
+
+                                # DEBUG: afficher les args normalisés et l'intention
+                                try:
+                                    print(f"=== TOOL DEBUG: normalized_args_before_policy for {tool_name}: {parsed_args}")
+                                    print(f"=== TOOL DEBUG: want_encode={want_encode}")
+                                except Exception:
+                                    pass
+
+                                if tool_name in self.default_decode_tools and not want_encode:
+                                    # Forcer le DÉCODAGE, même si le LLM a proposé "encode"
                                     parsed_args["mode"] = "decode"
+                                    parsed_args["operation"] = "decode"
+                                    parsed_args["action"] = "decode"
+
+                                # DEBUG: afficher les args finaux
+                                try:
+                                    print(f"=== TOOL DEBUG: final_args_for_plugin {tool_name}: {parsed_args}")
+                                except Exception:
+                                    pass
 
                                 # Trouver et exécuter l'outil
                                 for tool in self.tools:
