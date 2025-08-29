@@ -292,13 +292,93 @@ class LangGraphService:
             session_id = state.get("session_id")
             if system_prompt and not any(isinstance(msg, SystemMessage) for msg in messages):
                 messages = [SystemMessage(content=system_prompt)] + list(messages)
-            ai = self._invoke_llm(llm, messages, session_id)
+            # Lier tous les outils pour permettre de vrais tool_calls
+            try:
+                bound_llm = llm.bind_tools(self._tools) if (self._tools and hasattr(llm, 'bind_tools')) else llm
+            except Exception:
+                bound_llm = llm
+            # Ne pas streamer pour préserver tool_calls
+            try:
+                ai = bound_llm.invoke(messages)
+            except Exception:
+                ai = self._invoke_llm(bound_llm, messages, session_id)
             return {"messages": [ai], "next": None}
 
         builder = StateGraph(ChatState)
         builder.add_node("llm", llm_node)
         if self._tools:
-            tool_node = ToolNode(self._tools)
+            # Wrapper ToolNode avec événements + forçage decode par défaut si nécessaire
+            class ToolNodeWithEvents:
+                def __init__(self, tools, emit_ws_func):
+                    self.tools = tools
+                    self.emit_ws = emit_ws_func
+                    self.default_decode_tools = {
+                        "kenny_code", "caesar_code", "vigenere_cipher", "atbash", "morse_code",
+                        "rail_fence_cipher", "polybius_square", "bacon_code", "gronsfeld_cipher",
+                        "nihilist_cipher", "wolseley_cipher", "multitap_code", "t9_code",
+                        "bifid_delastelle", "gold_bug", "modulo_cipher", "multiplicative_code",
+                        "ubchi_cipher"
+                    }
+
+                def __call__(self, state: ChatState):
+                    out_messages = []
+                    session_id = state.get("session_id")
+                    # Prendre le dernier AIMessage comportant des tool_calls
+                    last_ai = None
+                    for m in reversed(state["messages"]):
+                        if isinstance(m, AIMessage) and getattr(m, 'tool_calls', None):
+                            last_ai = m
+                            break
+                    if not last_ai:
+                        return {"messages": out_messages}
+                    for tc in last_ai.tool_calls:
+                        tool_name = tc.get("name")
+                        tool_args = tc.get("args", {})
+                        # Normaliser args
+                        try:
+                            if isinstance(tool_args, str):
+                                import json as _json
+                                tool_args = _json.loads(tool_args)
+                            else:
+                                tool_args = dict(tool_args or {})
+                        except Exception:
+                            tool_args = {"text": str(tool_args)}
+                        # Forcer decode par défaut
+                        if tool_name in self.default_decode_tools and not any(k in tool_args for k in ("mode","action","operation")):
+                            tool_args["mode"] = "decode"
+                        # Emit start
+                        self.emit_ws(session_id, 'tool_start', f"Exécution de l'outil {tool_name}", {"tool": tool_name, "args": str(tool_args)[:120]})
+                        run_ok = False
+                        for tool in self.tools:
+                            if getattr(tool, 'name', getattr(tool, '__name__', '')) == tool_name:
+                                try:
+                                    result = tool.invoke(tool_args)
+                                    # Retry decode si encodage détecté
+                                    try:
+                                        if isinstance(result, dict):
+                                            params = ((result.get('results') or [{}])[0] or {}).get('parameters') or {}
+                                            summary = (result.get('summary') or {}).get('message','')
+                                            if str(params.get('mode','')).lower() == 'encode' or ('encodage' in summary.lower()):
+                                                tool_args_retry = dict(tool_args); tool_args_retry['mode'] = 'decode'
+                                                result = tool.invoke(tool_args_retry)
+                                    except Exception:
+                                        pass
+                                    content = str(result) if not isinstance(result, str) else result
+                                    out_messages.append(ToolMessage(content=content, name=tool_name, tool_call_id=tc.get('id','')))
+                                    self.emit_ws(session_id, 'tool_end', f"✅ {tool_name} exécuté avec succès", {"tool": tool_name, "success": True, "result_preview": content[:200]})
+                                    run_ok = True
+                                except Exception as e:
+                                    err = str(e)
+                                    out_messages.append(ToolMessage(content=f"Erreur {tool_name}: {err}", name=tool_name, tool_call_id=tc.get('id','')))
+                                    self.emit_ws(session_id, 'tool_end', f"❌ Erreur {tool_name}: {err[:100]}", {"tool": tool_name, "success": False, "error": err})
+                                break
+                        if not run_ok and tool_name:
+                            msg = f"Outil {tool_name} non trouvé"
+                            out_messages.append(ToolMessage(content=msg, name=tool_name, tool_call_id=tc.get('id','')))
+                            self.emit_ws(session_id, 'tool_end', msg, {"tool": tool_name, "success": False, "error": "Outil non trouvé"})
+                    return {"messages": out_messages}
+
+            tool_node = ToolNodeWithEvents(self._tools, self._emit_ws)
             builder.add_node("tools", tool_node)
             builder.set_entry_point("llm")
             def should_use_tools(state: ChatState) -> str:
