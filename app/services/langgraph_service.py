@@ -134,11 +134,11 @@ class LangGraphService:
                             print("=== WARNING: LangGraph - PluginManager n'a pas de loaded_plugins ===")
                     else:
                         print("=== WARNING: LangGraph - PluginManager non disponible dans l'application ===")
-                            self._plugin_manager = None
+                        self._plugin_manager = None
                 except Exception as e_init:
                     print(f"=== ERROR: Récupération du PluginManager échouée: {str(e_init)} ===")
                     self._plugin_manager = None
-                
+
                 # Créer les outils à partir des plugins
                 self._create_tools_from_plugins()
                 
@@ -188,7 +188,7 @@ class LangGraphService:
                     plugin_tool.name = p_name
                     if hasattr(p_wrapper, 'metadata') and getattr(p_wrapper, 'metadata'):
                         plugin_tool.description = f"{getattr(p_wrapper.metadata, 'description', p_name) or p_name}. Utilisez ce plugin pour {p_name.replace('_', ' ')}."
-                            else:
+                    else:
                         plugin_tool.description = f"Plugin {p_name}. Utilisez ce plugin pour {p_name.replace('_', ' ')}."
                     return plugin_tool
                 
@@ -879,7 +879,7 @@ class LangGraphService:
                             pass
                         langchain_messages.append(HumanMessage(content=parts))
                     else:
-                    langchain_messages.append(HumanMessage(content=msg["content"]))
+                        langchain_messages.append(HumanMessage(content=msg["content"]))
                 elif msg["role"] == "assistant":
                     langchain_messages.append(AIMessage(content=msg["content"]))
                 elif msg["role"] == "system":

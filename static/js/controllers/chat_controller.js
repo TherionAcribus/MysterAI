@@ -74,6 +74,29 @@
             this.tabsTarget.style.paddingRight = `${sidebarWidth + 10}px`;
         }
 
+        #isChatBusy(chatContainer) {
+            try { return chatContainer && chatContainer.dataset.busy === '1'; } catch (e) { return false; }
+        }
+
+        #setChatBusy(chatContainer, busy) {
+            try {
+                if (!chatContainer) return;
+                chatContainer.dataset.busy = busy ? '1' : '0';
+                const textarea = chatContainer.querySelector('.chat-input');
+                const sendBtn = chatContainer.querySelector('.chat-send-button');
+                // Laisser la zone de texte toujours active pour permettre l'écriture
+                if (textarea) {
+                    textarea.disabled = false;
+                    if (textarea.classList) textarea.classList.remove('opacity-50');
+                }
+                // Désactiver seulement le bouton d'envoi
+                if (sendBtn) {
+                    sendBtn.disabled = !!busy;
+                    if (sendBtn.classList) sendBtn.classList.toggle('opacity-50', !!busy);
+                }
+            } catch (e) {}
+        }
+
         #notifyPipelineChanged(chatContainer, label) {
             try {
                 const messagesContainer = chatContainer.querySelector('.chat-messages');
@@ -480,6 +503,11 @@
             // Envoyer le message avec Ctrl+Enter ou Cmd+Enter
             if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
                 event.preventDefault();
+                // Bloquer si une génération est en cours pour ce chat
+                try {
+                    const activeChat = event.currentTarget.closest('.chat-instance');
+                    if (this.#isChatBusy(activeChat)) return;
+                } catch (e) {}
                 this.sendMessage(event);
             }
         }
@@ -488,6 +516,8 @@
             // Trouver le chat actif
             const activeChat = this.chatListTarget.querySelector('.chat-instance.active');
             if (!activeChat) return;
+            // Ne pas autoriser un nouvel envoi si génération en cours
+            if (this.#isChatBusy(activeChat)) return;
             
             const chatId = parseInt(activeChat.dataset.chatId);
             const textarea = activeChat.querySelector('.chat-input');
@@ -532,6 +562,8 @@
             `;
             messagesContainer.appendChild(typingElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            // Verrouiller l'UI de ce chat pendant la génération
+            this.#setChatBusy(activeChat, true);
             
             // Récupérer le modèle actif
             const activeModel = document.getElementById('ai-model-selector')?.value || null;
@@ -802,6 +834,8 @@
                         if (typing) typing.remove();
                         const streamingBubble = activeChat.querySelector('.chat-message.streaming-current');
                         if (streamingBubble) streamingBubble.classList.remove('streaming-current');
+                        // Déverrouiller immédiatement après annulation
+                        this.#setChatBusy(activeChat, false);
                     }
                 };
                 const onDone = (data) => {
@@ -821,6 +855,8 @@
                     } else if (data.status === 'error') {
                         el.textContent = 'Erreur: ' + (data.message || '');
                     }
+                    // Déverrouiller à la fin
+                    this.#setChatBusy(activeChat, false);
                 };
                 try {
                     if (window.wsService) {
