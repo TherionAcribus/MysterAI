@@ -331,7 +331,7 @@ Toutes les API liées à l'IA sont accessibles via le préfixe `/api/ai/`. Les e
 
 **Endpoint:** `POST /api/ai/chat`
 
-**Description:** Envoie une conversation au modèle d'IA et retourne la réponse. Supporte le suivi temps réel via WebSocket (progression, tokens) et des options de streaming et d'affichage de la réflexion.
+**Description:** Envoie une conversation au modèle d'IA et retourne la réponse. Supporte le suivi temps réel via WebSocket (progression, tokens) et des options de streaming et d'affichage de la réflexion. Lorsqu'un pipeline avec étape `tools` est actif, l'orchestration respecte l'ordre strict OpenAI assistant(tool_calls) → ToolMessage(s) → assistant.
 
 **Corps de la requête:**
 ```json
@@ -410,6 +410,7 @@ Lorsqu'un `session_id` est fourni, le serveur émet des événements WebSocket:
     }
   }
   ```
+- `tool_start` / `tool_end` : Émis lors de l'exécution des outils (nom, arguments, succès/erreur, aperçu résultat).
 - `step_end` : Émis à la fin de chaque étape du pipeline
   ```json
   {

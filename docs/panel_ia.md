@@ -88,6 +88,7 @@ Intégration WebSocket:
   - À la fin de chaque étape: message avec la clé de sortie et un aperçu du résultat généré.
 - **Progression visuelle**: La barre de statut se met à jour avec l'état actuel ("Étape classify (LLM) — exécution", "Étape tool_select (TOOLS) — décision et appels d'outils", etc.).
 - **Détails enrichis**: Les messages incluent des aperçus formatés du prompt, des outils utilisés et des résultats obtenus pour une transparence complète.
+ - **Outils en direct**: Lors de `tool_start` / `tool_end`, le panel affiche le nom de l'outil, les arguments, le statut (succès/échec) et un aperçu du résultat. 
 
 ## Implémentation technique
 

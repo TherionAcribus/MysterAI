@@ -32,7 +32,7 @@ Exemple minimal du pipeline géocache:
       "steps": [
         {"id": "classify", "type": "llm", "prompt": "Classifie le puzzle...", "output_key": "classification"},
         {"id": "plan", "type": "llm", "prompt": "Sur la base de {classification}, propose...", "output_key": "plan"},
-        {"id": "tool_select", "type": "tools", "allowed_tools": ["ocr","exif","qr","cipher","formula"], "selection_from": "plan"},
+        {"id": "tool_select", "type": "tools", "allowed_tools": ["ocr","exif","qr","cipher","formula"], "selection_from": "plan", "prompt": "CRITIQUE: Tu DOIS faire des vrais tool calls. Pour les outils de chiffrement, par défaut utilise le mode decode. Si des données manquent, demande-les d'abord."},
         {"id": "verify", "type": "llm", "prompt": "Vérifie la cohérence...", "output_key": "final"}
       ]
     }
