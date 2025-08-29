@@ -57,6 +57,15 @@
                     // Séparer les modèles par type
                     const onlineModels = data.models.filter(model => model.type === 'online');
                     const localModels = data.models.filter(model => model.type === 'local');
+
+                    const buildOptionLabel = (model) => {
+                        // Pictos selon capacités
+                        const icons = [];
+                        if (model.supports_tools) icons.push('🔧');
+                        if (model.supports_thinking) icons.push('🧠');
+                        if (model.supports_vision) icons.push('👁');
+                        return icons.length ? `${model.name} ${icons.join('')}` : model.name;
+                    };
                     
                     // Créer un groupe pour les modèles en ligne
                     if (onlineModels.length > 0) {
@@ -66,10 +75,12 @@
                         onlineModels.forEach(model => {
                             const option = document.createElement('option');
                             option.value = model.id;
-                            option.textContent = model.name;
+                            option.textContent = buildOptionLabel(model);
                             option.selected = model.is_active;
                             option.setAttribute('data-usable', model.is_usable ? 'true' : 'false');
                             if (model.supports_vision) option.setAttribute('data-vision', 'true');
+                            if (model.supports_tools) option.setAttribute('data-tools', 'true');
+                            if (model.supports_thinking) option.setAttribute('data-thinking', 'true');
                             onlineGroup.appendChild(option);
                         });
                         
@@ -84,10 +95,12 @@
                         localModels.forEach(model => {
                             const option = document.createElement('option');
                             option.value = model.id;
-                            option.textContent = model.name;
+                            option.textContent = buildOptionLabel(model);
                             option.selected = model.is_active;
                             option.setAttribute('data-usable', model.is_usable !== false ? 'true' : 'false');
                             if (model.supports_vision) option.setAttribute('data-vision', 'true');
+                            if (model.supports_tools) option.setAttribute('data-tools', 'true');
+                            if (model.supports_thinking) option.setAttribute('data-thinking', 'true');
                             console.log(`=== DEBUG: Création option locale - ID: ${model.id}, Nom: ${model.name}, Actif: ${model.is_active}`);
                             localGroup.appendChild(option);
                         });

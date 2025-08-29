@@ -645,20 +645,27 @@ def get_ai_models():
             is_usable = bool(m.get('is_usable', False))
             name = raw_name + ('' if is_usable else ' (API Key manquante)')
 
-            # Déterminer si le modèle supporte la vision
-            supports_vision = False
-            try:
-                lower_id = (legacy_id or '').lower()
-                supports_vision = any(x in lower_id for x in ['gpt-4o', 'gpt-4.1', 'vision'])
-            except Exception:
-                supports_vision = False
+            # Capacités à partir du registre si disponibles
+            caps = m.get('capabilities') or []
+            supports_tools = 'tools' in caps
+            supports_thinking = 'thinking' in caps
+            # Déterminer si le modèle supporte la vision (registre prioritaire, sinon heuristique)
+            supports_vision = ('vision' in caps)
+            if not supports_vision:
+                try:
+                    lower_id = (legacy_id or '').lower()
+                    supports_vision = any(x in lower_id for x in ['gpt-4o', 'gpt-4.1', 'vision'])
+                except Exception:
+                    supports_vision = False
 
             online_models_data.append({
                 'legacy_id': legacy_id,
                 'raw_name': raw_name,
                 'name': name,
                 'is_usable': is_usable,
-                'supports_vision': supports_vision
+                'supports_vision': supports_vision,
+                'supports_tools': supports_tools,
+                'supports_thinking': supports_thinking
             })
 
             # Compter les occurrences des noms pour détecter les dupliqués
@@ -681,7 +688,9 @@ def get_ai_models():
                 'type': 'online',
                 'is_active': is_active,
                 'is_usable': data['is_usable'],
-                'supports_vision': data['supports_vision']
+                'supports_vision': data.get('supports_vision', False),
+                'supports_tools': data.get('supports_tools', False),
+                'supports_thinking': data.get('supports_thinking', False)
             })
 
             logger.info(f"=== DEBUG ONLINE: Modèle ajouté - ID: {data['legacy_id']}, Nom: {display_name}, Actif: {is_active}")
@@ -702,6 +711,8 @@ def get_ai_models():
             # Vision: lire d'abord les capacités du registre (models.user.json peut définir 'vision')
             caps = m.get('capabilities') or []
             supports_vision = 'vision' in caps
+            supports_tools = 'tools' in caps
+            supports_thinking = 'thinking' in caps
             if not supports_vision:
                 # fallback heuristique (legacy)
                 try:
@@ -723,7 +734,9 @@ def get_ai_models():
                 'short_id': short_id,
                 'raw_name': raw_name,
                 'display_name': display_name,
-                'supports_vision': supports_vision
+                'supports_vision': supports_vision,
+                'supports_tools': supports_tools,
+                'supports_thinking': supports_thinking
             })
 
             # Compter les occurrences des noms pour détecter les dupliqués
@@ -750,7 +763,9 @@ def get_ai_models():
                 'type': 'local',
                 'is_active': is_active,
                 'is_usable': True,
-                'supports_vision': data['supports_vision']
+                'supports_vision': data.get('supports_vision', False),
+                'supports_tools': data.get('supports_tools', False),
+                'supports_thinking': data.get('supports_thinking', False)
             })
 
             logger.info(f"=== DEBUG LOCAL: Modèle ajouté - ID: {data['full']}, Nom: {display_name}, Actif: {is_active}")
