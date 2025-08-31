@@ -1731,32 +1731,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 const testedHtml = tested.length ? `
                     <div class="bg-gray-700 rounded-lg p-4 mb-3">
                         <h3 class="text-md font-medium text-blue-300 mb-2">Plugins testés (${tested.length})</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full text-sm text-gray-200">
-                                <thead>
-                                    <tr class="text-gray-400">
-                                        <th class="text-left py-1 pr-4">Plugin</th>
-                                        <th class="text-right py-1 pr-4">Score</th>
-                                        <th class="text-right py-1 pr-4">Fragments</th>
-                                        <th class="text-right py-1 pr-4">Temps (ms)</th>
-                                        <th class="text-left py-1 pr-4">Erreur</th>
-                                        <th class="text-left py-1">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${tested.map(t => `
-                                        <tr class="border-t border-gray-600">
-                                            <td class="py-1 pr-4">${escapeHtml(t.plugin)}</td>
-                                            <td class="py-1 pr-4 text-right ${t.is_match ? 'text-green-400' : 'text-gray-400'}">${Math.round((t.score || 0) * 100)}%</td>
-                                            <td class="py-1 pr-4 text-right">${t.fragments_count ?? 0}</td>
-                                            <td class="py-1 pr-4 text-right">${t.time_ms ?? ''}</td>
-                                            <td class="py-1 pr-4 text-left text-red-300">${escapeHtml(t.error || '')}</td>
-                                            <td class="py-1 text-left">${(t.can_decode && t.is_match) ? `<button data-action=\"click->geocache-solver#decodeWithPlugin\" data-plugin=\"${escapeHtml(t.plugin)}\" class=\"bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded\">Décoder</button>` : ''}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                        <div id="metasolver-tested-table" class="w-full"></div>
                     </div>` : '';
                 const skippedHtml = skipped.length ? `
                     <div class="bg-gray-700 rounded-lg p-4 mb-3">
@@ -1766,6 +1741,40 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         </ul>
                     </div>` : '';
                 html += testedHtml + skippedHtml;
+                // Après génération HTML, initialiser Tabulator pour le tableau testé
+                setTimeout(() => {
+                    try {
+                        const tableEl = document.getElementById('metasolver-tested-table');
+                        if (!tableEl || typeof Tabulator === 'undefined') return;
+                        const rows = tested.map((t, idx) => ({
+                            id: idx + 1,
+                            plugin: t.plugin,
+                            scorePct: Math.round((t.score || 0) * 100),
+                            fragments: t.fragments_count ?? 0,
+                            time_ms: t.time_ms ?? '',
+                            error: t.error || '',
+                            can_decode: !!t.can_decode,
+                            is_match: !!t.is_match
+                        }));
+                        new Tabulator(tableEl, {
+                            data: rows,
+                            layout: "fitColumns",
+                            height: 280,
+                            placeholder: "Aucun plugin testé",
+                            columns: [
+                                { title: "Plugin", field: "plugin", headerSort: true },
+                                { title: "Score", field: "scorePct", hozAlign: "right", headerSort: true, formatter: (cell) => `${cell.getValue()}%` },
+                                { title: "Fragments", field: "fragments", hozAlign: "right", headerSort: true },
+                                { title: "Temps (ms)", field: "time_ms", hozAlign: "right", headerSort: true },
+                                { title: "Erreur", field: "error", headerSort: false, formatter: (cell) => `<span class=\"text-red-300\">${escapeHtml(cell.getValue())}</span>` },
+                                { title: "Actions", field: "actions", headerSort: false, formatter: (cell) => {
+                                    const row = cell.getRow().getData();
+                                    return (row.can_decode && row.is_match) ? `<button data-action=\"click->geocache-solver#decodeWithPlugin\" data-plugin=\"${escapeHtml(row.plugin)}\" class=\"bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded\">Décoder</button>` : '';
+                                } }
+                            ]
+                        });
+                    } catch (e) { console.warn('Tabulator init (tested) échoué:', e); }
+                }, 0);
             }
 
             // Traiter chaque résultat (sauf en mode Analyse avec nouveau bloc)
