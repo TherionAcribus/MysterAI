@@ -17,6 +17,7 @@ Ce document décrit le fonctionnement du MetaSolver: un orchestrateur qui parcou
 - **Plugin MetaSolver**: `plugins/official/metadetection/main.py`
   - Entrée principale: `execute(inputs)` avec `mode` = `detect` | `decode`.
   - Sous-routines: `detect_codes`, `decode_code`, helpers de formatage `_is_standardized_format`, `_process_*`.
+  - **Résolution dynamique des plugins**: utilise `PluginManager.get_plugins_for(role)` pour sélectionner automatiquement les plugins éligibles selon leurs métadonnées (`capabilities`, `kinds`, `defaults`) et les préférences utilisateur.
 - **WebSockets**: service émet des événements `progress_metadetection` et `complete_metadetection` pour le statut live (steps: `started`, `prepare`, `detect_found`, `decode_start`, `decode_try_plugin`, `partial_result`, `finalizing`, `completed`, et états `paused`, `resumed`, `canceled`).
 
 ### Flux d’exécution
@@ -28,8 +29,8 @@ Ce document décrit le fonctionnement du MetaSolver: un orchestrateur qui parcou
    - écoute les événements `progress_metadetection` (barre de progression + traces incrémentales) et `complete_metadetection` (résumé final).
 4) Le backend normalise le texte, prépare les entrées pour le plugin `metadetection` et l’exécute via `plugin_manager`.
 5) Le plugin `metadetection`:
-   - en mode **detect**: parcourt des plugins (liste blanche), appelle `check_code(...)`, et retourne une liste standardisée des candidats avec scores et fragments;
-   - en mode **decode**: exécute un **plugin précis** (si `plugin_name`) ou **enchaîne** plusieurs plugins, agrège les résultats, extrait/évalue coordonnées et meilleures réponses.
+   - en mode **detect**: parcourt automatiquement les plugins éligibles (via `PluginManager.get_plugins_for("analysis")`), appelle `check_code(...)`, et retourne une liste détaillée avec scores, fragments, temps d'exécution et plugins ignorés;
+   - en mode **decode**: exécute un **plugin précis** (si `plugin_name`) ou **enchaîne** plusieurs plugins éligibles (via `PluginManager.get_plugins_for("decode")`), agrège les résultats, extrait/évalue coordonnées et meilleures réponses.
 6) Le frontend rend un résumé formaté (avec possibilité de réutiliser des coordonnées détectées ailleurs dans l’UI).
 
 ### Paramètres pris en charge
@@ -92,7 +93,13 @@ Exemple abrégé:
 - Panneau MetaSolver dans `templates/geocache_solver.html` avec:
   - menu Mode / Précision / Caractères autorisés / Clé / Embedded / GPS;
   - boutons "Analyser" et "Décrypter";
-  - zone `metasolver-result` (statut live + contenu formaté).
+  - zone `metasolver-result` (statut live + contenu formaté avec Tabulator pour les tableaux interactifs).
+- **Affichage amélioré des résultats d'analyse**:
+  - Table Tabulator interactive pour les plugins testés (tri, scroll, recherche).
+  - Colonnes: Plugin, Score, Fragments, Temps (ms), Erreur, Actions.
+  - Bouton "Décoder" directement dans le tableau pour les plugins détectés et décodables.
+  - Section séparée pour les plugins ignorés avec raison d'exclusion.
+  - Élimination du double affichage (ancien système supprimé).
 
 ### Intégration côté Frontend (Stimulus)
 - `executeMetaSolver(event)`: construit `FormData`, ouvre session WS, POST `/api/plugins/metadetection/execute`, affiche et met à jour les résultats.
@@ -108,22 +115,27 @@ Exemple abrégé:
 ### Plugin `metadetection`
 - `execute(inputs)`: route en fonction du `mode`.
   - **detect**: `detect_codes(text, strict, allowed_chars, embedded)`
-    - Parcourt des plugins (liste blanche de dev), appelle `check_code(...)` si disponible; 
-    - construit une liste de candidats avec score, fragments, `can_decode`.
+    - Parcourt automatiquement les plugins éligibles via `PluginManager.get_plugins_for("analysis")`;
+    - appelle `check_code(...)` si disponible avec mesure du temps d'exécution;
+    - retourne `tested_plugins` (avec score, fragments, temps, erreurs, `can_decode`) et `skipped_plugins` (avec raison d'exclusion).
   - **decode**: `decode_code(plugin_name, ...)`
     - Si `plugin_name`: exécute uniquement ce plugin;
-    - sinon: essaie une liste blanche de plugins, récupère uniquement les sorties au format standardisé, agrège.
+    - sinon: essaie automatiquement les plugins éligibles via `PluginManager.get_plugins_for("decode")`;
+    - récupère uniquement les sorties au format standardisé, agrège avec gestion des erreurs.
 - Helpers: `_is_standardized_format`, `_process_plugin_result`, `_process_standardized_result` pour unifier l’output.
+- **Reporting amélioré**: fournit des métriques détaillées sur les plugins testés/ignorés pour le débogage et l'optimisation.
 
 ### Ajouter un nouveau plugin compatible MetaSolver
 1) Implémenter idéalement:
-   - `check_code(text: str, strict: bool, allowed_chars: list | None, embedded: bool) -> dict` retournant au minimum: 
+   - `check_code(text: str, strict: bool, allowed_chars: list | None, embedded: bool) -> dict` retournant au minimum:
      - `is_match: bool`, `score: float (0..1)`, `fragments: list[ { value: str, ... } ]`.
-   - `execute(inputs: dict) -> dict` au **format standardisé** (cf. exemple JSON ci-dessus). 
+   - `execute(inputs: dict) -> dict` au **format standardisé** (cf. exemple JSON ci-dessus).
      - Utiliser `status`, `results[]`, `summary`, etc.
-2) S’assurer que le plugin est chargé par le `plugin_manager`.
-3) Pour le faire considérer par MetaSolver (en phase actuelle):
-   - ajouter le nom du plugin aux listes blanches `included_plugins` de `detect_codes`/`decode_code` dans `metadetection/main.py`.
+2) Ajouter les métadonnées dans `plugin.json`:
+   - `"capabilities": {"analyze": true, "decode": true, "encode": false}` (selon les fonctionnalités)
+   - `"kinds": ["code"]` (type fonctionnel: code, calculator, image, geo, etc.)
+   - `"defaults": {"include_in_analysis": true, "include_in_decode": true}` (inclusion par défaut)
+3) S'assurer que le plugin est chargé par le `plugin_manager` (il sera automatiquement considéré par MetaSolver selon ses métadonnées).
 
 ### Bonnes pratiques
 - Respecter la normalisation d’entrées (`strict/smooth`, `allowed_chars`, `embedded`, `key`).
