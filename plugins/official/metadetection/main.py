@@ -350,6 +350,7 @@ class MetaDetectionPlugin:
                         "score": float(check_result.get("score", 0.0) or 0.0),
                         "fragments_count": len(check_result.get("fragments", []) or []),
                         "time_ms": int((_time.time() - _t0) * 1000),
+                        "can_decode": bool(hasattr(p_instance, "execute")),
                         "error": None
                     })
             except Exception as e:
@@ -365,6 +366,7 @@ class MetaDetectionPlugin:
                     "score": 0.0,
                     "fragments_count": 0,
                     "time_ms": time_ms,
+                    "can_decode": False,
                     "error": str(e)
                 })
                 continue

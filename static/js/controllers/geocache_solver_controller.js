@@ -1709,8 +1709,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             console.log("formatMetaDetectionResults - Détecté format standardisé avec tableau results", result.results);
             let html = '';
             
-            // Afficher le résumé si disponible
-            if (result.summary) {
+            // Afficher le résumé si disponible (supprimé en mode Analyse avec nouveau bloc)
+            const hasAnalysisBlocks = Array.isArray(result.tested_plugins) || Array.isArray(result.skipped_plugins);
+            const isDetectOverall = result.inputs && result.inputs.mode === 'detect';
+            if (result.summary && !(isDetectOverall && hasAnalysisBlocks)) {
                 console.log("formatMetaDetectionResults - Résumé disponible:", result.summary);
                 html += `
                     <div class="bg-gray-700 rounded-lg p-4 mb-3">
@@ -1764,7 +1766,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 html += testedHtml + skippedHtml;
             }
 
-            // Traiter chaque résultat
+            // Traiter chaque résultat (sauf en mode Analyse avec nouveau bloc)
+            if (!(isDetectOverall && hasAnalysisBlocks)) {
             result.results.forEach((resultEntry, index) => {
                 console.log("formatMetaDetectionResults - Traitement du résultat", index, resultEntry);
                 const isBest = result.summary && result.summary.best_result_id === resultEntry.id;
@@ -1898,6 +1901,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         })()}
                     </div>`;
             });
+            }
             
             html += `</div></div>`;
             console.log("formatMetaDetectionResults - HTML généré pour le format standardisé (longueur):", html.length);
