@@ -1739,7 +1739,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                         <th class="text-right py-1 pr-4">Score</th>
                                         <th class="text-right py-1 pr-4">Fragments</th>
                                         <th class="text-right py-1 pr-4">Temps (ms)</th>
-                                        <th class="text-left py-1">Erreur</th>
+                                        <th class="text-left py-1 pr-4">Erreur</th>
+                                        <th class="text-left py-1">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1749,7 +1750,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                             <td class="py-1 pr-4 text-right ${t.is_match ? 'text-green-400' : 'text-gray-400'}">${Math.round((t.score || 0) * 100)}%</td>
                                             <td class="py-1 pr-4 text-right">${t.fragments_count ?? 0}</td>
                                             <td class="py-1 pr-4 text-right">${t.time_ms ?? ''}</td>
-                                            <td class="py-1 text-left text-red-300">${escapeHtml(t.error || '')}</td>
+                                            <td class="py-1 pr-4 text-left text-red-300">${escapeHtml(t.error || '')}</td>
+                                            <td class="py-1 text-left">${(t.can_decode && t.is_match) ? `<button data-action=\"click->geocache-solver#decodeWithPlugin\" data-plugin=\"${escapeHtml(t.plugin)}\" class=\"bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded\">Décoder</button>` : ''}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
