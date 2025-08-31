@@ -1614,6 +1614,11 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             }
         };
 
+        // Petite fonction d'échappement HTML pour du texte arbitraire (erreurs, raisons)
+        const escapeHtml = (s) => {
+            try { return (s ?? '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;'); } catch (e) { return ''; }
+        };
+
         // Vérifier si des coordonnées GPS ont été détectées dans primary_coordinates
         let gpsCoordinatesHtml = '';
         // Préparer éventuellement un encart pour les plugins en échec
@@ -1717,6 +1722,48 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     </div>`;
             }
             
+            // Section: Plugins testés / ignorés (mode Analyse)
+            if (Array.isArray(result.tested_plugins) || Array.isArray(result.skipped_plugins)) {
+                const tested = Array.isArray(result.tested_plugins) ? result.tested_plugins : [];
+                const skipped = Array.isArray(result.skipped_plugins) ? result.skipped_plugins : [];
+                const testedHtml = tested.length ? `
+                    <div class="bg-gray-700 rounded-lg p-4 mb-3">
+                        <h3 class="text-md font-medium text-blue-300 mb-2">Plugins testés (${tested.length})</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-gray-200">
+                                <thead>
+                                    <tr class="text-gray-400">
+                                        <th class="text-left py-1 pr-4">Plugin</th>
+                                        <th class="text-right py-1 pr-4">Score</th>
+                                        <th class="text-right py-1 pr-4">Fragments</th>
+                                        <th class="text-right py-1 pr-4">Temps (ms)</th>
+                                        <th class="text-left py-1">Erreur</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tested.map(t => `
+                                        <tr class="border-t border-gray-600">
+                                            <td class="py-1 pr-4">${escapeHtml(t.plugin)}</td>
+                                            <td class="py-1 pr-4 text-right ${t.is_match ? 'text-green-400' : 'text-gray-400'}">${Math.round((t.score || 0) * 100)}%</td>
+                                            <td class="py-1 pr-4 text-right">${t.fragments_count ?? 0}</td>
+                                            <td class="py-1 pr-4 text-right">${t.time_ms ?? ''}</td>
+                                            <td class="py-1 text-left text-red-300">${escapeHtml(t.error || '')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>` : '';
+                const skippedHtml = skipped.length ? `
+                    <div class="bg-gray-700 rounded-lg p-4 mb-3">
+                        <h3 class="text-md font-medium text-gray-300 mb-2">Plugins ignorés (${skipped.length})</h3>
+                        <ul class="list-disc list-inside text-sm text-gray-300">
+                            ${skipped.map(s => `<li><span class="text-gray-200 font-medium">${escapeHtml(s.plugin)}</span> — <span class="text-gray-400">${escapeHtml(s.reason || '')}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+                html += testedHtml + skippedHtml;
+            }
+
             // Traiter chaque résultat
             result.results.forEach((resultEntry, index) => {
                 console.log("formatMetaDetectionResults - Traitement du résultat", index, resultEntry);

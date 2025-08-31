@@ -39,9 +39,19 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
   "entry_point": "main.py",
   "dependencies": [],
   "categories": ["CategoryName"],
+  "kinds": ["code"],
   "brute_force": true,
   "enable_scoring": true,
   "accept_accents": false,
+  "capabilities": {
+    "analyze": true,
+    "decode": true,
+    "encode": false
+  },
+  "defaults": {
+    "include_in_analysis": true,
+    "include_in_decode": true
+  },
   "scoring_method": {
     "type": "lexical",
     "custom_weights": {
@@ -79,6 +89,26 @@ Chaque plugin doit avoir un fichier `plugin.json` qui définit ses métadonnées
   - Si défini à `false`, aucune option de scoring ne sera affichée, et le scoring ne sera pas appliqué
   - L'état initial de cette case à cocher (si affichée) est déterminé par le paramètre global `enable_auto_scoring`
 - `accept_accents`: Indique si le plugin accepte les caractères accentués (booléen)
+### Sélection dynamique des plugins (Analyse / Décryptage)
+
+Le `PluginManager` expose une méthode de résolution `get_plugins_for(role)` qui sélectionne les plugins selon:
+
+- Les métadonnées du `plugin.json`:
+  - `capabilities.analyze` / `capabilities.decode`
+  - `kinds` (ex: `code`, `calculator`, `image`, `geo`)
+  - `defaults.include_in_analysis` / `defaults.include_in_decode`
+- Des préférences utilisateur stockées dans `AppConfig` (DB):
+  - `plugins.analysis.enabled`: liste JSON de noms de plugins explicitement activés pour l’Analyse
+  - `plugins.analysis.disabled`: liste JSON de noms de plugins explicitement désactivés pour l’Analyse
+  - `plugins.decode.enabled`: liste JSON de noms de plugins explicitement activés pour le Décryptage
+  - `plugins.decode.disabled`: liste JSON de noms de plugins explicitement désactivés pour le Décryptage
+
+Rétrocompatibilité: si `capabilities` est omis,
+- Analyse: inférence automatique `analyze = True` si la classe plugin expose `check_code`
+- Décryptage: inférence automatique `decode = True` si la classe plugin expose `execute`
+
+Remarque: pour l’Analyse, seuls les plugins exposant `check_code` seront effectivement utilisés.
+
   - Si défini à `true`, les caractères accentués seront conservés dans le texte d'entrée
   - Si défini à `false` (valeur par défaut), les caractères accentués seront convertis en leurs équivalents non accentués (ex: 'é' → 'e', 'à' → 'a', etc.)
   - Utile pour les plugins qui fonctionnent uniquement avec des caractères ASCII standards

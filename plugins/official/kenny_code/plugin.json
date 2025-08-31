@@ -7,9 +7,19 @@
     "entry_point": "main.py",
     "dependencies": [],
     "categories": ["AlphabetsDecryption"],
+    "kinds": ["code"],
     "brute_force": false,
     "enable_scoring": true,
     "accept_accents": false,
+    "capabilities": {
+      "analyze": true,
+      "decode": true,
+      "encode": true
+    },
+    "defaults": {
+      "include_in_analysis": true,
+      "include_in_decode": true
+    },
     "scoring_method": {
       "type": "lexical",
       "custom_weights": {

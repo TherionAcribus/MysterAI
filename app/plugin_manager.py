@@ -11,6 +11,7 @@ from loguru import logger
 from app.models.plugin_model import Plugin
 from app import db  # Utiliser l'instance de db de l'application
 from app.services.scoring_service import get_scoring_service
+from app.models.app_config import AppConfig
 
 
 # ============================================================
@@ -36,6 +37,10 @@ class PluginMetadata:
     input_types: Dict[str, Any]
     output_types: Dict[str, Any]
     accept_accents: bool = False  # Indique si le plugin accepte les caractères accentués
+    # Champs additionnels pour gouvernance d'utilisation
+    capabilities: Dict[str, Any] = None  # ex: {"analyze": true, "decode": true}
+    kinds: List[str] = None              # ex: ["code"], ["calculator"], ["image"]
+    defaults: Dict[str, Any] = None      # ex: {"include_in_analysis": true, "include_in_decode": true}
 
     @classmethod
     def from_json(cls, json_data: dict) -> 'PluginMetadata':
@@ -50,7 +55,10 @@ class PluginMetadata:
             categories=json_data.get('categories', []),      # <-- gère la liste de catégories
             input_types=json_data.get('input_types', {}),    # <-- Dict[str, Any]
             output_types=json_data.get('output_types', {}),  # <-- Dict[str, Any]
-            accept_accents=json_data.get('accept_accents', False)  # <-- Paramètre pour les accents
+            accept_accents=json_data.get('accept_accents', False),  # <-- Paramètre pour les accents
+            capabilities=json_data.get('capabilities') or {},
+            kinds=json_data.get('kinds') or [],
+            defaults=json_data.get('defaults') or {}
         )
 
 # ============================================================
@@ -206,6 +214,101 @@ class PluginManager:
             with app.app_context():
                 self.discover_plugins()
                 self.load_plugins()
+
+    # ---------------------------------------------------------
+    # Sélection dynamique des plugins selon rôle et préférences
+    # ---------------------------------------------------------
+    def get_plugins_for(self, role: str = "analysis") -> List[str]:
+        """
+        Retourne une liste de noms de plugins à utiliser pour un rôle donné.
+        role: "analysis" | "decode"
+        Gouvernance:
+          - métadonnées plugin.json: capabilities, kinds, defaults
+          - préférences AppConfig (overrides):
+                plugins.analysis.enabled / plugins.analysis.disabled
+                plugins.decode.enabled   / plugins.decode.disabled
+          - exigences de rôle:
+                analysis -> présence de check_code
+        """
+        role = (role or "analysis").lower()
+        enable_key = f"plugins.{role}.enabled"
+        disable_key = f"plugins.{role}.disabled"
+
+        # Lire préférences utilisateur (JSON liste de noms)
+        try:
+            enabled_list = AppConfig.get_value(enable_key, "[]")
+            disabled_list = AppConfig.get_value(disable_key, "[]")
+        except Exception:
+            enabled_list = "[]"
+            disabled_list = "[]"
+        try:
+            import json as _json
+            enabled_names: List[str] = _json.loads(enabled_list) if isinstance(enabled_list, str) else (enabled_list or [])
+            disabled_names: List[str] = _json.loads(disabled_list) if isinstance(disabled_list, str) else (disabled_list or [])
+        except Exception:
+            enabled_names = []
+            disabled_names = []
+
+        allowed: List[str] = []
+
+        # Itérer sur les plugins connus en base pour lire metadata_json
+        try:
+            with self.app.app_context():
+                all_plugins = Plugin.query.all()
+        except Exception:
+            all_plugins = []
+
+        name_to_record = {p.name: p for p in all_plugins}
+
+        for name, wrapper in self.loaded_plugins.items():
+            # 1) Métadonnées
+            metadata_dict = None
+            try:
+                record = name_to_record.get(name)
+                if record and record.metadata_json:
+                    import json as _json
+                    metadata_dict = _json.loads(record.metadata_json)
+            except Exception:
+                metadata_dict = None
+
+            capabilities = (metadata_dict or {}).get("capabilities", {}) or {}
+            defaults = (metadata_dict or {}).get("defaults", {}) or {}
+
+            # 2) Gate par capability
+            inst = getattr(wrapper, "_instance", None)
+            # Inférence par défaut si non renseigné dans metadata
+            if role == "analysis":
+                analyze_cap = capabilities.get("analyze")
+                if analyze_cap is None:
+                    analyze_cap = bool(inst and hasattr(inst, "check_code"))
+                if not analyze_cap:
+                    continue
+            else:  # decode
+                decode_cap = capabilities.get("decode")
+                if decode_cap is None:
+                    decode_cap = bool(inst and hasattr(inst, "execute"))
+                if not decode_cap:
+                    continue
+
+            # 3) Defaults include
+            default_include = bool(defaults.get("include_in_analysis" if role == "analysis" else "include_in_decode", True))
+
+            # 4) Overrides utilisateur
+            included = default_include
+            if name in enabled_names:
+                included = True
+            if name in disabled_names:
+                included = False
+
+            # 5) Exigence spécifique au rôle
+            if included and role == "analysis":
+                if not (inst and hasattr(inst, "check_code")):
+                    included = False
+
+            if included:
+                allowed.append(name)
+
+        return allowed
 
     def discover_plugins(self):
         """

@@ -6,7 +6,17 @@
     "plugin_type": "python",
     "entry_point": "main.py",
     "categories": ["CalculationsCoordinates"],
+    "kinds": ["calculator", "geo"],
     "dependencies": [],
+    "capabilities": {
+        "analyze": false,
+        "decode": false,
+        "encode": false
+    },
+    "defaults": {
+        "include_in_analysis": false,
+        "include_in_decode": false
+    },
     "input_types": {
         "coordinates": {
             "type": "string",

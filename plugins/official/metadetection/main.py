@@ -105,6 +105,8 @@ class MetaDetectionPlugin:
             # Préparation des résultats standardisés
             standardized_results = []
             combined_results = {}
+            tested_plugins_meta = old_result.get("result", {}).get("tested_plugins", [])
+            skipped_plugins_meta = old_result.get("result", {}).get("skipped_plugins", [])
             
             for idx, code in enumerate(possible_codes):
                 plugin_name = code.get("plugin_name", "unknown")
@@ -172,6 +174,8 @@ class MetaDetectionPlugin:
                 },
                 "results": standardized_results,
                 "combined_results": combined_results,
+                "tested_plugins": tested_plugins_meta,
+                "skipped_plugins": skipped_plugins_meta,
                 "summary": {
                     "best_result_id": standardized_results[0]["id"] if standardized_results else None,
                     "total_results": len(standardized_results),
@@ -277,33 +281,36 @@ class MetaDetectionPlugin:
         from app import get_plugin_manager
         plugin_manager = get_plugin_manager()
         
-        # Liste des plugins à exclure pour éviter les boucles récursives
-        excluded_plugins = ["metadetection"]
-        
-        # Liste des plugins à utiliser pour le test (phase de développement)
-        included_plugins = [
-            #"abaddon_code",
-            "kenny_code",
-            #"hexadecimal_encoder_decoder",
-            "letter_value",
-            "roman_numerals",
-            "wherigo_reverse_decoder",
-            "gronsfeld_cipher"
-        ]
+        # Résolution dynamique des plugins éligibles à l'analyse
+        resolved_plugins = plugin_manager.get_plugins_for(role="analysis")
+
+        # Préparer la liste des plugins chargés (hors metadetection) pour indiquer ceux non testés
+        all_loaded = [name for name in plugin_manager.loaded_plugins.keys() if name != "metadetection"]
+        names_to_test = set(resolved_plugins)
+        tested_plugins: list[dict] = []
+        skipped_plugins: list[dict] = []
+
+        # Marquer les non testés avec une raison approximative
+        for name in all_loaded:
+            if name not in names_to_test:
+                wrapper = plugin_manager.loaded_plugins.get(name)
+                inst = getattr(wrapper, "_instance", None) if wrapper else None
+                reason = "disabled_by_preferences_or_metadata"
+                if not inst:
+                    reason = "not_initialized"
+                elif not hasattr(inst, "check_code"):
+                    reason = "no_check_code"
+                skipped_plugins.append({"plugin": name, "reason": reason})
         
         if not text:
             return {"result": {"possible_codes": []}}
         
         possible_codes = []
         
-        # Récupérer les plugins depuis le plugin_manager.loaded_plugins
-        for plugin_name, plugin_wrapper in plugin_manager.loaded_plugins.items():
-            # Ignorer les plugins exclus
-            if plugin_name in excluded_plugins:
-                continue
-            
-            # Ignorer les plugins non inclus dans la liste de test
-            if included_plugins and plugin_name not in included_plugins:
+        # Récupérer les plugins éligibles via le résolveur
+        for plugin_name in resolved_plugins:
+            plugin_wrapper = plugin_manager.loaded_plugins.get(plugin_name)
+            if not plugin_wrapper:
                 continue
             
             # Obtenir l'instance du plugin
@@ -317,6 +324,8 @@ class MetaDetectionPlugin:
             
             # Essayer d'analyser avec ce plugin
             try:
+                import time as _time
+                _t0 = _time.time()
                 # Convertir le paramètre strict en booléen pour check_code
                 strict_bool = strict if isinstance(strict, bool) else strict == "strict"
                 
@@ -334,8 +343,30 @@ class MetaDetectionPlugin:
                         }
                         
                         possible_codes.append(code_info)
+                    # Ajouter au rapport testé
+                    tested_plugins.append({
+                        "plugin": plugin_name,
+                        "is_match": bool(check_result.get("is_match", False)),
+                        "score": float(check_result.get("score", 0.0) or 0.0),
+                        "fragments_count": len(check_result.get("fragments", []) or []),
+                        "time_ms": int((_time.time() - _t0) * 1000),
+                        "error": None
+                    })
             except Exception as e:
                 print(f"Erreur lors de l'analyse avec {plugin_name}: {str(e)}")
+                try:
+                    import time as _time
+                    time_ms = int((_time.time() - _t0) * 1000)
+                except Exception:
+                    time_ms = None
+                tested_plugins.append({
+                    "plugin": plugin_name,
+                    "is_match": False,
+                    "score": 0.0,
+                    "fragments_count": 0,
+                    "time_ms": time_ms,
+                    "error": str(e)
+                })
                 continue
         
         # Trier les résultats par score décroissant
@@ -343,7 +374,9 @@ class MetaDetectionPlugin:
         
         return {
             "result": {
-                "possible_codes": possible_codes
+                "possible_codes": possible_codes,
+                "tested_plugins": tested_plugins,
+                "skipped_plugins": skipped_plugins
             }
         }
 
