@@ -19,7 +19,7 @@
         <div id="global-notifications" class="mb-6"></div>
 
         <!-- Grille des sections de paramètres -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Paramètres Généraux -->
             <div class="bg-gray-800 rounded-lg p-6 border border-gray-700" 
@@ -183,8 +183,77 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Paramètres des Plugins -->
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700"
+                 data-controller="plugin-settings"
+                 data-plugin-settings-api-endpoint-value="/api/settings/plugins">
+
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-semibold flex items-center">
+                        <i class="fas fa-plug mr-3 text-green-400"></i>
+                        Plugins
+                    </h2>
+                    <div class="flex items-center space-x-3">
+                        <div data-plugin-settings-target="syncStatus" class="text-sm px-3 py-1 rounded bg-gray-700">
+                            Initialisation...
+                        </div>
+                        <div data-plugin-settings-target="loadingIndicator" class="hidden text-green-400">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div data-plugin-settings-target="notification" class="notification hidden mb-4"></div>
+
+                <!-- Aperçu rapide des plugins -->
+                <div class="mb-6">
+                    <div class="text-sm text-gray-400 mb-3">
+                        Configuration des plugins utilisés par l'Analyse et le Décryptage
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-xs text-gray-400 mb-1">Analyse</div>
+                            <div data-plugin-settings-target="analysisCount" class="text-lg font-semibold text-blue-400">-</div>
+                        </div>
+                        <div class="bg-gray-700 p-3 rounded-lg">
+                            <div class="text-xs text-gray-400 mb-1">Décryptage</div>
+                            <div data-plugin-settings-target="decodeCount" class="text-lg font-semibold text-purple-400">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bouton pour ouvrir les paramètres détaillés -->
+                <div class="text-center">
+                    <button data-action="click->plugin-settings#openDetailedSettings"
+                            class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                        <i class="fas fa-cogs mr-2"></i>Configurer les Plugins
+                    </button>
+                    <p class="text-xs text-gray-400 mt-2">
+                        Ouvrir le panneau détaillé de configuration
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-600 mt-6">
+                    <div class="text-xs text-gray-400 space-x-4">
+                        <span>Cache: <span data-plugin-settings-target="cacheVersion" class="text-green-400">-</span></span>
+                        <span>Auto-save: 2s</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button data-action="click->plugin-settings#manualSave"
+                                data-plugin-settings-target="saveButton"
+                                class="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 transition-colors">
+                            <i class="fas fa-save mr-1"></i>Sauvegarder
+                        </button>
+                        <button data-action="click->plugin-settings#refreshSettings"
+                                class="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-sync-alt mr-1"></i>Recharger
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-        
+
         <!-- Console de développement (mode debug) -->
         <div id="dev-console-section" class="mt-8 bg-gray-900 rounded-lg p-6 border border-gray-600" style="display: none;">
             <div class="flex items-center justify-between mb-4">

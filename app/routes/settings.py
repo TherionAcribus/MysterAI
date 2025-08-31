@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, Response
 from app.models.app_config import AppConfig
 import logging
 
@@ -7,6 +7,9 @@ logger = logging.getLogger(__name__)
 
 # Créer un blueprint pour les routes de paramètres
 settings_bp = Blueprint('settings', __name__, url_prefix='/api/settings')
+
+# Créer un blueprint pour les routes des plugins de configuration (pour GoldenLayout)
+plugins_config_bp = Blueprint('plugins_config', __name__, url_prefix='/api/plugins')
 
 @settings_bp.route('/general_panel', methods=['GET'])
 def get_general_settings_panel():
@@ -834,6 +837,669 @@ def test_minimal():
 """
    
     return html_content 
+
+@settings_bp.route('/plugins', methods=['GET'])
+def get_plugins_settings():
+    """
+    Récupère les paramètres des plugins (liste des plugins activés pour analyse/décryptage)
+    """
+    logger.info("=== DEBUG: Route /api/settings/plugins appelée ===")
+    try:
+        from app.plugin_manager import PluginManager
+        from flask import current_app
+
+        # Récupérer le PluginManager depuis l'app
+        plugin_manager = current_app.plugin_manager
+
+        # Récupérer les paramètres actuels
+        settings = {
+            'analysis_enabled_plugins': AppConfig.get_value('plugins.analysis.enabled', []),
+            'analysis_disabled_plugins': AppConfig.get_value('plugins.analysis.disabled', []),
+            'decode_enabled_plugins': AppConfig.get_value('plugins.decode.enabled', []),
+            'decode_disabled_plugins': AppConfig.get_value('plugins.decode.disabled', [])
+        }
+
+        # Récupérer la liste des plugins disponibles
+        available_plugins = []
+        for name, wrapper in plugin_manager.loaded_plugins.items():
+            metadata_dict = None
+            try:
+                record = plugin_manager._get_plugin_record(name)
+                if record and record.metadata_json:
+                    import json as _json
+                    metadata_dict = _json.loads(record.metadata_json)
+            except Exception:
+                pass
+
+            capabilities = (metadata_dict or {}).get("capabilities", {}) or {}
+            kinds = (metadata_dict or {}).get("kinds", []) or []
+            defaults = (metadata_dict or {}).get("defaults", {}) or {}
+
+            # Déterminer si le plugin peut être utilisé pour analyse/décryptage
+            can_analyze = capabilities.get("analyze", False) or (wrapper._instance and hasattr(wrapper._instance, "check_code"))
+            can_decode = capabilities.get("decode", False) or (wrapper._instance and hasattr(wrapper._instance, "execute"))
+
+            available_plugins.append({
+                'name': name,
+                'description': metadata_dict.get('description', '') if metadata_dict else '',
+                'kinds': kinds,
+                'can_analyze': can_analyze,
+                'can_decode': can_decode,
+                'default_analysis': defaults.get('include_in_analysis', True),
+                'default_decode': defaults.get('include_in_decode', True)
+            })
+
+        # Générer une version de cache basée sur le timestamp
+        from datetime import datetime
+        cache_version = datetime.now().strftime("%H:%M:%S")
+
+        logger.info(f"=== DEBUG: Paramètres plugins récupérés: {len(available_plugins)} plugins disponibles ===")
+        return jsonify({
+            'success': True,
+            'settings': settings,
+            'available_plugins': available_plugins,
+            'cache_version': cache_version,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la récupération des paramètres plugins: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@settings_bp.route('/plugins_panel', methods=['GET'])
+def get_plugins_settings_panel():
+    """
+    Retourne le template HTML pour les paramètres des plugins
+    """
+    logger.info("=== DEBUG: Route /api/settings/plugins_panel appelée ===")
+    try:
+        html = render_template('settings/plugins_settings.html')
+        logger.info("=== DEBUG: Template des paramètres plugins rendu avec succès ===")
+        return html
+    except Exception as e:
+        logger.error(f"=== ERREUR lors du rendu du template plugins: {str(e)} ===")
+        return f"Erreur lors du chargement des paramètres plugins: {str(e)}", 500
+
+@settings_bp.route('/plugins/save', methods=['POST'])
+def save_plugins_settings():
+    """
+    Enregistre les paramètres des plugins
+    """
+    try:
+        data = request.get_json()
+        logger.info(f"=== DEBUG: Données reçues pour enregistrement plugins: {data} ===")
+
+        # Valider les données
+        if not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Format de données invalide'
+            }), 400
+
+        # Enregistrer les paramètres d'analyse
+        if 'analysis_enabled_plugins' in data:
+            AppConfig.set_value(
+                'plugins.analysis.enabled',
+                data.get('analysis_enabled_plugins', []),
+                category='plugins',
+                description='Plugins explicitement activés pour l\'analyse'
+            )
+
+        if 'analysis_disabled_plugins' in data:
+            AppConfig.set_value(
+                'plugins.analysis.disabled',
+                data.get('analysis_disabled_plugins', []),
+                category='plugins',
+                description='Plugins explicitement désactivés pour l\'analyse'
+            )
+
+        # Enregistrer les paramètres de décryptage
+        if 'decode_enabled_plugins' in data:
+            AppConfig.set_value(
+                'plugins.decode.enabled',
+                data.get('decode_enabled_plugins', []),
+                category='plugins',
+                description='Plugins explicitement activés pour le décryptage'
+            )
+
+        if 'decode_disabled_plugins' in data:
+            AppConfig.set_value(
+                'plugins.decode.disabled',
+                data.get('decode_disabled_plugins', []),
+                category='plugins',
+                description='Plugins explicitement désactivés pour le décryptage'
+            )
+
+        # Générer une version de cache basée sur le timestamp
+        from datetime import datetime
+        cache_version = datetime.now().strftime("%H:%M:%S")
+
+        logger.info("=== DEBUG: Paramètres plugins enregistrés avec succès ===")
+        return jsonify({
+            'success': True,
+            'message': 'Paramètres des plugins enregistrés avec succès',
+            'cache_version': cache_version,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de l'enregistrement des paramètres plugins: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@plugins_config_bp.route('/analysis-config/interface', methods=['GET'])
+def get_plugins_analysis_config():
+    """
+    Page de configuration détaillée des plugins pour l'analyse
+    """
+    try:
+        from app.plugin_manager import PluginManager
+        from flask import current_app
+
+        # Récupérer le PluginManager depuis l'app
+        plugin_manager = current_app.plugin_manager
+
+        # Récupérer les paramètres actuels
+        settings = {
+            'analysis_enabled_plugins': AppConfig.get_value('plugins.analysis.enabled', []),
+            'analysis_disabled_plugins': AppConfig.get_value('plugins.analysis.disabled', [])
+        }
+
+        # Récupérer la liste des plugins disponibles pour l'analyse
+        available_plugins = []
+        for name, wrapper in plugin_manager.loaded_plugins.items():
+            metadata_dict = None
+            try:
+                record = plugin_manager._get_plugin_record(name)
+                if record and record.metadata_json:
+                    import json as _json
+                    metadata_dict = _json.loads(record.metadata_json)
+            except Exception:
+                pass
+
+            capabilities = (metadata_dict or {}).get("capabilities", {}) or {}
+            kinds = (metadata_dict or {}).get("kinds", []) or []
+            defaults = (metadata_dict or {}).get("defaults", {}) or {}
+
+            # Vérifier si le plugin peut être utilisé pour l'analyse
+            can_analyze = capabilities.get("analyze", False) or (wrapper._instance and hasattr(wrapper._instance, "check_code"))
+
+            if can_analyze:
+                available_plugins.append({
+                    'name': name,
+                    'description': metadata_dict.get('description', '') if metadata_dict else '',
+                    'kinds': kinds,
+                    'can_analyze': can_analyze,
+                    'default_analysis': defaults.get('include_in_analysis', True)
+                })
+
+        # Générer le HTML pour la page de configuration
+        html = f"""
+        <div data-controller="plugin-config"
+             data-plugin-config-mode-value="analysis"
+             class="p-6 text-gray-200">
+
+            <div class="mb-6">
+                <h2 class="text-2xl font-semibold mb-2 flex items-center">
+                    <i class="fas fa-search text-blue-400 mr-3"></i>
+                    Configuration des Plugins - Analyse
+                </h2>
+                <p class="text-gray-400">
+                    Sélectionnez les plugins à utiliser lors de la phase d'analyse du MetaSolver.
+                    Les plugins non sélectionnés ne seront pas testés lors de la détection automatique.
+                </p>
+            </div>
+
+            <!-- Barre d'outils -->
+            <div class="flex justify-between items-center mb-6 p-4 bg-gray-800 rounded-lg">
+                <div class="flex space-x-3">
+                    <button data-action="click->plugin-config#selectAll"
+                            class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                        <i class="fas fa-check-square mr-2"></i>Tout sélectionner
+                    </button>
+                    <button data-action="click->plugin-config#deselectAll"
+                            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        <i class="fas fa-square mr-2"></i>Tout désélectionner
+                    </button>
+                </div>
+                <div class="text-sm text-gray-400">
+                    <span data-plugin-config-target="selectedCount">0</span> / <span data-plugin-config-target="totalCount">0</span> plugins sélectionnés
+                </div>
+            </div>
+
+            <!-- Liste des plugins -->
+            <div class="space-y-3" data-plugin-config-target="pluginList">
+        """
+
+        for plugin in available_plugins:
+            # Déterminer l'état initial
+            enabled_plugins = set(settings['analysis_enabled_plugins'] or [])
+            disabled_plugins = set(settings['analysis_disabled_plugins'] or [])
+
+            if plugin['name'] in enabled_plugins:
+                is_checked = True
+                is_default = False
+            elif plugin['name'] in disabled_plugins:
+                is_checked = False
+                is_default = False
+            else:
+                is_checked = plugin['default_analysis']
+                is_default = True
+
+            checked_attr = 'checked' if is_checked else ''
+            default_indicator = ' <span class="text-xs text-gray-500">(défaut)</span>' if is_default else ''
+
+            html += f"""
+                <div class="plugin-item bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <input type="checkbox"
+                                       data-plugin-config-target="pluginCheckbox"
+                                       data-plugin-name="{plugin['name']}"
+                                       {checked_attr}
+                                       class="form-checkbox h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded">
+                                <h4 class="font-semibold text-white">{plugin['name']}{default_indicator}</h4>
+                            </div>
+                            {f'<p class="text-gray-300 text-sm mb-2 ml-8">{plugin["description"]}</p>' if plugin['description'] else ''}
+                            <div class="flex flex-wrap gap-1 ml-8">
+                                {"".join([f'<span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">{kind}</span>' for kind in plugin["kinds"]])}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end text-xs text-gray-500">
+                            <span class="mb-1">Analyse: <span class="text-green-400">✓</span></span>
+                        </div>
+                    </div>
+                </div>
+            """
+
+        html += """
+            </div>
+
+            <!-- Barre de sauvegarde -->
+            <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4">
+                <div class="flex justify-between items-center max-w-7xl mx-auto">
+                    <div class="text-sm text-gray-400">
+                        Les modifications sont sauvegardées automatiquement
+                    </div>
+                    <div class="flex space-x-3">
+                        <button data-action="click->plugin-config#resetToDefaults"
+                                class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                            <i class="fas fa-undo mr-2"></i>Réinitialiser
+                        </button>
+                        <button data-action="click->plugin-config#saveConfiguration"
+                                data-plugin-config-target="saveButton"
+                                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                            <i class="fas fa-save mr-2"></i>Enregistrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Styles -->
+            <style>
+                .plugin-item:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }
+                .form-checkbox:checked {
+                    background-color: #3b82f6;
+                    border-color: #3b82f6;
+                }
+            </style>
+        </div>
+        """
+
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur génération page configuration analyse: {str(e)}")
+        return Response(f"<div class='p-4 text-red-200'>Erreur: {str(e)}</div>", mimetype='text/html', status=500)
+
+@plugins_config_bp.route('/decode-config/interface', methods=['GET'])
+def get_plugins_decode_config():
+    """
+    Page de configuration détaillée des plugins pour le décryptage
+    """
+    try:
+        from app.plugin_manager import PluginManager
+        from flask import current_app
+
+        # Récupérer le PluginManager depuis l'app
+        plugin_manager = current_app.plugin_manager
+
+        # Récupérer les paramètres actuels
+        settings = {
+            'decode_enabled_plugins': AppConfig.get_value('plugins.decode.enabled', []),
+            'decode_disabled_plugins': AppConfig.get_value('plugins.decode.disabled', [])
+        }
+
+        # Récupérer la liste des plugins disponibles pour le décryptage
+        available_plugins = []
+        for name, wrapper in plugin_manager.loaded_plugins.items():
+            metadata_dict = None
+            try:
+                record = plugin_manager._get_plugin_record(name)
+                if record and record.metadata_json:
+                    import json as _json
+                    metadata_dict = _json.loads(record.metadata_json)
+            except Exception:
+                pass
+
+            capabilities = (metadata_dict or {}).get("capabilities", {}) or {}
+            kinds = (metadata_dict or {}).get("kinds", []) or []
+            defaults = (metadata_dict or {}).get("defaults", {}) or {}
+
+            # Vérifier si le plugin peut être utilisé pour le décryptage
+            can_decode = capabilities.get("decode", False) or (wrapper._instance and hasattr(wrapper._instance, "execute"))
+
+            if can_decode:
+                available_plugins.append({
+                    'name': name,
+                    'description': metadata_dict.get('description', '') if metadata_dict else '',
+                    'kinds': kinds,
+                    'can_decode': can_decode,
+                    'default_decode': defaults.get('include_in_decode', True)
+                })
+
+        # Générer le HTML pour la page de configuration
+        html = f"""
+        <div data-controller="plugin-config"
+             data-plugin-config-mode-value="decode"
+             class="p-6 text-gray-200">
+
+            <div class="mb-6">
+                <h2 class="text-2xl font-semibold mb-2 flex items-center">
+                    <i class="fas fa-key text-purple-400 mr-3"></i>
+                    Configuration des Plugins - Décryptage
+                </h2>
+                <p class="text-gray-400">
+                    Sélectionnez les plugins à utiliser lors de la phase de décryptage du MetaSolver.
+                    Les plugins non sélectionnés ne seront pas utilisés lors de l'exécution des algorithmes.
+                </p>
+            </div>
+
+            <!-- Barre d'outils -->
+            <div class="flex justify-between items-center mb-6 p-4 bg-gray-800 rounded-lg">
+                <div class="flex space-x-3">
+                    <button data-action="click->plugin-config#selectAll"
+                            class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                        <i class="fas fa-check-square mr-2"></i>Tout sélectionner
+                    </button>
+                    <button data-action="click->plugin-config#deselectAll"
+                            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        <i class="fas fa-square mr-2"></i>Tout désélectionner
+                    </button>
+                </div>
+                <div class="text-sm text-gray-400">
+                    <span data-plugin-config-target="selectedCount">0</span> / <span data-plugin-config-target="totalCount">0</span> plugins sélectionnés
+                </div>
+            </div>
+
+            <!-- Liste des plugins -->
+            <div class="space-y-3" data-plugin-config-target="pluginList">
+        """
+
+        for plugin in available_plugins:
+            # Déterminer l'état initial
+            enabled_plugins = set(settings['decode_enabled_plugins'] or [])
+            disabled_plugins = set(settings['decode_disabled_plugins'] or [])
+
+            if plugin['name'] in enabled_plugins:
+                is_checked = True
+                is_default = False
+            elif plugin['name'] in disabled_plugins:
+                is_checked = False
+                is_default = False
+            else:
+                is_checked = plugin['default_decode']
+                is_default = True
+
+            checked_attr = 'checked' if is_checked else ''
+            default_indicator = ' <span class="text-xs text-gray-500">(défaut)</span>' if is_default else ''
+
+            html += f"""
+                <div class="plugin-item bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <input type="checkbox"
+                                       data-plugin-config-target="pluginCheckbox"
+                                       data-plugin-name="{plugin['name']}"
+                                       {checked_attr}
+                                       class="form-checkbox h-5 w-5 text-purple-600 bg-gray-700 border-gray-600 rounded">
+                                <h4 class="font-semibold text-white">{plugin['name']}{default_indicator}</h4>
+                            </div>
+                            {f'<p class="text-gray-300 text-sm mb-2 ml-8">{plugin["description"]}</p>' if plugin['description'] else ''}
+                            <div class="flex flex-wrap gap-1 ml-8">
+                                {"".join([f'<span class="px-2 py-1 bg-purple-600 text-white text-xs rounded">{kind}</span>' for kind in plugin["kinds"]])}
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end text-xs text-gray-500">
+                            <span class="mb-1">Décryptage: <span class="text-green-400">✓</span></span>
+                        </div>
+                    </div>
+                </div>
+            """
+
+        html += """
+            </div>
+
+            <!-- Barre de sauvegarde -->
+            <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4">
+                <div class="flex justify-between items-center max-w-7xl mx-auto">
+                    <div class="text-sm text-gray-400">
+                        Les modifications sont sauvegardées automatiquement
+                    </div>
+                    <div class="flex space-x-3">
+                        <button data-action="click->plugin-config#resetToDefaults"
+                                class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                            <i class="fas fa-undo mr-2"></i>Réinitialiser
+                        </button>
+                        <button data-action="click->plugin-config#saveConfiguration"
+                                data-plugin-config-target="saveButton"
+                                class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50">
+                            <i class="fas fa-save mr-2"></i>Enregistrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Styles -->
+            <style>
+                .plugin-item:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                }
+                .form-checkbox:checked {
+                    background-color: #9333ea;
+                    border-color: #9333ea;
+                }
+            </style>
+        </div>
+        """
+
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur génération page configuration décryptage: {str(e)}")
+        return Response(f"<div class='p-4 text-red-200'>Erreur: {str(e)}</div>", mimetype='text/html', status=500)
+
+@plugins_config_bp.route('/analysis-config/save', methods=['POST'])
+def save_plugins_analysis_config():
+    """
+    Sauvegarde la configuration détaillée des plugins pour l'analyse
+    """
+    try:
+        data = request.get_json()
+        logger.info(f"=== DEBUG: Données reçues pour sauvegarde analyse: {data} ===")
+
+        # Valider les données
+        if not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Format de données invalide'
+            }), 400
+
+        # Sauvegarder les paramètres d'analyse
+        enabled_plugins = data.get('enabled_plugins', [])
+        disabled_plugins = data.get('disabled_plugins', [])
+
+        AppConfig.set_value(
+            'plugins.analysis.enabled',
+            enabled_plugins,
+            category='plugins',
+            description='Plugins explicitement activés pour l\'analyse'
+        )
+
+        AppConfig.set_value(
+            'plugins.analysis.disabled',
+            disabled_plugins,
+            category='plugins',
+            description='Plugins explicitement désactivés pour l\'analyse'
+        )
+
+        # Générer une version de cache basée sur le timestamp
+        from datetime import datetime
+        cache_version = datetime.now().strftime("%H:%M:%S")
+
+        logger.info("=== DEBUG: Configuration analyse sauvegardée avec succès ===")
+        return jsonify({
+            'success': True,
+            'message': 'Configuration de l\'analyse sauvegardée avec succès',
+            'cache_version': cache_version,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la sauvegarde de la configuration analyse: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@plugins_config_bp.route('/decode-config/save', methods=['POST'])
+def save_plugins_decode_config():
+    """
+    Sauvegarde la configuration détaillée des plugins pour le décryptage
+    """
+    try:
+        data = request.get_json()
+        logger.info(f"=== DEBUG: Données reçues pour sauvegarde décryptage: {data} ===")
+
+        # Valider les données
+        if not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Format de données invalide'
+            }), 400
+
+        # Sauvegarder les paramètres de décryptage
+        enabled_plugins = data.get('enabled_plugins', [])
+        disabled_plugins = data.get('disabled_plugins', [])
+
+        AppConfig.set_value(
+            'plugins.decode.enabled',
+            enabled_plugins,
+            category='plugins',
+            description='Plugins explicitement activés pour le décryptage'
+        )
+
+        AppConfig.set_value(
+            'plugins.decode.disabled',
+            disabled_plugins,
+            category='plugins',
+            description='Plugins explicitement désactivés pour le décryptage'
+        )
+
+        # Générer une version de cache basée sur le timestamp
+        from datetime import datetime
+        cache_version = datetime.now().strftime("%H:%M:%S")
+
+        logger.info("=== DEBUG: Configuration décryptage sauvegardée avec succès ===")
+        return jsonify({
+            'success': True,
+            'message': 'Configuration du décryptage sauvegardée avec succès',
+            'cache_version': cache_version,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"=== ERREUR lors de la sauvegarde de la configuration décryptage: {str(e)} ===")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@plugins_config_bp.route('/analysis-config/info_panel', methods=['GET'])
+def get_plugins_analysis_info_panel():
+    """
+    Retourne le panneau d'information pour la configuration d'analyse
+    """
+    try:
+        html = """
+        <div class="p-4">
+            <h3 class="text-lg font-semibold mb-3 text-gray-200">
+                <i class="fas fa-search text-blue-400 mr-2"></i>
+                Configuration des Plugins - Analyse
+            </h3>
+            <div class="text-sm text-gray-400 space-y-2">
+                <p>
+                    <strong>Analyse</strong> : Phase de détection automatique des plugins pertinents
+                    pour déchiffrer une énigme de géocaching.
+                </p>
+                <p>
+                    Cette page vous permet de configurer quels plugins sont utilisés lors de
+                    l'analyse automatique par le MetaSolver.
+                </p>
+                <ul class="mt-3 space-y-1">
+                    <li>• <strong>Plugins activés</strong> : Utilisés lors de l'analyse</li>
+                    <li>• <strong>Plugins désactivés</strong> : Ignorés lors de l'analyse</li>
+                    <li>• <strong>Plugins par défaut</strong> : Suivent la configuration par défaut</li>
+                </ul>
+            </div>
+        </div>
+        """
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur génération panneau info analyse: {str(e)}")
+        return Response("<div class='p-4 text-red-400'>Erreur de chargement</div>", mimetype='text/html', status=500)
+
+@plugins_config_bp.route('/decode-config/info_panel', methods=['GET'])
+def get_plugins_decode_info_panel():
+    """
+    Retourne le panneau d'information pour la configuration de décryptage
+    """
+    try:
+        html = """
+        <div class="p-4">
+            <h3 class="text-lg font-semibold mb-3 text-gray-200">
+                <i class="fas fa-key text-purple-400 mr-2"></i>
+                Configuration des Plugins - Décryptage
+            </h3>
+            <div class="text-sm text-gray-400 space-y-2">
+                <p>
+                    <strong>Décryptage</strong> : Phase d'exécution des algorithmes de déchiffrement
+                    sur les énigmes détectées.
+                </p>
+                <p>
+                    Cette page vous permet de configurer quels plugins sont utilisés lors de
+                    l'exécution des algorithmes de décryptage par le MetaSolver.
+                </p>
+                <ul class="mt-3 space-y-1">
+                    <li>• <strong>Plugins activés</strong> : Utilisés lors du décryptage</li>
+                    <li>• <strong>Plugins désactivés</strong> : Ignorés lors du décryptage</li>
+                    <li>• <strong>Plugins par défaut</strong> : Suivent la configuration par défaut</li>
+                </ul>
+            </div>
+        </div>
+        """
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logger.error(f"Erreur génération panneau info décryptage: {str(e)}")
+        return Response("<div class='p-4 text-red-400'>Erreur de chargement</div>", mimetype='text/html', status=500)
 
 @settings_bp.route('/test_tabopener', methods=['GET'])
 def test_tabopener():

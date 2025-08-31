@@ -1,0 +1,72 @@
+<div class="space-y-6">
+    <!-- En-tête -->
+    <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-200">Configuration des Plugins</h3>
+    </div>
+
+    <!-- Description -->
+    <div class="text-sm text-gray-400 mb-6">
+        Configurez les plugins utilisés par le MetaSolver pour l'analyse et le décryptage des énigmes de géocaching.
+    </div>
+
+    <!-- Boutons d'accès aux configurations détaillées -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Configuration Analyse -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-search text-blue-400 text-xl mr-3"></i>
+                <h4 class="text-lg font-semibold text-white">Analyse</h4>
+            </div>
+            <p class="text-sm text-gray-400 mb-6">
+                Configurez les plugins utilisés lors de la phase d'analyse pour détecter automatiquement
+                quel(s) plugin(s) sont pertinents pour déchiffrer une énigme.
+            </p>
+            <button
+                data-tab-opener="plugins-analysis-config"
+                data-tab-title="Configuration Analyse"
+                data-tab-component="plugin"
+                data-tab-unique-id="plugins-analysis-config"
+                data-tab-config-pluginname="analysis-config"
+                class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+                <i class="fas fa-cogs mr-2"></i>Configurer l'Analyse
+            </button>
+        </div>
+
+        <!-- Configuration Décryptage -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center mb-4">
+                <i class="fas fa-key text-purple-400 text-xl mr-3"></i>
+                <h4 class="text-lg font-semibold text-white">Décryptage</h4>
+            </div>
+            <p class="text-sm text-gray-400 mb-6">
+                Configurez les plugins utilisés lors de la phase de décryptage pour traiter
+                automatiquement les énigmes avec les algorithmes appropriés.
+            </p>
+            <button
+                data-tab-opener="plugins-decode-config"
+                data-tab-title="Configuration Décryptage"
+                data-tab-component="plugin"
+                data-tab-unique-id="plugins-decode-config"
+                data-tab-config-pluginname="decode-config"
+                class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+                <i class="fas fa-cogs mr-2"></i>Configurer le Décryptage
+            </button>
+        </div>
+    </div>
+
+    <!-- Informations complémentaires -->
+    <div class="mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h4 class="text-md font-medium text-gray-200 mb-3">
+            <i class="fas fa-info-circle mr-2 text-blue-400"></i>Informations
+        </h4>
+        <ul class="text-sm text-gray-400 space-y-2">
+            <li>• <strong>Analyse</strong> : Phase de détection automatique des plugins pertinents</li>
+            <li>• <strong>Décryptage</strong> : Phase d'exécution des algorithmes de déchiffrement</li>
+            <li>• Les configurations sont sauvegardées automatiquement</li>
+            <li>• Vous pouvez activer/désactiver des plugins selon vos besoins</li>
+            <li>• Les plugins sont organisés par catégories fonctionnelles</li>
+        </ul>
+    </div>
+</div>

@@ -188,11 +188,451 @@ async function initializeSettingsControllers() {
         
         app.register('formula-settings', FormulaSettingsController);
         console.log('✅ FormulaSettingsController enregistré avec succès');
-        
-        // 5. Déclencher l'événement global
+
+        // 4. Créer et enregistrer le contrôleur des paramètres des plugins
+        console.log('🔧 Création du contrôleur des paramètres des plugins...');
+        class PluginSettingsController extends window.BaseSettingsController {
+            static targets = [
+                ...window.BaseSettingsController.targets,
+                "pluginList", "analysisTab", "decodeTab", "selectAllAnalysis", "selectAllDecode",
+                "deselectAllAnalysis", "deselectAllDecode", "analysisCount", "decodeCount"
+            ]
+
+            apiEndpoint = '/api/settings/plugins'
+
+            connect() {
+                console.log('🔗 PluginSettingsController connecté !');
+                super.connect();
+                this.currentTab = 'analysis'; // Onglet par défaut
+                this.updateTabVisibility();
+            }
+
+            gatherSettings() {
+                const settings = {
+                    analysis_enabled_plugins: [],
+                    analysis_disabled_plugins: [],
+                    decode_enabled_plugins: [],
+                    decode_disabled_plugins: []
+                };
+
+                // Collecter les états des checkboxes
+                const checkboxes = this.element.querySelectorAll('input[type="checkbox"][data-plugin]');
+                checkboxes.forEach(checkbox => {
+                    const pluginName = checkbox.dataset.plugin;
+                    const isAnalysis = checkbox.dataset.type === 'analysis';
+                    const isEnabled = checkbox.checked;
+
+                    if (isAnalysis) {
+                        if (isEnabled) {
+                            settings.analysis_enabled_plugins.push(pluginName);
+                        } else {
+                            settings.analysis_disabled_plugins.push(pluginName);
+                        }
+                    } else {
+                        if (isEnabled) {
+                            settings.decode_enabled_plugins.push(pluginName);
+                        } else {
+                            settings.decode_disabled_plugins.push(pluginName);
+                        }
+                    }
+                });
+
+                console.log('📤 PluginSettings gatherSettings:', settings);
+                return settings;
+            }
+
+            updateUI(settings) {
+                console.log('🔄 PluginSettings updateUI appelée avec:', settings);
+
+                const availablePlugins = this.availablePlugins || [];
+                const enabledAnalysis = new Set(settings.analysis_enabled_plugins || []);
+                const disabledAnalysis = new Set(settings.analysis_disabled_plugins || []);
+                const enabledDecode = new Set(settings.decode_enabled_plugins || []);
+                const disabledDecode = new Set(settings.decode_disabled_plugins || []);
+
+                // Mettre à jour les compteurs d'aperçu
+                this.updateOverviewCounts(settings, availablePlugins);
+
+                // Générer le HTML pour la liste des plugins
+                let html = '';
+
+                availablePlugins.forEach(plugin => {
+                    const analysisEnabled = enabledAnalysis.has(plugin.name);
+                    const analysisDisabled = disabledAnalysis.has(plugin.name);
+                    const decodeEnabled = enabledDecode.has(plugin.name);
+                    const decodeDisabled = disabledDecode.has(plugin.name);
+
+                    // Déterminer l'état par défaut pour l'analyse
+                    let analysisChecked = plugin.can_analyze;
+                    if (analysisEnabled) analysisChecked = true;
+                    else if (analysisDisabled) analysisChecked = false;
+                    else analysisChecked = plugin.default_analysis;
+
+                    // Déterminer l'état par défaut pour le décryptage
+                    let decodeChecked = plugin.can_decode;
+                    if (decodeEnabled) decodeChecked = true;
+                    else if (decodeDisabled) decodeChecked = false;
+                    else decodeChecked = plugin.default_decode;
+
+                    html += `
+                        <div class="plugin-item bg-gray-700 rounded-lg p-4 mb-3">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-white mb-1">${plugin.name}</h4>
+                                    ${plugin.description ? `<p class="text-gray-300 text-sm mb-2">${plugin.description}</p>` : ''}
+                                    <div class="flex flex-wrap gap-1 mb-2">
+                                        ${plugin.kinds.map(kind => `<span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">${kind}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div class="flex flex-col gap-2 ml-4">
+                                    ${plugin.can_analyze ? `
+                                        <label class="flex items-center gap-2 text-sm">
+                                            <input type="checkbox"
+                                                   data-plugin="${plugin.name}"
+                                                   data-type="analysis"
+                                                   data-action="change->plugin-settings#settingChanged"
+                                                   ${analysisChecked ? 'checked' : ''}
+                                                   class="rounded">
+                                            <span class="text-gray-300">Analyse</span>
+                                        </label>
+                                    ` : '<div class="h-6"></div>'}
+                                    ${plugin.can_decode ? `
+                                        <label class="flex items-center gap-2 text-sm">
+                                            <input type="checkbox"
+                                                   data-plugin="${plugin.name}"
+                                                   data-type="decode"
+                                                   data-action="change->plugin-settings#settingChanged"
+                                                   ${decodeChecked ? 'checked' : ''}
+                                                   class="rounded">
+                                            <span class="text-gray-300">Décryptage</span>
+                                        </label>
+                                    ` : '<div class="h-6"></div>'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (this.hasPluginListTarget) {
+                    this.pluginListTarget.innerHTML = html;
+                }
+            }
+
+            getDefaults() {
+                return {
+                    analysis_enabled_plugins: [],
+                    analysis_disabled_plugins: [],
+                    decode_enabled_plugins: [],
+                    decode_disabled_plugins: []
+                };
+            }
+
+            // Mettre à jour les compteurs d'aperçu
+            updateOverviewCounts(settings, availablePlugins) {
+                const enabledAnalysis = new Set(settings.analysis_enabled_plugins || []);
+                const disabledAnalysis = new Set(settings.analysis_disabled_plugins || []);
+                const enabledDecode = new Set(settings.decode_enabled_plugins || []);
+                const disabledDecode = new Set(settings.decode_disabled_plugins || []);
+
+                let analysisCount = 0;
+                let decodeCount = 0;
+
+                availablePlugins.forEach(plugin => {
+                    // Compter pour l'analyse
+                    const analysisEnabled = enabledAnalysis.has(plugin.name);
+                    const analysisDisabled = disabledAnalysis.has(plugin.name);
+                    let analysisChecked = plugin.can_analyze;
+                    if (analysisEnabled) analysisChecked = true;
+                    else if (analysisDisabled) analysisChecked = false;
+                    else analysisChecked = plugin.default_analysis;
+
+                    if (analysisChecked) analysisCount++;
+
+                    // Compter pour le décryptage
+                    const decodeEnabled = enabledDecode.has(plugin.name);
+                    const decodeDisabled = disabledDecode.has(plugin.name);
+                    let decodeChecked = plugin.can_decode;
+                    if (decodeEnabled) decodeChecked = true;
+                    else if (decodeDisabled) decodeChecked = false;
+                    else decodeChecked = plugin.default_decode;
+
+                    if (decodeChecked) decodeCount++;
+                });
+
+                if (this.hasAnalysisCountTarget) {
+                    this.analysisCountTarget.textContent = analysisCount;
+                }
+                if (this.hasDecodeCountTarget) {
+                    this.decodeCountTarget.textContent = decodeCount;
+                }
+            }
+
+            // Ouvrir les paramètres détaillés dans GoldenLayout
+            async openDetailedSettings() {
+                try {
+                    console.log('🔧 Ouverture des paramètres détaillés des plugins...');
+
+                    // Utiliser TabOpenerService pour ouvrir dans GoldenLayout
+                    if (window.TabOpenerService) {
+                        const tabConfig = {
+                            title: 'Configuration des Plugins',
+                            type: 'component',
+                            componentName: 'iframe',
+                            componentState: {
+                                url: '/api/settings/plugins_panel',
+                                title: 'Configuration des Plugins'
+                            }
+                        };
+
+                        await window.TabOpenerService.openTab(tabConfig);
+                        this.showNotification('Panneau de configuration ouvert', 'success');
+                    } else {
+                        // Fallback: ouvrir dans une nouvelle fenêtre
+                        console.warn('TabOpenerService non disponible, ouverture dans une nouvelle fenêtre');
+                        window.open('/api/settings/plugins_panel', '_blank', 'width=1000,height=800');
+                        this.showNotification('Ouverture dans une nouvelle fenêtre', 'info');
+                    }
+                } catch (error) {
+                    console.error('Erreur lors de l\'ouverture des paramètres détaillés:', error);
+                    this.showNotification('Erreur lors de l\'ouverture: ' + error.message, 'error');
+                }
+            }
+
+            // Gestion des onglets
+            showAnalysisTab() {
+                this.currentTab = 'analysis';
+                this.updateTabVisibility();
+            }
+
+            showDecodeTab() {
+                this.currentTab = 'decode';
+                this.updateTabVisibility();
+            }
+
+            updateTabVisibility() {
+                if (this.hasAnalysisTabTarget && this.hasDecodeTabTarget) {
+                    if (this.currentTab === 'analysis') {
+                        this.analysisTabTarget.classList.remove('hidden');
+                        this.decodeTabTarget.classList.add('hidden');
+                    } else {
+                        this.analysisTabTarget.classList.add('hidden');
+                        this.decodeTabTarget.classList.remove('hidden');
+                    }
+                }
+            }
+
+            // Gestion des sélections multiples
+            selectAllAnalysis() {
+                this.setAllCheckboxes('analysis', true);
+            }
+
+            deselectAllAnalysis() {
+                this.setAllCheckboxes('analysis', false);
+            }
+
+            selectAllDecode() {
+                this.setAllCheckboxes('decode', true);
+            }
+
+            deselectAllDecode() {
+                this.setAllCheckboxes('decode', false);
+            }
+
+            setAllCheckboxes(type, checked) {
+                const checkboxes = this.element.querySelectorAll(`input[type="checkbox"][data-type="${type}"]`);
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = checked;
+                });
+                this.settingChanged();
+            }
+
+            // Override de loadInitialSettings pour stocker les plugins disponibles
+            async loadInitialSettings() {
+                try {
+                    this.updateSyncStatus('Chargement...');
+
+                    const response = await fetch(this.apiEndpoint);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.availablePlugins = data.available_plugins || [];
+                        this.updateUI(data.settings);
+                        this.updateSyncStatus('À jour');
+                        this.showNotification('Paramètres des plugins chargés', 'success');
+                    } else {
+                        throw new Error(data.error || 'Erreur inconnue');
+                    }
+                } catch (error) {
+                    console.error('Erreur chargement plugins:', error);
+                    this.showNotification('Erreur: ' + error.message, 'error');
+                    this.updateSyncStatus('Erreur');
+                }
+            }
+        }
+
+        app.register('plugin-settings', PluginSettingsController);
+        console.log('✅ PluginSettingsController enregistré avec succès');
+
+        // 5. Créer et enregistrer le contrôleur de configuration détaillée des plugins
+        console.log('🔧 Création du contrôleur de configuration détaillée des plugins...');
+        class PluginConfigController extends window.BaseSettingsController {
+            static targets = [
+                ...window.BaseSettingsController.targets,
+                "pluginCheckbox", "selectedCount", "totalCount", "saveButton"
+            ]
+
+            mode = 'analysis' // analysis ou decode
+
+            connect() {
+                console.log('🔗 PluginConfigController connecté !');
+                super.connect();
+                this.mode = this.modeValue || 'analysis';
+                this.updateCounts();
+                this.attachCheckboxListeners();
+            }
+
+            // Écouter les changements des checkboxes
+            attachCheckboxListeners() {
+                this.pluginCheckboxTargets.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        this.updateCounts();
+                        this.settingChanged();
+                    });
+                });
+            }
+
+            // Mettre à jour les compteurs
+            updateCounts() {
+                const checkedBoxes = this.pluginCheckboxTargets.filter(cb => cb.checked);
+                const totalBoxes = this.pluginCheckboxTargets.length;
+
+                if (this.hasSelectedCountTarget) {
+                    this.selectedCountTarget.textContent = checkedBoxes.length;
+                }
+                if (this.hasTotalCountTarget) {
+                    this.totalCountTarget.textContent = totalBoxes;
+                }
+            }
+
+            // Collecter les paramètres actuels
+            gatherSettings() {
+                const settings = {
+                    mode: this.mode,
+                    enabled_plugins: [],
+                    disabled_plugins: []
+                };
+
+                this.pluginCheckboxTargets.forEach(checkbox => {
+                    const pluginName = checkbox.dataset.pluginName;
+                    if (checkbox.checked) {
+                        settings.enabled_plugins.push(pluginName);
+                    } else {
+                        settings.disabled_plugins.push(pluginName);
+                    }
+                });
+
+                console.log('📤 PluginConfig gatherSettings:', settings);
+                return settings;
+            }
+
+            // Mettre à jour l'interface
+            updateUI(settings) {
+                console.log('🔄 PluginConfig updateUI appelée avec:', settings);
+                // L'interface est générée côté serveur, pas besoin de mise à jour côté client
+            }
+
+            // Valeurs par défaut
+            getDefaults() {
+                return {
+                    mode: this.mode,
+                    enabled_plugins: [],
+                    disabled_plugins: []
+                };
+            }
+
+            // Actions
+            selectAll() {
+                this.setAllCheckboxes(true);
+            }
+
+            deselectAll() {
+                this.setAllCheckboxes(false);
+            }
+
+            setAllCheckboxes(checked) {
+                this.pluginCheckboxTargets.forEach(checkbox => {
+                    checkbox.checked = checked;
+                });
+                this.updateCounts();
+                this.settingChanged();
+            }
+
+            resetToDefaults() {
+                if (confirm('Êtes-vous sûr de vouloir réinitialiser tous les paramètres aux valeurs par défaut ?')) {
+                    // Réinitialiser côté serveur en rechargeant la page
+                    window.location.reload();
+                }
+            }
+
+            // Sauvegarde manuelle
+            async saveConfiguration() {
+                if (this.hasSaveButtonTarget) {
+                    this.saveButtonTarget.disabled = true;
+                    this.saveButtonTarget.textContent = 'Sauvegarde...';
+                }
+
+                try {
+                    await this.manualSave();
+                    this.showNotification('Configuration sauvegardée avec succès', 'success');
+                } catch (error) {
+                    this.showNotification('Erreur lors de la sauvegarde: ' + error.message, 'error');
+                } finally {
+                    if (this.hasSaveButtonTarget) {
+                        this.saveButtonTarget.disabled = false;
+                        this.saveButtonTarget.textContent = 'Enregistrer';
+                    }
+                }
+            }
+
+            // Override de manualSave pour gérer les routes spécifiques
+            async manualSave() {
+                try {
+                    this.updateSyncStatus('Sauvegarde...');
+
+                    const settings = this.gatherSettings();
+                    const endpoint = this.mode === 'analysis'
+                        ? '/api/plugins/analysis-config/save'
+                        : '/api/plugins/decode-config/save';
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(settings)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.updateSyncStatus('Sauvegardé');
+                        return data;
+                    } else {
+                        throw new Error(data.error || 'Erreur inconnue');
+                    }
+                } catch (error) {
+                    console.error('Erreur sauvegarde:', error);
+                    this.updateSyncStatus('Erreur');
+                    throw error;
+                }
+            }
+        }
+
+        app.register('plugin-config', PluginConfigController);
+        console.log('✅ PluginConfigController enregistré avec succès');
+
+        // 6. Déclencher l'événement global
         window.dispatchEvent(new CustomEvent('SettingsSystemReady', {
-            detail: { 
-                controllers: ['general-settings', 'formula-settings'],
+            detail: {
+                controllers: ['general-settings', 'formula-settings', 'plugin-settings', 'plugin-config'],
                 message: 'Système de settings complètement initialisé'
             }
         }));

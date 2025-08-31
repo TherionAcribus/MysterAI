@@ -6,7 +6,7 @@ from .plugins import plugins_bp
 from .alphabets import alphabets_bp
 from .logs import logs_bp
 from app.routes.ai_routes import ai_bp
-from .settings import settings_bp
+from .settings import settings_bp, plugins_config_bp
 from .multi_solver import multi_solver_bp
 
 blueprints = [
@@ -19,6 +19,7 @@ blueprints = [
     logs_bp,
     ai_bp,
     settings_bp,
+    plugins_config_bp,  # Blueprint pour la configuration des plugins
     multi_solver_bp
 ]
 

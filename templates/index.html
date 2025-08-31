@@ -386,6 +386,7 @@
                                 <button class="settings-tab active" data-tab="general">Général</button>
                                 <button class="settings-tab" data-tab="ai">Intelligence Artificielle</button>
                                 <button class="settings-tab" data-tab="formula">Formula Solver</button>
+                                <button class="settings-tab" data-tab="plugins">Plugins</button>
                                 <button class="settings-tab" data-tab="appearance">Apparence</button>
                             </div>
                             
@@ -416,9 +417,9 @@
                                 </div>
                                 
                                 <!-- Paramètres Formula Solver -->
-                                <div id="formula-settings" class="settings-section" 
+                                <div id="formula-settings" class="settings-section"
                                      data-controller="formula-settings"
-                                     hx-get="/api/settings/formula_panel" 
+                                     hx-get="/api/settings/formula_panel"
                                      hx-trigger="load"
                                      hx-swap="innerHTML">
                                     <!-- Le contenu sera chargé via HTMX -->
@@ -426,7 +427,19 @@
                                         <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                                     </div>
                                 </div>
-                                
+
+                                <!-- Paramètres des Plugins -->
+                                <div id="plugins-settings" class="settings-section"
+                                     data-controller="plugin-settings"
+                                     hx-get="/api/settings/plugins_panel"
+                                     hx-trigger="load"
+                                     hx-swap="innerHTML">
+                                    <!-- Le contenu sera chargé via HTMX -->
+                                    <div class="flex items-center justify-center h-32">
+                                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+                                    </div>
+                                </div>
+
                                 <!-- Paramètres d'apparence -->
                                 <div id="appearance-settings" class="settings-section">
                                     <h2 class="text-lg font-semibold mb-4">Paramètres d'apparence</h2>
