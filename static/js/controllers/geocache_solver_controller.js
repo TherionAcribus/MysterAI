@@ -1800,8 +1800,17 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 const testedHtml = tested.length ? `
                     <div class="bg-gray-700 rounded-lg p-4 mb-3">
                         <h3 class="text-md font-medium text-blue-300 mb-2">Plugins testés (${tested.length})</h3>
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="text-xs text-gray-400">Cochez les plugins à utiliser pour le décryptage</div>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400">Sélection rapide:</span>
+                                <select id="metasolver-bulk-select-mode" class="bg-gray-800 text-gray-200 text-xs rounded px-2 py-1 border border-gray-600">
+                                    <option value="all">Tout sélectionner</option>
+                                    <option value="none">Tout désélectionner</option>
+                                    <option value="min" selected>Score ≥</option>
+                                </select>
+                                <input id="metasolver-bulk-min-score" type="number" min="0" max="100" value="80" class="bg-gray-800 text-gray-200 text-xs rounded px-2 py-1 w-16 border border-gray-600">
+                                <button id="metasolver-bulk-apply" class="bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 px-2 rounded">Appliquer</button>
+                            </div>
                             <div class="flex gap-2">
                                 <button id="btn-decrypt-selected" class="bg-green-600 hover:bg-green-700 text-white text-xs py-1 px-2 rounded disabled:opacity-50" disabled>Décoder la sélection</button>
                             </div>
@@ -1821,9 +1830,10 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                     try {
                         const tableEl = document.getElementById('metasolver-tested-table');
                         if (!tableEl || typeof Tabulator === 'undefined') return;
+                        const defaultThreshold = 80;
                         const rows = tested.map((t, idx) => ({
                             id: idx + 1,
-                            selected: false,
+                            selected: !!(t.can_decode && t.is_match && Math.round((t.score || 0) * 100) >= defaultThreshold),
                             plugin: t.plugin,
                             scorePct: Math.round((t.score || 0) * 100),
                             fragments: t.fragments_count ?? 0,
@@ -1869,6 +1879,50 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             if (cell.getField() === 'selected') updateButtonState();
                         });
                         updateButtonState();
+
+                        // Gestion sélection rapide (bulk)
+                        const bulkModeEl = document.getElementById('metasolver-bulk-select-mode');
+                        const bulkMinEl = document.getElementById('metasolver-bulk-min-score');
+                        const bulkApplyBtn = document.getElementById('metasolver-bulk-apply');
+
+                        if (bulkModeEl) {
+                            bulkModeEl.addEventListener('change', () => {
+                                const mode = bulkModeEl.value;
+                                if (bulkMinEl) bulkMinEl.disabled = (mode !== 'min');
+                            });
+                        }
+                        if (bulkApplyBtn) {
+                            bulkApplyBtn.addEventListener('click', () => {
+                                const mode = (bulkModeEl && bulkModeEl.value) || 'all';
+                                const threshold = bulkMinEl ? Math.max(0, Math.min(100, parseInt(bulkMinEl.value || '0', 10))) : 0;
+                                const data = table.getData();
+                                const updates = [];
+                                data.forEach(r => {
+                                    let sel = false;
+                                    if (mode === 'all') sel = !!r.can_decode;
+                                    else if (mode === 'none') sel = false;
+                                    else if (mode === 'min') sel = !!(r.can_decode && r.is_match && (r.scorePct >= threshold));
+                                    if (r.selected !== sel) updates.push({ id: r.id, selected: sel });
+                                });
+                                if (updates.length) table.updateData(updates);
+                                updateButtonState();
+                            });
+                        }
+
+                        // Appliquer automatiquement la sélection par score ≥ 80% au chargement
+                        try {
+                            const threshold = defaultThreshold;
+                            const data = table.getData();
+                            const updates = [];
+                            data.forEach(r => {
+                                const sel = !!(r.can_decode && r.is_match && (r.scorePct >= threshold));
+                                if (r.selected !== sel) updates.push({ id: r.id, selected: sel });
+                            });
+                            if (updates.length) table.updateData(updates);
+                            updateButtonState();
+                            if (bulkModeEl) bulkModeEl.value = 'min';
+                            if (bulkMinEl) bulkMinEl.disabled = false;
+                        } catch (e) { /* ignore */ }
 
                         if (btn) {
                             btn.addEventListener('click', async () => {
