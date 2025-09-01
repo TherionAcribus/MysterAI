@@ -599,6 +599,16 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         key = request.form.get('key', None)
+        # Liste explicite de plugins à utiliser pour le décryptage (optionnel)
+        decode_plugins_json = request.form.get('decode_plugins')
+        decode_plugins = None
+        if decode_plugins_json:
+            try:
+                decode_plugins = json.loads(decode_plugins_json)
+                if not isinstance(decode_plugins, list):
+                    decode_plugins = None
+            except Exception:
+                decode_plugins = None
         plugin_scope = request.form.get('plugin_scope')  # 'selected' | 'all'
         # Optionnel: coordonnées d'origine au format JSON { ddm_lat, ddm_lon }
         origin_coords_json = request.form.get('origin_coords')
@@ -676,6 +686,9 @@ def execute_metadetection():
         # Ajouter la clé si fournie
         if key:
             inputs['key'] = key
+        # Ajouter la liste explicite de plugins de décryptage si fournie
+        if decode_plugins:
+            inputs['decode_plugins'] = decode_plugins
         # Ajouter les coordonnées d'origine si fournies
         if origin_coords and isinstance(origin_coords, dict):
             # Normaliser les clés attendues

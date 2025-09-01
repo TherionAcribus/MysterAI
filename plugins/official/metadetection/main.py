@@ -204,6 +204,12 @@ class MetaDetectionPlugin:
                 'phase': 'decode',
                 'plugin': plugin_name or 'auto'
             })
+            # Logs: liste explicite de plugins si fournie
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"MetaDetection.decode: explicit decode_plugins? count={(len(inputs.get('decode_plugins')) if isinstance(inputs.get('decode_plugins'), list) else 0)}")
+            except Exception:
+                pass
             decode_results = self.decode_code(
                 plugin_name,
                 text,
@@ -215,7 +221,8 @@ class MetaDetectionPlugin:
                 ws_session_id=ws_session_id,
                 ws_service=ws_service,
                 origin_coords=origin_coords,
-                plugin_scope=scope
+                plugin_scope=scope,
+                decode_plugins=inputs.get('decode_plugins')
             )
             
             # Mesure du temps d'exécution
@@ -409,7 +416,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None, origin_coords: dict | None = None, plugin_scope: str = "selected") -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None, origin_coords: dict | None = None, plugin_scope: str = "selected", decode_plugins: list | None = None) -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -429,27 +436,36 @@ class MetaDetectionPlugin:
         # Liste des plugins à exclure pour éviter les boucles récursives
         excluded_plugins = ["metadetection"]
 
-        # Déterminer si on doit ignorer les overrides utilisateur
-        ignore_overrides = plugin_scope.lower() == "all"
+        # Si une liste explicite est fournie, l'utiliser en priorité
+        if isinstance(decode_plugins, list) and len(decode_plugins) > 0:
+            included_plugins = [p for p in decode_plugins if p not in excluded_plugins]
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"MetaDetection.decode_code: using explicit decode_plugins list, count={len(included_plugins)}")
+            except Exception:
+                pass
+        else:
+            # Déterminer si on doit ignorer les overrides utilisateur
+            ignore_overrides = plugin_scope.lower() == "all"
 
-        # Utiliser PluginManager pour obtenir la liste des plugins selon la portée
-        try:
-            plugins_to_test = plugin_manager.get_plugins_for("decode", ignore_overrides=ignore_overrides)
-            # Filtrer les plugins exclus
-            included_plugins = [p for p in plugins_to_test if p not in excluded_plugins]
+            # Utiliser PluginManager pour obtenir la liste des plugins selon la portée
             try:
-                from loguru import logger as _lg
-                _lg.debug(f"MetaDetection.decode_code: scope={plugin_scope}, ignore_overrides={ignore_overrides}, resolved_plugins={len(included_plugins)}")
-            except Exception:
-                pass
-        except Exception as e:
-            # Fallback vers une liste vide si PluginManager échoue
-            included_plugins = []
-            try:
-                from loguru import logger as _lg
-                _lg.error(f"MetaDetection.decode_code: échec récupération plugins via PluginManager: {e}")
-            except Exception:
-                pass
+                plugins_to_test = plugin_manager.get_plugins_for("decode", ignore_overrides=ignore_overrides)
+                # Filtrer les plugins exclus
+                included_plugins = [p for p in plugins_to_test if p not in excluded_plugins]
+                try:
+                    from loguru import logger as _lg
+                    _lg.debug(f"MetaDetection.decode_code: scope={plugin_scope}, ignore_overrides={ignore_overrides}, resolved_plugins={len(included_plugins)}")
+                except Exception:
+                    pass
+            except Exception as e:
+                # Fallback vers une liste vide si PluginManager échoue
+                included_plugins = []
+                try:
+                    from loguru import logger as _lg
+                    _lg.error(f"MetaDetection.decode_code: échec récupération plugins via PluginManager: {e}")
+                except Exception:
+                    pass
         
         # Structure du résultat standardisé
         result_structure = {

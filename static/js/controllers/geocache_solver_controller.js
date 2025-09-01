@@ -1314,6 +1314,72 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         }
     }
 
+    // Nouvelle méthode: lancer un décryptage avec une sélection explicite de plugins
+    async decodeSelectedPlugins(selectedPlugins) {
+        try {
+            // 1) Créer/obtenir une session WebSocket comme pour un décryptage normal
+            let sessionId = null;
+            try {
+                const sessionResp = await fetch('/api/plugins/metadetection/session', { method: 'POST' });
+                if (sessionResp.ok) {
+                    const sessionData = await sessionResp.json();
+                    sessionId = sessionData.session_id;
+                }
+            } catch (e) {
+                console.warn('Impossible de créer la session WebSocket MetaSolver', e);
+            }
+            if (sessionId && window.wsService) {
+                this._metaWsSessionId = sessionId;
+                window.wsService.joinSession(sessionId);
+            }
+
+            // 2) Brancher les handlers WS si pas déjà fait
+            try { this.connectWebSocketProgressForMetaSolver(); } catch (e) { /* ignore */ }
+
+            // 3) Construire un FormData identique au bouton "Décrypter"
+            const formData = new FormData();
+            const text = this.normalizeText(this.descriptionTextTarget.value || '');
+            const strict = document.getElementById('metasolver-strict').value;
+            const embedded = document.getElementById('metasolver-embedded').checked;
+            const pluginScopeEl = document.getElementById('metasolver-plugin-scope');
+            const pluginScope = pluginScopeEl ? pluginScopeEl.value : 'selected';
+
+            formData.append('text', text);
+            formData.append('mode', 'decode');
+            formData.append('strict', strict);
+            formData.append('embedded', embedded ? 'true' : 'false');
+            formData.append('plugin_scope', pluginScope);
+            formData.append('decode_plugins', JSON.stringify(selectedPlugins));
+            if (sessionId) formData.append('ws_session_id', sessionId);
+
+            // Optionnel: clé
+            const keyValueElement = document.getElementById('metasolver-key');
+            const keyValue = keyValueElement ? keyValueElement.value.trim() : "";
+            if (keyValue) formData.append('key', keyValue);
+
+            // 4) Afficher la zone de résultat + statut live (comme le flux normal)
+            const resultElement = document.getElementById('metasolver-result');
+            const resultContentElement = document.getElementById('metasolver-result-content');
+            resultElement.classList.remove('hidden');
+            resultContentElement.innerHTML = '';
+
+            // 5) Appeler l'API d'exécution
+            const resp = await fetch('/api/plugins/metadetection/execute', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            // Si le backend renvoie un ws_session_id, s'y abonner si pas fait
+            if (data && data.ws_session_id && window.wsService) {
+                this._metaWsSessionId = data.ws_session_id;
+                window.wsService.joinSession(data.ws_session_id);
+            }
+
+            // 6) Rendu final du résultat (comme d’habitude)
+            resultContentElement.innerHTML = await this.formatMetaDetectionResults(data.result || data);
+        } catch (e) {
+            console.warn('Décodage sélection échoué:', e);
+        }
+    }
+
     connectWebSocketProgressForMetaSolver() {
         // Branche les handlers globaux une seule fois
         if (!window.wsService || this._metaWsHandlersInitialized) return;
@@ -1734,6 +1800,12 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                 const testedHtml = tested.length ? `
                     <div class="bg-gray-700 rounded-lg p-4 mb-3">
                         <h3 class="text-md font-medium text-blue-300 mb-2">Plugins testés (${tested.length})</h3>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs text-gray-400">Cochez les plugins à utiliser pour le décryptage</div>
+                            <div class="flex gap-2">
+                                <button id="btn-decrypt-selected" class="bg-green-600 hover:bg-green-700 text-white text-xs py-1 px-2 rounded disabled:opacity-50" disabled>Décoder la sélection</button>
+                            </div>
+                        </div>
                         <div id="metasolver-tested-table" class="w-full"></div>
                     </div>` : '';
                 const skippedHtml = skipped.length ? `
@@ -1751,6 +1823,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                         if (!tableEl || typeof Tabulator === 'undefined') return;
                         const rows = tested.map((t, idx) => ({
                             id: idx + 1,
+                            selected: false,
                             plugin: t.plugin,
                             scorePct: Math.round((t.score || 0) * 100),
                             fragments: t.fragments_count ?? 0,
@@ -1759,12 +1832,21 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                             can_decode: !!t.can_decode,
                             is_match: !!t.is_match
                         }));
-                        new Tabulator(tableEl, {
+                        const table = new Tabulator(tableEl, {
                             data: rows,
                             layout: "fitColumns",
                             height: 280,
                             placeholder: "Aucun plugin testé",
                             columns: [
+                                { title: "", field: "selected", hozAlign: "center", width: 40, headerSort: false, formatter: (cell) => {
+                                        const value = !!cell.getValue();
+                                        return `<input type=\"checkbox\" ${value ? 'checked' : ''} />`;
+                                    },
+                                    cellClick: (e, cell) => {
+                                        const current = !!cell.getValue();
+                                        cell.setValue(!current, true); // true => mutate table data
+                                    }
+                                },
                                 { title: "Plugin", field: "plugin", headerSort: true },
                                 { title: "Score", field: "scorePct", hozAlign: "right", headerSort: true, formatter: (cell) => `${cell.getValue()}%` },
                                 { title: "Fragments", field: "fragments", hozAlign: "right", headerSort: true },
@@ -1776,6 +1858,25 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
                                 } }
                             ]
                         });
+
+                        // Gérer le bouton "Décoder la sélection"
+                        const btn = document.getElementById('btn-decrypt-selected');
+                        const updateButtonState = () => {
+                            const selectedRows = table.getData().filter(r => r.selected && r.can_decode);
+                            if (btn) btn.disabled = selectedRows.length === 0;
+                        };
+                        table.on("cellEdited", (cell) => {
+                            if (cell.getField() === 'selected') updateButtonState();
+                        });
+                        updateButtonState();
+
+                        if (btn) {
+                            btn.addEventListener('click', async () => {
+                                const selected = table.getData().filter(r => r.selected && r.can_decode).map(r => r.plugin);
+                                if (!selected.length) return;
+                                await this.decodeSelectedPlugins(selected);
+                            });
+                        }
                     } catch (e) { console.warn('Tabulator init (tested) échoué:', e); }
                 }, 0);
             }
