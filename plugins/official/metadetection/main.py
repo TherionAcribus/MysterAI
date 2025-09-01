@@ -191,6 +191,14 @@ class MetaDetectionPlugin:
             }
             
         elif mode == "decode":
+            # Récupérer plugin_scope depuis les inputs
+            scope = inputs.get("plugin_scope", "selected")
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"MetaDetection.decode: plugin_scope={scope}")
+            except Exception:
+                pass
+
             # Récupérer les résultats de décodage (format standardisé uniquement)
             emit_progress('decode_start', 'Début du décodage...', 10, {
                 'phase': 'decode',
@@ -206,7 +214,8 @@ class MetaDetectionPlugin:
                 enable_bruteforce,
                 ws_session_id=ws_session_id,
                 ws_service=ws_service,
-                origin_coords=origin_coords
+                origin_coords=origin_coords,
+                plugin_scope=scope
             )
             
             # Mesure du temps d'exécution
@@ -400,7 +409,7 @@ class MetaDetectionPlugin:
             }
         }
 
-    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None, origin_coords: dict | None = None) -> dict:
+    def decode_code(self, plugin_name: str = None, text: str = "", strict: str = "smooth", allowed_chars: list = None, embedded: bool = False, key: str = None, brute_force: bool = True, ws_session_id: str | None = None, ws_service=None, origin_coords: dict | None = None, plugin_scope: str = "selected") -> dict:
         """
         Décode un texte en utilisant soit un plugin spécifique, soit tous les plugins ayant une méthode execute.
         
@@ -419,40 +428,28 @@ class MetaDetectionPlugin:
         
         # Liste des plugins à exclure pour éviter les boucles récursives
         excluded_plugins = ["metadetection"]
-        
-        # Liste des plugins à utiliser pour le test (phase de développement)
-        included_plugins = [
-            "abaddon_code",
-            "letter_value",
-            "kenny_code",
-            "roman_numerals",
-            "wherigo_reverse_decoder",
-            "gronsfeld_cipher",
-            "beaufort_cipher",
-            "bifid_delastelle",
-            "vigenere_cipher",
-            "multiplicative_code",
-            "bacon_code",
-            "modulo_cipher",
-            "bifid_delastelle",
-            "nihilist_cipher",
-            "tap_code",
-            "polybius_square",
-            "nak_nak_code",
-            "atbash",
-            "chemical_elements",
-            "caesar_code",
-            "morse_code",
-            "alpha_decoder",
-            "checksum_code",
-            "base_converter",
-            "rail_fence_cipher",
-            "ubchi_cipher",
-            "caesar_box_cipher",
-            "consonants_vowels_rank",
-            "shadok_numbers",
-            "fox_code"
-        ]
+
+        # Déterminer si on doit ignorer les overrides utilisateur
+        ignore_overrides = plugin_scope.lower() == "all"
+
+        # Utiliser PluginManager pour obtenir la liste des plugins selon la portée
+        try:
+            plugins_to_test = plugin_manager.get_plugins_for("decode", ignore_overrides=ignore_overrides)
+            # Filtrer les plugins exclus
+            included_plugins = [p for p in plugins_to_test if p not in excluded_plugins]
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"MetaDetection.decode_code: scope={plugin_scope}, ignore_overrides={ignore_overrides}, resolved_plugins={len(included_plugins)}")
+            except Exception:
+                pass
+        except Exception as e:
+            # Fallback vers une liste vide si PluginManager échoue
+            included_plugins = []
+            try:
+                from loguru import logger as _lg
+                _lg.error(f"MetaDetection.decode_code: échec récupération plugins via PluginManager: {e}")
+            except Exception:
+                pass
         
         # Structure du résultat standardisé
         result_structure = {
