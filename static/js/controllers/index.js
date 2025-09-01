@@ -195,8 +195,9 @@ async function initializeSettingsControllers() {
             static values = { mode: String }
             static targets = [
                 ...window.BaseSettingsController.targets,
-                "pluginList", "analysisTab", "decodeTab", "selectAllAnalysis", "selectAllDecode",
-                "deselectAllAnalysis", "deselectAllDecode", "analysisCount", "decodeCount"
+                "pluginList", "analysisPluginList", "decodePluginList", "analysisTab", "decodeTab",
+                "selectAllAnalysis", "selectAllDecode", "deselectAllAnalysis", "deselectAllDecode",
+                "analysisCount", "decodeCount"
             ]
 
             apiEndpoint = '/api/settings/plugins'
@@ -204,7 +205,15 @@ async function initializeSettingsControllers() {
             connect() {
                 console.log('🔗 PluginSettingsController connecté !');
                 super.connect();
-                this.currentTab = 'analysis'; // Onglet par défaut
+
+                // Initialiser l'onglet actif en fonction du mode
+                const mode = this.hasModeValue ? (this.modeValue || 'both') : 'both';
+                if (mode === 'decode') {
+                    this.currentTab = 'decode';
+                } else {
+                    this.currentTab = 'analysis'; // Onglet par défaut
+                }
+
                 this.updateTabVisibility();
             }
 
@@ -326,7 +335,13 @@ async function initializeSettingsControllers() {
                     `;
                 });
 
-                if (this.hasPluginListTarget) {
+                // Utiliser le bon target selon l'onglet actif
+                if (this.currentTab === 'analysis' && this.hasAnalysisPluginListTarget) {
+                    this.analysisPluginListTarget.innerHTML = html;
+                } else if (this.currentTab === 'decode' && this.hasDecodePluginListTarget) {
+                    this.decodePluginListTarget.innerHTML = html;
+                } else if (this.hasPluginListTarget) {
+                    // Fallback pour la compatibilité
                     this.pluginListTarget.innerHTML = html;
                 }
             }
@@ -482,10 +497,16 @@ async function initializeSettingsControllers() {
             }
 
             setAllCheckboxes(type, checked) {
-                const checkboxes = this.element.querySelectorAll(`input[type="checkbox"][data-type="${type}"]`);
-                checkboxes.forEach(checkbox => {
+                // Chercher les checkboxes dans tous les onglets, même ceux cachés
+                const allCheckboxes = this.element.querySelectorAll(`input[type="checkbox"][data-type="${type}"]`);
+                console.log(`🔍 setAllCheckboxes: trouvé ${allCheckboxes.length} checkboxes de type "${type}"`);
+
+                allCheckboxes.forEach(checkbox => {
+                    const wasChecked = checkbox.checked;
                     checkbox.checked = checked;
+                    console.log(`🔄 Checkbox ${checkbox.dataset.plugin}: ${wasChecked} → ${checked}`);
                 });
+
                 this.settingChanged();
             }
 
