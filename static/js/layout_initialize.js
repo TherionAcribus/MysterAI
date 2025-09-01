@@ -1057,6 +1057,22 @@ function initializeLayout() {
             container.getElement().load(url);
         });
 
+        // Enregistrer un composant générique pour charger un panneau de settings interne
+        mainLayout.registerComponent('settings-panel', function(container, state) {
+            try {
+                const url = (state && state.url) || '/api/settings/plugins_panel';
+                container.getElement().load(url);
+            } catch (e) {
+                container.getElement().html(`
+                    <div class="w-full h-full bg-gray-900 overflow-auto p-4">
+                        <div class="flex items-center justify-center h-full">
+                            <div class="text-red-500">Erreur lors du chargement du panneau: ${e && e.message ? e.message : 'inconnue'}</div>
+                        </div>
+                    </div>
+                `);
+            }
+        });
+
         // Enregistrer le composant multi-solver
         mainLayout.registerComponent('multi-solver', function(container, state) {
             console.log("Création du composant multi-solver", state);

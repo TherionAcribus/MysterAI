@@ -599,6 +599,7 @@ def execute_metadetection():
         embedded = request.form.get('embedded', 'false').lower() == 'true'
         plugin_name = request.form.get('plugin_name', None)  # Optionnel, pour le décodage avec un plugin spécifique
         key = request.form.get('key', None)
+        plugin_scope = request.form.get('plugin_scope')  # 'selected' | 'all'
         # Optionnel: coordonnées d'origine au format JSON { ddm_lat, ddm_lon }
         origin_coords_json = request.form.get('origin_coords')
         origin_coords = None
@@ -627,7 +628,7 @@ def execute_metadetection():
             return jsonify({'error': 'Aucun texte fourni'}), 400
             
         # Créer une session si non fournie
-        if ws_service and not ws_session_id:
+        if ws_service and (ws_session_id is None or ws_session_id == ""):
             try:
                 ws_session_id = ws_service.create_session('metadetection')
             except Exception:
@@ -656,6 +657,13 @@ def execute_metadetection():
             'strict': strict,  # Transmettre le paramètre strict tel quel ('strict' ou 'smooth')
             'ws_session_id': ws_session_id
         }
+        if plugin_scope:
+            inputs['plugin_scope'] = plugin_scope
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"routes.plugins.execute_metadetection: plugin_scope={plugin_scope}")
+            except Exception:
+                pass
         
         # Ajouter les caractères autorisés si fournis
         if allowed_chars:

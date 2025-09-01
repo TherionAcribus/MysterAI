@@ -218,7 +218,7 @@ class PluginManager:
     # ---------------------------------------------------------
     # Sélection dynamique des plugins selon rôle et préférences
     # ---------------------------------------------------------
-    def get_plugins_for(self, role: str = "analysis") -> List[str]:
+    def get_plugins_for(self, role: str = "analysis", ignore_overrides: bool = False) -> List[str]:
         """
         Retourne une liste de noms de plugins à utiliser pour un rôle donné.
         role: "analysis" | "decode"
@@ -234,20 +234,55 @@ class PluginManager:
         enable_key = f"plugins.{role}.enabled"
         disable_key = f"plugins.{role}.disabled"
 
-        # Lire préférences utilisateur (JSON liste de noms)
-        try:
-            enabled_list = AppConfig.get_value(enable_key, "[]")
-            disabled_list = AppConfig.get_value(disable_key, "[]")
-        except Exception:
-            enabled_list = "[]"
-            disabled_list = "[]"
-        try:
-            import json as _json
-            enabled_names: List[str] = _json.loads(enabled_list) if isinstance(enabled_list, str) else (enabled_list or [])
-            disabled_names: List[str] = _json.loads(disabled_list) if isinstance(disabled_list, str) else (disabled_list or [])
-        except Exception:
+        def _parse_name_list(raw_val) -> List[str]:
+            if isinstance(raw_val, list):
+                return [str(x) for x in raw_val]
+            if isinstance(raw_val, str):
+                val = raw_val.strip()
+                if not val:
+                    return []
+                # Essayer JSON pur
+                try:
+                    import json as _json
+                    parsed = _json.loads(val)
+                    if isinstance(parsed, list):
+                        return [str(x) for x in parsed]
+                except Exception:
+                    pass
+                # Essayer en remplaçant quotes simples par doubles (format style Python)
+                try:
+                    import json as _json
+                    normalized = val.replace("'", '"')
+                    parsed2 = _json.loads(normalized)
+                    if isinstance(parsed2, list):
+                        return [str(x) for x in parsed2]
+                except Exception:
+                    pass
+                # Fallback: parser [a, b, c]
+                if val.startswith('[') and val.endswith(']'):
+                    inner = val[1:-1].strip()
+                    if not inner:
+                        return []
+                    return [s.strip().strip("'\"") for s in inner.split(',') if s.strip()]
+            return []
+
+        if ignore_overrides:
             enabled_names = []
             disabled_names = []
+        else:
+            try:
+                enabled_raw = AppConfig.get_value(enable_key, [])
+                disabled_raw = AppConfig.get_value(disable_key, [])
+            except Exception:
+                enabled_raw = []
+                disabled_raw = []
+            enabled_names = _parse_name_list(enabled_raw)
+            disabled_names = _parse_name_list(disabled_raw)
+
+        try:
+            logger.debug(f"PluginManager.get_plugins_for(role={role}, ignore_overrides={ignore_overrides}) enabled={len(enabled_names)} disabled={len(disabled_names)}")
+        except Exception:
+            pass
 
         allowed: List[str] = []
 
@@ -260,6 +295,7 @@ class PluginManager:
 
         name_to_record = {p.name: p for p in all_plugins}
 
+        eligible_count = 0
         for name, wrapper in self.loaded_plugins.items():
             # 1) Métadonnées
             metadata_dict = None
@@ -289,16 +325,21 @@ class PluginManager:
                     decode_cap = bool(inst and hasattr(inst, "execute"))
                 if not decode_cap:
                     continue
+            eligible_count += 1
 
-            # 3) Defaults include
-            default_include = bool(defaults.get("include_in_analysis" if role == "analysis" else "include_in_decode", True))
+            # 3) Defaults include (ignorés si ignore_overrides=True → inclure tous les éligibles)
+            if ignore_overrides:
+                default_include = True
+            else:
+                default_include = bool(defaults.get("include_in_analysis" if role == "analysis" else "include_in_decode", True))
 
             # 4) Overrides utilisateur
             included = default_include
-            if name in enabled_names:
-                included = True
-            if name in disabled_names:
-                included = False
+            if not ignore_overrides:
+                if name in enabled_names:
+                    included = True
+                if name in disabled_names:
+                    included = False
 
             # 5) Exigence spécifique au rôle
             if included and role == "analysis":
@@ -308,6 +349,10 @@ class PluginManager:
             if included:
                 allowed.append(name)
 
+        try:
+            logger.debug(f"PluginManager.get_plugins_for → eligible={eligible_count} allowed={len(allowed)} (role={role}, ignore_overrides={ignore_overrides})")
+        except Exception:
+            pass
         return allowed
 
     def discover_plugins(self):

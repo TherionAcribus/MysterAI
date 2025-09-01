@@ -188,10 +188,11 @@ async function initializeSettingsControllers() {
         
         app.register('formula-settings', FormulaSettingsController);
         console.log('✅ FormulaSettingsController enregistré avec succès');
-
+        
         // 4. Créer et enregistrer le contrôleur des paramètres des plugins
         console.log('🔧 Création du contrôleur des paramètres des plugins...');
         class PluginSettingsController extends window.BaseSettingsController {
+            static values = { mode: String }
             static targets = [
                 ...window.BaseSettingsController.targets,
                 "pluginList", "analysisTab", "decodeTab", "selectAllAnalysis", "selectAllDecode",
@@ -208,12 +209,8 @@ async function initializeSettingsControllers() {
             }
 
             gatherSettings() {
-                const settings = {
-                    analysis_enabled_plugins: [],
-                    analysis_disabled_plugins: [],
-                    decode_enabled_plugins: [],
-                    decode_disabled_plugins: []
-                };
+                const mode = this.hasModeValue ? (this.modeValue || 'both') : 'both';
+                const settings = {};
 
                 // Collecter les états des checkboxes
                 const checkboxes = this.element.querySelectorAll('input[type="checkbox"][data-plugin]');
@@ -223,16 +220,18 @@ async function initializeSettingsControllers() {
                     const isEnabled = checkbox.checked;
 
                     if (isAnalysis) {
-                        if (isEnabled) {
-                            settings.analysis_enabled_plugins.push(pluginName);
-                        } else {
-                            settings.analysis_disabled_plugins.push(pluginName);
+                        if (mode !== 'decode') {
+                            if (!('analysis_enabled_plugins' in settings)) settings.analysis_enabled_plugins = [];
+                            if (!('analysis_disabled_plugins' in settings)) settings.analysis_disabled_plugins = [];
+                            if (isEnabled) settings.analysis_enabled_plugins.push(pluginName);
+                            else settings.analysis_disabled_plugins.push(pluginName);
                         }
                     } else {
-                        if (isEnabled) {
-                            settings.decode_enabled_plugins.push(pluginName);
-                        } else {
-                            settings.decode_disabled_plugins.push(pluginName);
+                        if (mode !== 'analysis') {
+                            if (!('decode_enabled_plugins' in settings)) settings.decode_enabled_plugins = [];
+                            if (!('decode_disabled_plugins' in settings)) settings.decode_disabled_plugins = [];
+                            if (isEnabled) settings.decode_enabled_plugins.push(pluginName);
+                            else settings.decode_disabled_plugins.push(pluginName);
                         }
                     }
                 });
@@ -245,18 +244,32 @@ async function initializeSettingsControllers() {
                 console.log('🔄 PluginSettings updateUI appelée avec:', settings);
 
                 const availablePlugins = this.availablePlugins || [];
-                const enabledAnalysis = new Set(settings.analysis_enabled_plugins || []);
-                const disabledAnalysis = new Set(settings.analysis_disabled_plugins || []);
-                const enabledDecode = new Set(settings.decode_enabled_plugins || []);
-                const disabledDecode = new Set(settings.decode_disabled_plugins || []);
+                const mode = this.hasModeValue ? (this.modeValue || 'both') : 'both';
+                const enabledAnalysisArr = this.parseListSetting(settings.analysis_enabled_plugins);
+                const disabledAnalysisArr = this.parseListSetting(settings.analysis_disabled_plugins);
+                const enabledDecodeArr = this.parseListSetting(settings.decode_enabled_plugins);
+                const disabledDecodeArr = this.parseListSetting(settings.decode_disabled_plugins);
 
-                // Mettre à jour les compteurs d'aperçu
-                this.updateOverviewCounts(settings, availablePlugins);
+                const enabledAnalysis = new Set(enabledAnalysisArr);
+                const disabledAnalysis = new Set(disabledAnalysisArr);
+                const enabledDecode = new Set(enabledDecodeArr);
+                const disabledDecode = new Set(disabledDecodeArr);
+
+                // Filtrer les plugins selon le mode (analysis/decode/both)
+                let filteredPlugins = availablePlugins;
+                if (mode === 'analysis') {
+                    filteredPlugins = availablePlugins.filter(p => p.can_analyze);
+                } else if (mode === 'decode') {
+                    filteredPlugins = availablePlugins.filter(p => p.can_decode);
+                }
+
+                // Mettre à jour les compteurs d'aperçu avec la liste filtrée
+                this.updateOverviewCounts(settings, filteredPlugins);
 
                 // Générer le HTML pour la liste des plugins
                 let html = '';
 
-                availablePlugins.forEach(plugin => {
+                filteredPlugins.forEach(plugin => {
                     const analysisEnabled = enabledAnalysis.has(plugin.name);
                     const analysisDisabled = disabledAnalysis.has(plugin.name);
                     const decodeEnabled = enabledDecode.has(plugin.name);
@@ -285,7 +298,7 @@ async function initializeSettingsControllers() {
                                     </div>
                                 </div>
                                 <div class="flex flex-col gap-2 ml-4">
-                                    ${plugin.can_analyze ? `
+                                    ${plugin.can_analyze && mode !== 'decode' ? `
                                         <label class="flex items-center gap-2 text-sm">
                                             <input type="checkbox"
                                                    data-plugin="${plugin.name}"
@@ -295,8 +308,8 @@ async function initializeSettingsControllers() {
                                                    class="rounded">
                                             <span class="text-gray-300">Analyse</span>
                                         </label>
-                                    ` : '<div class="h-6"></div>'}
-                                    ${plugin.can_decode ? `
+                                    ` : ''}
+                                    ${plugin.can_decode && mode !== 'analysis' ? `
                                         <label class="flex items-center gap-2 text-sm">
                                             <input type="checkbox"
                                                    data-plugin="${plugin.name}"
@@ -306,7 +319,7 @@ async function initializeSettingsControllers() {
                                                    class="rounded">
                                             <span class="text-gray-300">Décryptage</span>
                                         </label>
-                                    ` : '<div class="h-6"></div>'}
+                                    ` : ''}
                                 </div>
                             </div>
                         </div>
@@ -316,6 +329,36 @@ async function initializeSettingsControllers() {
                 if (this.hasPluginListTarget) {
                     this.pluginListTarget.innerHTML = html;
                 }
+            }
+
+            // Convertit une valeur de paramètre (array ou string) en array robuste
+            parseListSetting(value) {
+                if (Array.isArray(value)) return value;
+                if (typeof value === 'string') {
+                    const trimmed = value.trim();
+                    if (!trimmed) return [];
+                    // Essayer JSON.parse tel quel
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (e1) {
+                        // Essayer en remplaçant les quotes simples par doubles (format Python-like)
+                        try {
+                            const normalized = trimmed.replace(/'/g, '"');
+                            const parsed2 = JSON.parse(normalized);
+                            return Array.isArray(parsed2) ? parsed2 : [];
+                        } catch (e2) {
+                            // Fallback: parser manuellement [a, b, c]
+                            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                                const inner = trimmed.slice(1, -1).trim();
+                                if (!inner) return [];
+                                return inner.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+                            }
+                            return [];
+                        }
+                    }
+                }
+                return [];
             }
 
             getDefaults() {
@@ -631,7 +674,7 @@ async function initializeSettingsControllers() {
 
         // 6. Déclencher l'événement global
         window.dispatchEvent(new CustomEvent('SettingsSystemReady', {
-            detail: {
+            detail: { 
                 controllers: ['general-settings', 'formula-settings', 'plugin-settings', 'plugin-config'],
                 message: 'Système de settings complètement initialisé'
             }

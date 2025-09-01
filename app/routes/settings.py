@@ -915,12 +915,29 @@ def get_plugins_settings_panel():
     """
     logger.info("=== DEBUG: Route /api/settings/plugins_panel appelée ===")
     try:
-        html = render_template('settings/plugins_settings.html')
+        # Si un focus est demandé (?focus=analysis|decode), le transmettre au template
+        focus = request.args.get('focus')
+        html = render_template('settings/plugins_settings.html', focus=focus)
         logger.info("=== DEBUG: Template des paramètres plugins rendu avec succès ===")
         return html
     except Exception as e:
         logger.error(f"=== ERREUR lors du rendu du template plugins: {str(e)} ===")
         return f"Erreur lors du chargement des paramètres plugins: {str(e)}", 500
+
+@settings_bp.route('/plugins_config_panel', methods=['GET'])
+def get_plugins_config_panel():
+    """
+    Retourne le template HTML pour la configuration détaillée (liste à cocher) des plugins
+    """
+    logger.info("=== DEBUG: Route /api/settings/plugins_config_panel appelée ===")
+    try:
+        focus = request.args.get('focus', 'analysis')
+        html = render_template('settings/plugins_config_panel.html', initial_tab=focus)
+        logger.info("=== DEBUG: Template des paramètres plugins (config détaillée) rendu avec succès ===")
+        return html
+    except Exception as e:
+        logger.error(f"=== ERREUR lors du rendu du template plugins_config_panel: {str(e)} ===")
+        return f"Erreur lors du chargement du panneau de configuration des plugins: {str(e)}", 500
 
 @settings_bp.route('/plugins/save', methods=['POST'])
 def save_plugins_settings():

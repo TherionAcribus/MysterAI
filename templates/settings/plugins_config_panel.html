@@ -1,0 +1,115 @@
+<div data-controller="plugin-settings"
+     data-plugin-settings-api-endpoint-value="/api/settings/plugins"
+     data-plugin-settings-mode-value="{{ initial_tab or 'both' }}"
+     class="space-y-6">
+
+    <!-- En-tête avec indicateurs -->
+    <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-200">Configuration des Plugins — Liste à cocher</h3>
+        <div class="flex items-center space-x-4">
+            <div data-plugin-settings-target="loadingIndicator" class="hidden">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+            </div>
+            <span class="text-sm text-gray-500">v<span data-plugin-settings-target="cacheVersion">-</span></span>
+            <span data-plugin-settings-target="syncStatus" class="text-sm text-gray-500">-</span>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div data-plugin-settings-target="notification" class="hidden p-3 rounded-lg"></div>
+
+    {% if (initial_tab or 'both') == 'both' %}
+        <!-- Onglets pour Analyse/Décryptage -->
+        <div class="mb-6">
+            <div class="border-b border-gray-700">
+                <nav class="-mb-px flex space-x-8">
+                    <button data-action="click->plugin-settings#showAnalysisTab"
+                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200
+                                   border-blue-500 text-blue-400 hover:text-blue-300 hover:border-blue-300">
+                        Analyse
+                    </button>
+                    <button data-action="click->plugin-settings#showDecodeTab"
+                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-400 hover:border-gray-400 transition-colors duration-200">
+                        Décryptage
+                    </button>
+                </nav>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Section Analyse (seule si focus=analysis ou both) -->
+    <div data-plugin-settings-target="analysisTab" class="space-y-4 {% if initial_tab == 'decode' %}hidden{% endif %}">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-md font-medium text-gray-200">Plugins utilisés pour l'Analyse</h4>
+            <div class="flex space-x-2">
+                <button data-plugin-settings-target="selectAllAnalysis"
+                        data-action="click->plugin-settings#selectAllAnalysis"
+                        class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                    Tout sélectionner
+                </button>
+                <button data-plugin-settings-target="deselectAllAnalysis"
+                        data-action="click->plugin-settings#deselectAllAnalysis"
+                        class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                    Tout désélectionner
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-4">
+            <div data-plugin-settings-target="pluginList" class="space-y-2">
+                <div class="text-center text-gray-500 py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                    Chargement des plugins...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Décryptage (seule si focus=decode ou both) -->
+    <div data-plugin-settings-target="decodeTab" class="{% if initial_tab == 'analysis' %}hidden{% endif %} space-y-4">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-md font-medium text-gray-200">Plugins utilisés pour le Décryptage</h4>
+            <div class="flex space-x-2">
+                <button data-plugin-settings-target="selectAllDecode"
+                        data-action="click->plugin-settings#selectAllDecode"
+                        class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                    Tout sélectionner
+                </button>
+                <button data-plugin-settings-target="deselectAllDecode"
+                        data-action="click->plugin-settings#deselectAllDecode"
+                        class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                    Tout désélectionner
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-4">
+            <div data-plugin-settings-target="pluginList" class="space-y-2">
+                <div class="text-center text-gray-500 py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                    Chargement des plugins...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="flex justify-between items-center pt-4 border-t border-gray-700">
+        <div class="flex space-x-3">
+            <button data-plugin-settings-target="saveButton"
+                    data-action="click->plugin-settings#manualSave"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                Enregistrer
+            </button>
+            <button data-action="click->plugin-settings#refreshSettings"
+                    class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                Actualiser
+            </button>
+        </div>
+        <button data-action="click->plugin-settings#resetDefaults"
+                class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+            Réinitialiser
+        </button>
+    </div>
+</div>
+

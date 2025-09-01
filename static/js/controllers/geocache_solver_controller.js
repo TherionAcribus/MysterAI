@@ -1155,6 +1155,8 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
         // Récupérer le mode depuis le bouton ou le select
         const mode = event.currentTarget.dataset.mode || document.getElementById('metasolver-mode').value;
         const strict = document.getElementById('metasolver-strict').value;
+        const pluginScopeEl = document.getElementById('metasolver-plugin-scope');
+        const pluginScope = pluginScopeEl ? pluginScopeEl.value : 'selected';
         const embedded = document.getElementById('metasolver-embedded').checked;
         const enableGpsDetection = document.getElementById('metasolver-gps-detection').checked;
         // Nouvelle option : clé éventuelle pour certains plugins
@@ -1204,6 +1206,7 @@ window.GeocacheSolverController = class extends Stimulus.Controller {
             formData.append('mode', mode);
             formData.append('strict', strict);
             formData.append('embedded', embedded ? 'true' : 'false');
+            formData.append('plugin_scope', pluginScope);
             formData.append('enable_gps_detection', enableGpsDetection ? 'true' : 'false');
             // Tenter d'ajouter les coordonnées d'origine de la géocache si disponibles
             try {

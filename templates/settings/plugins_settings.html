@@ -22,11 +22,12 @@
                 quel(s) plugin(s) sont pertinents pour déchiffrer une énigme.
             </p>
             <button
-                data-tab-opener="plugins-analysis-config"
+                data-tab-opener="settings-panel"
                 data-tab-title="Configuration Analyse"
-                data-tab-component="plugin"
+                data-tab-component="settings-panel"
                 data-tab-unique-id="plugins-analysis-config"
-                data-tab-config-pluginname="analysis-config"
+                data-tab-config-url="/api/settings/plugins_config_panel?focus=analysis"
+                data-tab-menu-openboth="Ouvrir les 2 onglets|Afficher Analyse + Décryptage|open-tab|settings-panel&title=Configuration%20Plugins&state=%7B%22url%22%3A%22%2Fapi%2Fsettings%2Fplugins_config_panel%3Ffocus%3Dboth%22%7D"
                 class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
                 <i class="fas fa-cogs mr-2"></i>Configurer l'Analyse
@@ -44,11 +45,12 @@
                 automatiquement les énigmes avec les algorithmes appropriés.
             </p>
             <button
-                data-tab-opener="plugins-decode-config"
+                data-tab-opener="settings-panel"
                 data-tab-title="Configuration Décryptage"
-                data-tab-component="plugin"
+                data-tab-component="settings-panel"
                 data-tab-unique-id="plugins-decode-config"
-                data-tab-config-pluginname="decode-config"
+                data-tab-config-url="/api/settings/plugins_config_panel?focus=decode"
+                data-tab-menu-openboth="Ouvrir les 2 onglets|Afficher Analyse + Décryptage|open-tab|settings-panel&title=Configuration%20Plugins&state=%7B%22url%22%3A%22%2Fapi%2Fsettings%2Fplugins_config_panel%3Ffocus%3Dboth%22%7D"
                 class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
             >
                 <i class="fas fa-cogs mr-2"></i>Configurer le Décryptage

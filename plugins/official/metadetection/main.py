@@ -97,7 +97,14 @@ class MetaDetectionPlugin:
                 'phase': 'detect',
             })
             # Ancien format pour rétrocompatibilité avec l'UI
-            old_result = self.detect_codes(text, strict, allowed_chars, embedded)
+            # Passer plugin_scope si fourni en entrée
+            scope = inputs.get("plugin_scope")
+            try:
+                from loguru import logger as _lg
+                _lg.debug(f"MetaDetection.detect: plugin_scope={scope}")
+            except Exception:
+                pass
+            old_result = self.detect_codes(text, strict, allowed_chars, embedded, plugin_scope=scope or "selected")
             
             # Conversion au nouveau format standardisé
             possible_codes = old_result.get("result", {}).get("possible_codes", [])
@@ -265,7 +272,7 @@ class MetaDetectionPlugin:
                 }
             }
 
-    def detect_codes(self, text: str, strict: bool = True, allowed_chars: list = None, embedded: bool = False) -> dict:
+    def detect_codes(self, text: str, strict: bool = True, allowed_chars: list = None, embedded: bool = False, plugin_scope: str = "selected") -> dict:
         """
         Détecte les codes potentiels dans un texte.
         
@@ -282,7 +289,18 @@ class MetaDetectionPlugin:
         plugin_manager = get_plugin_manager()
         
         # Résolution dynamique des plugins éligibles à l'analyse
-        resolved_plugins = plugin_manager.get_plugins_for(role="analysis")
+        scope = (plugin_scope or "selected").lower()
+        if scope == "all":
+            # Ignorer les overrides pour avoir tous les éligibles
+            resolved_plugins = plugin_manager.get_plugins_for(role="analysis", ignore_overrides=True)
+        else:
+            # Respecter la sélection utilisateur (enabled/disabled)
+            resolved_plugins = plugin_manager.get_plugins_for(role="analysis", ignore_overrides=False)
+        try:
+            from loguru import logger as _lg
+            _lg.debug(f"MetaDetection.detect_codes: scope={scope}, resolved_plugins={len(resolved_plugins)}")
+        except Exception:
+            pass
 
         # Préparer la liste des plugins chargés (hors metadetection) pour indiquer ceux non testés
         all_loaded = [name for name in plugin_manager.loaded_plugins.keys() if name != "metadetection"]
