@@ -29,38 +29,69 @@ def extract_coordinates(soup: BeautifulSoup) -> Tuple[float, float]:
 
 def extract_difficulty_terrain(soup: BeautifulSoup) -> Tuple[float, float]:
     """Extrait la difficulté et le terrain de la géocache"""
-    difficulty_text = soup.find(text=lambda t: t and t.strip() == 'Difficulty:')
-    terrain_text = soup.find(text=lambda t: t and t.strip() == 'Terrain:')
-    
+    # Supporter FR/EN et variations d'espaces/retours ligne
+    def is_label(text: str) -> bool:
+        if not text:
+            return False
+        t = text.strip().lower()
+        return t in ('difficulty:', 'difficulté:', 'terrain:')
+
+    # Chercher les noeuds de texte des labels
+    difficulty_text = soup.find(string=lambda t: t and t.strip().lower() in ('difficulty:', 'difficulté:'))
+    terrain_text = soup.find(string=lambda t: t and t.strip().lower() == 'terrain:')
+
     logger.debug(f"Texte difficulté trouvé: {difficulty_text}")
     logger.debug(f"Texte terrain trouvé: {terrain_text}")
-    
-    if not difficulty_text or not terrain_text:
-        raise Exception("Impossible de trouver les labels difficulté/terrain. Êtes-vous connecté sur geocaching.com ?")
-    
-    # Les valeurs sont dans l'attribut alt des images
-    difficulty_img = difficulty_text.find_next('img')
-    terrain_img = terrain_text.find_next('img')
-    
+
+    difficulty_img = None
+    terrain_img = None
+
+    if difficulty_text:
+        difficulty_img = difficulty_text.find_next('img')
+    if terrain_text:
+        terrain_img = terrain_text.find_next('img')
+
+    # Fallback: utiliser le conteneur standard si les labels ne sont pas trouvés (ou images manquantes)
+    if not difficulty_img or not terrain_img:
+        container = soup.find('div', {'id': 'ctl00_ContentBody_diffTerr'})
+        logger.debug(f"Conteneur diffTerr: {container is not None}")
+        if container:
+            # Dans ce conteneur, il y a deux <dl>; le premier pour Difficulty/Difficulté, le second pour Terrain
+            dls = container.find_all('dl')
+            if len(dls) >= 2:
+                try:
+                    if not difficulty_img:
+                        difficulty_img = dls[0].find('img')
+                    if not terrain_img:
+                        terrain_img = dls[1].find('img')
+                except Exception:
+                    pass
+
     logger.debug(f"Image difficulté trouvée: {difficulty_img}")
     logger.debug(f"Image terrain trouvée: {terrain_img}")
-    
+
     if not difficulty_img or not terrain_img:
         raise Exception("Impossible de trouver les images de difficulté/terrain")
-    
+
     # Extraire les valeurs des attributs alt (format: "X out of 5" ou "X.5 out of 5")
-    difficulty_value = difficulty_img['alt'].split()[0]
-    terrain_value = terrain_img['alt'].split()[0]
-    
+    difficulty_alt = difficulty_img.get('alt', '').strip()
+    terrain_alt = terrain_img.get('alt', '').strip()
+
+    if not difficulty_alt or not terrain_alt:
+        raise Exception("Attribut alt manquant pour difficulté/terrain")
+
+    difficulty_value = difficulty_alt.split()[0]
+    terrain_value = terrain_alt.split()[0]
+
     logger.debug(f"Valeur difficulté: '{difficulty_value}'")
     logger.debug(f"Valeur terrain: '{terrain_value}'")
-    
+
     if not difficulty_value or not terrain_value:
         raise Exception("Les valeurs de difficulté/terrain sont vides")
-    
+
     difficulty = float(difficulty_value)
     terrain = float(terrain_value)
-    
+
     logger.debug(f"Difficulté: {difficulty}, Terrain: {terrain}")
     return difficulty, terrain
 
